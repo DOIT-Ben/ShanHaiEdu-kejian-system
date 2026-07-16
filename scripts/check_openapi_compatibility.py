@@ -1,0 +1,398 @@
+#!/usr/bin/env python3
+"""Reject high-confidence breaking changes to the shared OpenAPI contract."""
+
+from __future__ import annotations
+
+import argparse
+import subprocess
+import sys
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+ROOT = Path(__file__).resolve().parents[1]
+CONTRACT_PATH = Path("contracts/api-surface.openapi.yaml")
+HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
+
+
+def load_yaml_text(text: str) -> dict[str, Any]:
+    document = yaml.safe_load(text)
+    if not isinstance(document, dict):
+        raise ValueError("OpenAPI document must be an object")
+    return document
+
+
+def load_base_contract(base_ref: str) -> dict[str, Any]:
+    result = subprocess.run(
+        ["git", "show", f"{base_ref}:{CONTRACT_PATH.as_posix()}"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    return load_yaml_text(result.stdout)
+
+
+def resolve_local_ref(document: Mapping[str, Any], value: Any) -> Any:
+    if not isinstance(value, dict) or set(value) != {"$ref"}:
+        return value
+    reference = value["$ref"]
+    if not isinstance(reference, str) or not reference.startswith("#/"):
+        return value
+    resolved: Any = document
+    for token in reference[2:].split("/"):
+        key = token.replace("~1", "/").replace("~0", "~")
+        if not isinstance(resolved, Mapping) or key not in resolved:
+            return value
+        resolved = resolved[key]
+    return resolved
+
+
+def operation_map(document: Mapping[str, Any]) -> dict[tuple[str, str], dict[str, Any]]:
+    operations: dict[tuple[str, str], dict[str, Any]] = {}
+    paths = document.get("paths", {})
+    if not isinstance(paths, Mapping):
+        return operations
+    for path, path_item in paths.items():
+        if not isinstance(path, str) or not isinstance(path_item, Mapping):
+            continue
+        for method, operation in path_item.items():
+            if method in HTTP_METHODS and isinstance(operation, dict):
+                operations[(path, method)] = operation
+    return operations
+
+
+def parameter_map(
+    document: Mapping[str, Any],
+    path: str,
+    operation: Mapping[str, Any],
+) -> dict[tuple[str, str], Mapping[str, Any]]:
+    parameters: dict[tuple[str, str], Mapping[str, Any]] = {}
+    paths = document.get("paths", {})
+    path_item = paths.get(path, {}) if isinstance(paths, Mapping) else {}
+    parameter_sources = (
+        path_item.get("parameters", []) if isinstance(path_item, Mapping) else [],
+        operation.get("parameters", []),
+    )
+    for raw_parameters in parameter_sources:
+        if not isinstance(raw_parameters, list):
+            continue
+        for raw_parameter in raw_parameters:
+            parameter = resolve_local_ref(document, raw_parameter)
+            if not isinstance(parameter, Mapping):
+                continue
+            name = parameter.get("name")
+            location = parameter.get("in")
+            if isinstance(name, str) and isinstance(location, str):
+                parameters[(location, name)] = parameter
+    return parameters
+
+
+def compare_schema_structure(
+    base_document: Mapping[str, Any],
+    current_document: Mapping[str, Any],
+    resolved_base: Mapping[str, Any],
+    resolved_current: Mapping[str, Any],
+    location: str,
+    errors: list[str],
+) -> None:
+    base_required = set(resolved_base.get("required", []))
+    current_required = set(resolved_current.get("required", []))
+    if base_required != current_required:
+        errors.append(f"{location}: required properties changed")
+
+    base_properties = resolved_base.get("properties", {})
+    current_properties = resolved_current.get("properties", {})
+    if isinstance(base_properties, Mapping):
+        if not isinstance(current_properties, Mapping):
+            errors.append(f"{location}: object properties were removed")
+            return
+        for name, property_schema in base_properties.items():
+            if name not in current_properties:
+                errors.append(f"{location}: property removed: {name}")
+                continue
+            compare_schema(
+                base_document,
+                current_document,
+                property_schema,
+                current_properties[name],
+                f"{location}.{name}",
+                errors,
+            )
+
+    base_items = resolved_base.get("items")
+    current_items = resolved_current.get("items")
+    if base_items is not None:
+        if current_items is None:
+            errors.append(f"{location}: array items schema removed")
+        else:
+            compare_schema(
+                base_document,
+                current_document,
+                base_items,
+                current_items,
+                f"{location}[]",
+                errors,
+            )
+
+
+def compare_schema(
+    base_document: Mapping[str, Any],
+    current_document: Mapping[str, Any],
+    base_schema: Any,
+    current_schema: Any,
+    location: str,
+    errors: list[str],
+) -> None:
+    resolved_base = resolve_local_ref(base_document, base_schema)
+    resolved_current = resolve_local_ref(current_document, current_schema)
+    if not isinstance(resolved_base, Mapping) or not isinstance(resolved_current, Mapping):
+        if resolved_base != resolved_current:
+            errors.append(f"{location}: schema changed incompatibly")
+        return
+
+    for keyword in ("type", "const"):
+        if keyword in resolved_base and resolved_base.get(keyword) != resolved_current.get(keyword):
+            errors.append(f"{location}: {keyword} changed")
+
+    base_enum = resolved_base.get("enum")
+    current_enum = resolved_current.get("enum")
+    if isinstance(base_enum, list) and (
+        not isinstance(current_enum, list) or set(base_enum) != set(current_enum)
+    ):
+        errors.append(f"{location}: enum values changed")
+    compare_schema_structure(
+        base_document,
+        current_document,
+        resolved_base,
+        resolved_current,
+        location,
+        errors,
+    )
+
+
+def compare_content(
+    base_document: Mapping[str, Any],
+    current_document: Mapping[str, Any],
+    base_container: Any,
+    current_container: Any,
+    location: str,
+    errors: list[str],
+) -> None:
+    resolved_base = resolve_local_ref(base_document, base_container)
+    resolved_current = resolve_local_ref(current_document, current_container)
+    if not isinstance(resolved_base, Mapping):
+        return
+    if not isinstance(resolved_current, Mapping):
+        errors.append(f"{location}: definition removed")
+        return
+
+    base_content = resolved_base.get("content", {})
+    current_content = resolved_current.get("content", {})
+    if not isinstance(base_content, Mapping):
+        return
+    if not isinstance(current_content, Mapping):
+        errors.append(f"{location}: content removed")
+        return
+    for media_type, base_media in base_content.items():
+        current_media = current_content.get(media_type)
+        if not isinstance(base_media, Mapping):
+            continue
+        if not isinstance(current_media, Mapping):
+            errors.append(f"{location}: media type removed: {media_type}")
+            continue
+        compare_schema(
+            base_document,
+            current_document,
+            base_media.get("schema", {}),
+            current_media.get("schema", {}),
+            f"{location} {media_type}",
+            errors,
+        )
+
+
+def compare_parameters(
+    base_document: Mapping[str, Any],
+    current_document: Mapping[str, Any],
+    path: str,
+    base_operation: Mapping[str, Any],
+    current_operation: Mapping[str, Any],
+    label: str,
+    errors: list[str],
+) -> None:
+    base_parameters = parameter_map(base_document, path, base_operation)
+    current_parameters = parameter_map(current_document, path, current_operation)
+    for parameter_key, base_parameter in base_parameters.items():
+        current_parameter = current_parameters.get(parameter_key)
+        if current_parameter is None:
+            errors.append(f"{label}: parameter removed: {parameter_key}")
+            continue
+        if not base_parameter.get("required") and current_parameter.get("required"):
+            errors.append(f"{label}: parameter became required: {parameter_key}")
+        compare_schema(
+            base_document,
+            current_document,
+            base_parameter.get("schema", {}),
+            current_parameter.get("schema", {}),
+            f"{label} parameter {parameter_key}",
+            errors,
+        )
+    for parameter_key, current_parameter in current_parameters.items():
+        if parameter_key not in base_parameters and current_parameter.get("required"):
+            errors.append(f"{label}: required parameter added: {parameter_key}")
+
+
+def compare_request_body(
+    base_document: Mapping[str, Any],
+    current_document: Mapping[str, Any],
+    base_operation: Mapping[str, Any],
+    current_operation: Mapping[str, Any],
+    label: str,
+    errors: list[str],
+) -> None:
+    base_body = resolve_local_ref(base_document, base_operation.get("requestBody"))
+    current_body = resolve_local_ref(current_document, current_operation.get("requestBody"))
+    if base_body is None:
+        if isinstance(current_body, Mapping) and current_body.get("required"):
+            errors.append(f"{label}: required request body added")
+        return
+    if current_body is None:
+        errors.append(f"{label}: request body removed")
+        return
+    if not isinstance(base_body, Mapping) or not isinstance(current_body, Mapping):
+        return
+    if not base_body.get("required") and current_body.get("required"):
+        errors.append(f"{label}: request body became required")
+    compare_content(
+        base_document,
+        current_document,
+        base_body,
+        current_body,
+        f"{label} request body",
+        errors,
+    )
+
+
+def compare_responses(
+    base_document: Mapping[str, Any],
+    current_document: Mapping[str, Any],
+    base_operation: Mapping[str, Any],
+    current_operation: Mapping[str, Any],
+    label: str,
+    errors: list[str],
+) -> None:
+    base_responses = base_operation.get("responses", {})
+    current_responses = current_operation.get("responses", {})
+    if not isinstance(base_responses, Mapping):
+        return
+    if not isinstance(current_responses, Mapping):
+        errors.append(f"{label}: responses removed")
+        return
+    for status, base_response in base_responses.items():
+        if status not in current_responses:
+            errors.append(f"{label}: response removed: {status}")
+            continue
+        compare_content(
+            base_document,
+            current_document,
+            base_response,
+            current_responses[status],
+            f"{label} response {status}",
+            errors,
+        )
+
+
+def compare_operations(
+    base_document: Mapping[str, Any],
+    current_document: Mapping[str, Any],
+    errors: list[str],
+) -> None:
+    base_operations = operation_map(base_document)
+    current_operations = operation_map(current_document)
+    for key, base_operation in base_operations.items():
+        path, method = key
+        label = f"{method.upper()} {path}"
+        current_operation = current_operations.get(key)
+        if current_operation is None:
+            errors.append(f"{label}: operation removed")
+            continue
+        if base_operation.get("operationId") != current_operation.get("operationId"):
+            errors.append(f"{label}: operationId changed")
+
+        compare_parameters(
+            base_document,
+            current_document,
+            path,
+            base_operation,
+            current_operation,
+            label,
+            errors,
+        )
+        compare_request_body(
+            base_document,
+            current_document,
+            base_operation,
+            current_operation,
+            label,
+            errors,
+        )
+        compare_responses(
+            base_document,
+            current_document,
+            base_operation,
+            current_operation,
+            label,
+            errors,
+        )
+
+
+def find_breaking_changes(
+    base_document: Mapping[str, Any],
+    current_document: Mapping[str, Any],
+) -> list[str]:
+    errors: list[str] = []
+    compare_operations(base_document, current_document, errors)
+
+    base_schemas = base_document.get("components", {}).get("schemas", {})
+    current_schemas = current_document.get("components", {}).get("schemas", {})
+    if isinstance(base_schemas, Mapping) and isinstance(current_schemas, Mapping):
+        for name, base_schema in base_schemas.items():
+            if name not in current_schemas:
+                errors.append(f"component schema removed: {name}")
+                continue
+            compare_schema(
+                base_document,
+                current_document,
+                base_schema,
+                current_schemas[name],
+                f"components.schemas.{name}",
+                errors,
+            )
+    return sorted(set(errors))
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--base-ref", default="origin/main")
+    args = parser.parse_args()
+    try:
+        base_document = load_base_contract(args.base_ref)
+        current_document = load_yaml_text((ROOT / CONTRACT_PATH).read_text(encoding="utf-8"))
+    except (OSError, ValueError, subprocess.CalledProcessError) as exc:
+        print(f"cannot load OpenAPI contracts: {type(exc).__name__}", file=sys.stderr)
+        return 2
+
+    errors = find_breaking_changes(base_document, current_document)
+    if errors:
+        for error in errors:
+            print(f"breaking OpenAPI change: {error}", file=sys.stderr)
+        return 1
+    print(f"OpenAPI compatibility check passed against {args.base_ref}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,5 +1,6 @@
 {
-  "schema_version": "1.0",
+  "$schema": "./mock-scenarios.schema.json",
+  "schema_version": "1.1",
   "scenarios": [
     {"id": "project_empty", "route": "/app/projects/:project_id", "description": "教材尚未上传的项目主页"},
     {"id": "lesson_plan_edit", "route": "/app/projects/:project_id/lessons/:lesson_id/work/lesson-plan", "description": "动态十二部分默认教案，可增删允许字段"},
@@ -14,5 +15,54 @@
     {"id": "sse_recovery", "route": "/app/tasks", "description": "事件断线、游标续传、REST 对账"},
     {"id": "budget_pause", "route": "/app/projects/:project_id", "description": "全自动因预算确认暂停"},
     {"id": "admin_content_publish", "route": "/admin/content", "description": "内容包导入、校验、评测和发布"}
+  ],
+  "stage0_contract_scenarios": [
+    {
+      "id": "project_created",
+      "operation_id": "createProject",
+      "response_status": "201",
+      "media_type": "application/json",
+      "fixture": "fixtures/stage0/project-created.json"
+    },
+    {
+      "id": "upload_session_created",
+      "operation_id": "createMaterialUploadSession",
+      "response_status": "201",
+      "media_type": "application/json",
+      "fixture": "fixtures/stage0/upload-session-created.json"
+    },
+    {
+      "id": "upload_confirmed_job",
+      "operation_id": "confirmMaterialUpload",
+      "response_status": "202",
+      "media_type": "application/json",
+      "fixture": "fixtures/stage0/upload-confirmed-job.json"
+    },
+    {
+      "id": "job_running",
+      "operation_id": "getGenerationJob",
+      "response_status": "200",
+      "media_type": "application/json",
+      "fixture": "fixtures/stage0/job-running.json"
+    },
+    {
+      "id": "job_cancel_requested",
+      "operation_id": "cancelGenerationJob",
+      "response_status": "202",
+      "media_type": "application/json",
+      "fixture": "fixtures/stage0/job-cancel-requested.json"
+    },
+    {
+      "id": "idempotency_conflict",
+      "operation_id": "createProject",
+      "response_status": "4XX",
+      "media_type": "application/json",
+      "fixture": "fixtures/stage0/idempotency-conflict.json"
+    },
+    {
+      "id": "job_progress_event",
+      "schema_file": "sse-event.schema.json",
+      "fixture": "fixtures/stage0/job-progress-event.json"
+    }
   ]
 }

@@ -15,6 +15,9 @@
 - `creation-package.schema.json`：项目导入通用创作中心的不可变包。
 - `content-definition.schema.json`：动态内容字段树。
 - `mock-scenarios.json`：前端必须覆盖的关键 Mock 场景。
+- `fixtures/stage0/`：阶段0项目、上传、任务、错误和SSE的确定性合同样例。
+- `generated/`：由当前OpenAPI确定性生成的bundle和TypeScript类型，不是第二份手工合同。
+- `typescript/client.ts`：基于生成paths和openapi-fetch的共享客户端工厂。
 
 ## 使用规则
 
@@ -23,3 +26,16 @@
 3. 破坏性变更必须同时修改调用方、测试、迁移和本文档，不另建补丁说明。
 4. 未在合同中定义的供应商字段只能停留在后端适配层，不能泄漏为前端依赖。
 5. Schema ID 和枚举值一经发布不得改变语义。
+
+## 本地命令
+
+```powershell
+pnpm install --frozen-lockfile
+pnpm contracts:lint
+pnpm contracts:generate
+pnpm contracts:typecheck
+pnpm contracts:test
+pnpm contracts:check-generated
+```
+
+首次更新依赖锁时运行 `pnpm install`。修改OpenAPI后必须重新生成并提交 `contracts/generated/`；CI会拒绝生成漂移和未声明的破坏性变更。

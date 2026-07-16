@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shanhaiedu.local/contracts/mock-scenarios.schema.json",
+  "title": "MockScenarioRegistry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "scenarios", "stage0_contract_scenarios"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"const": "1.1"},
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "route", "description"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "route": {"type": "string", "minLength": 1},
+          "description": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "stage0_contract_scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {"$ref": "#/$defs/operation_response"},
+          {"$ref": "#/$defs/schema_fixture"}
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "base": {
+      "type": "object",
+      "required": ["id", "fixture"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+        "fixture": {"type": "string", "pattern": "^fixtures/stage0/[a-z0-9-]+\\.json$"}
+      }
+    },
+    "operation_response": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "operation_id", "response_status", "media_type", "fixture"],
+          "properties": {
+            "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+            "operation_id": {"type": "string", "minLength": 1},
+            "response_status": {"type": "string", "pattern": "^([1-5][0-9]{2}|[1-5]XX)$"},
+            "media_type": {"type": "string", "minLength": 1},
+            "fixture": {"type": "string", "pattern": "^fixtures/stage0/[a-z0-9-]+\\.json$"}
+          }
+        }
+      ]
+    },
+    "schema_fixture": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "schema_file", "fixture"],
+          "properties": {
+            "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+            "schema_file": {"type": "string", "pattern": "^[a-z0-9-]+\\.schema\\.json$"},
+            "fixture": {"type": "string", "pattern": "^fixtures/stage0/[a-z0-9-]+\\.json$"}
+          }
+        }
+      ]
+    }
+  }
+}

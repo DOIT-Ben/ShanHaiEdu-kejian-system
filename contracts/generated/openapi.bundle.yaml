@@ -1,0 +1,1483 @@
+openapi: 3.1.0
+info:
+  title: ShanHaiEdu Core Integration Surface
+  version: 2.1.0
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+  description: 当前核心联调合同。后端运行时生成的 OpenAPI 可以增加资源和字段， 但不得改变本文件已定义的语义、错误包、并发和幂等约定。
+servers:
+  - url: /api/v2
+security:
+  - cookieAuth: []
+paths:
+  /health/live:
+    get:
+      summary: API进程存活检查
+      operationId: getLiveness
+      security: []
+      responses:
+        '200':
+          description: API process is alive; this check has no external dependencies
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LivenessEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /health/ready:
+    get:
+      summary: API依赖就绪检查
+      operationId: getReadiness
+      security: []
+      responses:
+        '200':
+          description: All required dependencies are ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessEnvelope'
+        '503':
+          description: One or more required dependencies are unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /projects:
+    get:
+      summary: 查询项目列表
+      operationId: listProjects
+      parameters:
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: Project page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectListEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+    post:
+      summary: 创建单知识点项目
+      operationId: createProject
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}:
+    get:
+      summary: 获取项目详情
+      operationId: getProject
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Project
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+    patch:
+      summary: 更新项目设置
+      operationId: updateProject
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                title:
+                  type: string
+                  minLength: 1
+                automation_mode:
+                  $ref: '#/components/schemas/AutomationMode'
+      responses:
+        '200':
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/materials/uploads:
+    post:
+      summary: 创建教材私有直传会话
+      operationId: createMaterialUploadSession
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUploadSessionRequest'
+      responses:
+        '201':
+          description: Presigned upload session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadSessionEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/materials/{material_id}/confirm:
+    post:
+      summary: 确认教材对象并创建后台任务
+      operationId: confirmMaterialUpload
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/MaterialId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmUploadRequest'
+      responses:
+        '202':
+          $ref: '#/components/responses/AcceptedJob'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/workflow:
+    get:
+      summary: 获取项目工作台聚合状态
+      operationId: getProjectWorkflow
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Aggregated workbench state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /lessons/{lesson_id}/intro-options:
+    get:
+      summary: 获取课时三类九套导入设计
+      operationId: getLessonIntroOptions
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Three categories and nine approved or draft introduction options
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - request_id
+                properties:
+                  data:
+                    $ref: '#/components/schemas/intro-option-set.schema'
+                  request_id:
+                    type: string
+        4XX:
+          $ref: '#/components/responses/Error'
+  /lessons/{lesson_id}/intro-selections:
+    post:
+      summary: 选择一个课堂导入方案
+      operationId: selectLessonIntroOption
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - intro_option_set_version_id
+                - option_key
+              properties:
+                intro_option_set_version_id:
+                  type: string
+                  format: uuid
+                option_key:
+                  type: string
+      responses:
+        '201':
+          description: Immutable active selection created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntroSelectionEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /node-runs/{node_run_id}/prompt-preview:
+    get:
+      summary: 获取节点最终业务提示词预览
+      operationId: getPromptPreview
+      parameters:
+        - $ref: '#/components/parameters/NodeRunId'
+      responses:
+        '200':
+          description: Editable business prompt and locked layer summaries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromptPreviewEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /node-runs/{node_run_id}/start:
+    post:
+      summary: 启动节点运行
+      operationId: startNodeRun
+      parameters:
+        - $ref: '#/components/parameters/NodeRunId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prompt_revision_id:
+                  type: string
+                  format: uuid
+      responses:
+        '202':
+          $ref: '#/components/responses/AcceptedJob'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /node-runs/{node_run_id}/creation-packages:
+    post:
+      summary: 从项目节点创建不可变创作包
+      operationId: createCreationPackage
+      parameters:
+        - $ref: '#/components/parameters/NodeRunId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Immutable package created
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - request_id
+                properties:
+                  data:
+                    $ref: '#/components/schemas/creation-package.schema'
+                  request_id:
+                    type: string
+        4XX:
+          $ref: '#/components/responses/Error'
+  /creation-batches:
+    post:
+      summary: 创建通用创作批次
+      operationId: createCreationBatch
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - studio_type
+                - title
+              properties:
+                studio_type:
+                  enum:
+                    - image
+                    - video
+                    - presentation
+                title:
+                  type: string
+                  minLength: 1
+                creation_package_id:
+                  type:
+                    - string
+                    - 'null'
+                  format: uuid
+      responses:
+        '201':
+          description: Creation batch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreationBatchEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /creation-batches/{batch_id}/generate:
+    post:
+      summary: 批量生成创作候选
+      operationId: generateCreationBatch
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - item_ids
+              properties:
+                item_ids:
+                  type: array
+                  minItems: 1
+                  uniqueItems: true
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '202':
+          $ref: '#/components/responses/AcceptedJob'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /generation-results/{result_id}/save-to-project:
+    post:
+      summary: 将候选结果保存到指定项目
+      operationId: saveGenerationResultToProject
+      parameters:
+        - name: result_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - project_id
+                - slot_key
+                - replace_mode
+              properties:
+                project_id:
+                  type: string
+                  format: uuid
+                slot_key:
+                  type: string
+                  minLength: 1
+                replace_mode:
+                  enum:
+                    - reject_if_occupied
+                    - replace_active
+                    - append
+      responses:
+        '200':
+          description: Result saved atomically
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaveOperationEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /generation-jobs/{job_id}:
+    get:
+      summary: 查询异步任务事实状态
+      operationId: getGenerationJob
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Generation job state from PostgreSQL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationJobEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /generation-jobs/{job_id}/cancel:
+    post:
+      summary: 请求协作式取消异步任务
+      operationId: cancelGenerationJob
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Cancellation requested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationJobEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /generation-jobs/{job_id}/events/stream:
+    get:
+      summary: 订阅单任务实时事件
+      operationId: streamGenerationJobEvents
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/LastEventId'
+      responses:
+        '200':
+          description: Server-sent event stream; data follows sse-event.schema.json
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        4XX:
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/events/stream:
+    get:
+      summary: 订阅项目实时事件
+      operationId: streamProjectEvents
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/LastEventId'
+      responses:
+        '200':
+          description: Server-sent event stream; data follows sse-event.schema.json
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        4XX:
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: shanhai_session
+  parameters:
+    ProjectId:
+      name: project_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    NodeRunId:
+      name: node_run_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    LessonId:
+      name: lesson_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    BatchId:
+      name: batch_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    MaterialId:
+      name: material_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    JobId:
+      name: job_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      schema:
+        type: string
+    LastEventId:
+      name: Last-Event-ID
+      in: header
+      required: false
+      schema:
+        type: string
+        minLength: 1
+    PageCursor:
+      name: page[cursor]
+      in: query
+      required: false
+      schema:
+        type: string
+    PageLimit:
+      name: page[limit]
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  responses:
+    Error:
+      description: Error envelope
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/error-envelope.schema'
+    AcceptedJob:
+      description: Long-running job accepted
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AcceptedJobEnvelope'
+  schemas:
+    AutomationMode:
+      type: string
+      enum:
+        - manual
+        - assisted
+        - automatic
+    Project:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - title
+        - subject
+        - knowledge_point
+        - status
+        - automation_mode
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        subject:
+          const: primary_math
+        grade:
+          type:
+            - string
+            - 'null'
+        textbook_edition:
+          type:
+            - string
+            - 'null'
+        knowledge_point:
+          type: string
+        status:
+          enum:
+            - draft
+            - active
+            - archived
+        automation_mode:
+          $ref: '#/components/schemas/AutomationMode'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ProjectEnvelope:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: '#/components/schemas/Project'
+        request_id:
+          type: string
+    ProjectListEnvelope:
+      type: object
+      required:
+        - data
+        - meta
+        - request_id
+      properties:
+        data:
+          type: object
+          required:
+            - items
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Project'
+        meta:
+          type: object
+          properties:
+            next_cursor:
+              type:
+                - string
+                - 'null'
+        request_id:
+          type: string
+    CreateProjectRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+        - knowledge_point
+      properties:
+        title:
+          type: string
+          minLength: 1
+        knowledge_point:
+          type: string
+          minLength: 1
+        grade:
+          type:
+            - string
+            - 'null'
+        textbook_edition:
+          type:
+            - string
+            - 'null'
+        automation_mode:
+          $ref: '#/components/schemas/AutomationMode'
+    CreateUploadSessionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - filename
+        - media_type
+        - size_bytes
+        - sha256
+      properties:
+        filename:
+          type: string
+          minLength: 1
+          maxLength: 255
+        media_type:
+          type: string
+          minLength: 1
+          maxLength: 255
+        size_bytes:
+          type: integer
+          minimum: 1
+        sha256:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+    UploadSession:
+      type: object
+      additionalProperties: false
+      required:
+        - upload_session_id
+        - material_id
+        - upload_url
+        - method
+        - required_headers
+        - expires_at
+      properties:
+        upload_session_id:
+          type: string
+          format: uuid
+        material_id:
+          type: string
+          format: uuid
+        upload_url:
+          type: string
+          format: uri
+        method:
+          const: PUT
+        required_headers:
+          type: object
+          additionalProperties:
+            type: string
+        expires_at:
+          type: string
+          format: date-time
+    UploadSessionEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: '#/components/schemas/UploadSession'
+        request_id:
+          type: string
+          minLength: 1
+    ConfirmUploadRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - upload_session_id
+        - etag
+        - size_bytes
+        - sha256
+      properties:
+        upload_session_id:
+          type: string
+          format: uuid
+        etag:
+          type: string
+          minLength: 1
+          maxLength: 255
+        size_bytes:
+          type: integer
+          minimum: 1
+        sha256:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+    NodeRun:
+      type: object
+      required:
+        - id
+        - node_key
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        node_key:
+          type: string
+        status:
+          $ref: '#/components/schemas/workflow-node-status.schema'
+        title:
+          type: string
+        stale_reason:
+          type:
+            - object
+            - 'null'
+    WorkflowEnvelope:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: object
+          required:
+            - project
+            - lessons
+            - node_runs
+          properties:
+            project:
+              $ref: '#/components/schemas/Project'
+            lessons:
+              type: array
+              items:
+                type: object
+            node_runs:
+              type: array
+              items:
+                $ref: '#/components/schemas/NodeRun'
+        request_id:
+          type: string
+    PromptPreviewEnvelope:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: object
+          required:
+            - editable_prompt
+            - locked_layers
+            - context_summary
+          properties:
+            editable_prompt:
+              type: string
+            locked_layers:
+              type: array
+              items:
+                type: object
+            context_summary:
+              type: array
+              items:
+                type: object
+            schema:
+              type:
+                - object
+                - 'null'
+        request_id:
+          type: string
+    IntroSelectionEnvelope:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: object
+          required:
+            - selection_id
+            - option_set_version_id
+            - option_key
+            - choice_mode
+            - selected_at
+          properties:
+            selection_id:
+              type: string
+              format: uuid
+            option_set_version_id:
+              type: string
+              format: uuid
+            option_key:
+              type: string
+            choice_mode:
+              enum:
+                - teacher_selected
+                - policy_default
+            selected_at:
+              type: string
+              format: date-time
+        request_id:
+          type: string
+    AcceptedJobEnvelope:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: object
+          required:
+            - job_id
+            - status
+            - events_url
+          properties:
+            job_id:
+              type: string
+              format: uuid
+            status:
+              enum:
+                - created
+                - queued
+                - running
+            events_url:
+              type: string
+        request_id:
+          type: string
+    GenerationJobStatus:
+      type: string
+      enum:
+        - created
+        - queued
+        - running
+        - succeeded
+        - failed
+        - cancel_requested
+        - cancelled
+    GenerationJob:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - job_type
+        - status
+        - progress_percent
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        job_type:
+          type: string
+          minLength: 1
+        status:
+          $ref: '#/components/schemas/GenerationJobStatus'
+        progress_percent:
+          type: integer
+          minimum: 0
+          maximum: 100
+        progress_message:
+          type:
+            - string
+            - 'null'
+        error_code:
+          type:
+            - string
+            - 'null'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    GenerationJobEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: '#/components/schemas/GenerationJob'
+        request_id:
+          type: string
+          minLength: 1
+    DependencyReadiness:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - ready
+        - status
+      properties:
+        name:
+          enum:
+            - postgresql
+            - redis
+            - object_storage
+        ready:
+          type: boolean
+        status:
+          enum:
+            - available
+            - unavailable
+            - not_configured
+    LivenessEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            - status
+            - service
+            - environment
+          properties:
+            status:
+              const: ok
+            service:
+              type: string
+              minLength: 1
+            environment:
+              enum:
+                - development
+                - test
+                - production
+        request_id:
+          type: string
+          minLength: 1
+    ReadinessEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            - status
+            - dependencies
+          properties:
+            status:
+              enum:
+                - ready
+                - not_ready
+            dependencies:
+              type: array
+              items:
+                $ref: '#/components/schemas/DependencyReadiness'
+        request_id:
+          type: string
+          minLength: 1
+    CreationBatchEnvelope:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: object
+          required:
+            - id
+            - studio_type
+            - title
+            - status
+            - items
+          properties:
+            id:
+              type: string
+              format: uuid
+            studio_type:
+              enum:
+                - image
+                - video
+                - presentation
+            title:
+              type: string
+            status:
+              enum:
+                - draft
+                - ready
+                - running
+                - partially_completed
+                - completed
+                - archived
+            items:
+              type: array
+              items:
+                type: object
+        request_id:
+          type: string
+    SaveOperationEnvelope:
+      type: object
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: object
+          required:
+            - operation_id
+            - status
+            - binding_id
+          properties:
+            operation_id:
+              type: string
+              format: uuid
+            status:
+              const: completed
+            binding_id:
+              type: string
+              format: uuid
+        request_id:
+          type: string
+    error-envelope.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://shanhaiedu.local/contracts/error-envelope.schema.json
+      title: ErrorEnvelope
+      type: object
+      additionalProperties: false
+      required:
+        - error
+        - request_id
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required:
+            - code
+            - message
+            - retryable
+          properties:
+            code:
+              type: string
+              minLength: 1
+            message:
+              type: string
+              minLength: 1
+            retryable:
+              type: boolean
+            details:
+              type: object
+              additionalProperties: true
+        request_id:
+          type: string
+          minLength: 1
+    workflow-node-status.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://shanhaiedu.local/contracts/workflow-node-status.schema.json
+      title: WorkflowNodeStatus
+      type: string
+      enum:
+        - disabled
+        - not_ready
+        - ready
+        - draft
+        - queued
+        - running
+        - review_required
+        - approved
+        - partially_completed
+        - failed
+        - paused
+        - cancel_requested
+        - cancelled
+        - stale
+        - skipped
+    option:
+      type: object
+      additionalProperties: false
+      required:
+        - option_key
+        - category
+        - title
+        - independent_concept
+        - hook
+        - viewer_value
+        - suggested_medium
+        - duration_seconds
+        - replacement_field_key
+        - course_anchor
+        - classroom_first_question
+        - handoff_moment
+        - must_not_preteach
+        - fit_reason
+        - risks
+        - recommendation_score
+        - recommendation_reason
+      properties:
+        option_key:
+          type: string
+          pattern: ^INTRO-(SCI|APP|STO)-[0-9]{2}$
+        category:
+          enum:
+            - science
+            - application
+            - story
+        title:
+          type: string
+          minLength: 1
+        independent_concept:
+          type: string
+          minLength: 1
+        hook:
+          type: string
+          minLength: 1
+        viewer_value:
+          type: string
+          minLength: 1
+        suggested_medium:
+          enum:
+            - video
+            - image
+            - physical_object
+            - question
+            - performance
+            - mixed
+        duration_seconds:
+          type: integer
+          minimum: 10
+          maximum: 600
+        replacement_field_key:
+          type:
+            - string
+            - 'null'
+        course_anchor:
+          type: string
+          minLength: 1
+        classroom_first_question:
+          type: string
+          minLength: 1
+        handoff_moment:
+          type: string
+          minLength: 1
+        must_not_preteach:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          uniqueItems: true
+        fit_reason:
+          type: string
+          minLength: 1
+        risks:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        recommendation_score:
+          type: integer
+          minimum: 1
+          maximum: 100
+        recommendation_reason:
+          type: string
+          minLength: 1
+    intro-option-set.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://shanhaiedu.local/contracts/intro-option-set.schema.json
+      title: IntroOptionSet
+      description: 三类九套课堂导入设计。业务校验器额外保证每类恰好三套、最高推荐分唯一。
+      type: object
+      additionalProperties: false
+      required:
+        - option_set_id
+        - lesson_unit_id
+        - status
+        - ideation_context_snapshot_id
+        - anchoring_context_snapshot_id
+        - options
+        - created_at
+      properties:
+        option_set_id:
+          type: string
+          format: uuid
+        lesson_unit_id:
+          type: string
+          format: uuid
+        status:
+          enum:
+            - draft
+            - review_required
+            - approved
+            - stale
+        ideation_context_snapshot_id:
+          type: string
+          format: uuid
+        anchoring_context_snapshot_id:
+          type: string
+          format: uuid
+        options:
+          type: array
+          minItems: 9
+          maxItems: 9
+          items:
+            $ref: '#/components/schemas/option'
+        created_at:
+          type: string
+          format: date-time
+      $defs:
+        option:
+          type: object
+          additionalProperties: false
+          required:
+            - option_key
+            - category
+            - title
+            - independent_concept
+            - hook
+            - viewer_value
+            - suggested_medium
+            - duration_seconds
+            - replacement_field_key
+            - course_anchor
+            - classroom_first_question
+            - handoff_moment
+            - must_not_preteach
+            - fit_reason
+            - risks
+            - recommendation_score
+            - recommendation_reason
+          properties:
+            option_key:
+              type: string
+              pattern: ^INTRO-(SCI|APP|STO)-[0-9]{2}$
+            category:
+              enum:
+                - science
+                - application
+                - story
+            title:
+              type: string
+              minLength: 1
+            independent_concept:
+              type: string
+              minLength: 1
+            hook:
+              type: string
+              minLength: 1
+            viewer_value:
+              type: string
+              minLength: 1
+            suggested_medium:
+              enum:
+                - video
+                - image
+                - physical_object
+                - question
+                - performance
+                - mixed
+            duration_seconds:
+              type: integer
+              minimum: 10
+              maximum: 600
+            replacement_field_key:
+              type:
+                - string
+                - 'null'
+            course_anchor:
+              type: string
+              minLength: 1
+            classroom_first_question:
+              type: string
+              minLength: 1
+            handoff_moment:
+              type: string
+              minLength: 1
+            must_not_preteach:
+              type: array
+              items:
+                type: string
+                minLength: 1
+              uniqueItems: true
+            fit_reason:
+              type: string
+              minLength: 1
+            risks:
+              type: array
+              items:
+                type: string
+                minLength: 1
+            recommendation_score:
+              type: integer
+              minimum: 1
+              maximum: 100
+            recommendation_reason:
+              type: string
+              minLength: 1
+    creation-package.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://shanhaiedu.local/contracts/creation-package.schema.json
+      title: CreationPackage
+      type: object
+      additionalProperties: false
+      required:
+        - package_id
+        - package_type
+        - status
+        - source
+        - items
+        - created_at
+      properties:
+        package_id:
+          type: string
+          format: uuid
+        package_type:
+          enum:
+            - image
+            - video
+            - presentation
+        status:
+          enum:
+            - building
+            - ready
+            - invalid
+            - expired
+        source:
+          type: object
+          additionalProperties: false
+          required:
+            - project_id
+            - node_run_id
+          properties:
+            project_id:
+              type: string
+              format: uuid
+            lesson_unit_id:
+              type:
+                - string
+                - 'null'
+              format: uuid
+            node_run_id:
+              type: string
+              format: uuid
+            is_stale:
+              type: boolean
+              default: false
+        style_contract:
+          type:
+            - object
+            - 'null'
+          additionalProperties: true
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - item_key
+              - position
+              - title
+              - prompt
+              - output_spec
+            properties:
+              item_key:
+                type: string
+                minLength: 1
+              position:
+                type: integer
+                minimum: 1
+              title:
+                type: string
+                minLength: 1
+              prompt:
+                type: object
+                additionalProperties: true
+              reference_assets:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - asset_version_id
+                    - role
+                  properties:
+                    asset_version_id:
+                      type: string
+                      format: uuid
+                    role:
+                      type: string
+                  additionalProperties: false
+              output_spec:
+                type: object
+                additionalProperties: true
+              target_slot_key:
+                type:
+                  - string
+                  - 'null'
+              consistency_key:
+                type:
+                  - string
+                  - 'null'
+        target_rules:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time

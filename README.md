@@ -64,7 +64,7 @@ uv run python -m workers.main --check
 uv run uvicorn apps.api.main:app --host 127.0.0.1 --port 8000
 ```
 
-API 存活检查是 `GET /health/live`，依赖就绪检查是 `GET /health/ready`。停止本地依赖但保留数据：
+容器使用 `GET /health/live` 和 `GET /health/ready`；共享API合同中的兼容路径是 `GET /api/v2/health/live` 和 `GET /api/v2/health/ready`。停止本地依赖但保留数据：
 
 ```powershell
 docker compose -f infra\compose.yaml down

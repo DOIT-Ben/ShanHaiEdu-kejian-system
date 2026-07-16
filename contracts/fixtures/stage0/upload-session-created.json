@@ -1,0 +1,13 @@
+{
+  "data": {
+    "upload_session_id": "0198f1a0-7c10-7000-8000-000000000002",
+    "material_id": "0198f1a0-7c10-7000-8000-000000000003",
+    "upload_url": "https://object-storage.test/uploads/presigned-example",
+    "method": "PUT",
+    "required_headers": {
+      "Content-Type": "application/pdf"
+    },
+    "expires_at": "2026-07-17T00:15:00Z"
+  },
+  "request_id": "req_stage0_upload_session"
+}

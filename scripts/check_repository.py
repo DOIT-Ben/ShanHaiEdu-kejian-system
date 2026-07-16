@@ -28,6 +28,11 @@ REQUIRED = {
     "docs/governance/DOCUMENT_POLICY.md",
     "docs/governance/DELIVERY_ROADMAP.md",
     "contracts/api-surface.openapi.yaml",
+    "contracts/generated/openapi.bundle.yaml",
+    "contracts/generated/typescript/schema.ts",
+    "contracts/mock-scenarios.schema.json",
+    "package.json",
+    "pnpm-lock.yaml",
 }
 
 FORBIDDEN_DIRECTORIES = {
