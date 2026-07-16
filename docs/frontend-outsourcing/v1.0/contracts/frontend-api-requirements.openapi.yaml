@@ -1,0 +1,1142 @@
+openapi: 3.1.0
+info:
+  title: ShanHaiEdu Web V2 Frontend Required API
+  version: 0.1.0-draft
+  description: >-
+    前端外包所需接口草案。后端发布的版本化正式OpenAPI是联调唯一事实来源；
+    本文件用于报价、Mock和确认前端能力边界。
+servers:
+  - url: /api/v2
+security:
+  - sessionCookie: []
+tags:
+  - name: Auth
+  - name: Projects
+  - name: Sources
+  - name: Lessons
+  - name: Workflows
+  - name: Prompts
+  - name: Runs
+  - name: Artifacts
+  - name: Assets
+  - name: Tasks
+  - name: Delivery
+  - name: Templates
+  - name: ModelGateway
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      security: []
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SessionResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /auth/me:
+    get:
+      tags: [Auth]
+      operationId: getCurrentSession
+      responses:
+        '200':
+          $ref: '#/components/responses/SessionResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      responses:
+        '204':
+          description: Logged out
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects:
+    get:
+      tags: [Projects]
+      operationId: listProjects
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Project page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      tags: [Projects]
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}:
+    get:
+      tags: [Projects]
+      operationId: getProject
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    patch:
+      tags: [Projects]
+      operationId: updateProject
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectRequest'
+      responses:
+        '200':
+          description: Project updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/upload-sessions:
+    post:
+      tags: [Sources]
+      operationId: createUploadSession
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUploadSessionRequest'
+      responses:
+        '201':
+          description: Upload session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadSessionEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/textbook-evidence/current:
+    get:
+      tags: [Sources]
+      operationId: getCurrentTextbookEvidence
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Current textbook evidence
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactVersionEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/lesson-divisions/current:
+    get:
+      tags: [Lessons]
+      operationId: getCurrentLessonDivision
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Current lesson division
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactVersionEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/lesson-divisions/{versionId}/approve:
+    post:
+      tags: [Lessons]
+      operationId: approveLessonDivision
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/VersionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalRequest'
+      responses:
+        '200':
+          description: Approved lesson division and created lessons
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/lessons:
+    get:
+      tags: [Lessons]
+      operationId: listLessons
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Lessons
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /lessons/{lessonId}:
+    get:
+      tags: [Lessons]
+      operationId: getLesson
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Lesson
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /lessons/{lessonId}/workspace:
+    get:
+      tags: [Workflows]
+      operationId: getLessonWorkspace
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Teacher-facing workflow projection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /lessons/{lessonId}/nodes/{nodeKey}:
+    get:
+      tags: [Workflows]
+      operationId: getNodeWorkspace
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/NodeKey'
+      responses:
+        '200':
+          description: Node workspace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeWorkspaceEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /lessons/{lessonId}/nodes/{nodeKey}/prompt-drafts:
+    post:
+      tags: [Prompts]
+      operationId: preparePromptDraft
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/NodeKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PromptDraftRequest'
+      responses:
+        '201':
+          description: Prompt draft
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromptVersionEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /lessons/{lessonId}/nodes/{nodeKey}/cost-estimate:
+    post:
+      tags: [Runs]
+      operationId: estimateNodeRunCost
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/NodeKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeRunRequest'
+      responses:
+        '200':
+          description: Cost estimate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostEstimateEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /lessons/{lessonId}/nodes/{nodeKey}/runs:
+    post:
+      tags: [Runs]
+      operationId: createNodeRun
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/NodeKey'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeRunRequest'
+      responses:
+        '202':
+          description: Node run accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /artifact-versions/{versionId}/approve:
+    post:
+      tags: [Artifacts]
+      operationId: approveArtifactVersion
+      parameters:
+        - $ref: '#/components/parameters/VersionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalRequest'
+      responses:
+        '200':
+          description: Artifact approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactVersionEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/assets:
+    get:
+      tags: [Assets]
+      operationId: listProjectAssets
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - in: query
+          name: type
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Assets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/tasks:
+    get:
+      tags: [Tasks]
+      operationId: listProjectTasks
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Tasks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /tasks/{taskId}/cancel:
+    post:
+      tags: [Tasks]
+      operationId: cancelTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '202':
+          description: Cancellation requested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /tasks/{taskId}/retry:
+    post:
+      tags: [Tasks]
+      operationId: retryTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Retry accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/delivery:
+    get:
+      tags: [Delivery]
+      operationId: getProjectDelivery
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Delivery checklist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/delivery/package-runs:
+    post:
+      tags: [Delivery]
+      operationId: createDeliveryPackageRun
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Packaging accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/templates:
+    get:
+      tags: [Templates]
+      operationId: listTemplates
+      responses:
+        '200':
+          description: Templates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplatePageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/model-gateway/providers:
+    get:
+      tags: [ModelGateway]
+      operationId: listProviders
+      responses:
+        '200':
+          description: Providers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      tags: [ModelGateway]
+      operationId: createProvider
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderUpsertRequest'
+      responses:
+        '201':
+          description: Provider created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/model-gateway/providers/{providerId}/connection-tests:
+    post:
+      tags: [ModelGateway]
+      operationId: testProviderConnection
+      parameters:
+        - $ref: '#/components/parameters/ProviderId'
+      responses:
+        '202':
+          description: Test accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/model-gateway/models:
+    get:
+      tags: [ModelGateway]
+      operationId: listModels
+      responses:
+        '200':
+          description: Models
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/model-gateway/routes:
+    get:
+      tags: [ModelGateway]
+      operationId: listRoutePolicies
+      responses:
+        '200':
+          description: Route policies
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoutePolicyPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/model-gateway/runs:
+    get:
+      tags: [ModelGateway]
+      operationId: listModelRuns
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Model runs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelRunPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: shanhai_session
+  parameters:
+    ProjectId:
+      in: path
+      name: projectId
+      required: true
+      schema: { type: string }
+    LessonId:
+      in: path
+      name: lessonId
+      required: true
+      schema: { type: string }
+    NodeKey:
+      in: path
+      name: nodeKey
+      required: true
+      schema: { type: string }
+    VersionId:
+      in: path
+      name: versionId
+      required: true
+      schema: { type: string }
+    TaskId:
+      in: path
+      name: taskId
+      required: true
+      schema: { type: string }
+    ProviderId:
+      in: path
+      name: providerId
+      required: true
+      schema: { type: string }
+    Cursor:
+      in: query
+      name: cursor
+      schema: { type: string }
+    PageSize:
+      in: query
+      name: page_size
+      schema: { type: integer, minimum: 1, maximum: 100, default: 30 }
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: true
+      schema: { type: string, minLength: 16, maxLength: 128 }
+  responses:
+    ErrorResponse:
+      description: Error envelope
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    SessionResponse:
+      description: Session envelope
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SessionEnvelope'
+  schemas:
+    Meta:
+      type: object
+      additionalProperties: false
+      required: [trace_id, server_time]
+      properties:
+        trace_id: { type: string }
+        server_time: { type: string, format: date-time }
+        next_cursor: { type: [string, 'null'] }
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, message, retryable, trace_id]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        retryable: { type: boolean }
+        action: { type: [string, 'null'] }
+        details: { type: object, additionalProperties: true }
+        trace_id: { type: string }
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [ok, error]
+      properties:
+        ok: { const: false }
+        error: { $ref: '#/components/schemas/Error' }
+    User:
+      type: object
+      additionalProperties: false
+      required: [user_id, display_name, role]
+      properties:
+        user_id: { type: string }
+        display_name: { type: string }
+        email: { type: string, format: email }
+        role: { enum: [teacher, template_admin, system_admin, audit_admin] }
+    Session:
+      type: object
+      additionalProperties: false
+      required: [user, csrf_token]
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        csrf_token: { type: string }
+    SessionEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/Session' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [identifier, password]
+      properties:
+        identifier: { type: string, minLength: 1 }
+        password: { type: string, minLength: 1 }
+    Project:
+      type: object
+      additionalProperties: false
+      required: [project_id, name, subject, grade, status, execution_mode, row_version, updated_at]
+      properties:
+        project_id: { type: string }
+        name: { type: string }
+        subject: { const: primary_math }
+        grade: { type: integer, minimum: 1, maximum: 6 }
+        textbook_version: { type: string }
+        volume: { type: string }
+        status: { enum: [draft, active, archived] }
+        execution_mode: { enum: [manual, semi_auto, full_auto_draft] }
+        progress_percent: { type: integer, minimum: 0, maximum: 100 }
+        row_version: { type: integer, minimum: 1 }
+        updated_at: { type: string, format: date-time }
+    CreateProjectRequest:
+      type: object
+      additionalProperties: false
+      required: [name, subject, grade, execution_mode]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        subject: { const: primary_math }
+        grade: { type: integer, minimum: 1, maximum: 6 }
+        textbook_version: { type: string }
+        volume: { type: string }
+        execution_mode: { enum: [manual, semi_auto, full_auto_draft] }
+        budget_minor_units: { type: integer, minimum: 0 }
+    UpdateProjectRequest:
+      type: object
+      additionalProperties: false
+      required: [row_version]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        execution_mode: { enum: [manual, semi_auto, full_auto_draft] }
+        row_version: { type: integer, minimum: 1 }
+    Lesson:
+      type: object
+      additionalProperties: false
+      required: [lesson_id, project_id, lesson_key, sequence_number, title, status]
+      properties:
+        lesson_id: { type: string }
+        project_id: { type: string }
+        lesson_key: { type: string }
+        sequence_number: { type: integer, minimum: 1 }
+        title: { type: string }
+        lesson_type: { type: string }
+        content_boundary: { type: object, additionalProperties: true }
+        status: { enum: [active, archived] }
+    NodeSummary:
+      type: object
+      additionalProperties: false
+      required: [node_key, title, group, status]
+      properties:
+        node_key: { type: string }
+        title: { type: string }
+        group: { type: string }
+        status:
+          enum: [locked, ready, queued, running, needs_review, revision_required, approved, stale, failed, blocked, cancelled, skipped]
+        progress_percent: { type: integer, minimum: 0, maximum: 100 }
+        blocker_message: { type: [string, 'null'] }
+    Workspace:
+      type: object
+      additionalProperties: false
+      required: [lesson, nodes, current_node_key]
+      properties:
+        lesson: { $ref: '#/components/schemas/Lesson' }
+        nodes:
+          type: array
+          items: { $ref: '#/components/schemas/NodeSummary' }
+        current_node_key: { type: string }
+    NodeWorkspace:
+      type: object
+      additionalProperties: false
+      required: [node, input_schema, output_renderer, prompt_versions, artifact_versions]
+      properties:
+        node: { $ref: '#/components/schemas/NodeSummary' }
+        input_schema: { type: object, additionalProperties: true }
+        input_values: { type: object, additionalProperties: true }
+        output_renderer: { type: string }
+        prompt_versions:
+          type: array
+          items: { $ref: '#/components/schemas/PromptVersion' }
+        artifact_versions:
+          type: array
+          items: { $ref: '#/components/schemas/ArtifactVersion' }
+        validation_results:
+          type: array
+          items: { $ref: '#/components/schemas/ValidationResult' }
+    PromptVersion:
+      type: object
+      additionalProperties: false
+      required: [prompt_version_id, version_number, editable_prompt, runtime_contract, created_at]
+      properties:
+        prompt_version_id: { type: string }
+        version_number: { type: integer, minimum: 1 }
+        editable_prompt: { type: string }
+        runtime_contract: { type: string }
+        created_at: { type: string, format: date-time }
+    PromptDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [input_values]
+      properties:
+        input_values: { type: object, additionalProperties: true }
+        revision_instruction: { type: string }
+        base_prompt_version_id: { type: string }
+    NodeRunRequest:
+      type: object
+      additionalProperties: false
+      required: [prompt_version_id, model_profile, parameters]
+      properties:
+        prompt_version_id: { type: string }
+        model_profile: { enum: [recommended, quality, economy, fast_draft, advanced] }
+        model_id: { type: [string, 'null'] }
+        parameters: { type: object, additionalProperties: true }
+        budget_authorization_id: { type: [string, 'null'] }
+    CostEstimate:
+      type: object
+      additionalProperties: false
+      required: [currency, minimum_minor_units, maximum_minor_units, candidate_count, requires_authorization]
+      properties:
+        currency: { type: string }
+        minimum_minor_units: { type: integer, minimum: 0 }
+        maximum_minor_units: { type: integer, minimum: 0 }
+        candidate_count: { type: integer, minimum: 1 }
+        requires_authorization: { type: boolean }
+    ValidationResult:
+      type: object
+      additionalProperties: false
+      required: [rule_id, severity, passed, message]
+      properties:
+        rule_id: { type: string }
+        severity: { enum: [info, warning, error] }
+        passed: { type: boolean }
+        message: { type: string }
+        action: { type: [string, 'null'] }
+    ArtifactVersion:
+      type: object
+      additionalProperties: false
+      required: [artifact_version_id, artifact_type, version_number, status, content, created_at]
+      properties:
+        artifact_version_id: { type: string }
+        artifact_type: { type: string }
+        version_number: { type: integer, minimum: 1 }
+        status: { enum: [draft, needs_review, approved, stale, superseded, rejected] }
+        content: { type: object, additionalProperties: true }
+        file_objects:
+          type: array
+          items: { $ref: '#/components/schemas/FileObject' }
+        created_at: { type: string, format: date-time }
+    FileObject:
+      type: object
+      additionalProperties: false
+      required: [file_object_id, file_name, mime_type, size_bytes]
+      properties:
+        file_object_id: { type: string }
+        file_name: { type: string }
+        mime_type: { type: string }
+        size_bytes: { type: integer, minimum: 0 }
+        preview_url: { type: [string, 'null'] }
+    Asset:
+      type: object
+      additionalProperties: false
+      required: [asset_id, asset_type, name, status, current_version_id]
+      properties:
+        asset_id: { type: string }
+        asset_type: { type: string }
+        name: { type: string }
+        status: { enum: [draft, needs_review, approved, stale, rejected] }
+        current_version_id: { type: string }
+        thumbnail_url: { type: [string, 'null'] }
+        source_node_key: { type: string }
+    Task:
+      type: object
+      additionalProperties: false
+      required: [task_id, task_type, status, progress_percent, created_at]
+      properties:
+        task_id: { type: string }
+        task_type: { type: string }
+        status: { enum: [queued, running, waiting_provider, downloading, completed, failed, cancel_requested, cancelled] }
+        progress_percent: { type: integer, minimum: 0, maximum: 100 }
+        progress_message: { type: string }
+        retryable: { type: boolean }
+        estimated_cost_minor_units: { type: integer, minimum: 0 }
+        actual_cost_minor_units: { type: integer, minimum: 0 }
+        error: { anyOf: [{ $ref: '#/components/schemas/Error' }, { type: 'null' }] }
+        created_at: { type: string, format: date-time }
+    ApprovalRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        note: { type: string, maxLength: 2000 }
+        override_warning_rule_ids:
+          type: array
+          items: { type: string }
+        override_reason: { type: string, maxLength: 2000 }
+    UploadSession:
+      type: object
+      additionalProperties: false
+      required: [upload_session_id, upload_url, method, expires_at]
+      properties:
+        upload_session_id: { type: string }
+        upload_url: { type: string, format: uri }
+        method: { enum: [PUT, POST] }
+        required_headers: { type: object, additionalProperties: { type: string } }
+        expires_at: { type: string, format: date-time }
+    CreateUploadSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [file_name, mime_type, size_bytes, source_type]
+      properties:
+        file_name: { type: string }
+        mime_type: { type: string }
+        size_bytes: { type: integer, minimum: 1 }
+        sha256: { type: string }
+        source_type: { enum: [textbook, supplement, existing_lesson_plan, image, audio, video] }
+    Provider:
+      type: object
+      additionalProperties: false
+      required: [provider_id, name, provider_type, enabled, health_status, credential_status]
+      properties:
+        provider_id: { type: string }
+        name: { type: string }
+        provider_type: { enum: [text, image, video, tts, multimodal] }
+        base_url: { type: string, format: uri }
+        enabled: { type: boolean }
+        health_status: { enum: [healthy, degraded, unavailable, unknown] }
+        credential_status: { enum: [configured, missing, invalid, expiring] }
+        credential_mask: { type: [string, 'null'] }
+        credential_updated_at: { type: [string, 'null'], format: date-time }
+    ProviderUpsertRequest:
+      type: object
+      additionalProperties: false
+      required: [name, provider_type, base_url, enabled]
+      properties:
+        name: { type: string }
+        provider_type: { enum: [text, image, video, tts, multimodal] }
+        base_url: { type: string, format: uri }
+        credential_value: { type: string }
+        timeout_seconds: { type: integer, minimum: 1, maximum: 600 }
+        concurrency_limit: { type: integer, minimum: 1 }
+        enabled: { type: boolean }
+    ModelDefinition:
+      type: object
+      additionalProperties: false
+      required: [model_id, provider_id, business_name, upstream_name, capabilities, enabled]
+      properties:
+        model_id: { type: string }
+        provider_id: { type: string }
+        business_name: { type: string }
+        upstream_name: { type: string }
+        capabilities:
+          type: array
+          items: { type: string }
+        constraints: { type: object, additionalProperties: true }
+        pricing: { type: object, additionalProperties: true }
+        enabled: { type: boolean }
+    RoutePolicy:
+      type: object
+      additionalProperties: false
+      required: [route_policy_id, capability, mode, primary_model_id, fallback_model_ids, enabled]
+      properties:
+        route_policy_id: { type: string }
+        capability: { type: string }
+        mode: { enum: [quality, economy, speed, balanced, fixed] }
+        primary_model_id: { type: string }
+        fallback_model_ids:
+          type: array
+          items: { type: string }
+        enabled: { type: boolean }
+    ModelRun:
+      type: object
+      additionalProperties: false
+      required: [model_run_id, capability, provider_id, model_id, status, created_at]
+      properties:
+        model_run_id: { type: string }
+        capability: { type: string }
+        provider_id: { type: string }
+        model_id: { type: string }
+        status: { enum: [queued, running, completed, failed, cancelled] }
+        estimated_cost_minor_units: { type: integer, minimum: 0 }
+        actual_cost_minor_units: { type: integer, minimum: 0 }
+        duration_ms: { type: integer, minimum: 0 }
+        fallback_from_model_run_id: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
+    Delivery:
+      type: object
+      additionalProperties: false
+      required: [status, items, blockers]
+      properties:
+        status: { enum: [not_ready, ready, packaging, completed, failed] }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/FileObject' }
+        blockers:
+          type: array
+          items: { type: string }
+    TemplateSummary:
+      type: object
+      additionalProperties: false
+      required: [template_id, name, node_type, current_version, status]
+      properties:
+        template_id: { type: string }
+        name: { type: string }
+        node_type: { type: string }
+        current_version: { type: string }
+        status: { enum: [draft, candidate, published, deprecated] }
+    ProjectEnvelope:
+      $ref: '#/components/schemas/GenericProjectEnvelope'
+    GenericProjectEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/Project' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    ProjectPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Project' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    LessonEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/Lesson' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    LessonPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Lesson' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    WorkspaceEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/Workspace' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    NodeWorkspaceEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/NodeWorkspace' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    PromptVersionEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/PromptVersion' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    CostEstimateEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/CostEstimate' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    ArtifactVersionEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/ArtifactVersion' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    UploadSessionEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/UploadSession' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    TaskEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/Task' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    TaskPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Task' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    AssetPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Asset' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    DeliveryEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/Delivery' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    ProviderEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/Provider' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    ProviderPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Provider' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    ModelPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ModelDefinition' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    RoutePolicyPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/RoutePolicy' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    ModelRunPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ModelRun' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    TemplatePageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/TemplateSummary' }
+        meta: { $ref: '#/components/schemas/Meta' }
+

@@ -1,0 +1,36 @@
+# Frontend
+node_modules/
+dist/
+.vite/
+coverage/
+playwright-report/
+test-results/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local runtime data
+storage/
+uploads/
+tmp/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# IDE and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,43 @@
+{
+  "schema_version": "shanhaiedu-frontend-outsourcing-package/v1",
+  "package_name": "shanhaiedu-frontend-outsourcing-v1.0",
+  "package_version": "1.0.0",
+  "created_at": "2026-07-16",
+  "language": "zh-CN",
+  "frontend_type": "production_spa",
+  "technology": [
+    "React 19",
+    "TypeScript",
+    "Vite",
+    "React Router",
+    "Tailwind CSS",
+    "Radix UI",
+    "TanStack Query",
+    "Zustand",
+    "MSW",
+    "Vitest",
+    "Playwright",
+    "Storybook"
+  ],
+  "backend_boundary": {
+    "api_prefix": "/api/v2",
+    "backend_implementation_included": false,
+    "provider_credentials_included": false,
+    "canonical_api_owner": "backend_openapi"
+  },
+  "contents": {
+    "main_documents": 16,
+    "contracts": 5,
+    "design_token_files": 2,
+    "checklists": 4,
+    "templates": 5,
+    "checksums": 1
+  },
+  "important_notes": [
+    "本包不包含旧前端代码。",
+    "frontend-api-requirements.openapi.yaml是前端需求草案，后端正式OpenAPI是联调唯一事实来源。",
+    "Figma源文件和生产源码由外包承接方按本包要求交付。",
+    "生产前端不得直接调用模型Provider或保存模型密钥。"
+  ]
+}
+

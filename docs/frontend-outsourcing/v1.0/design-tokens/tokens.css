@@ -1,0 +1,64 @@
+:root {
+  --sh-bg: #f6f7fa;
+  --sh-surface-1: #ffffff;
+  --sh-surface-2: #f9fafc;
+  --sh-surface-hover: #f2f5fa;
+  --sh-border: #e3e7ef;
+  --sh-divider: #edf0f5;
+  --sh-text-1: #182033;
+  --sh-text-2: #5f6b7c;
+  --sh-text-muted: #8993a4;
+  --sh-text-disabled: #b8c0cc;
+  --sh-brand: #2854e8;
+  --sh-brand-hover: #2146c7;
+  --sh-brand-selected: #edf2ff;
+  --sh-success: #15966a;
+  --sh-success-surface: #eaf8f2;
+  --sh-warning: #d98200;
+  --sh-warning-surface: #fff5de;
+  --sh-danger: #d93f45;
+  --sh-danger-surface: #fff0f1;
+  --sh-running: #7557d9;
+  --sh-running-surface: #f3f0ff;
+
+  --sh-space-1: 4px;
+  --sh-space-2: 8px;
+  --sh-space-3: 12px;
+  --sh-space-4: 16px;
+  --sh-space-5: 20px;
+  --sh-space-6: 24px;
+  --sh-space-8: 32px;
+  --sh-space-10: 40px;
+  --sh-space-12: 48px;
+
+  --sh-radius-control: 8px;
+  --sh-radius-card: 10px;
+  --sh-radius-panel: 12px;
+  --sh-radius-overlay: 14px;
+  --sh-radius-preview: 16px;
+
+  --sh-motion-button: 120ms;
+  --sh-motion-tab: 160ms;
+  --sh-motion-panel: 180ms;
+  --sh-motion-overlay: 220ms;
+  --sh-motion-page: 240ms;
+  --sh-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --sh-topbar-height: 64px;
+  --sh-app-rail-width: 72px;
+  --sh-workflow-rail-width: 280px;
+  --sh-inspector-width: 400px;
+  --sh-task-dock-collapsed: 48px;
+  --sh-task-dock-expanded: 260px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --sh-motion-button: 0ms;
+    --sh-motion-tab: 0ms;
+    --sh-motion-panel: 0ms;
+    --sh-motion-overlay: 0ms;
+    --sh-motion-page: 0ms;
+  }
+}
+
