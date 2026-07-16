@@ -28,6 +28,13 @@ class Settings(BaseSettings):
     database_url: SecretStr | None = None
     redis_url: SecretStr | None = None
     object_storage_health_url: HttpUrl | None = None
+    object_storage_endpoint: str | None = None
+    object_storage_access_key: SecretStr | None = None
+    object_storage_secret_key: SecretStr | None = None
+    object_storage_secure: bool = True
+    object_storage_bucket: str = Field(default="shanhaiedu", min_length=3, max_length=63)
+    upload_session_ttl_seconds: int = Field(default=900, ge=60, le=3600)
+    max_upload_size_bytes: int = Field(default=52_428_800, ge=1)
     dependency_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
 
     @model_validator(mode="after")
@@ -36,7 +43,14 @@ class Settings(BaseSettings):
             return self
         missing = [
             name
-            for name in ("database_url", "redis_url", "object_storage_health_url")
+            for name in (
+                "database_url",
+                "redis_url",
+                "object_storage_health_url",
+                "object_storage_endpoint",
+                "object_storage_access_key",
+                "object_storage_secret_key",
+            )
             if getattr(self, name) is None
         ]
         if missing:

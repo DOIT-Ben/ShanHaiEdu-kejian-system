@@ -30,7 +30,7 @@
 | `POST` | `/lessons/{lesson_id}/intro-options/generate` | 启动独立创意与锚定两阶段生成 |
 | `POST` | `/lessons/{lesson_id}/intro-selections` | 选择一个已批准导入方案 |
 
-上传流程：API 创建会话 → 浏览器直传 S3 → 客户端带 ETag/大小确认 → 后端检查对象并入队扫描解析。确认前文件不得进入模型上下文。
+上传流程：API 创建会话 → 浏览器直传 S3 → 客户端带 ETag/大小确认 → 后端从私有对象流式核对 MIME、大小与 SHA-256 并入队扫描解析。短期预签名 URL 不持久化，确认前文件不得进入模型上下文。
 
 ### 工作流、节点与审核
 
