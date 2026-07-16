@@ -4,9 +4,10 @@
 
 在阅读经过整理的产品和技术方案前，先阅读：
 
-- `docs/requirements/2026-07-16-original-business-requirements-v1.md`
+- 当前基线：`docs/requirements/2026-07-16-original-business-requirements-v2.md`
+- 历史基线：`docs/requirements/2026-07-16-original-business-requirements-v1.md`
 
-该文件保存教材、课时、教案、PPT、视频、自动化、半自动化及独立图片/视频创作台的原始业务意图。后续规格不得静默覆盖这份基线。
+V2保存教材、课时、教案、PPT、视频、自动化、半自动化及通用图片/视频创作台的当前原始业务意图，并明确项目通过创作任务包导入创作台、创作结果保存回项目资产包。后续规格不得静默覆盖这份基线。
 
 ## 1. 先确认哪些决定已经锁定
 
