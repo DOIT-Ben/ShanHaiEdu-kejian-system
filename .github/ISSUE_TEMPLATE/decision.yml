@@ -1,0 +1,46 @@
+name: 设计决策
+description: 产品主线、跨模块合同、核心数据或长期技术方向的调整
+title: "[Decision] "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 当前问题
+      description: 现行设计或实现为什么不能继续满足目标？
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: 不可违反的约束
+      description: 产品、数据、合同、兼容、成本和交付约束。
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: 候选方案与权衡
+      description: 至少比较两个真实可行的方案。
+    validations:
+      required: true
+  - type: textarea
+    id: recommendation
+    attributes:
+      label: 推荐方案
+      description: 给出选择理由和放弃其他方案的原因。
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: 影响与迁移
+      description: 列出需要直接修改和删除的现行文档、合同、数据、代码和测试。
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: 成功与回退标准
+      description: 如何证明决定有效？失败时如何恢复或前向修复？
+    validations:
+      required: true

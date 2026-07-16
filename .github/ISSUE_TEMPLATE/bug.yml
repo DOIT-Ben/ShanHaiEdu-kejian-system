@@ -1,0 +1,48 @@
+name: 缺陷报告
+description: 报告可以复现的产品、合同或工程缺陷
+title: "[Bug] "
+body:
+  - type: textarea
+    id: symptom
+    attributes:
+      label: 实际现象
+      description: 发生了什么？附最小必要证据，不上传敏感业务数据。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 最小复现步骤
+      value: |
+        1. 第一步
+        2. 第二步
+        3. 第三步
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 版本或提交
+      description: 环境、发布版本、工作流版本或Git SHA。
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: 影响与严重程度
+      description: 哪些用户、资产或流程受到影响？是否存在数据、安全或费用风险？
+    validations:
+      required: true
+  - type: textarea
+    id: test
+    attributes:
+      label: 回归测试要求
+      description: 修复前必须增加什么失败测试？
+    validations:
+      required: true
