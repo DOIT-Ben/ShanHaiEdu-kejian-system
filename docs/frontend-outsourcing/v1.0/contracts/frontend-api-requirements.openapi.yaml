@@ -3,8 +3,10 @@ info:
   title: ShanHaiEdu Web V2 Frontend Required API
   version: 0.1.0-draft
   description: >-
-    前端外包所需接口草案。后端发布的版本化正式OpenAPI是联调唯一事实来源；
-    本文件用于报价、Mock和确认前端能力边界。
+    前端外包所需接口草案，已应用2026-07-17业务口径修订。后端发布的版本化正式OpenAPI
+    是联调唯一事实来源；本文件用于报价、Mock和确认前端能力边界。
+x-contract-status: frontend-requirements-draft
+x-current-design: docs/superpowers/specs/2026-07-17-shanhai-courseware-platform-runtime-design.md
 servers:
   - url: /api/v2
 security:
@@ -617,30 +619,26 @@ components:
   schemas:
     Meta:
       type: object
-      additionalProperties: false
-      required: [trace_id, server_time]
+      additionalProperties: true
       properties:
-        trace_id: { type: string }
         server_time: { type: string, format: date-time }
         next_cursor: { type: [string, 'null'] }
     Error:
       type: object
       additionalProperties: false
-      required: [code, message, retryable, trace_id]
+      required: [code, message, retryable, details]
       properties:
         code: { type: string }
         message: { type: string }
         retryable: { type: boolean }
-        action: { type: [string, 'null'] }
         details: { type: object, additionalProperties: true }
-        trace_id: { type: string }
     ErrorEnvelope:
       type: object
       additionalProperties: false
-      required: [ok, error]
+      required: [error, request_id]
       properties:
-        ok: { const: false }
         error: { $ref: '#/components/schemas/Error' }
+        request_id: { type: string }
     User:
       type: object
       additionalProperties: false
@@ -659,11 +657,11 @@ components:
         csrf_token: { type: string }
     SessionEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data: { $ref: '#/components/schemas/Session' }
         meta: { $ref: '#/components/schemas/Meta' }
+        request_id: { type: string }
     LoginRequest:
       type: object
       additionalProperties: false
@@ -729,7 +727,7 @@ components:
         title: { type: string }
         group: { type: string }
         status:
-          enum: [locked, ready, queued, running, needs_review, revision_required, approved, stale, failed, blocked, cancelled, skipped]
+          enum: [disabled, not_ready, ready, draft, queued, running, review_required, approved, partially_completed, failed, paused, cancel_requested, cancelled, stale, skipped]
         progress_percent: { type: integer, minimum: 0, maximum: 100 }
         blocker_message: { type: [string, 'null'] }
     Workspace:
@@ -745,10 +743,12 @@ components:
     NodeWorkspace:
       type: object
       additionalProperties: false
-      required: [node, input_schema, output_renderer, prompt_versions, artifact_versions]
+      required: [node, content_definition_version_id, input_schema, ui_schema, output_renderer, prompt_versions, artifact_versions]
       properties:
         node: { $ref: '#/components/schemas/NodeSummary' }
+        content_definition_version_id: { type: string }
         input_schema: { type: object, additionalProperties: true }
+        ui_schema: { type: object, additionalProperties: true }
         input_values: { type: object, additionalProperties: true }
         output_renderer: { type: string }
         prompt_versions:
@@ -816,7 +816,7 @@ components:
         artifact_version_id: { type: string }
         artifact_type: { type: string }
         version_number: { type: integer, minimum: 1 }
-        status: { enum: [draft, needs_review, approved, stale, superseded, rejected] }
+        status: { enum: [draft, review_required, approved, stale, superseded, rejected] }
         content: { type: object, additionalProperties: true }
         file_objects:
           type: array
@@ -840,7 +840,7 @@ components:
         asset_id: { type: string }
         asset_type: { type: string }
         name: { type: string }
-        status: { enum: [draft, needs_review, approved, stale, rejected] }
+        status: { enum: [draft, review_required, approved, stale, rejected] }
         current_version_id: { type: string }
         thumbnail_url: { type: [string, 'null'] }
         source_node_key: { type: string }
@@ -983,160 +983,159 @@ components:
       $ref: '#/components/schemas/GenericProjectEnvelope'
     GenericProjectEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data: { $ref: '#/components/schemas/Project' }
         meta: { $ref: '#/components/schemas/Meta' }
+        request_id: { type: string }
     ProjectPageEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data:
           type: array
           items: { $ref: '#/components/schemas/Project' }
         meta: { $ref: '#/components/schemas/Meta' }
+        request_id: { type: string }
     LessonEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data: { $ref: '#/components/schemas/Lesson' }
         meta: { $ref: '#/components/schemas/Meta' }
+        request_id: { type: string }
     LessonPageEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data:
           type: array
           items: { $ref: '#/components/schemas/Lesson' }
         meta: { $ref: '#/components/schemas/Meta' }
+        request_id: { type: string }
     WorkspaceEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data: { $ref: '#/components/schemas/Workspace' }
         meta: { $ref: '#/components/schemas/Meta' }
+        request_id: { type: string }
     NodeWorkspaceEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data: { $ref: '#/components/schemas/NodeWorkspace' }
         meta: { $ref: '#/components/schemas/Meta' }
+        request_id: { type: string }
     PromptVersionEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data: { $ref: '#/components/schemas/PromptVersion' }
         meta: { $ref: '#/components/schemas/Meta' }
+        request_id: { type: string }
     CostEstimateEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data: { $ref: '#/components/schemas/CostEstimate' }
         meta: { $ref: '#/components/schemas/Meta' }
+        request_id: { type: string }
     ArtifactVersionEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data: { $ref: '#/components/schemas/ArtifactVersion' }
         meta: { $ref: '#/components/schemas/Meta' }
+        request_id: { type: string }
     UploadSessionEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data: { $ref: '#/components/schemas/UploadSession' }
         meta: { $ref: '#/components/schemas/Meta' }
+        request_id: { type: string }
     TaskEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data: { $ref: '#/components/schemas/Task' }
         meta: { $ref: '#/components/schemas/Meta' }
+        request_id: { type: string }
     TaskPageEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data:
           type: array
           items: { $ref: '#/components/schemas/Task' }
         meta: { $ref: '#/components/schemas/Meta' }
+        request_id: { type: string }
     AssetPageEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data:
           type: array
           items: { $ref: '#/components/schemas/Asset' }
         meta: { $ref: '#/components/schemas/Meta' }
+        request_id: { type: string }
     DeliveryEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data: { $ref: '#/components/schemas/Delivery' }
         meta: { $ref: '#/components/schemas/Meta' }
+        request_id: { type: string }
     ProviderEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data: { $ref: '#/components/schemas/Provider' }
         meta: { $ref: '#/components/schemas/Meta' }
+        request_id: { type: string }
     ProviderPageEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data:
           type: array
           items: { $ref: '#/components/schemas/Provider' }
         meta: { $ref: '#/components/schemas/Meta' }
+        request_id: { type: string }
     ModelPageEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data:
           type: array
           items: { $ref: '#/components/schemas/ModelDefinition' }
         meta: { $ref: '#/components/schemas/Meta' }
+        request_id: { type: string }
     RoutePolicyPageEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data:
           type: array
           items: { $ref: '#/components/schemas/RoutePolicy' }
         meta: { $ref: '#/components/schemas/Meta' }
+        request_id: { type: string }
     ModelRunPageEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data:
           type: array
           items: { $ref: '#/components/schemas/ModelRun' }
         meta: { $ref: '#/components/schemas/Meta' }
+        request_id: { type: string }
     TemplatePageEnvelope:
       type: object
-      required: [ok, data, meta]
+      required: [data, meta, request_id]
       properties:
-        ok: { const: true }
         data:
           type: array
           items: { $ref: '#/components/schemas/TemplateSummary' }
         meta: { $ref: '#/components/schemas/Meta' }
-
+        request_id: { type: string }

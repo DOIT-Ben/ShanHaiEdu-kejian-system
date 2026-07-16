@@ -1,7 +1,7 @@
 {
   "schema_version": "shanhaiedu-frontend-outsourcing-package/v1",
   "package_name": "shanhaiedu-frontend-outsourcing-v1.0",
-  "package_version": "1.0.0",
+  "package_version": "1.0.1",
   "created_at": "2026-07-16",
   "language": "zh-CN",
   "frontend_type": "production_spa",
@@ -26,7 +26,7 @@
     "canonical_api_owner": "backend_openapi"
   },
   "contents": {
-    "main_documents": 16,
+    "main_documents": 17,
     "contracts": 5,
     "design_token_files": 2,
     "checklists": 4,
@@ -34,10 +34,12 @@
     "checksums": 1
   },
   "important_notes": [
+    "必须先执行15_已确认业务口径修订_2026-07-17.md。",
+    "十二部分是内置默认内容结构，不得在组件中写死。",
+    "图片、视频和PPT创作台是平台级能力，通过创作包和保存操作与项目通信。",
     "本包不包含旧前端代码。",
     "frontend-api-requirements.openapi.yaml是前端需求草案，后端正式OpenAPI是联调唯一事实来源。",
     "Figma源文件和生产源码由外包承接方按本包要求交付。",
     "生产前端不得直接调用模型Provider或保存模型密钥。"
   ]
 }
-

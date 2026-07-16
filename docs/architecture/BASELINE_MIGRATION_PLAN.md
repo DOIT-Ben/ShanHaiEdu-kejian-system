@@ -1,5 +1,7 @@
 # 既有后端基座迁移计划
 
+> 当前迁移边界受`docs/superpowers/specs/2026-07-17-shanhai-courseware-platform-runtime-design.md`约束。旧状态枚举、固定十二列教案、项目挂载创作台和旧API响应包不得直接迁入。
+
 ## 1. 迁移原则
 
 源基座：`DOIT-Ben/shanhaiedu-v1.0.0` 的 `main`。
@@ -42,31 +44,46 @@
 
 ### 阶段 B：项目、工作流和版本
 
-- 迁移项目、工作流配置、节点状态、版本、审批和级联失效。
+- 迁移项目、课时、分支配置、工作流定义/运行、正式状态机、版本、审批和精确过期。
 - 将文件目录型状态逐步迁到 SQLAlchemy repository。
 - 增加工作流 definition/run 分离，项目绑定不可变工作流版本。
+- 建立Artifact、ArtifactVersion、FileAsset、ProjectAssetSlot和AssetBinding。
 
 退出条件：固定课例可从教材到教案确认，刷新后状态不丢失。
 
-### 阶段 C：Prompt 与模型网关
+### 阶段 C：内容运行时、Prompt 与模型网关
 
 - 迁移 Prompt registry 和 Provider adapter。
+- 建立内容包导入、验证、发布和固定版本机制。
+- 建立Content Definition Schema通用结构，默认导入十二部分教案包。
+- 建立ContextBinding白名单、Prompt编译器和结构化输出校验。
 - 增加逻辑模型、能力、路由策略、密钥引用、健康检查和 usage record。
 - 保存每次真实发送的 Prompt snapshot。
 - 接入 Dramatiq/Redis，把长任务从 API 进程移出。
 
 退出条件：文本和图片任务可异步运行、取消、重试和审计。
 
-### 阶段 D：资产、视频和交付
+### 阶段 D：通用创作引擎和创作台
+
+- 建立CreationPackage、CreationBatch、GenerationJob/Attempt/Result。
+- 支持批量生成、部分成功、单项重试、候选选择和StyleContract。
+- 建立SaveToProjectOperation原子保存事务。
+- 提供项目导入创作台和创作台独立使用两种入口。
+
+退出条件：项目任务包可导入图片创作台，候选可保存回来源或其他有权限项目，未保存候选不污染项目资产。
+
+### 阶段 E：PPT、视频和交付
 
 - 增加 S3/MinIO 资产存储和预签名上传。
-- 迁移视频 Provider，增加细分镜到片段的批任务与部分重试。
+- 建立PPT大纲、逐页规格、封面门禁、视觉契约、正文资产和可编辑混合PPTX装配。
+- 迁移视频Provider，按锚点、母版故事、粗分镜、视觉母图、图片资产和细分镜生成shot候选。
+- 候选通过技术校验、被选择并保存后才创建正式clip_id。
 - 增加 FFmpeg 合成、ffprobe 校验、TTS 和交付包。
 - 将所有模型输出注册为资产并建立派生关系。
 
 退出条件：真实图片可作为输入生成真实视频片段，并合成可播放成品。
 
-### 阶段 E：生产化
+### 阶段 F：生产化
 
 - PostgreSQL/Alembic 完成，SQLite 只留给单元测试。
 - 建立配额、限流、费用、审计、备份、恢复和告警。
@@ -106,10 +123,11 @@ main
 1. 输出源基座可复用模块清单和依赖图。
 2. 建立目标目录、Python 依赖锁定和 Docker Compose。
 3. 迁入 FastAPI 启动、认证和项目 API。
-4. 建立 PostgreSQL 数据模型与第一版 Alembic。
-5. 对齐前端 OpenAPI 需求草案，形成正式 `/api/v2` 合同。
-6. 建立任务、SSE、幂等和资产上传最小闭环。
-7. 接入一个真实文本模型和一个真实图片模型。
-8. 用固定教材完成“上传—课时划分—教案—确认”的后端验收。
+4. 按正式规格建立PostgreSQL核心数据模型与第一版Alembic。
+5. 建立内容包、动态教案Schema和Prompt编译最小闭环。
+6. 对齐前端需求草案，形成正式`/api/v2`合同和生成客户端。
+7. 建立任务、SSE、Outbox、幂等和资产上传最小闭环。
+8. 接入一个真实文本模型和一个真实图片模型。
+9. 用固定教材完成“上传—课时划分—动态结构教案—确认”的后端验收。
 
 前端可以并行使用 MSW 开发，但联调前必须冻结第一版正式 OpenAPI。

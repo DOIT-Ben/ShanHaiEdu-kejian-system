@@ -1,34 +1,25 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://shanhaiedu.local/contracts/sse-events-v1.schema.json",
+  "$id": "https://shanhaiedu.local/contracts/sse-events-v2.schema.json",
   "title": "ShanHaiEdu SSE Event",
   "type": "object",
   "additionalProperties": false,
-  "required": ["event_id", "event_type", "occurred_at", "project_id", "payload"],
+  "required": ["event_id", "event_type", "occurred_at", "status", "progress", "message", "data"],
   "properties": {
     "event_id": { "type": "string", "minLength": 1 },
     "event_type": {
-      "enum": [
-        "task.queued",
-        "task.started",
-        "task.progress",
-        "task.completed",
-        "task.failed",
-        "task.cancelled",
-        "node.status_changed",
-        "artifact.version_created",
-        "artifact.approved",
-        "budget.updated",
-        "provider.degraded"
-      ]
+      "type": "string",
+      "pattern": "^(workflow\\.node|generation\\.job|creation\\.batch|artifact|asset|ppt|video|delivery|system\\.notification)\\.[a-z0-9_.-]+$"
     },
     "occurred_at": { "type": "string", "format": "date-time" },
     "organization_id": { "type": ["string", "null"] },
-    "project_id": { "type": "string", "minLength": 1 },
+    "project_id": { "type": ["string", "null"] },
     "lesson_id": { "type": ["string", "null"] },
-    "node_key": { "type": ["string", "null"] },
-    "task_id": { "type": ["string", "null"] },
-    "payload": { "type": "object", "additionalProperties": true }
+    "node_run_id": { "type": ["string", "null"] },
+    "job_id": { "type": ["string", "null"] },
+    "status": { "type": ["string", "null"] },
+    "progress": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
+    "message": { "type": "string" },
+    "data": { "type": "object", "additionalProperties": true }
   }
 }
-

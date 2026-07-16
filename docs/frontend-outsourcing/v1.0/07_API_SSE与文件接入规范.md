@@ -1,5 +1,7 @@
 # 07 API、SSE与文件接入规范
 
+> 当前业务修订见`15_已确认业务口径修订_2026-07-17.md`。本文件描述前端要求，正式联调仍以后端OpenAPI为准。
+
 ## 1. 基础约定
 
 - 正式业务API前缀：`/api/v2`。
@@ -16,12 +18,9 @@
 
 ```json
 {
-  "ok": true,
   "data": {},
-  "meta": {
-    "trace_id": "trace_01",
-    "server_time": "2026-07-16T10:00:00Z"
-  }
+  "meta": {},
+  "request_id": "req_01"
 }
 ```
 
@@ -29,15 +28,13 @@
 
 ```json
 {
-  "ok": false,
   "error": {
     "code": "BUDGET_AUTHORIZATION_REQUIRED",
     "message": "本次生成预计超出项目预算，需要确认后继续。",
     "retryable": false,
-    "action": "authorize_budget",
-    "details": {},
-    "trace_id": "trace_01"
-  }
+    "details": {}
+  },
+  "request_id": "req_01"
 }
 ```
 
@@ -67,6 +64,10 @@
 - Node Runs：费用估算、提交、取消和重试。
 - Artifacts：产物、版本、批准和失效。
 - Assets：列表、引用、预览和下载授权。
+- Content Definitions：动态结构、UI Schema、字段权限和版本。
+- Creation Packages：从项目准备并导入创作台的不可变任务包。
+- Creation Batches：通用创作批次、任务项、候选、选择和保存回项目。
+- Studios：图片、视频和PPT平台级创作入口。
 - Tasks：任务列表和详情。
 - Delivery：清单、打包和下载。
 - Templates：模板列表、导入、试运行、发布和回滚。
@@ -76,29 +77,29 @@
 
 ## 5. SSE
 
-建议端点：
+标准端点：
 
 ```text
-GET /api/v2/events?project_id={projectId}&last_event_id={eventId}
+GET /api/v2/events/stream
+GET /api/v2/projects/{projectId}/events/stream
+GET /api/v2/jobs/{jobId}/events/stream
 ```
 
 事件：
 
-- `task.queued`
-- `task.started`
-- `task.progress`
-- `task.completed`
-- `task.failed`
-- `task.cancelled`
-- `node.status_changed`
-- `artifact.version_created`
-- `artifact.approved`
-- `budget.updated`
-- `provider.degraded`
+- `workflow.node.*`
+- `generation.job.*`
+- `creation.batch.*`
+- `artifact.*`
+- `asset.*`
+- `ppt.*`
+- `video.*`
+- `delivery.*`
+- `system.notification`
 
 规则：
 
-- 每个事件具有event_id、event_type、occurred_at、project_id和payload。
+- 每个事件具有event_id、event_type、occurred_at、project_id、node_run_id、job_id、status、progress、message和最小安全data。
 - EventSource断开后指数退避重连。
 - 使用最后事件ID恢复。
 - 连续失败后退化为低频轮询。
@@ -141,4 +142,3 @@ GET /api/v2/events?project_id={projectId}&last_event_id={eventId}
 - 取消浏览器请求不等于取消后端模型任务。
 - 模型任务取消必须调用专用取消端点并等待后端确认。
 - 已提交且不支持取消的Provider任务必须明确提示可能继续计费。
-

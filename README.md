@@ -6,40 +6,38 @@
 
 本仓库是后续产品、前端、后端、工作流和交付材料的唯一主仓库，活动分支统一使用 `main`。
 
-当前首批提交以产品和工程规格为主：
+当前仓库已经形成经确认的产品与运行时设计基线：
 
 - 前端完全重做，不继承旧前端的布局和视觉实现。
 - 后端不从零重写，以 `DOIT-Ben/shanhaiedu-v1.0.0` 的 FastAPI、状态机、任务、产物和 Provider adapter 为迁移基座。
 - 第一阶段只闭环小学数学，但领域、节点模板和模型 Provider 均预留扩展能力。
 - 所有模型调用必须经过后端模型网关；前端不得保存或直接调用 Provider 密钥。
+- 教案十二部分是内置默认内容结构，不是写死的程序结构；管理员可以导入新结构包。
+- 图片、视频和 PPT 创作台是平台级通用能力，通过创作包导入和结果保存与项目双向通信。
 
 ## 从这里开始
 
-1. [统一材料入口](docs/START_HERE.md)
-2. [给前端外包团队的开工指令](docs/vendor/FRONTEND_KICKOFF_INSTRUCTION.md)
-3. [后端构建蓝图](docs/architecture/BACKEND_ARCHITECTURE.md)
-4. [既有后端迁移计划](docs/architecture/BASELINE_MIGRATION_PLAN.md)
-5. [分支、合同与变更规则](docs/governance/BRANCH_AND_CONTRACT_RULES.md)
-6. [前端外包规格全集](docs/frontend-outsourcing/v1.0/README.md)
+1. [当前正式运行时与后端业务设计](docs/superpowers/specs/2026-07-17-shanhai-courseware-platform-runtime-design.md)
+2. [统一材料入口](docs/START_HERE.md)
+3. [前端已确认业务口径修订](docs/frontend-outsourcing/v1.0/15_已确认业务口径修订_2026-07-17.md)
+4. [给前端外包团队的开工指令](docs/vendor/FRONTEND_KICKOFF_INSTRUCTION.md)
+5. [后端构建蓝图](docs/architecture/BACKEND_ARCHITECTURE.md)
+6. [既有后端迁移计划](docs/architecture/BASELINE_MIGRATION_PLAN.md)
+7. [分支、合同与变更规则](docs/governance/BRANCH_AND_CONTRACT_RULES.md)
 
 ## 产品主线
 
 ```text
 教材上传
   -> 课时划分
-  -> 每课时教案
-  -> PPT 分支
-  -> 导入创意三类九套
-  -> 锚点选择
-  -> 视觉母图
-  -> 粗分镜
-  -> 图片资产
-  -> 细分镜
-  -> 视频片段
-  -> 合成与交付
+  -> 每课时动态结构教案
+  -> [可选] PPT：大纲 -> 逐页规格 -> 封面 -> 视觉契约 -> 正文 -> PPTX
+  -> [可选] 视频：三类九套锚点 -> 母版故事 -> 粗分镜 -> 视觉母图
+             -> 图片资产 -> 细分镜 -> shot候选 -> 合格clip -> 合成
+  -> 交付
 ```
 
-PPT 与导入视频都是已批准教案的下游项目，但二者在生产链路上互不依赖。导入创意不直接从知识点或教案内容推导，只通过已定义的创意类型与锚点建立，再在后续脚本阶段完成课程适配。
+PPT 与导入视频都是已批准教案的可选下游分支，但二者在生产链路上互不依赖。锚点选择不读取知识点、教材或教案，只通过已定义的创意类型与锚点库建立；锚点批准后，后续故事节点才使用受控课程知识摘要完成适配。
 
 ## 目标技术栈
 

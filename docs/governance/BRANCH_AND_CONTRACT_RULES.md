@@ -9,10 +9,12 @@
 
 ## 事实来源
 
+- 当前产品与运行时设计以`docs/superpowers/specs/2026-07-17-shanhai-courseware-platform-runtime-design.md`及后续已批准ADR为准。
 - 后端提交的 OpenAPI 是联调唯一接口事实来源。
 - 数据库变化必须带 Alembic migration。
 - 工作流变化必须升级 definition 版本，运行中的项目继续绑定旧版本。
 - Prompt 模板变化必须形成新版本，不覆盖历史运行使用的内容。
+- 内容结构、规则、锚点和模型档案变化必须形成新的内容包版本，项目继续固定引用原版本，除非显式迁移。
 - Figma 只在标记 Ready for Dev 后成为视觉验收依据。
 
 ## 兼容规则
