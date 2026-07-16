@@ -48,3 +48,7 @@ backups/
 Thumbs.db
 .idea/
 .vscode/
+
+# Local agent continuity
+.codex/
+.entire/

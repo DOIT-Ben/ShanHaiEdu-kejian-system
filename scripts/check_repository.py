@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import subprocess
@@ -42,6 +43,8 @@ FORBIDDEN_NAME = re.compile(
 )
 
 MARKDOWN_LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+FRONTEND_CHECKSUMS = ROOT / "docs/frontend/CHECKSUMS.sha256"
+TEXT_CHECKSUM_SUFFIXES = {".css", ".json", ".md"}
 
 
 def repository_files() -> list[Path]:
@@ -121,6 +124,39 @@ def check_markdown_links(files: list[Path], errors: list[str]) -> None:
                 errors.append(f"broken link: {path.relative_to(ROOT)} -> {raw}")
 
 
+def check_checksum_manifest(manifest: Path, errors: list[str]) -> None:
+    try:
+        lines = manifest.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError) as exc:
+        errors.append(f"cannot read checksum manifest {manifest}: {exc}")
+        return
+
+    for line_number, line in enumerate(lines, start=1):
+        if not line.strip():
+            continue
+        try:
+            expected, raw_target = line.split(maxsplit=1)
+        except ValueError:
+            errors.append(f"invalid checksum line {manifest}:{line_number}")
+            continue
+        target = (manifest.parent / raw_target.lstrip("*")).resolve()
+        try:
+            target.relative_to(manifest.parent.resolve())
+        except ValueError:
+            errors.append(f"checksum target escapes manifest directory: {raw_target}")
+            continue
+        try:
+            content = target.read_bytes()
+        except OSError as exc:
+            errors.append(f"cannot read checksum target {target}: {exc}")
+            continue
+        if target.suffix in TEXT_CHECKSUM_SUFFIXES or target.name.endswith(".example"):
+            content = content.replace(b"\r\n", b"\n")
+        actual = hashlib.sha256(content).hexdigest()
+        if actual != expected:
+            errors.append(f"checksum mismatch: {target.relative_to(manifest.parent.resolve())}")
+
+
 def report_size_triggers(files: list[Path]) -> None:
     for path in files:
         if path.suffix != ".md":
@@ -145,6 +181,7 @@ def main() -> int:
     check_json(files, errors)
     check_yaml(files, errors)
     check_markdown_links(files, errors)
+    check_checksum_manifest(FRONTEND_CHECKSUMS, errors)
     report_size_triggers(files)
 
     if errors:
