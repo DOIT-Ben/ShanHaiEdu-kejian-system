@@ -1,57 +1,81 @@
-# 山海教育课件系统统一阅读入口
+# 山海教育课件系统最短阅读入口
 
-本仓库当前树只保留一套有效口径。不要从Git历史、旧聊天记录或外部压缩包复制需求。
+当前树只保留一套有效口径。不要从Git历史、旧聊天记录或外部压缩包复制需求。
 
-## 产品和项目负责人
+## 所有人先读
 
-1. `docs/product/REQUIREMENTS_ANALYSIS.md`
-2. `docs/product/PRODUCT_SPEC.md`
-3. `docs/workflows/END_TO_END_WORKFLOW.md`
-4. `docs/workflows/INTRO_ANCHORS.md`
-5. `docs/workflows/PPT_PRODUCTION.md`
-6. `docs/workflows/VIDEO_PRODUCTION.md`
-7. `docs/frontend/README.md`
-8. `docs/backend/README.md`
+1. `README.md`：项目是什么。
+2. `AGENTS.md`：必须怎样工作。
+3. `CURRENT_STATUS.md`：现在做到哪里。
+4. 被分配的GitHub Issue和Pull Request：本次具体做什么。
 
-## 前端团队
+完成以上步骤后，只读取与任务直接相关的部分。不要把“接手项目”理解为通读所有文档。
 
-1. `docs/product/REQUIREMENTS_ANALYSIS.md`
-2. `docs/frontend/README.md`
-3. `docs/workflows/INTRO_ANCHORS.md`
-4. `docs/workflows/PPT_PRODUCTION.md`
-5. `docs/workflows/VIDEO_PRODUCTION.md`
-6. `docs/frontend/00_产品范围与固定决策.md`
-7. `docs/frontend/01_信息架构与主页.md`
-8. `docs/frontend/02_项目与课时工作台.md`
-9. `docs/frontend/03_通用创作中心.md`
-10. `docs/frontend/04_素材成果与管理端.md`
-11. `docs/frontend/05_视觉系统与动效.md`
-12. `docs/frontend/06_组件化与代码架构.md`
-13. `docs/frontend/07_路由状态与合同接入.md`
-14. `docs/frontend/08_测试验收与外包交付.md`
-15. `contracts/`
+## 产品与工作流任务
 
-## 后端团队
+按任务选择：
 
-1. `docs/product/REQUIREMENTS_ANALYSIS.md`
-2. `docs/backend/README.md`
-3. `docs/workflows/INTRO_ANCHORS.md`
-4. `docs/workflows/PPT_PRODUCTION.md`
-5. `docs/workflows/VIDEO_PRODUCTION.md`
-6. `docs/backend/00_系统架构.md`
-7. `docs/backend/01_领域模型与资产版本.md`
-8. `docs/backend/02_工作流与创作引擎.md`
-9. `docs/backend/03_内容运行时与模型网关.md`
-10. `docs/backend/04_数据库设计.md`
-11. `docs/backend/05_API_SSE权限与安全.md`
-12. `docs/backend/06_测试迁移与交付.md`
-13. `contracts/`
+- `docs/product/REQUIREMENTS_ANALYSIS.md`：用户问题、范围和业务规则。
+- `docs/product/PRODUCT_SPEC.md`：现行产品能力和验收口径。
+- `docs/workflows/END_TO_END_WORKFLOW.md`：整个项目链路。
+- `docs/workflows/INTRO_ANCHORS.md`：三类九套与锚定隔离。
+- `docs/workflows/PPT_PRODUCTION.md`：PPT生产。
+- `docs/workflows/VIDEO_PRODUCTION.md`：视频生产。
 
-## 事实来源优先级
+只修改某一工作流时，不需要先读取全部前后端设计。
 
-1. `docs/product`和`docs/workflows`定义业务语义与流程。
-2. `contracts`定义跨前后端的机器边界。
-3. `docs/backend`与`docs/frontend`定义各自工程实现。
-4. 已合并到`main`的迁移、生成OpenAPI、代码和测试必须实现以上设计；冲突视为缺陷。
+## 前端任务
 
-发现冲突必须修改现行源文档、合同和实现，不得增加“补充说明”“临时兼容说明”继续叠加口径。
+1. `docs/frontend/README.md`
+2. 当前功能对应的`docs/frontend/0x_*.md`
+3. 当前功能对应的工作流文档
+4. `contracts/README.md`及实际使用的Schema/OpenAPI路径
+5. 当前Feature代码与测试
+
+不要手写后端DTO，不要从旧外包包复制实现，不要为了一个新节点在页面堆叠类型判断。
+
+## 后端任务
+
+1. `docs/backend/README.md`
+2. 当前模块对应的`docs/backend/0x_*.md`
+3. 当前模块对应的工作流文档
+4. `contracts/README.md`及实际修改的合同
+5. 当前模块代码、迁移和测试
+
+不要因为任务涉及模型就通读所有Provider或视频设计。以模块边界和应用接口缩小范围。
+
+## 数据库与合同任务
+
+1. `docs/backend/01_领域模型与资产版本.md`
+2. `docs/backend/04_数据库设计.md`
+3. `docs/backend/05_API_SSE权限与安全.md`
+4. `contracts/`
+5. 当前Alembic迁移、消费者和合同测试
+
+任何破坏性变更先建立Decision Issue，并在一个PR同步迁移、消费者、测试和回退策略。
+
+## 测试与验收任务
+
+1. Issue验收标准和PR风险说明
+2. 对应产品或工作流文档
+3. `docs/frontend/08_测试验收与外包交付.md`或`docs/backend/06_测试迁移与交付.md`
+4. 相关合同和测试代码
+5. `docs/governance/DELIVERY_ROADMAP.md`中的当前阶段出口
+
+MVP和里程碑验收必须使用真实黄金项目，Mock和截图只用于开发辅助。
+
+## 团队治理任务
+
+- `docs/governance/TEAM_WORKFLOW.md`：Issue、分支、PR、交接和关闭。
+- `docs/governance/DOCUMENT_POLICY.md`：信息放置、替换和删除。
+- `docs/governance/DELIVERY_ROADMAP.md`：阶段、并行策略和MVP出口。
+
+## 冲突处理
+
+- 产品与工作流文档描述预期行为。
+- 合同描述跨模块机器边界。
+- 代码、迁移和测试描述已实现行为。
+
+三者不一致时，它们共同构成一个阻塞缺陷。停止扩展功能，创建或更新Issue，并在同一变更中统一口径。禁止增加补充说明让团队自行选择。
+
+历史只在调查回归、责任审计或当前资料无法解释的决定时定向读取。

@@ -1,0 +1,15 @@
+# Repository and governance
+/AGENTS.md @DOIT-Ben
+/CURRENT_STATUS.md @DOIT-Ben
+/docs/governance/ @DOIT-Ben
+
+# Product and contracts
+/docs/product/ @DOIT-Ben
+/docs/workflows/ @DOIT-Ben
+/contracts/ @DOIT-Ben
+
+# Security, data and provider boundaries
+/apps/api/ @DOIT-Ben
+/workers/ @DOIT-Ben
+/workflow/ @DOIT-Ben
+/infra/ @DOIT-Ben

@@ -2,6 +2,9 @@
 node_modules/
 dist/
 .vite/
+.turbo/
+.cache/
+.pnpm-store/
 coverage/
 playwright-report/
 test-results/
@@ -12,8 +15,11 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+htmlcov/
 .venv/
 venv/
+*.egg-info/
 
 # Environment and secrets
 .env
@@ -24,10 +30,18 @@ venv/
 storage/
 uploads/
 tmp/
+runtime/
+artifacts/
+downloads/
+exports/
+scratch/
+backups/
 *.db
 *.sqlite
 *.sqlite3
 *.log
+*.tmp
+*.swp
 
 # IDE and OS
 .DS_Store
