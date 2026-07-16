@@ -2,7 +2,7 @@
 40d3873dfa3e2ae2fed07c3f7a1a83771533a4ac8ab9ab9b314123fe0006ae55  ./AGENTS.md
 fdeec351fdb0694f1db55b23974d62bd43c0f4c268c8ecbd460cdb333346db85  ./README.md
 b48a65a8759f8abb21d40b2ab1dd968506129b5ed8784cacad9fe03ef1298c55  ./deliverables/shanhaiedu-frontend-outsourcing-v1.0.zip
-5f9fa25122f493a7cae83815f572e8b5126ebb8e3bc30474517ece02bc6b306f  ./docs/START_HERE.md
+1cbded94867e40d3bbd7566baa24839d4f6b64f3be468e30f5b0f31895ddc858  ./docs/START_HERE.md
 4fefad05a32eacba1916913abed942e4dcd64593c8970f937966c38a7cf5ce27  ./docs/architecture/BACKEND_ARCHITECTURE.md
 0bb1417ce40605990d11574173040eaf28c517abf1d1b215d60ba427da804e66  ./docs/architecture/BASELINE_MIGRATION_PLAN.md
 0bb69e89f2aa7ac26dc48edc0a0dedd7887c7416464db19c04ca3aa46f983b1b  ./docs/frontend-outsourcing/v1.0/00_范围边界与固定决策.md
@@ -40,4 +40,5 @@ e826318a5408f0d7b8b465972d9d0851197eba3731c8db2ea929f68e7001deaf  ./docs/fronten
 fd2271c93f76b3c2a2f15f590a2dd1c5aefa55921b851f0f977dcaef83ca2448  ./docs/frontend-outsourcing/v1.0/templates/pull-request-template.md
 a3f56d5fcf14ebe45c393844d642d6b5fb389ab5e65585997a22822aa305d1ef  ./docs/frontend-outsourcing/v1.0/templates/vendor-weekly-report.md
 56002a5bdc536baa05ddd85ad2b8d172047e63238672e08173fe6b4f46462890  ./docs/governance/BRANCH_AND_CONTRACT_RULES.md
+c53acd8bdea05886a2676e1a66fd6b374b400106b968b0575fe857d1a1cdeb0f  ./docs/requirements/2026-07-16-original-business-requirements-v1.md
 42304029e1d8732290e9ea1c530428b0ce009d9b682fbb1d2dcd6b86e15980a2  ./docs/vendor/FRONTEND_KICKOFF_INSTRUCTION.md
