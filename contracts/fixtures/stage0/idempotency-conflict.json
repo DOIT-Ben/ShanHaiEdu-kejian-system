@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "IDEMPOTENCY_CONFLICT",
+    "message": "The idempotency key was already used for a different request.",
+    "retryable": false,
+    "details": {
+      "scope": "projects.create"
+    }
+  },
+  "request_id": "req_stage0_idempotency_conflict"
+}

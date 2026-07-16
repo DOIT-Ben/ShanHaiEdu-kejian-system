@@ -1,0 +1,8 @@
+{
+  "data": {
+    "job_id": "0198f1a0-7c10-7000-8000-000000000004",
+    "status": "queued",
+    "events_url": "/api/v2/generation-jobs/0198f1a0-7c10-7000-8000-000000000004/events/stream"
+  },
+  "request_id": "req_stage0_upload_confirm"
+}

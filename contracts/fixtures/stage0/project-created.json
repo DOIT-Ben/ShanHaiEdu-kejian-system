@@ -1,0 +1,15 @@
+{
+  "data": {
+    "id": "0198f1a0-7c10-7000-8000-000000000001",
+    "title": "Fractions: one half",
+    "subject": "primary_math",
+    "grade": "3",
+    "textbook_edition": "renjiao",
+    "knowledge_point": "Understanding one half",
+    "status": "draft",
+    "automation_mode": "assisted",
+    "created_at": "2026-07-17T00:00:00Z",
+    "updated_at": "2026-07-17T00:00:00Z"
+  },
+  "request_id": "req_stage0_project_created"
+}

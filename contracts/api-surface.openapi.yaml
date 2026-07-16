@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ShanHaiEdu Core Integration Surface
-  version: 2.0.0
+  version: 2.1.0
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
@@ -13,6 +13,40 @@ servers:
 security:
   - cookieAuth: []
 paths:
+  /health/live:
+    get:
+      summary: API进程存活检查
+      operationId: getLiveness
+      security: []
+      responses:
+        '200':
+          description: API process is alive; this check has no external dependencies
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LivenessEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /health/ready:
+    get:
+      summary: API依赖就绪检查
+      operationId: getReadiness
+      security: []
+      responses:
+        '200':
+          description: All required dependencies are ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessEnvelope'
+        '503':
+          description: One or more required dependencies are unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
   /projects:
     get:
       summary: 查询项目列表
@@ -92,6 +126,47 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProjectEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/materials/uploads:
+    post:
+      summary: 创建教材私有直传会话
+      operationId: createMaterialUploadSession
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUploadSessionRequest'
+      responses:
+        '201':
+          description: Presigned upload session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadSessionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/materials/{material_id}/confirm:
+    post:
+      summary: 确认教材对象并创建后台任务
+      operationId: confirmMaterialUpload
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/MaterialId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmUploadRequest'
+      responses:
+        '202':
+          $ref: '#/components/responses/AcceptedJob'
         '4XX':
           $ref: '#/components/responses/Error'
   /projects/{project_id}/workflow:
@@ -295,16 +370,59 @@ paths:
                 $ref: '#/components/schemas/SaveOperationEnvelope'
         '4XX':
           $ref: '#/components/responses/Error'
+  /generation-jobs/{job_id}:
+    get:
+      summary: 查询异步任务事实状态
+      operationId: getGenerationJob
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Generation job state from PostgreSQL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationJobEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /generation-jobs/{job_id}/cancel:
+    post:
+      summary: 请求协作式取消异步任务
+      operationId: cancelGenerationJob
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Cancellation requested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationJobEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /generation-jobs/{job_id}/events/stream:
+    get:
+      summary: 订阅单任务实时事件
+      operationId: streamGenerationJobEvents
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/LastEventId'
+      responses:
+        '200':
+          description: Server-sent event stream; data follows sse-event.schema.json
+          content:
+            text/event-stream:
+              schema: {type: string}
+        '4XX':
+          $ref: '#/components/responses/Error'
   /projects/{project_id}/events/stream:
     get:
       summary: 订阅项目实时事件
       operationId: streamProjectEvents
       parameters:
         - $ref: '#/components/parameters/ProjectId'
-        - name: Last-Event-ID
-          in: header
-          required: false
-          schema: {type: string}
+        - $ref: '#/components/parameters/LastEventId'
       responses:
         '200':
           description: Server-sent event stream; data follows sse-event.schema.json
@@ -340,6 +458,16 @@ components:
       in: path
       required: true
       schema: {type: string, format: uuid}
+    MaterialId:
+      name: material_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    JobId:
+      name: job_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
     IdempotencyKey:
       name: Idempotency-Key
       in: header
@@ -350,6 +478,11 @@ components:
       in: header
       required: true
       schema: {type: string}
+    LastEventId:
+      name: Last-Event-ID
+      in: header
+      required: false
+      schema: {type: string, minLength: 1}
     PageCursor:
       name: page[cursor]
       in: query
@@ -424,6 +557,44 @@ components:
         textbook_edition: {type: [string, 'null']}
         automation_mode:
           $ref: '#/components/schemas/AutomationMode'
+    CreateUploadSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [filename, media_type, size_bytes, sha256]
+      properties:
+        filename: {type: string, minLength: 1, maxLength: 255}
+        media_type: {type: string, minLength: 1, maxLength: 255}
+        size_bytes: {type: integer, minimum: 1}
+        sha256: {type: string, pattern: '^[a-f0-9]{64}$'}
+    UploadSession:
+      type: object
+      additionalProperties: false
+      required: [upload_session_id, material_id, upload_url, method, required_headers, expires_at]
+      properties:
+        upload_session_id: {type: string, format: uuid}
+        material_id: {type: string, format: uuid}
+        upload_url: {type: string, format: uri}
+        method: {const: PUT}
+        required_headers:
+          type: object
+          additionalProperties: {type: string}
+        expires_at: {type: string, format: date-time}
+    UploadSessionEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/UploadSession'}
+        request_id: {type: string, minLength: 1}
+    ConfirmUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [upload_session_id, etag, size_bytes, sha256]
+      properties:
+        upload_session_id: {type: string, format: uuid}
+        etag: {type: string, minLength: 1, maxLength: 255}
+        size_bytes: {type: integer, minimum: 1}
+        sha256: {type: string, pattern: '^[a-f0-9]{64}$'}
     NodeRun:
       type: object
       required: [id, node_key, status]
@@ -484,6 +655,67 @@ components:
             status: {enum: [created, queued, running]}
             events_url: {type: string}
         request_id: {type: string}
+    GenerationJobStatus:
+      type: string
+      enum: [created, queued, running, succeeded, failed, cancel_requested, cancelled]
+    GenerationJob:
+      type: object
+      additionalProperties: false
+      required: [id, job_type, status, progress_percent, created_at, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        project_id: {type: [string, 'null'], format: uuid}
+        job_type: {type: string, minLength: 1}
+        status: {$ref: '#/components/schemas/GenerationJobStatus'}
+        progress_percent: {type: integer, minimum: 0, maximum: 100}
+        progress_message: {type: [string, 'null']}
+        error_code: {type: [string, 'null']}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    GenerationJobEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/GenerationJob'}
+        request_id: {type: string, minLength: 1}
+    DependencyReadiness:
+      type: object
+      additionalProperties: false
+      required: [name, ready, status]
+      properties:
+        name: {enum: [postgresql, redis, object_storage]}
+        ready: {type: boolean}
+        status: {enum: [available, unavailable, not_configured]}
+    LivenessEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [status, service, environment]
+          properties:
+            status: {const: ok}
+            service: {type: string, minLength: 1}
+            environment: {enum: [development, test, production]}
+        request_id: {type: string, minLength: 1}
+    ReadinessEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [status, dependencies]
+          properties:
+            status: {enum: [ready, not_ready]}
+            dependencies:
+              type: array
+              items: {$ref: '#/components/schemas/DependencyReadiness'}
+        request_id: {type: string, minLength: 1}
     CreationBatchEnvelope:
       type: object
       required: [data, request_id]

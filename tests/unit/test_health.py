@@ -40,6 +40,10 @@ async def test_liveness_is_independent_and_preserves_request_id() -> None:
     assert response.headers[REQUEST_ID_HEADER] == "req_test_liveness"
     assert response.json()["data"]["status"] == "ok"
 
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        api_response = await client.get("/api/v2/health/live")
+    assert api_response.status_code == 200
+
 
 async def test_readiness_reports_dependency_failure_without_sensitive_detail() -> None:
     settings = Settings(_env_file=None, environment="test")
@@ -55,6 +59,10 @@ async def test_readiness_reports_dependency_failure_without_sensitive_detail() -
     dependencies = cast(list[dict[str, object]], data["dependencies"])
     assert data["status"] == "not_ready"
     assert dependencies == [{"name": "postgresql", "ready": False, "status": "unavailable"}]
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        api_response = await client.get("/api/v2/health/ready")
+    assert api_response.status_code == 503
 
 
 async def test_invalid_request_id_is_replaced() -> None:

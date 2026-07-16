@@ -33,7 +33,8 @@ def create_app(
     app.state.settings = resolved_settings
     app.state.readiness = readiness_provider
 
-    @app.get("/health/live", tags=["system"])
+    @app.get("/health/live", tags=["system"], include_in_schema=False)
+    @app.get("/api/v2/health/live", tags=["system"])
     async def liveness(request: Request) -> dict[str, object]:
         return {
             "data": {
@@ -44,7 +45,8 @@ def create_app(
             "request_id": request.state.request_id,
         }
 
-    @app.get("/health/ready", tags=["system"])
+    @app.get("/health/ready", tags=["system"], include_in_schema=False)
+    @app.get("/api/v2/health/ready", tags=["system"])
     async def readiness_check(request: Request) -> JSONResponse:
         report = await readiness_provider.check()
         return JSONResponse(

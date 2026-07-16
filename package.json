@@ -1,0 +1,29 @@
+{
+  "name": "shanhaiedu-kejian-system",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.30.2",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "contracts:lint": "redocly lint contracts/api-surface.openapi.yaml",
+    "contracts:schema": "ajv compile --spec=draft2020 -c ajv-formats -s 'contracts/*.schema.json'",
+    "contracts:bundle": "redocly bundle contracts/api-surface.openapi.yaml -o contracts/generated/openapi.bundle.yaml",
+    "contracts:generate": "pnpm contracts:bundle && openapi-typescript contracts/generated/openapi.bundle.yaml -o contracts/generated/typescript/schema.ts",
+    "contracts:typecheck": "tsc -p tsconfig.contracts.json --noEmit",
+    "contracts:test": "uv run pytest tests/contract",
+    "contracts:check-generated": "pnpm contracts:generate && git diff --exit-code -- contracts/generated",
+    "contracts:check": "pnpm contracts:lint && pnpm contracts:schema && pnpm contracts:generate && pnpm contracts:typecheck && pnpm contracts:test && pnpm contracts:check-generated"
+  },
+  "dependencies": {
+    "openapi-fetch": "0.14.0"
+  },
+  "devDependencies": {
+    "@redocly/cli": "2.39.0",
+    "ajv-cli": "5.0.0",
+    "ajv-formats": "3.0.1",
+    "openapi-typescript": "7.8.0",
+    "typescript": "5.8.3"
+  }
+}

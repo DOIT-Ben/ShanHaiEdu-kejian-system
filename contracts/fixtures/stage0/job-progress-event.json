@@ -1,0 +1,16 @@
+{
+  "event_id": "0198f1a0-7c10-7000-8000-000000000005",
+  "sequence_no": 4,
+  "event_type": "generation.job.progress",
+  "occurred_at": "2026-07-17T00:01:05Z",
+  "project_id": "0198f1a0-7c10-7000-8000-000000000001",
+  "resource": {
+    "type": "generation_job",
+    "id": "0198f1a0-7c10-7000-8000-000000000004"
+  },
+  "payload": {
+    "status": "running",
+    "progress_percent": 40
+  },
+  "request_id": "req_stage0_job_event"
+}
