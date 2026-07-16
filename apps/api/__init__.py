@@ -1,0 +1,1 @@
+"""ShanHaiEdu FastAPI application."""

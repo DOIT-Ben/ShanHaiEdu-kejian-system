@@ -51,6 +51,27 @@
 - 协议：REST `/api/v2`、SSE、OpenAPI 3.1、JSON Schema。
 - 模型：文本、图片、视频和TTS全部经过服务端模型网关。
 
+## 后端基座快速开始
+
+需要 Python 3.12、uv 和 Docker Desktop。首次启动：
+
+```powershell
+Copy-Item .env.example .env
+uv sync --frozen
+docker compose -f infra\compose.yaml up -d postgres redis minio
+uv run python scripts\smoke_local_stack.py
+uv run python -m workers.main --check
+uv run uvicorn apps.api.main:app --host 127.0.0.1 --port 8000
+```
+
+API 存活检查是 `GET /health/live`，依赖就绪检查是 `GET /health/ready`。停止本地依赖但保留数据：
+
+```powershell
+docker compose -f infra\compose.yaml down
+```
+
+本地 `.env`、数据库、缓存和对象存储数据不得提交。普通测试和CI不连接真实模型Provider。
+
 ## 目标代码结构
 
 ```text
