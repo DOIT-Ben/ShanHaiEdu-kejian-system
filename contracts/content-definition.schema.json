@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
+  "title": "ContentDefinition",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["definition_key", "title", "fields"],
+  "properties": {
+    "definition_key": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+    "title": {"type": "string", "minLength": 1},
+    "description": {"type": "string"},
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/field"}
+    }
+  },
+  "$defs": {
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field_key", "label", "type", "required", "editable", "deletable"],
+      "properties": {
+        "field_key": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+        "label": {"type": "string", "minLength": 1},
+        "description": {"type": "string"},
+        "type": {
+          "enum": ["text", "rich_text", "number", "boolean", "list", "table", "group", "repeatable", "reference", "asset", "math", "rubric", "timeline"]
+        },
+        "required": {"type": "boolean"},
+        "editable": {"type": "boolean"},
+        "deletable": {"type": "boolean"},
+        "repeatable": {"type": "boolean", "default": false},
+        "min_items": {"type": "integer", "minimum": 0},
+        "max_items": {"type": "integer", "minimum": 1},
+        "ui_widget": {"type": "string"},
+        "placeholder": {"type": "string"},
+        "generation_instruction": {"type": "string"},
+        "validation_rules": {"type": "array", "items": {"type": "object"}},
+        "visibility_condition": {"type": ["object", "null"]},
+        "export_mapping": {"type": ["object", "null"]},
+        "children": {"type": "array", "items": {"$ref": "#/$defs/field"}}
+      }
+    }
+  }
+}

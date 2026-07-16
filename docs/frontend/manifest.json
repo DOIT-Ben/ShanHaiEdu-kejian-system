@@ -1,0 +1,28 @@
+{
+  "package": "shanhaiedu-frontend-spec",
+  "spec_version": "2.0.0",
+  "status": "current",
+  "updated_at": "2026-07-17",
+  "entry": "README.md",
+  "contracts": "../../contracts",
+  "technology": {
+    "framework": "React 19",
+    "language": "TypeScript strict",
+    "bundler": "Vite",
+    "router": "React Router",
+    "server_state": "TanStack Query",
+    "ui_state": "Zustand",
+    "styling": "Tailwind CSS",
+    "primitives": "Radix UI and shadcn/ui"
+  },
+  "required_deliverables": [
+    "source_code",
+    "figma_source",
+    "storybook",
+    "mock_mode",
+    "real_api_mode",
+    "automated_tests",
+    "production_build",
+    "handover_documentation"
+  ]
+}

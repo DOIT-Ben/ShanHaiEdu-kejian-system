@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shanhaiedu.local/contracts/ppt-page-spec.schema.json",
+  "title": "PptPageSpec",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "page_key",
+    "position",
+    "page_type",
+    "teaching_task",
+    "source_refs",
+    "student_focus",
+    "canvas",
+    "visual",
+    "editable_text_blocks",
+    "editable_math_shapes",
+    "layout_spec",
+    "interaction_spec"
+  ],
+  "properties": {
+    "page_key": {"type": "string", "pattern": "^PAGE-[0-9]{2,}$"},
+    "position": {"type": "integer", "minimum": 1},
+    "page_type": {"enum": ["cover", "introduction", "concept", "exploration", "example", "practice", "discussion", "summary", "other"]},
+    "teaching_task": {"type": "string", "minLength": 1},
+    "source_refs": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "student_focus": {"type": "string", "minLength": 1},
+    "canvas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["aspect_ratio", "background_mode", "safe_area"],
+      "properties": {
+        "aspect_ratio": {"const": "16:9"},
+        "background_mode": {"enum": ["cover_art", "solid_white"]},
+        "background_color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+        "safe_area": {"type": "object", "additionalProperties": true}
+      }
+    },
+    "visual": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["visual_decision", "image_strategy", "main_visual_description", "asset_requirements"],
+      "properties": {
+        "visual_decision": {"enum": ["quantity_relation", "whole_part", "comparison", "transformation", "unit_one", "change", "operation", "life_application", "other"]},
+        "image_strategy": {"enum": ["textbook_reconstruction", "original_asset", "mixed"]},
+        "main_visual_description": {"type": "string", "minLength": 1},
+        "asset_requirements": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["requirement_key", "role", "prompt", "negative_prompt", "target_slot_key"],
+            "properties": {
+              "requirement_key": {"type": "string", "minLength": 1},
+              "role": {"enum": ["main_visual", "supporting_visual", "decorative"]},
+              "prompt": {"type": "string", "minLength": 1},
+              "negative_prompt": {"type": "string"},
+              "target_slot_key": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      }
+    },
+    "editable_text_blocks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["block_key", "role", "text", "layout"],
+        "properties": {
+          "block_key": {"type": "string"},
+          "role": {"enum": ["title", "body", "question", "label", "answer", "note"]},
+          "text": {"type": "string"},
+          "layout": {"type": "object"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "editable_math_shapes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["shape_key", "shape_type", "data", "layout"],
+        "properties": {
+          "shape_key": {"type": "string"},
+          "shape_type": {"enum": ["formula", "line_segment", "hundred_grid", "ratio_bar", "progress_bar", "arrow", "chart", "table", "custom"]},
+          "data": {"type": "object"},
+          "layout": {"type": "object"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "layout_spec": {"type": "object", "additionalProperties": true},
+    "interaction_spec": {"type": "object", "additionalProperties": true},
+    "speaker_notes": {"type": "string"},
+    "validation_rules": {"type": "array", "items": {"type": "object"}}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"page_type": {"const": "cover"}}, "required": ["page_type"]},
+      "then": {"properties": {"canvas": {"type": "object", "properties": {"background_mode": {"const": "cover_art"}}}}},
+      "else": {
+        "properties": {
+          "canvas": {
+            "type": "object",
+            "properties": {
+              "background_mode": {"const": "solid_white"},
+              "background_color": {"const": "#FFFFFF"}
+            },
+            "required": ["background_color"]
+          }
+        }
+      }
+    }
+  ]
+}

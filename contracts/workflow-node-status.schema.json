@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shanhaiedu.local/contracts/workflow-node-status.schema.json",
+  "title": "WorkflowNodeStatus",
+  "type": "string",
+  "enum": [
+    "disabled",
+    "not_ready",
+    "ready",
+    "draft",
+    "queued",
+    "running",
+    "review_required",
+    "approved",
+    "partially_completed",
+    "failed",
+    "paused",
+    "cancel_requested",
+    "cancelled",
+    "stale",
+    "skipped"
+  ]
+}

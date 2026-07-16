@@ -1,0 +1,41 @@
+:root {
+  --sh-brand-50: #eef4ff;
+  --sh-brand-100: #dde8ff;
+  --sh-brand-300: #88a8ff;
+  --sh-brand-500: #315ef5;
+  --sh-brand-600: #2449d8;
+  --sh-brand-700: #1d3aaf;
+  --sh-ink-strong: #14213d;
+  --sh-ink-default: #334155;
+  --sh-ink-muted: #64748b;
+  --sh-ink-faint: #94a3b8;
+  --sh-surface-canvas: #f5f7fb;
+  --sh-surface-base: #ffffff;
+  --sh-surface-soft: #f8fafc;
+  --sh-line-subtle: #e7ebf2;
+  --sh-line-default: #d7dee9;
+  --sh-success: #16855b;
+  --sh-warning: #b56a09;
+  --sh-danger: #c73543;
+  --sh-radius-sm: 8px;
+  --sh-radius-md: 12px;
+  --sh-radius-lg: 16px;
+  --sh-radius-xl: 24px;
+  --sh-shadow-card: 0 10px 30px rgb(20 33 61 / 8%);
+  --sh-shadow-floating: 0 18px 60px rgb(20 33 61 / 14%);
+  --sh-duration-fast: 120ms;
+  --sh-duration-normal: 200ms;
+  --sh-duration-slow: 320ms;
+  --sh-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --sh-topbar-height: 64px;
+  --sh-project-sidebar-width: 248px;
+  --sh-advanced-drawer-width: 400px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --sh-duration-fast: 0ms;
+    --sh-duration-normal: 0ms;
+    --sh-duration-slow: 0ms;
+  }
+}

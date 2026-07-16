@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shanhaiedu.local/contracts/video-shot.schema.json",
+  "title": "VideoFineStoryboardShot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "shot_id",
+    "scene_id",
+    "position",
+    "duration_seconds",
+    "visible_beat",
+    "start_state",
+    "end_state",
+    "camera",
+    "action",
+    "asset_usages",
+    "prompt_text",
+    "continuity_notes"
+  ],
+  "properties": {
+    "shot_id": {"type": "string", "pattern": "^SHOT-[0-9]{2,}$"},
+    "scene_id": {"type": "string", "minLength": 1},
+    "position": {"type": "integer", "minimum": 1},
+    "duration_seconds": {"enum": [10, 15]},
+    "visible_beat": {"type": "string", "minLength": 1},
+    "start_state": {"type": "string", "minLength": 1},
+    "end_state": {"type": "string", "minLength": 1},
+    "camera": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["framing", "angle", "movement", "start_composition", "end_composition"],
+      "properties": {
+        "framing": {"type": "string"},
+        "angle": {"type": "string"},
+        "movement": {"type": "string"},
+        "start_composition": {"type": "string"},
+        "end_composition": {"type": "string"}
+      }
+    },
+    "action": {"type": "string", "minLength": 1},
+    "asset_usages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["image_index", "asset_version_id", "semantic_name", "purpose"],
+        "properties": {
+          "image_index": {"type": "integer", "minimum": 1},
+          "asset_version_id": {"type": "string", "format": "uuid"},
+          "semantic_name": {"type": "string", "minLength": 1},
+          "purpose": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "prompt_text": {"type": "string", "minLength": 1},
+    "narration_text": {"type": "string"},
+    "dialogue_text": {"type": "string"},
+    "sound_intent": {"type": "string"},
+    "continuity_notes": {"type": "string", "minLength": 1},
+    "negative_constraints": {"type": "array", "items": {"type": "string"}}
+  }
+}

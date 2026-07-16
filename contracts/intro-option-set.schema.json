@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shanhaiedu.local/contracts/intro-option-set.schema.json",
+  "title": "IntroOptionSet",
+  "description": "三类九套课堂导入设计。业务校验器额外保证每类恰好三套、最高推荐分唯一。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "option_set_id",
+    "lesson_unit_id",
+    "status",
+    "ideation_context_snapshot_id",
+    "anchoring_context_snapshot_id",
+    "options",
+    "created_at"
+  ],
+  "properties": {
+    "option_set_id": {"type": "string", "format": "uuid"},
+    "lesson_unit_id": {"type": "string", "format": "uuid"},
+    "status": {"enum": ["draft", "review_required", "approved", "stale"]},
+    "ideation_context_snapshot_id": {"type": "string", "format": "uuid"},
+    "anchoring_context_snapshot_id": {"type": "string", "format": "uuid"},
+    "options": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "items": {"$ref": "#/$defs/option"}
+    },
+    "created_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "option_key",
+        "category",
+        "title",
+        "independent_concept",
+        "hook",
+        "viewer_value",
+        "suggested_medium",
+        "duration_seconds",
+        "replacement_field_key",
+        "course_anchor",
+        "classroom_first_question",
+        "handoff_moment",
+        "must_not_preteach",
+        "fit_reason",
+        "risks",
+        "recommendation_score",
+        "recommendation_reason"
+      ],
+      "properties": {
+        "option_key": {"type": "string", "pattern": "^INTRO-(SCI|APP|STO)-[0-9]{2}$"},
+        "category": {"enum": ["science", "application", "story"]},
+        "title": {"type": "string", "minLength": 1},
+        "independent_concept": {"type": "string", "minLength": 1},
+        "hook": {"type": "string", "minLength": 1},
+        "viewer_value": {"type": "string", "minLength": 1},
+        "suggested_medium": {"enum": ["video", "image", "physical_object", "question", "performance", "mixed"]},
+        "duration_seconds": {"type": "integer", "minimum": 10, "maximum": 600},
+        "replacement_field_key": {"type": ["string", "null"]},
+        "course_anchor": {"type": "string", "minLength": 1},
+        "classroom_first_question": {"type": "string", "minLength": 1},
+        "handoff_moment": {"type": "string", "minLength": 1},
+        "must_not_preteach": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        },
+        "fit_reason": {"type": "string", "minLength": 1},
+        "risks": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "recommendation_score": {"type": "integer", "minimum": 1, "maximum": 100},
+        "recommendation_reason": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}
