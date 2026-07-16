@@ -1,7 +1,7 @@
 581d84899bd41f9dae9626461b7cc210f39bfaf4641548bb5ba023ab1187bbe9  ./.gitignore
 40d3873dfa3e2ae2fed07c3f7a1a83771533a4ac8ab9ab9b314123fe0006ae55  ./AGENTS.md
 d6a38c2ce21b8d790b4c81a60c7b54c223ccbb067b963db67938f78f82d46ed9  ./README.md
-f91364347e9662407aa45fe9b66aba2ec0a51a5d817640ef7fb11dbe792b02f3  ./deliverables/shanhaiedu-frontend-outsourcing-v1.0.zip
+3c60d15e2dd5fa1d2badbfe4adb6e4b2bab117b12efb4659437c70414aea19b5  ./deliverables/shanhaiedu-frontend-outsourcing-v1.0.zip
 006972195e657c686a96db12afc62d05324743a0dbcce6ef3ef5780b830570a7  ./docs/START_HERE.md
 b2ce072d32bc02bf122e7394cf0ab38c048902618f76b3d511f78731ec6346ce  ./docs/architecture/BACKEND_ARCHITECTURE.md
 34735cbfaa7e4c74b010a389f66c21bbb1aa5315e1b664d1641a1c11b6bdddf9  ./docs/architecture/BASELINE_MIGRATION_PLAN.md
@@ -20,8 +20,8 @@ ae3f81a1ba3aab6976bf14e81b91131140eba8a081c2371a8ff2fa1a8f6de090  ./docs/fronten
 42644966d95f65c1f3936c3800137b71b51ecb01fbdec59818d856dae509bdde  ./docs/frontend-outsourcing/v1.0/12_里程碑付款与变更管理.md
 ebbf0c0a1d41b63b434944882b1bea8df3f4ccc085c786bbca4532463e6e65e4  ./docs/frontend-outsourcing/v1.0/13_开发实施计划.md
 413ca1d190c7e4e95a2028fdf262a1cd60c44bb787a4b479d369be900011a62e  ./docs/frontend-outsourcing/v1.0/14_外包询价与投标回复模板.md
-13f7241b154a55cc58e604e4b045ba11d9047d7f1ce531be91572d9ce9be9f66  ./docs/frontend-outsourcing/v1.0/15_已确认业务口径修订_2026-07-17.md
-9965f42309a8e2eefdb40cf4507651a0a6e01f660d8df3738ffb22bc531b3e00  ./docs/frontend-outsourcing/v1.0/CHECKSUMS.sha256
+1ffa1c56414d8092c0aef9473c9dcc2eb9c01136987305b898ee03d2aa753158  ./docs/frontend-outsourcing/v1.0/15_已确认业务口径修订_2026-07-17.md
+6b44dae3121de1fddb655ea23e634caf2bdd1e82c9c873c16e1f34ba6bf5f228  ./docs/frontend-outsourcing/v1.0/CHECKSUMS.sha256
 bb48fd0d88c06861a128f5b2c4ee64cf0ca80ae8cba9ea289b8f744ef2c311c7  ./docs/frontend-outsourcing/v1.0/README.md
 bad4829cd602f1fab90969a8767885a8348ca9acd4974c37da3272d26f2903cc  ./docs/frontend-outsourcing/v1.0/checklists/component-acceptance.md
 ccd3f0da5dc6dff3ee80e6904b7fc34179ef2c8e56ad7c9bcd0a6664cca5ae81  ./docs/frontend-outsourcing/v1.0/checklists/page-acceptance.md
@@ -43,5 +43,5 @@ a3f56d5fcf14ebe45c393844d642d6b5fb389ab5e65585997a22822aa305d1ef  ./docs/fronten
 720a8236305dd5126d92251a519a19cc3da8f588f81457144ec707f9b6955d39  ./docs/governance/BRANCH_AND_CONTRACT_RULES.md
 82744d4cbfa1cd0054ef3f8d2ac664eaf7f0146392e799cedc5cd9fca656c6d0  ./docs/requirements/2026-07-16-original-business-requirements-v1.md
 dd52206bc62d26ee55d90518f17b96d43c7f7ae0eea15e818f36e6ac1c36d973  ./docs/requirements/2026-07-16-original-business-requirements-v2.md
-f16a195ece5107c73b83e91cd0bc46f8d6a76857ebcff3fa97e861ffa15a8c04  ./docs/superpowers/specs/2026-07-17-shanhai-courseware-platform-runtime-design.md
+6b854f5e285b0a34fdc1cb0dd6337fee38a950318bc9df82bf13e25618612d2b  ./docs/superpowers/specs/2026-07-17-shanhai-courseware-platform-runtime-design.md
 317cf7170872927fa2e6c8f8517e6d015f4b2cb0c73ca1a3e9d1e5fd1760d931  ./docs/vendor/FRONTEND_KICKOFF_INSTRUCTION.md
