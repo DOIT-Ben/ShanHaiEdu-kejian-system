@@ -1,0 +1,74 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+@theme inline {
+  --color-*: initial;
+  --color-page: var(--sh-bg);
+  --color-surface-1: var(--sh-surface-1);
+  --color-surface-2: var(--sh-surface-2);
+  --color-surface-hover: var(--sh-surface-hover);
+  --color-line: var(--sh-border);
+  --color-divider: var(--sh-divider);
+  --color-ink-1: var(--sh-text-1);
+  --color-ink-2: var(--sh-text-2);
+  --color-ink-muted: var(--sh-text-muted);
+  --color-ink-disabled: var(--sh-text-disabled);
+  --color-brand: var(--sh-brand);
+  --color-brand-hover: var(--sh-brand-hover);
+  --color-brand-selected: var(--sh-brand-selected);
+  --color-success: var(--sh-success);
+  --color-success-surface: var(--sh-success-surface);
+  --color-warning: var(--sh-warning);
+  --color-warning-surface: var(--sh-warning-surface);
+  --color-danger: var(--sh-danger);
+  --color-danger-surface: var(--sh-danger-surface);
+  --color-running: var(--sh-running);
+  --color-running-surface: var(--sh-running-surface);
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-transparent: transparent;
+
+  --font-sans: Inter, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
+
+  --radius-control: var(--sh-radius-control);
+  --radius-card: var(--sh-radius-card);
+  --radius-panel: var(--sh-radius-panel);
+  --radius-overlay: var(--sh-radius-overlay);
+  --radius-preview: var(--sh-radius-preview);
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+  }
+
+  body {
+    background-color: var(--sh-bg);
+    color: var(--sh-text-1);
+    font-size: 14px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  *:focus-visible {
+    outline: 2px solid var(--sh-brand);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background-color: var(--sh-brand-selected);
+  }
+}
+
+@layer utilities {
+  .transition-token {
+    transition-timing-function: var(--sh-ease-standard);
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--sh-border) transparent;
+  }
+}

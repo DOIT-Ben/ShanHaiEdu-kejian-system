@@ -8,6 +8,9 @@ dist/
 coverage/
 playwright-report/
 test-results/
+storybook-static/
+.eslintcache
+*.tsbuildinfo
 
 # Python
 __pycache__/

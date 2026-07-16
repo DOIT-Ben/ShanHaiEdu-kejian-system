@@ -1,0 +1,2920 @@
+openapi: 3.1.0
+info:
+  title: ShanHaiEdu Web V2 Frontend Required API
+  version: 0.2.0-draft
+  description: >-
+    前端外包所需接口草案（apps/web 工作副本）。基线为
+    docs/frontend-outsourcing/v1.0/contracts/frontend-api-requirements.openapi.yaml；
+    带 x-frontend-gap: true 的路径与字段为前端补充的需求缺口，
+    需在联调前由后端确认并进入正式 OpenAPI。后端发布的版本化正式 OpenAPI
+    是联调唯一事实来源。
+servers:
+  - url: /api/v2
+security:
+  - sessionCookie: []
+tags:
+  - name: Auth
+  - name: Home
+  - name: Projects
+  - name: Sources
+  - name: Lessons
+  - name: Workflows
+  - name: Prompts
+  - name: Runs
+  - name: Artifacts
+  - name: Assets
+  - name: Tasks
+  - name: Delivery
+  - name: Templates
+  - name: ModelGateway
+  - name: Admin
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      security: []
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SessionResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /auth/me:
+    get:
+      tags: [Auth]
+      operationId: getCurrentSession
+      responses:
+        '200':
+          $ref: '#/components/responses/SessionResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      responses:
+        '204':
+          description: Logged out
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /home/overview:
+    get:
+      tags: [Home]
+      operationId: getHomeOverview
+      x-frontend-gap: true
+      responses:
+        '200':
+          description: Teacher home overview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeOverviewEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects:
+    get:
+      tags: [Projects]
+      operationId: listProjects
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: status
+          schema: { enum: [draft, active, archived] }
+        - in: query
+          name: keyword
+          schema: { type: string }
+        - in: query
+          name: sort
+          schema: { enum: [updated_desc, created_desc, name_asc] }
+      responses:
+        '200':
+          description: Project page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      tags: [Projects]
+      operationId: createProject
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}:
+    get:
+      tags: [Projects]
+      operationId: getProject
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    patch:
+      tags: [Projects]
+      operationId: updateProject
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectRequest'
+      responses:
+        '200':
+          description: Project updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Projects]
+      operationId: deleteDraftProject
+      x-frontend-gap: true
+      description: 仅允许删除草稿项目；已激活项目走归档。
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '204':
+          description: Draft project deleted
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/archive:
+    post:
+      tags: [Projects]
+      operationId: archiveProject
+      x-frontend-gap: true
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Project archived
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/restore:
+    post:
+      tags: [Projects]
+      operationId: restoreProject
+      x-frontend-gap: true
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Project restored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/upload-sessions:
+    post:
+      tags: [Sources]
+      operationId: createUploadSession
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUploadSessionRequest'
+      responses:
+        '201':
+          description: Upload session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadSessionEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /upload-sessions/{uploadSessionId}/complete:
+    post:
+      tags: [Sources]
+      operationId: completeUploadSession
+      x-frontend-gap: true
+      parameters:
+        - in: path
+          name: uploadSessionId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteUploadSessionRequest'
+      responses:
+        '200':
+          description: Upload confirmed; file object created and parse task queued when applicable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadCompletionEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/textbook-evidence/current:
+    get:
+      tags: [Sources]
+      operationId: getCurrentTextbookEvidence
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Current textbook evidence
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactVersionEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/textbook-evidence/corrections:
+    post:
+      tags: [Sources]
+      operationId: correctTextbookEvidence
+      x-frontend-gap: true
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvidenceCorrectionRequest'
+      responses:
+        '200':
+          description: Corrected evidence version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactVersionEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/lesson-divisions/current:
+    get:
+      tags: [Lessons]
+      operationId: getCurrentLessonDivision
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Current lesson division
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactVersionEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    patch:
+      tags: [Lessons]
+      operationId: updateLessonDivision
+      x-frontend-gap: true
+      description: 教师编辑课时划分草稿，携带 row_version 乐观锁；409 返回冲突信息。
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDivisionRequest'
+      responses:
+        '200':
+          description: Updated division version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactVersionEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/lesson-divisions/versions:
+    get:
+      tags: [Lessons]
+      operationId: listLessonDivisionVersions
+      x-frontend-gap: true
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Division versions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactVersionPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/lesson-divisions/runs:
+    post:
+      tags: [Lessons]
+      operationId: regenerateLessonDivision
+      x-frontend-gap: true
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DivisionRunRequest'
+      responses:
+        '202':
+          description: Division regeneration accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/lesson-divisions/{versionId}/approve:
+    post:
+      tags: [Lessons]
+      operationId: approveLessonDivision
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/VersionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalRequest'
+      responses:
+        '200':
+          description: Approved lesson division and created lessons
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/lessons:
+    get:
+      tags: [Lessons]
+      operationId: listLessons
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Lessons
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /lessons/{lessonId}:
+    get:
+      tags: [Lessons]
+      operationId: getLesson
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Lesson
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /lessons/{lessonId}/workspace:
+    get:
+      tags: [Workflows]
+      operationId: getLessonWorkspace
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Teacher-facing workflow projection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /lessons/{lessonId}/nodes/{nodeKey}:
+    get:
+      tags: [Workflows]
+      operationId: getNodeWorkspace
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/NodeKey'
+      responses:
+        '200':
+          description: Node workspace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeWorkspaceEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /lessons/{lessonId}/nodes/{nodeKey}/inputs:
+    patch:
+      tags: [Workflows]
+      operationId: updateNodeInputs
+      x-frontend-gap: true
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/NodeKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateNodeInputsRequest'
+      responses:
+        '200':
+          description: Node inputs saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeWorkspaceEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /lessons/{lessonId}/nodes/{nodeKey}/draft:
+    patch:
+      tags: [Workflows]
+      operationId: saveNodeDraft
+      x-frontend-gap: true
+      description: 教师对当前输出的文档式编辑草稿自动保存；不覆盖任何已生成版本。
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/NodeKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveNodeDraftRequest'
+      responses:
+        '200':
+          description: Draft saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeDraftEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /lessons/{lessonId}/nodes/{nodeKey}/transitions:
+    post:
+      tags: [Workflows]
+      operationId: transitionNode
+      x-frontend-gap: true
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/NodeKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeTransitionRequest'
+      responses:
+        '200':
+          description: Node transitioned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeWorkspaceEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /lessons/{lessonId}/nodes/{nodeKey}/model-options:
+    get:
+      tags: [Runs]
+      operationId: getNodeModelOptions
+      x-frontend-gap: true
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/NodeKey'
+      responses:
+        '200':
+          description: Authorized model options for this node
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelOptionsEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /lessons/{lessonId}/nodes/{nodeKey}/artifact-versions:
+    post:
+      tags: [Artifacts]
+      operationId: createEditedArtifactVersion
+      x-frontend-gap: true
+      description: 由教师编辑内容创建新的产物版本（不覆盖历史版本）。
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/NodeKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEditedVersionRequest'
+      responses:
+        '201':
+          description: New artifact version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactVersionEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /lessons/{lessonId}/nodes/{nodeKey}/prompt-drafts:
+    post:
+      tags: [Prompts]
+      operationId: preparePromptDraft
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/NodeKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PromptDraftRequest'
+      responses:
+        '201':
+          description: Prompt draft
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromptVersionEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /lessons/{lessonId}/nodes/{nodeKey}/cost-estimate:
+    post:
+      tags: [Runs]
+      operationId: estimateNodeRunCost
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/NodeKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeRunRequest'
+      responses:
+        '200':
+          description: Cost estimate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostEstimateEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /lessons/{lessonId}/nodes/{nodeKey}/budget-authorizations:
+    post:
+      tags: [Runs]
+      operationId: createBudgetAuthorization
+      x-frontend-gap: true
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/NodeKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BudgetAuthorizationRequest'
+      responses:
+        '201':
+          description: Budget authorization granted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetAuthorizationEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /lessons/{lessonId}/nodes/{nodeKey}/runs:
+    post:
+      tags: [Runs]
+      operationId: createNodeRun
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/NodeKey'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeRunRequest'
+      responses:
+        '202':
+          description: Node run accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /lessons/{lessonId}/nodes/{nodeKey}/items/{itemId}/actions:
+    post:
+      tags: [Workflows]
+      operationId: runNodeItemAction
+      x-frontend-gap: true
+      description: >-
+        针对节点内条目（导入设计单套、PPT 单页、单个镜头、单个片段）的
+        局部操作：revise、regenerate、approve、lock_creative_redo_anchor、
+        duplicate_as_custom、retry_clip、approve_clip、replace_image。
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/NodeKey'
+        - in: path
+          name: itemId
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeItemActionRequest'
+      responses:
+        '200':
+          description: Item action result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeItemActionEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /artifact-versions/{versionId}:
+    get:
+      tags: [Artifacts]
+      operationId: getArtifactVersion
+      x-frontend-gap: true
+      parameters:
+        - $ref: '#/components/parameters/VersionId'
+      responses:
+        '200':
+          description: Artifact version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactVersionEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /artifact-versions/{versionId}/approve:
+    post:
+      tags: [Artifacts]
+      operationId: approveArtifactVersion
+      parameters:
+        - $ref: '#/components/parameters/VersionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalRequest'
+      responses:
+        '200':
+          description: Artifact approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactVersionEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /artifact-versions/{versionId}/confirm-stale:
+    post:
+      tags: [Artifacts]
+      operationId: confirmStaleArtifactVersion
+      x-frontend-gap: true
+      description: 上游变化后教师确认沿用当前版本。
+      parameters:
+        - $ref: '#/components/parameters/VersionId'
+      responses:
+        '200':
+          description: Stale confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactVersionEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/assets:
+    get:
+      tags: [Assets]
+      operationId: listProjectAssets
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: type
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: source_node_key
+          schema: { type: string }
+        - in: query
+          name: keyword
+          schema: { type: string }
+      responses:
+        '200':
+          description: Assets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /assets/{assetId}:
+    get:
+      tags: [Assets]
+      operationId: getAssetDetail
+      x-frontend-gap: true
+      parameters:
+        - in: path
+          name: assetId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Asset detail with versions and usage references
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDetailEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /file-objects/{fileObjectId}/download-authorizations:
+    post:
+      tags: [Assets]
+      operationId: createDownloadAuthorization
+      x-frontend-gap: true
+      parameters:
+        - in: path
+          name: fileObjectId
+          required: true
+          schema: { type: string }
+      responses:
+        '201':
+          description: Short-lived download authorization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadAuthorizationEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /tasks:
+    get:
+      tags: [Tasks]
+      operationId: listMyTasks
+      x-frontend-gap: true
+      parameters:
+        - in: query
+          name: scope
+          schema: { enum: [mine] }
+        - in: query
+          name: status
+          schema: { type: string }
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Tasks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/tasks:
+    get:
+      tags: [Tasks]
+      operationId: listProjectTasks
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: lesson_id
+          schema: { type: string }
+        - in: query
+          name: node_key
+          schema: { type: string }
+      responses:
+        '200':
+          description: Tasks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /tasks/{taskId}:
+    get:
+      tags: [Tasks]
+      operationId: getTask
+      x-frontend-gap: true
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /tasks/{taskId}/cancel:
+    post:
+      tags: [Tasks]
+      operationId: cancelTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '202':
+          description: Cancellation requested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /tasks/{taskId}/retry:
+    post:
+      tags: [Tasks]
+      operationId: retryTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Retry accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/delivery:
+    get:
+      tags: [Delivery]
+      operationId: getProjectDelivery
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - in: query
+          name: lesson_id
+          schema: { type: string }
+      responses:
+        '200':
+          description: Delivery checklist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /projects/{projectId}/delivery/package-runs:
+    post:
+      tags: [Delivery]
+      operationId: createDeliveryPackageRun
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Packaging accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/templates:
+    get:
+      tags: [Templates]
+      operationId: listTemplates
+      parameters:
+        - in: query
+          name: node_type
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        '200':
+          description: Templates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplatePageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      tags: [Templates]
+      operationId: importTemplate
+      x-frontend-gap: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateImportRequest'
+      responses:
+        '201':
+          description: Template imported as draft
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateDetailEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/templates/{templateId}:
+    get:
+      tags: [Templates]
+      operationId: getTemplateDetail
+      x-frontend-gap: true
+      parameters:
+        - $ref: '#/components/parameters/TemplateId'
+      responses:
+        '200':
+          description: Template detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateDetailEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    patch:
+      tags: [Templates]
+      operationId: updateTemplate
+      x-frontend-gap: true
+      parameters:
+        - $ref: '#/components/parameters/TemplateId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateUpdateRequest'
+      responses:
+        '200':
+          description: Template updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateDetailEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/templates/{templateId}/dry-runs:
+    post:
+      tags: [Templates]
+      operationId: dryRunTemplate
+      x-frontend-gap: true
+      parameters:
+        - $ref: '#/components/parameters/TemplateId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Dry run task accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/templates/{templateId}/publish:
+    post:
+      tags: [Templates]
+      operationId: publishTemplate
+      x-frontend-gap: true
+      parameters:
+        - $ref: '#/components/parameters/TemplateId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplatePublishRequest'
+      responses:
+        '200':
+          description: Template published
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateDetailEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/templates/{templateId}/rollback:
+    post:
+      tags: [Templates]
+      operationId: rollbackTemplate
+      x-frontend-gap: true
+      parameters:
+        - $ref: '#/components/parameters/TemplateId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateRollbackRequest'
+      responses:
+        '200':
+          description: Template rolled back
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateDetailEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/model-gateway/overview:
+    get:
+      tags: [ModelGateway]
+      operationId: getGatewayOverview
+      x-frontend-gap: true
+      responses:
+        '200':
+          description: Gateway overview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GatewayOverviewEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/model-gateway/providers:
+    get:
+      tags: [ModelGateway]
+      operationId: listProviders
+      responses:
+        '200':
+          description: Providers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      tags: [ModelGateway]
+      operationId: createProvider
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderUpsertRequest'
+      responses:
+        '201':
+          description: Provider created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/model-gateway/providers/{providerId}:
+    patch:
+      tags: [ModelGateway]
+      operationId: updateProvider
+      x-frontend-gap: true
+      parameters:
+        - $ref: '#/components/parameters/ProviderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderUpdateRequest'
+      responses:
+        '200':
+          description: Provider updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/model-gateway/providers/{providerId}/connection-tests:
+    post:
+      tags: [ModelGateway]
+      operationId: testProviderConnection
+      parameters:
+        - $ref: '#/components/parameters/ProviderId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Test accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/model-gateway/models:
+    get:
+      tags: [ModelGateway]
+      operationId: listModels
+      responses:
+        '200':
+          description: Models
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/model-gateway/models/{modelId}:
+    patch:
+      tags: [ModelGateway]
+      operationId: updateModel
+      x-frontend-gap: true
+      parameters:
+        - in: path
+          name: modelId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelUpdateRequest'
+      responses:
+        '200':
+          description: Model updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/model-gateway/routes:
+    get:
+      tags: [ModelGateway]
+      operationId: listRoutePolicies
+      responses:
+        '200':
+          description: Route policies
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoutePolicyPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      tags: [ModelGateway]
+      operationId: createRoutePolicy
+      x-frontend-gap: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoutePolicyUpsertRequest'
+      responses:
+        '201':
+          description: Route policy created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoutePolicyEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/model-gateway/routes/{routePolicyId}:
+    put:
+      tags: [ModelGateway]
+      operationId: updateRoutePolicy
+      x-frontend-gap: true
+      parameters:
+        - in: path
+          name: routePolicyId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoutePolicyUpsertRequest'
+      responses:
+        '200':
+          description: Route policy updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoutePolicyEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/model-gateway/routes/simulate:
+    post:
+      tags: [ModelGateway]
+      operationId: simulateRoutePolicy
+      x-frontend-gap: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RouteSimulationRequest'
+      responses:
+        '200':
+          description: Simulation result and conflict check
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RouteSimulationEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/model-gateway/budgets:
+    get:
+      tags: [ModelGateway]
+      operationId: getBudgets
+      x-frontend-gap: true
+      responses:
+        '200':
+          description: Budget configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetConfigEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    put:
+      tags: [ModelGateway]
+      operationId: updateBudgets
+      x-frontend-gap: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BudgetConfigUpdateRequest'
+      responses:
+        '200':
+          description: Budget configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetConfigEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/model-gateway/runs:
+    get:
+      tags: [ModelGateway]
+      operationId: listModelRuns
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: capability
+          schema: { type: string }
+        - in: query
+          name: provider_id
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: project_id
+          schema: { type: string }
+        - in: query
+          name: fallback_only
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Model runs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelRunPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/model-gateway/runs/{modelRunId}:
+    get:
+      tags: [ModelGateway]
+      operationId: getModelRun
+      x-frontend-gap: true
+      parameters:
+        - in: path
+          name: modelRunId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Model run detail (desensitized)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelRunDetailEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/workflows:
+    get:
+      tags: [Admin]
+      operationId: listWorkflowVersions
+      x-frontend-gap: true
+      responses:
+        '200':
+          description: Workflow versions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowVersionPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/workflows/{workflowId}:
+    get:
+      tags: [Admin]
+      operationId: getWorkflowVersion
+      x-frontend-gap: true
+      parameters:
+        - in: path
+          name: workflowId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Workflow version detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowVersionDetailEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/users:
+    get:
+      tags: [Admin]
+      operationId: listUsers
+      x-frontend-gap: true
+      parameters:
+        - in: query
+          name: keyword
+          schema: { type: string }
+        - in: query
+          name: role
+          schema: { type: string }
+      responses:
+        '200':
+          description: Users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/users/{userId}:
+    patch:
+      tags: [Admin]
+      operationId: updateUser
+      x-frontend-gap: true
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserUpdateRequest'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/organizations:
+    get:
+      tags: [Admin]
+      operationId: listOrganizations
+      x-frontend-gap: true
+      responses:
+        '200':
+          description: Organizations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /admin/audit:
+    get:
+      tags: [Admin]
+      operationId: listAuditEntries
+      x-frontend-gap: true
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+        - in: query
+          name: actor
+          schema: { type: string }
+        - in: query
+          name: object_type
+          schema: { type: string }
+      responses:
+        '200':
+          description: Audit entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditPageEnvelope'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: shanhai_session
+  parameters:
+    ProjectId:
+      in: path
+      name: projectId
+      required: true
+      schema: { type: string }
+    LessonId:
+      in: path
+      name: lessonId
+      required: true
+      schema: { type: string }
+    NodeKey:
+      in: path
+      name: nodeKey
+      required: true
+      schema: { type: string }
+    VersionId:
+      in: path
+      name: versionId
+      required: true
+      schema: { type: string }
+    TaskId:
+      in: path
+      name: taskId
+      required: true
+      schema: { type: string }
+    ProviderId:
+      in: path
+      name: providerId
+      required: true
+      schema: { type: string }
+    TemplateId:
+      in: path
+      name: templateId
+      required: true
+      schema: { type: string }
+    Cursor:
+      in: query
+      name: cursor
+      schema: { type: string }
+    PageSize:
+      in: query
+      name: page_size
+      schema: { type: integer, minimum: 1, maximum: 100, default: 30 }
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: true
+      schema: { type: string, minLength: 16, maxLength: 128 }
+  responses:
+    ErrorResponse:
+      description: Error envelope
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    SessionResponse:
+      description: Session envelope
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SessionEnvelope'
+  schemas:
+    Meta:
+      type: object
+      additionalProperties: false
+      required: [trace_id, server_time]
+      properties:
+        trace_id: { type: string }
+        server_time: { type: string, format: date-time }
+        next_cursor: { type: [string, 'null'] }
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, message, retryable, trace_id]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        retryable: { type: boolean }
+        action: { type: [string, 'null'] }
+        details: { type: object, additionalProperties: true }
+        trace_id: { type: string }
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [ok, error]
+      properties:
+        ok: { const: false }
+        error: { $ref: '#/components/schemas/Error' }
+    User:
+      type: object
+      additionalProperties: false
+      required: [user_id, display_name, role]
+      properties:
+        user_id: { type: string }
+        display_name: { type: string }
+        email: { type: string, format: email }
+        role: { enum: [teacher, template_admin, system_admin, audit_admin] }
+        organization_id: { type: [string, 'null'] }
+        organization_name: { type: [string, 'null'] }
+    Session:
+      type: object
+      additionalProperties: false
+      required: [user, csrf_token]
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        csrf_token: { type: string }
+    SessionEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/Session' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [identifier, password]
+      properties:
+        identifier: { type: string, minLength: 1 }
+        password: { type: string, minLength: 1 }
+    Project:
+      type: object
+      additionalProperties: false
+      required: [project_id, name, subject, grade, status, execution_mode, row_version, updated_at]
+      properties:
+        project_id: { type: string }
+        name: { type: string }
+        subject: { const: primary_math }
+        grade: { type: integer, minimum: 1, maximum: 6 }
+        textbook_version: { type: string }
+        volume: { type: string }
+        status: { enum: [draft, active, archived] }
+        execution_mode: { enum: [manual, semi_auto, full_auto_draft] }
+        progress_percent: { type: integer, minimum: 0, maximum: 100 }
+        textbook_status: { enum: [none, uploading, parsing, evidence_ready, parse_failed] }
+        division_status: { enum: [none, generating, needs_review, approved, failed] }
+        lesson_count: { type: integer, minimum: 0 }
+        budget_minor_units: { type: integer, minimum: 0 }
+        spent_minor_units: { type: integer, minimum: 0 }
+        currency: { type: string }
+        output_scope:
+          type: object
+          additionalProperties: false
+          properties:
+            ppt: { type: boolean }
+            video: { type: boolean }
+        row_version: { type: integer, minimum: 1 }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    CreateProjectRequest:
+      type: object
+      additionalProperties: false
+      required: [name, subject, grade, execution_mode]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        subject: { const: primary_math }
+        grade: { type: integer, minimum: 1, maximum: 6 }
+        textbook_version: { type: string }
+        volume: { type: string }
+        knowledge_scope: { type: string }
+        execution_mode: { enum: [manual, semi_auto, full_auto_draft] }
+        budget_minor_units: { type: integer, minimum: 0 }
+        lesson_duration_minutes: { type: integer, minimum: 10, maximum: 120 }
+        division_preference: { enum: [follow_textbook, fine_grained, coarse_grained] }
+        output_scope:
+          type: object
+          additionalProperties: false
+          properties:
+            ppt: { type: boolean }
+            video: { type: boolean }
+        model_profile: { enum: [recommended, quality, economy, fast_draft] }
+        textbook_file_object_id: { type: [string, 'null'] }
+        textbook_library_id: { type: [string, 'null'] }
+    UpdateProjectRequest:
+      type: object
+      additionalProperties: false
+      required: [row_version]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        execution_mode: { enum: [manual, semi_auto, full_auto_draft] }
+        budget_minor_units: { type: integer, minimum: 0 }
+        output_scope:
+          type: object
+          additionalProperties: false
+          properties:
+            ppt: { type: boolean }
+            video: { type: boolean }
+        row_version: { type: integer, minimum: 1 }
+    ReviewItem:
+      type: object
+      additionalProperties: false
+      required: [review_id, project_id, project_name, title, node_key, waiting_since]
+      properties:
+        review_id: { type: string }
+        project_id: { type: string }
+        project_name: { type: string }
+        lesson_id: { type: [string, 'null'] }
+        lesson_title: { type: [string, 'null'] }
+        node_key: { type: string }
+        artifact_version_id: { type: [string, 'null'] }
+        title: { type: string }
+        waiting_since: { type: string, format: date-time }
+    RecentDelivery:
+      type: object
+      additionalProperties: false
+      required: [project_id, project_name, file_object, delivered_at]
+      properties:
+        project_id: { type: string }
+        project_name: { type: string }
+        file_object: { $ref: '#/components/schemas/FileObject' }
+        delivered_at: { type: string, format: date-time }
+    HomeOverview:
+      type: object
+      additionalProperties: false
+      required: [recent_projects, pending_reviews, running_tasks, failed_tasks, recent_deliveries]
+      properties:
+        recent_projects:
+          type: array
+          items: { $ref: '#/components/schemas/Project' }
+        pending_reviews:
+          type: array
+          items: { $ref: '#/components/schemas/ReviewItem' }
+        running_tasks:
+          type: array
+          items: { $ref: '#/components/schemas/Task' }
+        failed_tasks:
+          type: array
+          items: { $ref: '#/components/schemas/Task' }
+        recent_deliveries:
+          type: array
+          items: { $ref: '#/components/schemas/RecentDelivery' }
+    HomeOverviewEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/HomeOverview' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    Lesson:
+      type: object
+      additionalProperties: false
+      required: [lesson_id, project_id, lesson_key, sequence_number, title, status]
+      properties:
+        lesson_id: { type: string }
+        project_id: { type: string }
+        lesson_key: { type: string }
+        sequence_number: { type: integer, minimum: 1 }
+        title: { type: string }
+        lesson_type: { type: string }
+        content_boundary: { type: object, additionalProperties: true }
+        status: { enum: [active, archived] }
+        stage_summary:
+          type: object
+          additionalProperties: false
+          properties:
+            lesson_plan: { $ref: '#/components/schemas/NodeStatus' }
+            intro_design: { $ref: '#/components/schemas/NodeStatus' }
+            ppt: { $ref: '#/components/schemas/NodeStatus' }
+            video: { $ref: '#/components/schemas/NodeStatus' }
+            delivery: { $ref: '#/components/schemas/NodeStatus' }
+    NodeStatus:
+      enum: [locked, ready, queued, running, needs_review, revision_required, approved, stale, failed, blocked, cancelled, skipped]
+    NodeSummary:
+      type: object
+      additionalProperties: false
+      required: [node_key, title, group, status]
+      properties:
+        node_key: { type: string }
+        title: { type: string }
+        group: { type: string }
+        status: { $ref: '#/components/schemas/NodeStatus' }
+        progress_percent: { type: integer, minimum: 0, maximum: 100 }
+        blocker_message: { type: [string, 'null'] }
+        capability: { type: [string, 'null'] }
+        skippable: { type: boolean }
+    Workspace:
+      type: object
+      additionalProperties: false
+      required: [lesson, nodes, current_node_key]
+      properties:
+        lesson: { $ref: '#/components/schemas/Lesson' }
+        nodes:
+          type: array
+          items: { $ref: '#/components/schemas/NodeSummary' }
+        current_node_key: { type: string }
+    UpstreamReference:
+      type: object
+      additionalProperties: false
+      required: [node_key, title, status]
+      properties:
+        node_key: { type: string }
+        title: { type: string }
+        status: { $ref: '#/components/schemas/NodeStatus' }
+        artifact_version_id: { type: [string, 'null'] }
+        version_number: { type: [integer, 'null'] }
+        stale: { type: boolean }
+    NodeWorkspace:
+      type: object
+      additionalProperties: false
+      required: [node, input_schema, output_renderer, prompt_versions, artifact_versions]
+      properties:
+        node: { $ref: '#/components/schemas/NodeSummary' }
+        description: { type: string }
+        capability: { type: [string, 'null'] }
+        input_schema: { type: object, additionalProperties: true }
+        input_values: { type: object, additionalProperties: true }
+        input_row_version: { type: integer, minimum: 1 }
+        draft_content: { type: [object, 'null'], additionalProperties: true }
+        draft_row_version: { type: integer, minimum: 1 }
+        output_renderer: { type: string }
+        upstream_references:
+          type: array
+          items: { $ref: '#/components/schemas/UpstreamReference' }
+        selected_asset_ids:
+          type: array
+          items: { type: string }
+        prompt_versions:
+          type: array
+          items: { $ref: '#/components/schemas/PromptVersion' }
+        artifact_versions:
+          type: array
+          items: { $ref: '#/components/schemas/ArtifactVersion' }
+        validation_results:
+          type: array
+          items: { $ref: '#/components/schemas/ValidationResult' }
+        active_task_id: { type: [string, 'null'] }
+    PromptVersion:
+      type: object
+      additionalProperties: false
+      required: [prompt_version_id, version_number, editable_prompt, runtime_contract, created_at]
+      properties:
+        prompt_version_id: { type: string }
+        version_number: { type: integer, minimum: 1 }
+        editable_prompt: { type: string }
+        runtime_contract: { type: string }
+        source: { enum: [system, edited, revision] }
+        base_prompt_version_id: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
+    PromptDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [input_values]
+      properties:
+        input_values: { type: object, additionalProperties: true }
+        revision_instruction: { type: string }
+        base_prompt_version_id: { type: string }
+        edited_prompt: { type: string }
+        reset_to_default: { type: boolean }
+    NodeRunRequest:
+      type: object
+      additionalProperties: false
+      required: [prompt_version_id, model_profile, parameters]
+      properties:
+        prompt_version_id: { type: string }
+        model_profile: { enum: [recommended, quality, economy, fast_draft, advanced] }
+        model_id: { type: [string, 'null'] }
+        parameters: { type: object, additionalProperties: true }
+        budget_authorization_id: { type: [string, 'null'] }
+    CostEstimate:
+      type: object
+      additionalProperties: false
+      required: [currency, minimum_minor_units, maximum_minor_units, candidate_count, requires_authorization]
+      properties:
+        currency: { type: string }
+        minimum_minor_units: { type: integer, minimum: 0 }
+        maximum_minor_units: { type: integer, minimum: 0 }
+        candidate_count: { type: integer, minimum: 1 }
+        requires_authorization: { type: boolean }
+        business_model_name: { type: string }
+        provider_name: { type: [string, 'null'] }
+        upstream_model_name: { type: [string, 'null'] }
+        allow_fallback: { type: boolean }
+        parameter_summary: { type: object, additionalProperties: true }
+    BudgetAuthorizationRequest:
+      type: object
+      additionalProperties: false
+      required: [estimated_max_minor_units, reason]
+      properties:
+        estimated_max_minor_units: { type: integer, minimum: 0 }
+        reason: { type: string, maxLength: 500 }
+    BudgetAuthorization:
+      type: object
+      additionalProperties: false
+      required: [budget_authorization_id, max_minor_units, expires_at]
+      properties:
+        budget_authorization_id: { type: string }
+        max_minor_units: { type: integer, minimum: 0 }
+        expires_at: { type: string, format: date-time }
+    BudgetAuthorizationEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/BudgetAuthorization' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    ValidationResult:
+      type: object
+      additionalProperties: false
+      required: [rule_id, severity, passed, message]
+      properties:
+        rule_id: { type: string }
+        severity: { enum: [info, warning, error] }
+        passed: { type: boolean }
+        message: { type: string }
+        action: { type: [string, 'null'] }
+    ArtifactVersion:
+      type: object
+      additionalProperties: false
+      required: [artifact_version_id, artifact_type, version_number, status, content, created_at]
+      properties:
+        artifact_version_id: { type: string }
+        artifact_type: { type: string }
+        version_number: { type: integer, minimum: 1 }
+        status: { enum: [draft, needs_review, approved, stale, superseded, rejected] }
+        content: { type: object, additionalProperties: true }
+        row_version: { type: integer, minimum: 1 }
+        file_objects:
+          type: array
+          items: { $ref: '#/components/schemas/FileObject' }
+        source: { enum: [generated, edited, corrected] }
+        model_run_id: { type: [string, 'null'] }
+        prompt_version_id: { type: [string, 'null'] }
+        stale_reason: { type: [string, 'null'] }
+        approved_at: { type: [string, 'null'], format: date-time }
+        created_at: { type: string, format: date-time }
+    FileObject:
+      type: object
+      additionalProperties: false
+      required: [file_object_id, file_name, mime_type, size_bytes]
+      properties:
+        file_object_id: { type: string }
+        file_name: { type: string }
+        mime_type: { type: string }
+        size_bytes: { type: integer, minimum: 0 }
+        preview_url: { type: [string, 'null'] }
+    Asset:
+      type: object
+      additionalProperties: false
+      required: [asset_id, asset_type, name, status, current_version_id]
+      properties:
+        asset_id: { type: string }
+        asset_type: { type: string }
+        name: { type: string }
+        status: { enum: [draft, needs_review, approved, stale, rejected] }
+        current_version_id: { type: string }
+        current_version_number: { type: integer, minimum: 1 }
+        thumbnail_url: { type: [string, 'null'] }
+        source_node_key: { type: string }
+        source_model_name: { type: [string, 'null'] }
+        lesson_id: { type: [string, 'null'] }
+        usage_count: { type: integer, minimum: 0 }
+        created_at: { type: string, format: date-time }
+    AssetVersion:
+      type: object
+      additionalProperties: false
+      required: [asset_version_id, version_number, status, created_at]
+      properties:
+        asset_version_id: { type: string }
+        version_number: { type: integer, minimum: 1 }
+        status: { enum: [draft, needs_review, approved, stale, rejected] }
+        file_object: { anyOf: [{ $ref: '#/components/schemas/FileObject' }, { type: 'null' }] }
+        source_model_name: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
+    UsageReference:
+      type: object
+      additionalProperties: false
+      required: [node_key, node_title, relation]
+      properties:
+        node_key: { type: string }
+        node_title: { type: string }
+        lesson_id: { type: [string, 'null'] }
+        lesson_title: { type: [string, 'null'] }
+        artifact_version_id: { type: [string, 'null'] }
+        relation: { enum: [input, reference, first_frame, master_image, clip_source, output] }
+    AssetDetail:
+      type: object
+      additionalProperties: false
+      required: [asset, versions, usage_references]
+      properties:
+        asset: { $ref: '#/components/schemas/Asset' }
+        versions:
+          type: array
+          items: { $ref: '#/components/schemas/AssetVersion' }
+        usage_references:
+          type: array
+          items: { $ref: '#/components/schemas/UsageReference' }
+    AssetDetailEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/AssetDetail' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    DownloadAuthorization:
+      type: object
+      additionalProperties: false
+      required: [file_object_id, url, expires_at]
+      properties:
+        file_object_id: { type: string }
+        url: { type: string }
+        expires_at: { type: string, format: date-time }
+    DownloadAuthorizationEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/DownloadAuthorization' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    Task:
+      type: object
+      additionalProperties: false
+      required: [task_id, task_type, status, progress_percent, created_at]
+      properties:
+        task_id: { type: string }
+        task_type: { type: string }
+        status: { enum: [queued, running, waiting_provider, downloading, completed, failed, cancel_requested, cancelled] }
+        progress_percent: { type: integer, minimum: 0, maximum: 100 }
+        progress_message: { type: string }
+        retryable: { type: boolean }
+        cancellable: { type: boolean }
+        project_id: { type: [string, 'null'] }
+        lesson_id: { type: [string, 'null'] }
+        node_key: { type: [string, 'null'] }
+        item_id: { type: [string, 'null'] }
+        provider_name: { type: [string, 'null'] }
+        estimated_cost_minor_units: { type: integer, minimum: 0 }
+        actual_cost_minor_units: { type: integer, minimum: 0 }
+        cost_incurred: { type: boolean }
+        error: { anyOf: [{ $ref: '#/components/schemas/Error' }, { type: 'null' }] }
+        created_at: { type: string, format: date-time }
+        finished_at: { type: [string, 'null'], format: date-time }
+    ApprovalRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        note: { type: string, maxLength: 2000 }
+        override_warning_rule_ids:
+          type: array
+          items: { type: string }
+        override_reason: { type: string, maxLength: 2000 }
+    UploadSession:
+      type: object
+      additionalProperties: false
+      required: [upload_session_id, upload_url, method, expires_at]
+      properties:
+        upload_session_id: { type: string }
+        upload_url: { type: string, format: uri }
+        method: { enum: [PUT, POST] }
+        required_headers: { type: object, additionalProperties: { type: string } }
+        expires_at: { type: string, format: date-time }
+    CreateUploadSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [file_name, mime_type, size_bytes, source_type]
+      properties:
+        file_name: { type: string }
+        mime_type: { type: string }
+        size_bytes: { type: integer, minimum: 1 }
+        sha256: { type: string }
+        source_type: { enum: [textbook, supplement, existing_lesson_plan, image, audio, video] }
+    CompleteUploadSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [sha256, size_bytes]
+      properties:
+        sha256: { type: string }
+        size_bytes: { type: integer, minimum: 1 }
+    UploadCompletion:
+      type: object
+      additionalProperties: false
+      required: [file_object]
+      properties:
+        file_object: { $ref: '#/components/schemas/FileObject' }
+        parse_task: { anyOf: [{ $ref: '#/components/schemas/Task' }, { type: 'null' }] }
+    UploadCompletionEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/UploadCompletion' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    EvidenceCorrectionRequest:
+      type: object
+      additionalProperties: false
+      required: [corrections, row_version]
+      properties:
+        corrections:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [page_number, field, corrected_value]
+            properties:
+              page_number: { type: integer, minimum: 1 }
+              field: { type: string }
+              corrected_value: { type: string }
+        row_version: { type: integer, minimum: 1 }
+    UpdateDivisionRequest:
+      type: object
+      additionalProperties: false
+      required: [content, row_version]
+      properties:
+        content: { type: object, additionalProperties: true }
+        row_version: { type: integer, minimum: 1 }
+    DivisionRunRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        instruction: { type: string, maxLength: 1000 }
+    UpdateNodeInputsRequest:
+      type: object
+      additionalProperties: false
+      required: [input_values, row_version]
+      properties:
+        input_values: { type: object, additionalProperties: true }
+        selected_asset_ids:
+          type: array
+          items: { type: string }
+        row_version: { type: integer, minimum: 1 }
+    SaveNodeDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [content, row_version]
+      properties:
+        content: { type: object, additionalProperties: true }
+        row_version: { type: integer, minimum: 1 }
+    NodeDraft:
+      type: object
+      additionalProperties: false
+      required: [row_version, saved_at]
+      properties:
+        row_version: { type: integer, minimum: 1 }
+        saved_at: { type: string, format: date-time }
+    NodeDraftEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/NodeDraft' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    NodeTransitionRequest:
+      type: object
+      additionalProperties: false
+      required: [action]
+      properties:
+        action: { enum: [skip, restore, pause, resume] }
+        reason: { type: string, maxLength: 500 }
+    ModelProfileOption:
+      type: object
+      additionalProperties: false
+      required: [profile, business_name, description]
+      properties:
+        profile: { enum: [recommended, quality, economy, fast_draft] }
+        business_name: { type: string }
+        description: { type: string }
+        default_candidate_count: { type: integer, minimum: 1 }
+    AdvancedModelOption:
+      type: object
+      additionalProperties: false
+      required: [model_id, business_name, provider_name]
+      properties:
+        model_id: { type: string }
+        business_name: { type: string }
+        provider_name: { type: string }
+        upstream_name: { type: [string, 'null'] }
+    ModelOptions:
+      type: object
+      additionalProperties: false
+      required: [profiles, advanced_models, allow_advanced, allow_fallback]
+      properties:
+        profiles:
+          type: array
+          items: { $ref: '#/components/schemas/ModelProfileOption' }
+        advanced_models:
+          type: array
+          items: { $ref: '#/components/schemas/AdvancedModelOption' }
+        allow_advanced: { type: boolean }
+        allow_fallback: { type: boolean }
+        parameter_bounds: { type: object, additionalProperties: true }
+    ModelOptionsEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/ModelOptions' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    CreateEditedVersionRequest:
+      type: object
+      additionalProperties: false
+      required: [content]
+      properties:
+        content: { type: object, additionalProperties: true }
+        base_artifact_version_id: { type: [string, 'null'] }
+        note: { type: string, maxLength: 2000 }
+    NodeItemActionRequest:
+      type: object
+      additionalProperties: false
+      required: [action]
+      properties:
+        action:
+          enum:
+            - revise
+            - regenerate
+            - approve
+            - lock_creative_redo_anchor
+            - duplicate_as_custom
+            - retry_clip
+            - approve_clip
+            - replace_image
+        instruction: { type: string, maxLength: 2000 }
+        payload: { type: object, additionalProperties: true }
+    NodeItemActionResult:
+      type: object
+      additionalProperties: false
+      properties:
+        task: { anyOf: [{ $ref: '#/components/schemas/Task' }, { type: 'null' }] }
+        artifact_version: { anyOf: [{ $ref: '#/components/schemas/ArtifactVersion' }, { type: 'null' }] }
+        node: { anyOf: [{ $ref: '#/components/schemas/NodeSummary' }, { type: 'null' }] }
+    NodeItemActionEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/NodeItemActionResult' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    DeliveryBlocker:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        lesson_id: { type: [string, 'null'] }
+        node_key: { type: [string, 'null'] }
+    DeliveryItem:
+      type: object
+      additionalProperties: false
+      required: [item_key, category, title, status]
+      properties:
+        item_key: { type: string }
+        category: { enum: [lesson_plan, ppt, video, subtitle, audio, quality_report, package] }
+        title: { type: string }
+        status: { enum: [missing, pending, blocked, ready, delivered] }
+        lesson_id: { type: [string, 'null'] }
+        file_object: { anyOf: [{ $ref: '#/components/schemas/FileObject' }, { type: 'null' }] }
+        version_number: { type: [integer, 'null'] }
+        quality_passed: { type: [boolean, 'null'] }
+        generated_at: { type: [string, 'null'], format: date-time }
+    Delivery:
+      type: object
+      additionalProperties: false
+      required: [status, items, blockers]
+      properties:
+        status: { enum: [not_ready, ready, packaging, completed, failed] }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/DeliveryItem' }
+        blockers:
+          type: array
+          items: { $ref: '#/components/schemas/DeliveryBlocker' }
+        package_task_id: { type: [string, 'null'] }
+        packaged_at: { type: [string, 'null'], format: date-time }
+        package_file: { anyOf: [{ $ref: '#/components/schemas/FileObject' }, { type: 'null' }] }
+    TemplateSummary:
+      type: object
+      additionalProperties: false
+      required: [template_id, name, node_type, current_version, status]
+      properties:
+        template_id: { type: string }
+        name: { type: string }
+        node_type: { type: string }
+        current_version: { type: string }
+        status: { enum: [draft, candidate, published, deprecated] }
+        description: { type: [string, 'null'] }
+        usage_count: { type: integer, minimum: 0 }
+        updated_at: { type: [string, 'null'], format: date-time }
+    TemplateVersion:
+      type: object
+      additionalProperties: false
+      required: [version, status, created_at]
+      properties:
+        version: { type: string }
+        status: { enum: [draft, candidate, published, deprecated] }
+        changelog: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
+    TemplateBinding:
+      type: object
+      additionalProperties: false
+      required: [node_type, workflow_version]
+      properties:
+        node_type: { type: string }
+        workflow_version: { type: string }
+        scope: { type: [string, 'null'] }
+    TemplateDetail:
+      type: object
+      additionalProperties: false
+      required: [template, versions, bindings, validation_results]
+      properties:
+        template: { $ref: '#/components/schemas/TemplateSummary' }
+        content: { type: [string, 'null'] }
+        variables_schema: { type: object, additionalProperties: true }
+        versions:
+          type: array
+          items: { $ref: '#/components/schemas/TemplateVersion' }
+        bindings:
+          type: array
+          items: { $ref: '#/components/schemas/TemplateBinding' }
+        validation_results:
+          type: array
+          items: { $ref: '#/components/schemas/ValidationResult' }
+    TemplateDetailEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/TemplateDetail' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    TemplateImportRequest:
+      type: object
+      additionalProperties: false
+      required: [name, node_type, content]
+      properties:
+        name: { type: string }
+        node_type: { type: string }
+        content: { type: string }
+        description: { type: string }
+    TemplateUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string }
+        content: { type: string }
+        description: { type: string }
+    TemplatePublishRequest:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: { type: string }
+        note: { type: string, maxLength: 2000 }
+        changelog: { type: string, maxLength: 2000 }
+        override_reason: { type: string, maxLength: 2000 }
+    TemplateRollbackRequest:
+      type: object
+      additionalProperties: false
+      required: [to_version, reason]
+      properties:
+        to_version: { type: string }
+        reason: { type: string, maxLength: 2000 }
+    Provider:
+      type: object
+      additionalProperties: false
+      required: [provider_id, name, provider_type, enabled, health_status, credential_status]
+      properties:
+        provider_id: { type: string }
+        name: { type: string }
+        provider_type: { enum: [text, image, video, tts, multimodal, presentation] }
+        base_url: { type: string, format: uri }
+        auth_method: { type: [string, 'null'] }
+        enabled: { type: boolean }
+        environment: { enum: [production, staging, development] }
+        health_status: { enum: [healthy, degraded, unavailable, unknown] }
+        credential_status: { enum: [configured, missing, invalid, expiring] }
+        credential_mask: { type: [string, 'null'] }
+        credential_updated_at: { type: [string, 'null'], format: date-time }
+        timeout_seconds: { type: [integer, 'null'] }
+        retry_limit: { type: [integer, 'null'] }
+        concurrency_limit: { type: [integer, 'null'] }
+        rate_limit_per_minute: { type: [integer, 'null'] }
+    ProviderUpsertRequest:
+      type: object
+      additionalProperties: false
+      required: [name, provider_type, base_url, enabled]
+      properties:
+        name: { type: string }
+        provider_type: { enum: [text, image, video, tts, multimodal, presentation] }
+        base_url: { type: string, format: uri }
+        auth_method: { type: string }
+        credential_value: { type: string }
+        environment: { enum: [production, staging, development] }
+        timeout_seconds: { type: integer, minimum: 1, maximum: 600 }
+        retry_limit: { type: integer, minimum: 0, maximum: 10 }
+        concurrency_limit: { type: integer, minimum: 1 }
+        rate_limit_per_minute: { type: integer, minimum: 1 }
+        enabled: { type: boolean }
+    ProviderUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string }
+        base_url: { type: string, format: uri }
+        auth_method: { type: string }
+        credential_value: { type: string }
+        environment: { enum: [production, staging, development] }
+        timeout_seconds: { type: integer, minimum: 1, maximum: 600 }
+        retry_limit: { type: integer, minimum: 0, maximum: 10 }
+        concurrency_limit: { type: integer, minimum: 1 }
+        rate_limit_per_minute: { type: integer, minimum: 1 }
+        enabled: { type: boolean }
+    ModelDefinition:
+      type: object
+      additionalProperties: false
+      required: [model_id, provider_id, business_name, upstream_name, capabilities, enabled]
+      properties:
+        model_id: { type: string }
+        provider_id: { type: string }
+        provider_name: { type: [string, 'null'] }
+        business_name: { type: string }
+        upstream_name: { type: string }
+        capabilities:
+          type: array
+          items: { type: string }
+        input_modalities:
+          type: array
+          items: { type: string }
+        output_modalities:
+          type: array
+          items: { type: string }
+        constraints: { type: object, additionalProperties: true }
+        features: { type: object, additionalProperties: true }
+        pricing: { type: object, additionalProperties: true }
+        recommended_scenarios: { type: [string, 'null'] }
+        enabled: { type: boolean }
+    ModelUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        business_name: { type: string }
+        recommended_scenarios: { type: string }
+        enabled: { type: boolean }
+    ModelEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/ModelDefinition' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    RoutePolicy:
+      type: object
+      additionalProperties: false
+      required: [route_policy_id, capability, mode, primary_model_id, fallback_model_ids, enabled]
+      properties:
+        route_policy_id: { type: string }
+        capability: { type: string }
+        mode: { enum: [quality, economy, speed, balanced, fixed] }
+        primary_model_id: { type: string }
+        fallback_model_ids:
+          type: array
+          items: { type: string }
+        allow_cross_provider_fallback: { type: boolean }
+        max_cost_minor_units: { type: [integer, 'null'] }
+        parameter_bounds: { type: object, additionalProperties: true }
+        scope_organization_id: { type: [string, 'null'] }
+        scope_project_id: { type: [string, 'null'] }
+        enabled: { type: boolean }
+        updated_at: { type: [string, 'null'], format: date-time }
+    RoutePolicyUpsertRequest:
+      type: object
+      additionalProperties: false
+      required: [capability, mode, primary_model_id, fallback_model_ids, enabled]
+      properties:
+        capability: { type: string }
+        mode: { enum: [quality, economy, speed, balanced, fixed] }
+        primary_model_id: { type: string }
+        fallback_model_ids:
+          type: array
+          items: { type: string }
+        allow_cross_provider_fallback: { type: boolean }
+        max_cost_minor_units: { type: [integer, 'null'] }
+        parameter_bounds: { type: object, additionalProperties: true }
+        scope_organization_id: { type: [string, 'null'] }
+        scope_project_id: { type: [string, 'null'] }
+        enabled: { type: boolean }
+    RoutePolicyEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/RoutePolicy' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    RouteSimulationRequest:
+      type: object
+      additionalProperties: false
+      required: [capability, mode, primary_model_id]
+      properties:
+        capability: { type: string }
+        mode: { enum: [quality, economy, speed, balanced, fixed] }
+        primary_model_id: { type: string }
+        fallback_model_ids:
+          type: array
+          items: { type: string }
+        scope_organization_id: { type: [string, 'null'] }
+        scope_project_id: { type: [string, 'null'] }
+    RouteSimulation:
+      type: object
+      additionalProperties: false
+      required: [selected_model_id, selected_model_name, fallback_chain, conflicts]
+      properties:
+        selected_model_id: { type: string }
+        selected_model_name: { type: string }
+        provider_name: { type: string }
+        fallback_chain:
+          type: array
+          items: { type: string }
+        conflicts:
+          type: array
+          items: { type: string }
+        estimated_cost_note: { type: [string, 'null'] }
+    RouteSimulationEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/RouteSimulation' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    OrganizationBudget:
+      type: object
+      additionalProperties: false
+      required: [organization_id, organization_name, monthly_limit_minor_units, spent_minor_units]
+      properties:
+        organization_id: { type: string }
+        organization_name: { type: string }
+        monthly_limit_minor_units: { type: integer, minimum: 0 }
+        spent_minor_units: { type: integer, minimum: 0 }
+    BudgetConfig:
+      type: object
+      additionalProperties: false
+      required: [currency, platform_daily_minor_units, teacher_quota_minor_units, project_default_minor_units, node_run_max_minor_units, overage_policy, row_version]
+      properties:
+        currency: { type: string }
+        platform_daily_minor_units: { type: integer, minimum: 0 }
+        platform_daily_spent_minor_units: { type: integer, minimum: 0 }
+        teacher_quota_minor_units: { type: integer, minimum: 0 }
+        project_default_minor_units: { type: integer, minimum: 0 }
+        node_run_max_minor_units: { type: integer, minimum: 0 }
+        overage_policy: { enum: [pause, require_authorization] }
+        organization_budgets:
+          type: array
+          items: { $ref: '#/components/schemas/OrganizationBudget' }
+        row_version: { type: integer, minimum: 1 }
+    BudgetConfigUpdateRequest:
+      type: object
+      additionalProperties: false
+      required: [row_version]
+      properties:
+        platform_daily_minor_units: { type: integer, minimum: 0 }
+        teacher_quota_minor_units: { type: integer, minimum: 0 }
+        project_default_minor_units: { type: integer, minimum: 0 }
+        node_run_max_minor_units: { type: integer, minimum: 0 }
+        overage_policy: { enum: [pause, require_authorization] }
+        organization_budgets:
+          type: array
+          items: { $ref: '#/components/schemas/OrganizationBudget' }
+        row_version: { type: integer, minimum: 1 }
+    BudgetConfigEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/BudgetConfig' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    CapabilityPrimary:
+      type: object
+      additionalProperties: false
+      required: [capability, business_name, model_id, provider_name]
+      properties:
+        capability: { type: string }
+        business_name: { type: string }
+        model_id: { type: string }
+        provider_name: { type: string }
+    GatewayDailyStats:
+      type: object
+      additionalProperties: false
+      required: [run_count, success_rate_percent, average_duration_ms, cost_minor_units, currency]
+      properties:
+        run_count: { type: integer, minimum: 0 }
+        success_rate_percent: { type: number, minimum: 0, maximum: 100 }
+        average_duration_ms: { type: integer, minimum: 0 }
+        cost_minor_units: { type: integer, minimum: 0 }
+        currency: { type: string }
+    DegradeNotice:
+      type: object
+      additionalProperties: false
+      required: [provider_id, provider_name, reason, since]
+      properties:
+        provider_id: { type: string }
+        provider_name: { type: string }
+        reason: { type: string }
+        since: { type: string, format: date-time }
+    GatewayOverview:
+      type: object
+      additionalProperties: false
+      required: [providers, today, failed_runs, degraded, capability_primaries]
+      properties:
+        providers:
+          type: array
+          items: { $ref: '#/components/schemas/Provider' }
+        today: { $ref: '#/components/schemas/GatewayDailyStats' }
+        failed_runs:
+          type: array
+          items: { $ref: '#/components/schemas/ModelRun' }
+        degraded:
+          type: array
+          items: { $ref: '#/components/schemas/DegradeNotice' }
+        capability_primaries:
+          type: array
+          items: { $ref: '#/components/schemas/CapabilityPrimary' }
+    GatewayOverviewEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/GatewayOverview' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    ModelRun:
+      type: object
+      additionalProperties: false
+      required: [model_run_id, capability, provider_id, model_id, status, created_at]
+      properties:
+        model_run_id: { type: string }
+        capability: { type: string }
+        provider_id: { type: string }
+        provider_name: { type: [string, 'null'] }
+        model_id: { type: string }
+        model_name: { type: [string, 'null'] }
+        status: { enum: [queued, running, completed, failed, cancelled] }
+        project_id: { type: [string, 'null'] }
+        lesson_id: { type: [string, 'null'] }
+        node_key: { type: [string, 'null'] }
+        is_fallback: { type: boolean }
+        estimated_cost_minor_units: { type: integer, minimum: 0 }
+        actual_cost_minor_units: { type: integer, minimum: 0 }
+        duration_ms: { type: integer, minimum: 0 }
+        fallback_from_model_run_id: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
+    ModelRunDetail:
+      type: object
+      additionalProperties: false
+      required: [run]
+      properties:
+        run: { $ref: '#/components/schemas/ModelRun' }
+        input_summary: { type: [string, 'null'] }
+        prompt_version_id: { type: [string, 'null'] }
+        parameters: { type: object, additionalProperties: true }
+        provider_task_id: { type: [string, 'null'] }
+        error: { anyOf: [{ $ref: '#/components/schemas/Error' }, { type: 'null' }] }
+        fallback_chain:
+          type: array
+          items: { type: string }
+    ModelRunDetailEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/ModelRunDetail' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    WorkflowVersion:
+      type: object
+      additionalProperties: false
+      required: [workflow_id, name, version, status, node_count]
+      properties:
+        workflow_id: { type: string }
+        name: { type: string }
+        version: { type: string }
+        status: { enum: [draft, published, deprecated] }
+        node_count: { type: integer, minimum: 0 }
+        bound_project_count: { type: integer, minimum: 0 }
+        published_at: { type: [string, 'null'], format: date-time }
+    WorkflowNodeDefinition:
+      type: object
+      additionalProperties: false
+      required: [node_key, title, group]
+      properties:
+        node_key: { type: string }
+        title: { type: string }
+        group: { type: string }
+        capability: { type: [string, 'null'] }
+        depends_on:
+          type: array
+          items: { type: string }
+        skippable: { type: boolean }
+    WorkflowVersionDetail:
+      type: object
+      additionalProperties: false
+      required: [workflow, nodes]
+      properties:
+        workflow: { $ref: '#/components/schemas/WorkflowVersion' }
+        nodes:
+          type: array
+          items: { $ref: '#/components/schemas/WorkflowNodeDefinition' }
+    WorkflowVersionDetailEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/WorkflowVersionDetail' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    WorkflowVersionPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/WorkflowVersion' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    AdminUser:
+      type: object
+      additionalProperties: false
+      required: [user_id, display_name, role, status]
+      properties:
+        user_id: { type: string }
+        display_name: { type: string }
+        email: { type: [string, 'null'] }
+        role: { enum: [teacher, template_admin, system_admin, audit_admin] }
+        status: { enum: [active, disabled] }
+        organization_id: { type: [string, 'null'] }
+        organization_name: { type: [string, 'null'] }
+        last_active_at: { type: [string, 'null'], format: date-time }
+    AdminUserUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        role: { enum: [teacher, template_admin, system_admin, audit_admin] }
+        status: { enum: [active, disabled] }
+        reason: { type: string, maxLength: 500 }
+    AdminUserEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/AdminUser' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    AdminUserPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/AdminUser' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    Organization:
+      type: object
+      additionalProperties: false
+      required: [organization_id, name]
+      properties:
+        organization_id: { type: string }
+        name: { type: string }
+        member_count: { type: integer, minimum: 0 }
+    OrganizationPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Organization' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    AuditEntry:
+      type: object
+      additionalProperties: false
+      required: [audit_id, actor_name, actor_role, action, object_type, occurred_at]
+      properties:
+        audit_id: { type: string }
+        actor_name: { type: string }
+        actor_role: { type: string }
+        action: { type: string }
+        object_type: { type: string }
+        object_id: { type: [string, 'null'] }
+        summary: { type: [string, 'null'] }
+        occurred_at: { type: string, format: date-time }
+        trace_id: { type: [string, 'null'] }
+    AuditPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/AuditEntry' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    ProjectEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/Project' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    ProjectPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Project' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    LessonEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/Lesson' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    LessonPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Lesson' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    WorkspaceEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/Workspace' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    NodeWorkspaceEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/NodeWorkspace' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    PromptVersionEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/PromptVersion' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    CostEstimateEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/CostEstimate' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    ArtifactVersionEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/ArtifactVersion' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    ArtifactVersionPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ArtifactVersion' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    UploadSessionEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/UploadSession' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    TaskEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/Task' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    TaskPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Task' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    AssetPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Asset' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    DeliveryEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/Delivery' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    ProviderEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data: { $ref: '#/components/schemas/Provider' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    ProviderPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Provider' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    ModelPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ModelDefinition' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    RoutePolicyPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/RoutePolicy' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    ModelRunPageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ModelRun' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    TemplatePageEnvelope:
+      type: object
+      required: [ok, data, meta]
+      properties:
+        ok: { const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/TemplateSummary' }
+        meta: { $ref: '#/components/schemas/Meta' }
