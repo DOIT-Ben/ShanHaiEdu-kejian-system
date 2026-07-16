@@ -26,14 +26,21 @@
 - GitHub Issue/PR任务事实源、交接、分支、文档生命周期和里程碑规则已初始化。
 - Issue/PR模板、CODEOWNERS和仓库治理检查已加入当前基线。
 
+## 当前责任分工
+
+- Codex负责除生产前端之外的平台开发：API、数据库、Worker、工作流、模型网关、对象存储、基础设施、合同和CI。
+- 独立前端承接方只负责`apps/web`、Figma、Storybook、MSW、前端测试与真实API联调。
+- 双方通过OpenAPI、JSON Schema、SSE、错误合同和Mock场景协作，不越过目录和职责边界。
+
 ## 待启动任务
 
-- [Issue #2：建立阶段0可运行工程骨架和CI](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/2)
+- [Issue #2：Codex建立阶段0后端平台骨架和CI](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/2)
+- [Issue #4：重新外包生产级前端实现](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)
 
 ## 当前阻塞
 
-- 尚未初始化可运行的前后端代码基座和CI。
-- 前端外包产物尚未进入本仓库进行工程验收。
+- 尚未初始化可运行的后端平台基座和CI。
+- 新前端承接方尚未从Issue #4建立Draft PR和工程预览。
 - 文本、图片、视频和TTS供应商的真实开发凭据尚未进入受控环境。
 
 这些阻塞不影响治理初始化，但会阻止阶段1业务运行验收。
@@ -43,9 +50,11 @@
 阶段0完成必须同时满足：
 
 - 团队治理文档、Issue/PR模板和仓库清洁校验合并到`main`。
-- 前后端目标目录、基础CI和本地环境能够启动。
+- 后端平台目录、基础CI和本地依赖能够启动。
+- 前端承接方建立`apps/web`工程、Storybook、MSW和可访问预览。
 - OpenAPI与JSON Schema进入自动校验。
-- 开发者可以创建项目、上传测试文件并看到任务状态的最小贯通界面。
+- 后端可以通过测试或命令行完成项目、上传、异步任务和SSE的最小贯通。
+- 前端可以基于合同完成对应Mock路径，并开始真实API联调。
 
 ## 接手提示
 
