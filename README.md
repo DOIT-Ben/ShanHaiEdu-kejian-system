@@ -59,6 +59,7 @@
 Copy-Item .env.example .env
 uv sync --frozen
 docker compose -f infra\compose.yaml up -d postgres redis minio
+uv run alembic upgrade head
 uv run python scripts\smoke_local_stack.py
 uv run python -m workers.main --check
 uv run uvicorn apps.api.main:app --host 127.0.0.1 --port 8000

@@ -1,0 +1,177 @@
+"""Upload session creation and presigned PUT orchestration."""
+
+from __future__ import annotations
+
+from datetime import datetime, timedelta
+from pathlib import PurePosixPath, PureWindowsPath
+from uuid import UUID
+
+from sqlalchemy.orm import Session
+
+from apps.api.database import utc_now
+from apps.api.errors import ApiError
+from apps.api.identity.models import SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID
+from apps.api.ids import new_uuid7
+from apps.api.projects.repository import ProjectRepository
+from apps.api.uploads.models import SourceMaterial, UploadSession
+from apps.api.uploads.schemas import CreateUploadSessionRequest, UploadSessionRead
+from apps.api.uploads.storage import ObjectStorage, ObjectStorageError
+
+ALLOWED_MEDIA_TYPES = frozenset({"application/pdf"})
+
+
+def safe_filename(filename: str) -> str:
+    candidate = filename.strip()
+    if (
+        not candidate
+        or candidate != PurePosixPath(candidate).name
+        or candidate != PureWindowsPath(candidate).name
+        or any(ord(character) < 32 for character in candidate)
+    ):
+        raise ApiError(
+            status_code=422,
+            code="UPLOAD_REJECTED",
+            message="The upload filename is unsafe.",
+            details={"field": "filename"},
+        )
+    return candidate
+
+
+def normalized_media_type(value: str) -> str:
+    return value.split(";", 1)[0].strip().lower()
+
+
+class UploadSessionService:
+    def __init__(
+        self,
+        *,
+        session: Session,
+        storage: ObjectStorage,
+        bucket: str,
+        ttl_seconds: int,
+        max_size_bytes: int,
+    ) -> None:
+        self._session = session
+        self._storage = storage
+        self._bucket = bucket
+        self._ttl_seconds = ttl_seconds
+        self._max_size_bytes = max_size_bytes
+
+    def create_session(
+        self, project_id: UUID, payload: CreateUploadSessionRequest
+    ) -> UploadSessionRead:
+        filename = safe_filename(payload.filename)
+        media_type = normalized_media_type(payload.media_type)
+        self._validate_upload_request(media_type=media_type, size_bytes=payload.size_bytes)
+        self._require_project(project_id)
+        self._session.rollback()
+
+        upload_id = new_uuid7()
+        material_id = new_uuid7()
+        key = (
+            f"organizations/{SYSTEM_ORGANIZATION_ID}/projects/{project_id}/materials/"
+            f"{material_id}/uploads/{upload_id}/{filename}"
+        )
+        expires_at = utc_now() + timedelta(seconds=self._ttl_seconds)
+        upload_url = self._presigned_url(key)
+        with self._session.begin():
+            self._require_project(project_id, for_update=True)
+            self._persist_upload_session(
+                project_id=project_id,
+                upload_id=upload_id,
+                material_id=material_id,
+                filename=filename,
+                media_type=media_type,
+                key=key,
+                expires_at=expires_at,
+                payload=payload,
+            )
+        return UploadSessionRead(
+            upload_session_id=upload_id,
+            material_id=material_id,
+            upload_url=upload_url,
+            required_headers={"Content-Type": media_type},
+            expires_at=expires_at,
+        )
+
+    def _require_project(self, project_id: UUID, *, for_update: bool = False) -> None:
+        project = ProjectRepository(self._session, SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID).get(
+            project_id, for_update=for_update
+        )
+        if project is None or project.status == "archived":
+            raise ApiError(
+                status_code=409 if for_update else 404,
+                code="PRECONDITION_NOT_MET" if for_update else "PROJECT_NOT_FOUND",
+                message="The project was not found or cannot accept uploads.",
+            )
+
+    def _presigned_url(self, key: str) -> str:
+        try:
+            return self._storage.create_presigned_put(
+                bucket=self._bucket,
+                key=key,
+                expires=timedelta(seconds=self._ttl_seconds),
+            )
+        except ObjectStorageError as exc:
+            raise ApiError(
+                status_code=503,
+                code="OBJECT_STORAGE_UNAVAILABLE",
+                message="The upload service is temporarily unavailable.",
+                retryable=True,
+            ) from exc
+
+    def _persist_upload_session(
+        self,
+        *,
+        project_id: UUID,
+        upload_id: UUID,
+        material_id: UUID,
+        filename: str,
+        media_type: str,
+        key: str,
+        expires_at: datetime,
+        payload: CreateUploadSessionRequest,
+    ) -> None:
+        material = SourceMaterial(
+            id=material_id,
+            organization_id=SYSTEM_ORGANIZATION_ID,
+            project_id=project_id,
+            material_kind="textbook",
+            file_asset_id=None,
+            original_filename=filename,
+            mime_type=media_type,
+            upload_status="pending_upload",
+            created_by=SYSTEM_PRINCIPAL_ID,
+            updated_by=SYSTEM_PRINCIPAL_ID,
+        )
+        upload = UploadSession(
+            id=upload_id,
+            organization_id=SYSTEM_ORGANIZATION_ID,
+            project_id=project_id,
+            material_id=material_id,
+            storage_bucket=self._bucket,
+            storage_key=key,
+            filename=filename,
+            expected_media_type=media_type,
+            expected_size_bytes=payload.size_bytes,
+            expected_sha256=payload.sha256,
+            status="created",
+            expires_at=expires_at,
+            created_by=SYSTEM_PRINCIPAL_ID,
+            updated_by=SYSTEM_PRINCIPAL_ID,
+        )
+        self._session.add_all((material, upload))
+
+    def _validate_upload_request(self, *, media_type: str, size_bytes: int) -> None:
+        if media_type not in ALLOWED_MEDIA_TYPES:
+            raise ApiError(
+                status_code=409,
+                code="UPLOAD_REJECTED",
+                message="The material media type is not allowed.",
+            )
+        if size_bytes > self._max_size_bytes:
+            raise ApiError(
+                status_code=409,
+                code="UPLOAD_REJECTED",
+                message="The material exceeds the upload size limit.",
+            )

@@ -27,15 +27,15 @@ venv/
 !.env.example
 
 # Local runtime data
-storage/
-uploads/
-tmp/
-runtime/
-artifacts/
-downloads/
-exports/
-scratch/
-backups/
+/storage/
+/uploads/
+/tmp/
+/runtime/
+/artifacts/
+/downloads/
+/exports/
+/scratch/
+/backups/
 *.db
 *.sqlite
 *.sqlite3

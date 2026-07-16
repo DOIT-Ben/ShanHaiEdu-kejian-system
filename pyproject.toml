@@ -5,12 +5,17 @@ description = "ShanHaiEdu courseware workbench backend platform"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+  "alembic>=1.16,<2",
+  "certifi>=2025.1.31",
   "fastapi>=0.115,<1",
   "httpx>=0.28,<1",
+  "minio>=7.2,<8",
   "psycopg[binary]>=3.2,<4",
   "pydantic-settings>=2.8,<3",
   "redis>=6,<8",
+  "sqlalchemy>=2.0.41,<3",
   "uvicorn[standard]>=0.34,<1",
+  "uuid6>=2024.7.10,<2026",
 ]
 
 [dependency-groups]
