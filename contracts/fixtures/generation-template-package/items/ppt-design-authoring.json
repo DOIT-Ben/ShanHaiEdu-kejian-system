@@ -1,0 +1,26 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "ppt_design.authoring",
+    "name": "PPT页级设计生成",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "ppt_design.authoring",
+    "title": "PPT页级设计生成",
+    "model_capability": "text.structured.ppt_design",
+    "input_definition_ref": {"item_key": "ppt_design.input", "kind": "input_definition"},
+    "output_definition_ref": {"item_key": "ppt_design.page", "kind": "content_definition"},
+    "sections": [
+      {"section_key": "role", "layer": "role", "content": "你是小学数学公开课PPT设计师。", "editable": false, "visible_to_teacher": true},
+      {"section_key": "task", "layer": "task", "content": "依据已批准教案和选定风格，生成结构化页级设计稿。", "editable": true, "visible_to_teacher": true},
+      {"section_key": "method", "layer": "method", "content": "封面单独设计；正文默认纯白且每页保留图片主视觉；文字、公式和数学图形必须可编辑。", "editable": false, "visible_to_teacher": true}
+    ],
+    "context_bindings": [
+      {"binding_key": "lesson_plan", "source": "lesson_plan.approved_version", "required": true, "exposure": "summary", "max_items": 1, "max_bytes": 500000}
+    ],
+    "user_edit_policy": {"mode": "replace_editable_layer", "max_chars": 30000}
+  }
+}

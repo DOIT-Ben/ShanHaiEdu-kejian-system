@@ -1,0 +1,19 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "ppt_design.input",
+    "name": "PPT设计稿输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "ppt_design.input",
+    "title": "PPT设计稿输入",
+    "fields": [
+      {"field_key": "lesson_plan", "label": "已批准教案", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "text", "allowed_item_kinds": ["content_definition"]},
+      {"field_key": "style_preset", "label": "PPT风格", "value_type": "reference", "required": true, "source": "teacher", "visibility": "primary", "widget": "style_picker", "allowed_item_kinds": ["style_preset"]},
+      {"field_key": "page_count", "label": "建议页数", "value_type": "number", "required": false, "source": "teacher", "visibility": "secondary", "widget": "number", "default_value": 12}
+    ]
+  }
+}

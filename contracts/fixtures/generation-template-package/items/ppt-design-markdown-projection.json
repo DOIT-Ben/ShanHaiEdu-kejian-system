@@ -1,0 +1,20 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "ppt_design.teacher_markdown",
+    "name": "PPT设计稿Markdown",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "ppt_design.teacher_markdown",
+    "title": "PPT设计稿Markdown",
+    "source_definition_ref": {"item_key": "ppt_design.page", "kind": "content_definition"},
+    "output_format": "markdown",
+    "renderer_id": "shanhai.markdown.v1",
+    "template": "## {{page_type}}\n\n**教学目标**：{{teaching_goal}}\n\n**视觉风格**：{{visual_style}}\n\n**背景策略**：{{background_policy}}\n\n**版式**：{{layout}}\n\n**可编辑元素**：{{editable_elements}}\n\n**图片资产需求**：{{asset_requirements}}",
+    "allowed_variables": ["page_type", "teaching_goal", "visual_style", "background_policy", "layout", "editable_elements", "asset_requirements"],
+    "teacher_visible": true
+  }
+}

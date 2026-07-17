@@ -1,0 +1,25 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "ppt_design.page",
+    "name": "PPT页级设计稿",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "ppt_design.page",
+    "title": "PPT页级设计稿",
+    "description": "后台保存结构化页面设计，教师端投影为可读设计文档。",
+    "definition_role": "artifact",
+    "fields": [
+      {"field_key": "page_type", "label": "页面类型", "type": "enum", "required": true, "editable": true, "deletable": false, "options": [{"value": "cover", "label": "封面"}, {"value": "content", "label": "正文"}, {"value": "summary", "label": "总结"}]},
+      {"field_key": "teaching_goal", "label": "教学目标", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+      {"field_key": "visual_style", "label": "视觉风格", "type": "reference", "required": true, "editable": true, "deletable": false},
+      {"field_key": "background_policy", "label": "背景策略", "type": "enum", "required": true, "editable": true, "deletable": false, "options": [{"value": "white", "label": "纯白"}, {"value": "image", "label": "图片"}, {"value": "solid", "label": "纯色"}]},
+      {"field_key": "layout", "label": "版式", "type": "object", "required": true, "editable": true, "deletable": false},
+      {"field_key": "editable_elements", "label": "可编辑元素", "type": "list", "required": true, "editable": true, "deletable": false},
+      {"field_key": "asset_requirements", "label": "图片资产需求", "type": "list", "required": true, "editable": true, "deletable": false}
+    ]
+  }
+}

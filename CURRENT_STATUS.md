@@ -19,6 +19,8 @@
 - 已建立供应商解耦的文本模型网关、确定性Fake、配置驱动适配器和显式真实冒烟入口。
 - 已建立内置内容Release、不可变定义、项目固定版本和工作流运行/节点快照骨架。
 - 已建立项目内容产物草稿、不可变版本、审核动作和真实依赖过期传播。
+- 已建立教材PDF隔离解析Worker、不可变证据包和可恢复任务链路。
+- 已冻结Schema驱动生成模板内容包V1及其类型化合同、引用和校验工具。
 - 已提供当前前端外包交付包。
 
 当前尚无可运行的端到端业务应用，不得把设计文档或静态原型描述为MVP完成。
@@ -31,7 +33,7 @@
 - 旧版并行设计目录从当前树清除。
 - GitHub Issue/PR任务事实源、交接、分支、文档生命周期和里程碑规则已初始化。
 - Issue/PR模板、CODEOWNERS和仓库治理检查已加入当前基线。
-- Issue #6、#7、#8、#9、#10、#21、#22、#23、#24和#25已合并，阶段0后端基础设施、数据、合同、异步可靠性、文本模型网关、身份授权、课时/分支、文件资产/解析版本、内容/工作流运行时以及产物版本/审核进入`main`。
+- Issue #6、#7、#8、#9、#10、#21、#22、#23、#24、#25、#27和#38已合并，阶段0后端基础设施、数据、合同、异步可靠性、文本模型网关、身份授权、课时/分支、文件资产/解析版本、内容/工作流运行时、产物版本/审核、教材PDF证据包以及Schema驱动生成模板合同进入`main`。
 
 ## 当前责任分工
 
@@ -43,12 +45,14 @@
 
 - [Issue #4：重新外包生产级前端实现](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)
 - [Issue #19：完成阶段1最小可运行后端基座](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/19)
+- [Issue #42：实现Markdown TemplateDraft解析与规范化V1](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/42)
 
 ## 下一实施任务
 
 - [Issue #26：实现上下文白名单、提示词快照和模型调用审计](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/26)
-- [Issue #27：实现教材PDF解析Worker与证据包](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/27)
 - [Issue #28：实现项目资产槽位与原子绑定](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/28)
+
+Issue #38已冻结Decision #37批准的Schema驱动生成模板内容包V1，Issue #26可直接消费现行Prompt、Context、输出和投影引用合同；Issue #42的内容包编译集成在其核心适配器完成后继续。
 
 ## 等待中的联调任务
 
@@ -82,7 +86,7 @@
 - 后端可以通过测试或命令行完成项目、上传、异步任务和SSE的最小贯通。
 - 前端可以基于合同完成对应Mock路径，并开始真实API联调。
 
-阶段1后端轨道已完成身份授权、课时/分支、文件资产/解析版本、内容/工作流运行时和产物版本/审核；下一波次按依赖推进#26 Prompt/Context/用量审计、#27教材PDF解析和已解锁的#28项目资产槽位。完整依赖、测试和回退要求以父Issue #19为准。
+阶段1后端轨道已完成身份授权、课时/分支、文件资产/解析版本、内容/工作流运行时、产物版本/审核、教材PDF解析和Schema驱动生成模板合同；当前#42推进Markdown模板适配器，#26恢复Prompt/Context/用量审计，#28继续作为已解锁的项目资产槽位任务。完整依赖、测试和回退要求以父Issue #19为准。
 
 ## 接手提示
 

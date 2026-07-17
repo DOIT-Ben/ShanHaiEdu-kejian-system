@@ -1,0 +1,20 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "image_prompt.teacher_text",
+    "name": "完整图片提示词",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "image_prompt.teacher_text",
+    "title": "完整图片提示词",
+    "source_definition_ref": {"item_key": "image_prompt.components", "kind": "content_definition"},
+    "output_format": "prompt_text",
+    "renderer_id": "shanhai.prompt_text.v1",
+    "template": "绘制{{content}}。构图：{{composition}}。色系：{{palette}}。质感：{{texture}}。光线：{{lighting}}。整体风格：{{style}}。避免：{{negative_constraints}}。",
+    "allowed_variables": ["content", "composition", "palette", "texture", "lighting", "style", "negative_constraints"],
+    "teacher_visible": true
+  }
+}

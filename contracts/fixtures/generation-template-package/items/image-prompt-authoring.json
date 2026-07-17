@@ -1,0 +1,26 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "image_prompt.authoring",
+    "name": "教育插画提示词生成",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "image_prompt.authoring",
+    "title": "教育插画提示词生成",
+    "model_capability": "text.structured.image_prompt",
+    "input_definition_ref": {"item_key": "image_prompt.input", "kind": "input_definition"},
+    "output_definition_ref": {"item_key": "image_prompt.components", "kind": "content_definition"},
+    "sections": [
+      {"section_key": "role", "layer": "role", "content": "你是小学数学教育视觉设计师。", "editable": false, "visible_to_teacher": true},
+      {"section_key": "task", "layer": "task", "content": "根据教师的画面内容和选定风格，生成结构化图片提示词字段。", "editable": true, "visible_to_teacher": true},
+      {"section_key": "quality", "layer": "quality_gate", "content": "不得依赖模型在图片中准确绘制文字、数字、公式、字幕或Logo。", "editable": false, "visible_to_teacher": true}
+    ],
+    "context_bindings": [
+      {"binding_key": "teacher_preferences", "source": "project.teacher_preferences", "required": false, "exposure": "summary", "max_items": 1, "max_bytes": 20000}
+    ],
+    "user_edit_policy": {"mode": "replace_editable_layer", "max_chars": 20000}
+  }
+}

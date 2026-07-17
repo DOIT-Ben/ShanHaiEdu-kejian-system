@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shanhaiedu.local/contracts/input-definition.schema.json",
+  "title": "InputDefinitionSpec",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["definition_key", "title", "fields"],
+  "properties": {
+    "definition_key": {"$ref": "#/$defs/key"},
+    "title": {"type": "string", "minLength": 1},
+    "description": {"type": "string"},
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/field"}
+    }
+  },
+  "$defs": {
+    "key": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{1,159}$"},
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field_key",
+        "label",
+        "value_type",
+        "required",
+        "source",
+        "visibility",
+        "widget"
+      ],
+      "properties": {
+        "field_key": {"$ref": "#/$defs/key"},
+        "label": {"type": "string", "minLength": 1},
+        "description": {"type": "string"},
+        "value_type": {
+          "enum": ["text", "rich_text", "number", "boolean", "enum", "list", "reference", "asset"]
+        },
+        "required": {"type": "boolean"},
+        "source": {"enum": ["teacher", "system", "context"]},
+        "visibility": {"enum": ["primary", "secondary", "advanced", "hidden"]},
+        "widget": {
+          "enum": [
+            "text",
+            "textarea",
+            "number",
+            "toggle",
+            "select",
+            "multiselect",
+            "style_picker",
+            "asset_picker"
+          ]
+        },
+        "default_value": {},
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value", "label"],
+            "properties": {
+              "value": {"type": "string", "minLength": 1},
+              "label": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        "allowed_item_kinds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"enum": ["style_preset", "content_definition"]}
+        },
+        "validation": {"$ref": "#/$defs/validation"}
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min_length": {"type": "integer", "minimum": 0},
+        "max_length": {"type": "integer", "minimum": 1},
+        "minimum": {"type": "number"},
+        "maximum": {"type": "number"},
+        "min_items": {"type": "integer", "minimum": 0},
+        "max_items": {"type": "integer", "minimum": 1},
+        "pattern": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

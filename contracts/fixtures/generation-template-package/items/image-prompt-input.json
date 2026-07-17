@@ -1,0 +1,46 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "image_prompt.input",
+    "name": "教育插画需求输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "image_prompt.input",
+    "title": "教育插画需求输入",
+    "description": "教师只填写画面内容并选择风格，专业字段由系统和上下文补全。",
+    "fields": [
+      {
+        "field_key": "content",
+        "label": "画面内容",
+        "value_type": "rich_text",
+        "required": true,
+        "source": "teacher",
+        "visibility": "primary",
+        "widget": "textarea",
+        "validation": {"min_length": 5, "max_length": 2000}
+      },
+      {
+        "field_key": "style_preset",
+        "label": "画面风格",
+        "value_type": "reference",
+        "required": true,
+        "source": "teacher",
+        "visibility": "primary",
+        "widget": "style_picker",
+        "allowed_item_kinds": ["style_preset"]
+      },
+      {
+        "field_key": "lesson_context",
+        "label": "课程上下文",
+        "value_type": "rich_text",
+        "required": false,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      }
+    ]
+  }
+}
