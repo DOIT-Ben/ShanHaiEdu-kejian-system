@@ -22,6 +22,7 @@
 - `prompt-template.schema.json`：业务Prompt分层、Context白名单和教师修订策略。
 - `projection-template.schema.json`：结构化事实到完整提示词和教师可读文档的确定性投影。
 - `generation-template.schema.json`：输入、风格、Prompt、输出、投影和逻辑能力的组合。
+- `markdown-template-draft.schema.json`：普通Markdown导入后的可审核模板草稿。
 - `mock-scenarios.json`：前端必须覆盖的关键 Mock 场景。
 - `fixtures/stage0/`：项目、上传、任务、工作流聚合、错误和SSE的确定性合同样例。
 - `generated/`：由当前OpenAPI确定性生成的bundle和TypeScript类型，不是第二份手工合同。
@@ -36,6 +37,7 @@
 5. Schema ID 和枚举值一经发布不得改变语义。
 6. 内容包导出稳定键、类型、版本和语义哈希，不导出数据库UUID、密钥、平台安全层正文、Provider私有参数、项目数据或运行快照。
 7. 教师可见完整提示词和Markdown是结构化事实的投影；教师自由修改保存为运行修订，不形成第二套内容模板。
+8. Markdown只作为管理员导入与预览格式；发布前必须编译为结构化内容定义，不能直接成为运行时事实源。
 
 ## 本地命令
 
@@ -46,6 +48,13 @@ pnpm contracts:generate
 pnpm contracts:typecheck
 pnpm contracts:test
 pnpm contracts:check-generated
+```
+
+检查Markdown模板草稿和规范化预览：
+
+```powershell
+uv run python scripts/inspect_markdown_template.py contracts\fixtures\markdown-template\math-comic-lesson.md --format json
+uv run python scripts/inspect_markdown_template.py contracts\fixtures\markdown-template\math-comic-lesson.md --format markdown
 ```
 
 首次更新依赖锁时运行 `pnpm install`。修改OpenAPI后必须重新生成并提交 `contracts/generated/`；CI会拒绝生成漂移和未声明的破坏性变更。
