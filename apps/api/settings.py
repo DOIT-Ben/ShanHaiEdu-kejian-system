@@ -42,6 +42,14 @@ class Settings(BaseSettings):
     outbox_poll_seconds: float = Field(default=0.5, gt=0, le=30)
     sse_poll_seconds: float = Field(default=0.5, gt=0, le=30)
     sse_heartbeat_seconds: float = Field(default=15, gt=0, le=60)
+    text_provider_name: str | None = None
+    text_provider_base_url: HttpUrl | None = None
+    text_provider_model: str | None = None
+    text_provider_secret_env: str = Field(
+        default="OPENROUTER_API_KEY",
+        pattern=r"^[A-Z][A-Z0-9_]{2,127}$",
+    )
+    text_provider_timeout_seconds: float = Field(default=30, gt=0, le=120)
 
     @model_validator(mode="after")
     def require_production_dependencies(self) -> Self:

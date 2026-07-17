@@ -73,6 +73,18 @@ docker compose -f infra\compose.yaml down
 
 本地 `.env`、数据库、缓存和对象存储数据不得提交。普通测试和CI不连接真实模型Provider。
 
+真实文本模型只通过显式冒烟命令调用。先在受控环境中注入密钥变量，不把密钥写入`.env`、命令历史或参数；再配置非敏感路由并运行：
+
+```powershell
+$env:SHANHAI_TEXT_PROVIDER_NAME="openrouter"
+$env:SHANHAI_TEXT_PROVIDER_BASE_URL="https://openrouter.ai/api/v1"
+$env:SHANHAI_TEXT_PROVIDER_MODEL="<approved-model>"
+$env:SHANHAI_TEXT_PROVIDER_SECRET_ENV="OPENROUTER_API_KEY"
+uv run python -m apps.api.cli model-smoke --capability text.smoke --real
+```
+
+命令只输出脱敏Provider/模型、request ID、UTC、耗时、用量、成本和结论，不输出密钥、提示词或模型正文。
+
 ## 目标代码结构
 
 ```text
