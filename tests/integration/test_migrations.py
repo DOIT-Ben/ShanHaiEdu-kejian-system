@@ -24,9 +24,11 @@ EXPECTED_TABLES = {
     "content_packages",
     "content_release_items",
     "content_releases",
+    "context_snapshots",
     "file_asset_versions",
     "file_assets",
     "generation_jobs",
+    "generation_attempts",
     "idempotency_records",
     "lesson_branch_configs",
     "lesson_units",
@@ -38,10 +40,12 @@ EXPECTED_TABLES = {
     "outbox_events",
     "principals",
     "projects",
+    "prompt_snapshots",
     "project_members",
     "event_stream_entries",
     "source_materials",
     "upload_sessions",
+    "usage_records",
     "users",
     "workflow_definition_versions",
     "workflow_definitions",
@@ -75,7 +79,13 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
     assert "generation_job_id" in parse_columns
     assert "uq_material_parse_versions_generation_job" in parse_indexes
     assert "fk_material_parse_versions_generation_job" in parse_foreign_keys
-    assert ScriptDirectory.from_config(config).get_current_head() == "c8d0e2f4a603"
+    artifact_foreign_keys = {
+        foreign_key["name"]
+        for foreign_key in database_inspector.get_foreign_keys("artifact_versions")
+    }
+    assert "fk_artifact_versions_context_snapshot" in artifact_foreign_keys
+    assert "fk_artifact_versions_prompt_snapshot" in artifact_foreign_keys
+    assert ScriptDirectory.from_config(config).get_current_head() == "a9e1f3c5b704"
     previous = os.environ.get("SHANHAI_DATABASE_URL")
     os.environ["SHANHAI_DATABASE_URL"] = postgres_database_url
     try:

@@ -1572,33 +1572,80 @@ components:
           type: string
     PromptPreviewEnvelope:
       type: object
+      additionalProperties: false
       required:
         - data
         - request_id
       properties:
         data:
           type: object
+          additionalProperties: false
           required:
             - editable_prompt
             - locked_layers
             - context_summary
           properties:
+            prompt_snapshot_id:
+              type: string
+              format: uuid
+            content_hash:
+              type: string
+              pattern: ^[0-9a-f]{64}$
             editable_prompt:
               type: string
             locked_layers:
               type: array
               items:
-                type: object
+                $ref: '#/components/schemas/PromptLockedLayerSummary'
             context_summary:
               type: array
               items:
-                type: object
+                $ref: '#/components/schemas/PromptContextSummary'
             schema:
               type:
                 - object
                 - 'null'
+              additionalProperties: true
         request_id:
           type: string
+    PromptLockedLayerSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        layer:
+          type: string
+          enum:
+            - platform_safety
+            - output_schema
+            - provider_format
+        key:
+          type: string
+          minLength: 1
+        locked:
+          type: boolean
+          const: true
+    PromptContextSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        binding_key:
+          type: string
+          minLength: 1
+        source:
+          type: string
+          minLength: 1
+        exposure:
+          type: string
+          enum:
+            - full
+            - summary
+            - hidden
+        item_count:
+          type: integer
+          minimum: 0
+        content_hash:
+          type: string
+          pattern: ^[0-9a-f]{64}$
     IntroSelectionEnvelope:
       type: object
       required:

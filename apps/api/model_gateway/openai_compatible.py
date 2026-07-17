@@ -38,7 +38,11 @@ class _Usage(BaseModel):
     prompt_tokens: int = Field(ge=0)
     completion_tokens: int = Field(ge=0)
     total_tokens: int = Field(ge=0)
-    cost: Decimal | None = Field(default=None, ge=0)
+    cost: Decimal | None = Field(
+        default=None,
+        ge=0,
+        le=Decimal("999999999999.999999"),
+    )
 
 
 class _Message(BaseModel):
@@ -62,7 +66,7 @@ class _Choice(BaseModel):
 
 class _Completion(BaseModel):
     id: str | None = None
-    model: str
+    model: str = Field(min_length=1, max_length=160)
     choices: list[_Choice] = Field(min_length=1)
     usage: _Usage
 

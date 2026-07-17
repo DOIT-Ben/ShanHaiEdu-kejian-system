@@ -758,12 +758,32 @@ export interface components {
         };
         PromptPreviewEnvelope: {
             data: {
+                /** Format: uuid */
+                prompt_snapshot_id?: string;
+                content_hash?: string;
                 editable_prompt: string;
-                locked_layers: Record<string, never>[];
-                context_summary: Record<string, never>[];
-                schema?: Record<string, never> | null;
+                locked_layers: components["schemas"]["PromptLockedLayerSummary"][];
+                context_summary: components["schemas"]["PromptContextSummary"][];
+                schema?: {
+                    [key: string]: unknown;
+                } | null;
             };
             request_id: string;
+        };
+        PromptLockedLayerSummary: {
+            /** @enum {string} */
+            layer?: "platform_safety" | "output_schema" | "provider_format";
+            key?: string;
+            /** @constant */
+            locked?: true;
+        };
+        PromptContextSummary: {
+            binding_key?: string;
+            source?: string;
+            /** @enum {string} */
+            exposure?: "full" | "summary" | "hidden";
+            item_count?: number;
+            content_hash?: string;
         };
         IntroSelectionEnvelope: {
             data: {
