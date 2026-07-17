@@ -13,6 +13,8 @@ from apps.api.errors import ApiError
 from apps.api.identity.models import SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID
 from apps.api.ids import new_uuid7
 from apps.api.projects.repository import ProjectRepository
+from apps.api.reliability.events import EventResource, EventWriter
+from apps.api.reliability.idempotency import CommandResult, IdempotencyService
 from apps.api.uploads.models import SourceMaterial, UploadSession
 from apps.api.uploads.schemas import CreateUploadSessionRequest, UploadSessionRead
 from apps.api.uploads.storage import ObjectStorage, ObjectStorageError
@@ -58,13 +60,34 @@ class UploadSessionService:
         self._max_size_bytes = max_size_bytes
 
     def create_session(
-        self, project_id: UUID, payload: CreateUploadSessionRequest
+        self,
+        project_id: UUID,
+        payload: CreateUploadSessionRequest,
+        *,
+        idempotency_key: str,
+        request_id: str,
     ) -> UploadSessionRead:
         filename = safe_filename(payload.filename)
         media_type = normalized_media_type(payload.media_type)
         self._validate_upload_request(media_type=media_type, size_bytes=payload.size_bytes)
-        self._require_project(project_id)
-        self._session.rollback()
+        idempotency_payload = {
+            "project_id": str(project_id),
+            **payload.model_dump(mode="json"),
+        }
+        idempotency = IdempotencyService(
+            self._session,
+            SYSTEM_ORGANIZATION_ID,
+            ttl_seconds=self._ttl_seconds,
+        )
+        with self._session.begin():
+            replay = idempotency.lookup(
+                scope="material_uploads.create",
+                key=idempotency_key,
+                payload=idempotency_payload,
+            )
+            self._require_project(project_id)
+        if replay is not None:
+            return UploadSessionRead.model_validate(replay.body)
 
         upload_id = new_uuid7()
         material_id = new_uuid7()
@@ -74,7 +97,15 @@ class UploadSessionService:
         )
         expires_at = utc_now() + timedelta(seconds=self._ttl_seconds)
         upload_url = self._presigned_url(key)
-        with self._session.begin():
+        created = UploadSessionRead(
+            upload_session_id=upload_id,
+            material_id=material_id,
+            upload_url=upload_url,
+            required_headers={"Content-Type": media_type},
+            expires_at=expires_at,
+        )
+
+        def command() -> CommandResult:
             self._require_project(project_id, for_update=True)
             self._persist_upload_session(
                 project_id=project_id,
@@ -86,13 +117,28 @@ class UploadSessionService:
                 expires_at=expires_at,
                 payload=payload,
             )
-        return UploadSessionRead(
-            upload_session_id=upload_id,
-            material_id=material_id,
-            upload_url=upload_url,
-            required_headers={"Content-Type": media_type},
-            expires_at=expires_at,
-        )
+            EventWriter(self._session, SYSTEM_ORGANIZATION_ID).append(
+                project_id=project_id,
+                event_type="material.upload.created",
+                resource=EventResource(type="source_material", id=material_id),
+                payload={"upload_session_id": str(upload_id), "status": "created"},
+                request_id=request_id,
+            )
+            return CommandResult(
+                status_code=201,
+                body=created.model_dump(mode="json"),
+                resource_type="upload_session",
+                resource_id=upload_id,
+            )
+
+        with self._session.begin():
+            result = idempotency.execute(
+                scope="material_uploads.create",
+                key=idempotency_key,
+                payload=idempotency_payload,
+                command=command,
+            )
+        return UploadSessionRead.model_validate(result.body)
 
     def _require_project(self, project_id: UUID, *, for_update: bool = False) -> None:
         project = ProjectRepository(self._session, SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID).get(

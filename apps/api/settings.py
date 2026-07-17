@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     upload_session_ttl_seconds: int = Field(default=900, ge=60, le=3600)
     max_upload_size_bytes: int = Field(default=52_428_800, ge=1)
     dependency_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
+    idempotency_ttl_seconds: int = Field(default=86_400, ge=60, le=604_800)
+    worker_lease_seconds: int = Field(default=60, ge=5, le=3600)
+    outbox_retry_seconds: int = Field(default=5, ge=1, le=300)
+    outbox_poll_seconds: float = Field(default=0.5, gt=0, le=30)
+    sse_poll_seconds: float = Field(default=0.5, gt=0, le=30)
+    sse_heartbeat_seconds: float = Field(default=15, gt=0, le=60)
 
     @model_validator(mode="after")
     def require_production_dependencies(self) -> Self:

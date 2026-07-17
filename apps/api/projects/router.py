@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
-from sqlalchemy.orm import Session
+from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.dependencies import get_session
 from apps.api.errors import ApiError
@@ -20,6 +21,10 @@ from apps.api.projects.schemas import (
     ProjectListEnvelope,
     ProjectRead,
 )
+from apps.api.reliability.events import EventResource, EventWriter
+from apps.api.reliability.idempotency import CommandResult, IdempotencyService
+from apps.api.reliability.sse import EventReplayRepository, parse_last_event_id, stream_events
+from apps.api.settings import Settings
 
 router = APIRouter(prefix="/api/v2/projects", tags=["projects"])
 
@@ -37,13 +42,40 @@ def repository(session: Session) -> ProjectRepository:
 def create_project(
     payload: CreateProjectRequest,
     request: Request,
-    _idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=128)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=128)],
     session: Annotated[Session, Depends(get_session)],
 ) -> ProjectEnvelope:
-    with session.begin():
+    settings = cast(Settings, request.app.state.settings)
+
+    def command() -> CommandResult:
         project = repository(session).create(payload)
+        EventWriter(session, SYSTEM_ORGANIZATION_ID).append(
+            project_id=project.id,
+            event_type="project.created",
+            resource=EventResource(type="project", id=project.id),
+            payload={"status": project.status},
+            request_id=request.state.request_id,
+        )
+        return CommandResult(
+            status_code=201,
+            body=ProjectRead.model_validate(project).model_dump(mode="json"),
+            resource_type="project",
+            resource_id=project.id,
+        )
+
+    with session.begin():
+        result = IdempotencyService(
+            session,
+            SYSTEM_ORGANIZATION_ID,
+            ttl_seconds=settings.idempotency_ttl_seconds,
+        ).execute(
+            scope="projects.create",
+            key=idempotency_key,
+            payload=payload.model_dump(mode="json"),
+            command=command,
+        )
     return ProjectEnvelope(
-        data=ProjectRead.model_validate(project),
+        data=ProjectRead.model_validate(result.body),
         request_id=request.state.request_id,
     )
 
@@ -90,4 +122,51 @@ def get_project(
     return ProjectEnvelope(
         data=ProjectRead.model_validate(project),
         request_id=request.state.request_id,
+    )
+
+
+@router.get(
+    "/{project_id}/events/stream",
+    response_class=StreamingResponse,
+    operation_id="streamProjectEvents",
+)
+def stream_project_events(
+    project_id: UUID,
+    request: Request,
+    last_event_id: Annotated[str | None, Header(alias="Last-Event-ID")] = None,
+) -> StreamingResponse:
+    factory = cast(sessionmaker[Session] | None, request.app.state.session_factory)
+    if factory is None:
+        raise ApiError(
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            message="Database persistence is not configured.",
+            retryable=True,
+        )
+    cursor = parse_last_event_id(last_event_id)
+    with factory() as session:
+        project = repository(session).get(project_id)
+        if project is None:
+            raise ApiError(
+                status_code=404,
+                code="PROJECT_NOT_FOUND",
+                message="The project was not found.",
+            )
+        EventReplayRepository(session).replay(
+            project_id=project_id,
+            after_sequence=cursor,
+            limit=1,
+        )
+    settings = cast(Settings, request.app.state.settings)
+    return StreamingResponse(
+        stream_events(
+            factory,
+            project_id=project_id,
+            after_sequence=cursor,
+            resource=None,
+            poll_seconds=settings.sse_poll_seconds,
+            heartbeat_seconds=settings.sse_heartbeat_seconds,
+        ),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

@@ -51,6 +51,8 @@ def test_upload_confirmation_validates_object_and_commits_atomically(
                 size_bytes=4,
                 sha256=SHA256,
             ),
+            idempotency_key="create-upload-session",
+            request_id="req-create-upload",
         )
         assert storage.last_presigned is not None
         expected = ObjectMetadata(
@@ -75,6 +77,8 @@ def test_upload_confirmation_validates_object_and_commits_atomically(
                 material_id=upload.material_id,
                 idempotency_key="confirm-size-mismatch",
                 payload=confirm.model_copy(update={"size_bytes": 5}),
+                request_id="req-size-mismatch",
+                idempotency_ttl_seconds=900,
             )
 
         mismatches = (
@@ -92,6 +96,8 @@ def test_upload_confirmation_validates_object_and_commits_atomically(
                     material_id=upload.material_id,
                     idempotency_key="confirm-object-mismatch",
                     payload=confirm,
+                    request_id="req-object-mismatch",
+                    idempotency_ttl_seconds=900,
                 )
 
         storage.put(expected)
@@ -100,9 +106,20 @@ def test_upload_confirmation_validates_object_and_commits_atomically(
             material_id=upload.material_id,
             idempotency_key="confirm-success",
             payload=confirm,
+            request_id="req-confirm-success",
+            idempotency_ttl_seconds=900,
+        )
+        replayed = confirmation_service.confirm(
+            project_id=project.id,
+            material_id=upload.material_id,
+            idempotency_key="confirm-success",
+            payload=confirm,
+            request_id="req-confirm-replay",
+            idempotency_ttl_seconds=900,
         )
 
         assert accepted.status == "queued"
+        assert replayed.job_id == accepted.job_id
         assert session.scalar(select(func.count()).select_from(FileAsset)) == 1
         assert session.scalar(select(func.count()).select_from(FileAssetVersion)) == 1
         assert session.scalar(select(func.count()).select_from(GenerationJob)) == 1

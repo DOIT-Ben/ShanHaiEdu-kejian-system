@@ -48,11 +48,16 @@ def create_upload_session(
     project_id: UUID,
     payload: CreateUploadSessionRequest,
     request: Request,
-    _idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=128)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=128)],
     session: Annotated[Session, Depends(get_session)],
     storage: Annotated[ObjectStorage, Depends(get_object_storage)],
 ) -> UploadSessionEnvelope:
-    created = session_service(request, session, storage).create_session(project_id, payload)
+    created = session_service(request, session, storage).create_session(
+        project_id,
+        payload,
+        idempotency_key=idempotency_key,
+        request_id=request.state.request_id,
+    )
     return UploadSessionEnvelope(data=created, request_id=request.state.request_id)
 
 
@@ -76,5 +81,7 @@ def confirm_upload(
         material_id=material_id,
         idempotency_key=idempotency_key,
         payload=payload,
+        request_id=request.state.request_id,
+        idempotency_ttl_seconds=cast(Settings, request.app.state.settings).idempotency_ttl_seconds,
     )
     return AcceptedJobEnvelope(data=accepted, request_id=request.state.request_id)

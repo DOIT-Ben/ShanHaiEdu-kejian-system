@@ -21,6 +21,7 @@ class GenerationJob(MutableAuditMixin, Base):
         ),
         CheckConstraint("progress_percent BETWEEN 0 AND 100", name="progress_range"),
         CheckConstraint("priority >= 0", name="priority_nonnegative"),
+        CheckConstraint("attempt_count >= 0", name="attempt_count_nonnegative"),
         CheckConstraint("lock_version >= 1", name="lock_version_positive"),
         CheckConstraint(
             "project_id IS NOT NULL OR source_material_id IS NOT NULL",
@@ -32,6 +33,7 @@ class GenerationJob(MutableAuditMixin, Base):
             "status",
             "created_at",
         ),
+        Index("ix_generation_jobs_status_lease", "status", "lease_expires_at"),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
@@ -52,6 +54,9 @@ class GenerationJob(MutableAuditMixin, Base):
     idempotency_key: Mapped[str | None] = mapped_column(String(128))
     request_hash: Mapped[str | None] = mapped_column(String(64))
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    lease_owner: Mapped[str | None] = mapped_column(String(160))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancel_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
