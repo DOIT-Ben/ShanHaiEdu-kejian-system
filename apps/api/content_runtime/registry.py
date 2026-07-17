@@ -1,0 +1,25 @@
+"""Deterministic built-in runtime identifiers used by migrations and ordinary CI."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from uuid import UUID
+
+BUILTIN_CONTENT_PACKAGE_ID = UUID("01970000-0000-7000-8000-000000000001")
+BUILTIN_CONTENT_PACKAGE_VERSION_ID = UUID("01970000-0000-7000-8000-000000000002")
+BUILTIN_CONTENT_RELEASE_ID = UUID("01970000-0000-7000-8000-000000000003")
+BUILTIN_CONTENT_DEFINITION_VERSION_ID = UUID("01970000-0000-7000-8000-000000000004")
+BUILTIN_WORKFLOW_DEFINITION_ID = UUID("01970000-0000-7000-8000-000000000005")
+BUILTIN_WORKFLOW_DEFINITION_VERSION_ID = UUID("01970000-0000-7000-8000-000000000006")
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeDefaults:
+    content_release_id: UUID
+    workflow_definition_version_id: UUID
+
+
+BUILTIN_RUNTIME_DEFAULTS = RuntimeDefaults(
+    content_release_id=BUILTIN_CONTENT_RELEASE_ID,
+    workflow_definition_version_id=BUILTIN_WORKFLOW_DEFINITION_VERSION_ID,
+)

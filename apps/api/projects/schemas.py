@@ -32,6 +32,8 @@ class ProjectRead(BaseModel):
     knowledge_point: str
     status: Literal["draft", "active", "archived"]
     automation_mode: AutomationMode
+    content_release_id: UUID
+    workflow_definition_version_id: UUID
     created_at: datetime
     updated_at: datetime
 

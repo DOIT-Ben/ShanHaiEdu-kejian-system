@@ -746,6 +746,12 @@ components:
             - archived
         automation_mode:
           $ref: '#/components/schemas/AutomationMode'
+        content_release_id:
+          type: string
+          format: uuid
+        workflow_definition_version_id:
+          type: string
+          format: uuid
         created_at:
           type: string
           format: date-time
@@ -1312,6 +1318,7 @@ components:
           minLength: 1
     NodeRun:
       type: object
+      additionalProperties: false
       required:
         - id
         - node_key
@@ -1320,8 +1327,19 @@ components:
         id:
           type: string
           format: uuid
+        workflow_run_id:
+          type: string
+          format: uuid
+        branch_run_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
         node_key:
           type: string
+        run_no:
+          type: integer
+          minimum: 1
         status:
           $ref: '#/components/schemas/workflow-node-status.schema'
         title:
@@ -1330,14 +1348,66 @@ components:
           type:
             - object
             - 'null'
+        started_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        finished_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    WorkflowRun:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - run_no
+        - status
+        - content_release_id
+        - workflow_definition_version_id
+        - started_at
+        - completed_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        run_no:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum:
+            - active
+            - paused
+            - completed
+            - failed
+            - cancelled
+        content_release_id:
+          type: string
+          format: uuid
+        workflow_definition_version_id:
+          type: string
+          format: uuid
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
     WorkflowEnvelope:
       type: object
+      additionalProperties: false
       required:
         - data
         - request_id
       properties:
         data:
           type: object
+          additionalProperties: false
           required:
             - project
             - lessons
@@ -1345,6 +1415,10 @@ components:
           properties:
             project:
               $ref: '#/components/schemas/Project'
+            workflow_run:
+              oneOf:
+                - $ref: '#/components/schemas/WorkflowRun'
+                - type: 'null'
             lessons:
               type: array
               items:

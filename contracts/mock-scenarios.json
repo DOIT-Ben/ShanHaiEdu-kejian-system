@@ -67,6 +67,13 @@
       "id": "job_progress_event",
       "schema_file": "sse-event.schema.json",
       "fixture": "fixtures/stage0/job-progress-event.json"
+    },
+    {
+      "id": "project_workflow",
+      "operation_id": "getProjectWorkflow",
+      "response_status": "200",
+      "media_type": "application/json",
+      "fixture": "fixtures/stage0/project-workflow.json"
     }
   ]
 }

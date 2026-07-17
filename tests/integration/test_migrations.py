@@ -13,6 +13,12 @@ from tests.conftest import run_migration
 
 EXPECTED_TABLES = {
     "alembic_version",
+    "branch_runs",
+    "content_definition_versions",
+    "content_package_versions",
+    "content_packages",
+    "content_release_items",
+    "content_releases",
     "file_asset_versions",
     "file_assets",
     "generation_jobs",
@@ -20,6 +26,8 @@ EXPECTED_TABLES = {
     "lesson_branch_configs",
     "lesson_units",
     "material_parse_versions",
+    "node_input_snapshots",
+    "node_runs",
     "organization_members",
     "organizations",
     "outbox_events",
@@ -30,6 +38,9 @@ EXPECTED_TABLES = {
     "source_materials",
     "upload_sessions",
     "users",
+    "workflow_definition_versions",
+    "workflow_definitions",
+    "workflow_runs",
 }
 
 
@@ -45,7 +56,7 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
     run_migration(postgres_database_url, "head")
     assert EXPECTED_TABLES.issubset(set(inspect(engine).get_table_names()))
 
-    assert ScriptDirectory.from_config(config).get_current_head() == "f4c8d2e6a103"
+    assert ScriptDirectory.from_config(config).get_current_head() == "a1b2c3d4e501"
     previous = os.environ.get("SHANHAI_DATABASE_URL")
     os.environ["SHANHAI_DATABASE_URL"] = postgres_database_url
     try:
@@ -96,6 +107,17 @@ def test_stage0_project_data_survives_identity_migration(postgres_database_url: 
             == 1
         )
         assert connection.scalar(text("SELECT count(*) FROM project_members")) == 0
+        pinned_versions = connection.execute(
+            text(
+                "SELECT content_release_id, workflow_definition_version_id "
+                "FROM projects WHERE id = :id"
+            ),
+            {"id": project_id},
+        ).one()
+        assert pinned_versions == (
+            UUID("01970000-0000-7000-8000-000000000003"),
+            UUID("01970000-0000-7000-8000-000000000006"),
+        )
         principal = connection.execute(
             text("SELECT principal_type, user_id FROM principals WHERE id = :id"),
             {"id": principal_id},

@@ -47,4 +47,16 @@ class Project(MutableAuditMixin, Base):
     owner_principal_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("principals.id", ondelete="RESTRICT"), nullable=False
     )
+    content_release_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("content_releases.id", ondelete="RESTRICT"), nullable=False
+    )
+    workflow_definition_version_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey(
+            "workflow_definition_versions.id",
+            name="fk_projects_workflow_definition_version",
+            ondelete="RESTRICT",
+        ),
+        nullable=False,
+    )
     lesson_division_version_id: Mapped[UUID | None] = mapped_column(Uuid)

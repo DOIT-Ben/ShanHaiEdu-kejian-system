@@ -15,7 +15,7 @@
 - `creation-package.schema.json`：项目导入通用创作中心的不可变包。
 - `content-definition.schema.json`：动态内容字段树。
 - `mock-scenarios.json`：前端必须覆盖的关键 Mock 场景。
-- `fixtures/stage0/`：阶段0项目、上传、任务、错误和SSE的确定性合同样例。
+- `fixtures/stage0/`：项目、上传、任务、工作流聚合、错误和SSE的确定性合同样例。
 - `generated/`：由当前OpenAPI确定性生成的bundle和TypeScript类型，不是第二份手工合同。
 - `typescript/client.ts`：基于生成paths和openapi-fetch的共享客户端工厂。
 
