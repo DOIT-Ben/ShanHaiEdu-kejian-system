@@ -3,6 +3,7 @@ from __future__ import annotations
 import httpx
 
 from apps.api.database import build_session_factory
+from apps.api.identity.context import system_actor
 from apps.api.jobs.models import GenerationJob
 from apps.api.jobs.service import GenerationJobService
 from apps.api.main import create_app
@@ -12,6 +13,7 @@ from apps.api.reliability.sse import EventReplayRepository
 from apps.api.settings import Settings
 from apps.api.uploads.storage import ObjectMetadata
 from tests.conftest import run_migration
+from tests.fakes.identity import configure_test_identity
 from tests.fakes.object_storage import FakeObjectStorage
 
 SHA256 = "a" * 64
@@ -24,6 +26,7 @@ async def test_project_upload_worker_sse_and_rest_reconciliation(
     storage = FakeObjectStorage()
     settings = Settings(_env_file=None, environment="test", database_url=postgres_database_url)
     app = create_app(settings=settings, object_storage=storage)
+    configure_test_identity(app)
     transport = httpx.ASGITransport(app=app)
     try:
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
@@ -84,14 +87,23 @@ async def test_project_upload_worker_sse_and_rest_reconciliation(
         def publish(event: OutboxEvent) -> None:
             if event.topic != "generation.job.queued":
                 return
+            actor = system_actor(event.organization_id)
             with factory() as session, session.begin():
-                service = GenerationJobService(session, idempotency_ttl_seconds=900)
+                service = GenerationJobService(
+                    session,
+                    actor=actor,
+                    idempotency_ttl_seconds=900,
+                )
                 claimed = service.claim(
                     event.aggregate_id, worker_id="e2e-worker", lease_seconds=30
                 )
                 assert claimed is not None
             with factory() as session, session.begin():
-                service = GenerationJobService(session, idempotency_ttl_seconds=900)
+                service = GenerationJobService(
+                    session,
+                    actor=actor,
+                    idempotency_ttl_seconds=900,
+                )
                 service.update_progress(
                     event.aggregate_id,
                     worker_id="e2e-worker",
@@ -99,9 +111,11 @@ async def test_project_upload_worker_sse_and_rest_reconciliation(
                     message="Deterministic progress",
                 )
             with factory() as session, session.begin():
-                GenerationJobService(session, idempotency_ttl_seconds=900).complete(
-                    event.aggregate_id, worker_id="e2e-worker"
-                )
+                GenerationJobService(
+                    session,
+                    actor=actor,
+                    idempotency_ttl_seconds=900,
+                ).complete(event.aggregate_id, worker_id="e2e-worker")
 
         dispatcher = OutboxDispatcher(
             factory,
@@ -118,7 +132,7 @@ async def test_project_upload_worker_sse_and_rest_reconciliation(
         with factory() as session:
             job = session.get(GenerationJob, job_id)
             assert job is not None and job.project_id is not None
-            events = EventReplayRepository(session).replay(
+            events = EventReplayRepository(session, job.organization_id).replay(
                 project_id=job.project_id,
                 after_sequence=0,
                 resource=("generation_job", job.id),

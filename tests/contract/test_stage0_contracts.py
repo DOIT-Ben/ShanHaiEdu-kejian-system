@@ -128,6 +128,23 @@ def test_health_operations_use_api_base_and_are_unauthenticated() -> None:
         assert "servers" not in operation
 
 
+def test_protected_operations_use_cookie_auth_without_identity_headers() -> None:
+    openapi = load_openapi()
+    assert openapi["security"] == [{"cookieAuth": []}]
+    scheme = openapi["components"]["securitySchemes"]["cookieAuth"]
+    assert scheme["type"] == "apiKey"
+    assert scheme["in"] == "cookie"
+    assert scheme["name"] == "shanhai_session"
+    assert "identity headers" in scheme["description"]
+
+    forbidden_headers = {"x-organization-id", "x-user-id", "x-principal-id"}
+    for operation in operations_by_id(openapi).values():
+        parameters = [resolve_local(openapi, item) for item in operation.get("parameters", [])]
+        assert forbidden_headers.isdisjoint(
+            str(parameter.get("name", "")).lower() for parameter in parameters
+        )
+
+
 def test_generated_types_and_shared_client_are_present() -> None:
     generated = CONTRACTS / "generated/typescript/schema.ts"
     client = CONTRACTS / "typescript/client.ts"

@@ -7,7 +7,6 @@ from sqlalchemy import func, select
 
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import ApiError
-from apps.api.identity.models import SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID
 from apps.api.jobs.models import GenerationJob
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
@@ -16,6 +15,7 @@ from apps.api.uploads.models import FileAsset, FileAssetVersion, SourceMaterial,
 from apps.api.uploads.schemas import ConfirmUploadRequest, CreateUploadSessionRequest
 from apps.api.uploads.session_service import UploadSessionService
 from apps.api.uploads.storage import ObjectMetadata, ObjectStorageError
+from tests.fakes.identity import seed_test_actor
 from tests.fakes.object_storage import FakeObjectStorage
 
 SHA256 = "a" * 64
@@ -28,9 +28,8 @@ def test_upload_confirmation_validates_object_and_commits_atomically(
     storage = FakeObjectStorage()
     with factory() as session:
         with session.begin():
-            project = ProjectRepository(
-                session, SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID
-            ).create(
+            actor = seed_test_actor(session)
+            project = ProjectRepository(session, actor).create(
                 CreateProjectRequest(
                     title="Fractions",
                     knowledge_point="Understanding one half",
@@ -39,6 +38,7 @@ def test_upload_confirmation_validates_object_and_commits_atomically(
         session_service = UploadSessionService(
             session=session,
             storage=storage,
+            actor=actor,
             bucket="shanhaiedu",
             ttl_seconds=900,
             max_size_bytes=10_000,
@@ -69,7 +69,11 @@ def test_upload_confirmation_validates_object_and_commits_atomically(
             size_bytes=4,
             sha256=SHA256,
         )
-        confirmation_service = UploadConfirmationService(session=session, storage=storage)
+        confirmation_service = UploadConfirmationService(
+            session=session,
+            storage=storage,
+            actor=actor,
+        )
 
         with pytest.raises(ApiError, match="UPLOAD_REJECTED"):
             confirmation_service.confirm(

@@ -5,12 +5,13 @@ from sqlalchemy import delete
 
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import ApiError
-from apps.api.identity.models import SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID
+from apps.api.identity.models import SYSTEM_ORGANIZATION_ID
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.reliability.events import EventResource, EventWriter
 from apps.api.reliability.models import EventStreamEntry
 from apps.api.reliability.sse import EventReplayRepository, encode_sse
+from tests.fakes.identity import seed_test_actor
 
 
 def test_sse_replays_after_last_event_id_and_detects_expired_history(
@@ -18,7 +19,8 @@ def test_sse_replays_after_last_event_id_and_detects_expired_history(
 ) -> None:
     factory = build_session_factory(build_engine(migrated_database_url))
     with factory() as session, session.begin():
-        project = ProjectRepository(session, SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID).create(
+        actor = seed_test_actor(session)
+        project = ProjectRepository(session, actor).create(
             CreateProjectRequest(title="Fractions", knowledge_point="One half")
         )
         writer = EventWriter(session, SYSTEM_ORGANIZATION_ID)
@@ -33,7 +35,7 @@ def test_sse_replays_after_last_event_id_and_detects_expired_history(
         project_id = project.id
 
     with factory() as session:
-        replay = EventReplayRepository(session).replay(
+        replay = EventReplayRepository(session, SYSTEM_ORGANIZATION_ID).replay(
             project_id=project_id,
             after_sequence=1,
         )
@@ -51,4 +53,7 @@ def test_sse_replays_after_last_event_id_and_detects_expired_history(
         )
 
     with factory() as session, pytest.raises(ApiError, match="EVENT_HISTORY_EXPIRED"):
-        EventReplayRepository(session).replay(project_id=project_id, after_sequence=1)
+        EventReplayRepository(session, SYSTEM_ORGANIZATION_ID).replay(
+            project_id=project_id,
+            after_sequence=1,
+        )

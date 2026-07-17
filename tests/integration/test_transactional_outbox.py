@@ -4,17 +4,19 @@ import pytest
 from sqlalchemy import func, select
 
 from apps.api.database import build_engine, build_session_factory
-from apps.api.identity.models import SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID
+from apps.api.identity.context import ActorContext
+from apps.api.identity.models import SYSTEM_ORGANIZATION_ID
 from apps.api.projects.models import Project
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.reliability.events import EventResource, EventWriter
 from apps.api.reliability.models import EventStreamEntry, OutboxEvent
 from apps.api.reliability.outbox import OutboxDispatcher
+from tests.fakes.identity import seed_test_actor
 
 
-def create_project_with_event(session, title: str) -> Project:
-    project = ProjectRepository(session, SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID).create(
+def create_project_with_event(session, actor: ActorContext, title: str) -> Project:
+    project = ProjectRepository(session, actor).create(
         CreateProjectRequest(title=title, knowledge_point="Understanding one half")
     )
     EventWriter(session, SYSTEM_ORGANIZATION_ID).append(
@@ -32,9 +34,11 @@ def test_business_write_and_outbox_commit_or_rollback_together(
 ) -> None:
     factory = build_session_factory(build_engine(migrated_database_url))
     with factory() as session:
+        with session.begin():
+            actor = seed_test_actor(session)
         with pytest.raises(RuntimeError, match="rollback"):
             with session.begin():
-                create_project_with_event(session, "Rolled back project")
+                create_project_with_event(session, actor, "Rolled back project")
                 raise RuntimeError("rollback")
 
         assert session.scalar(select(func.count()).select_from(Project)) == 0
@@ -43,7 +47,7 @@ def test_business_write_and_outbox_commit_or_rollback_together(
         session.rollback()
 
         with session.begin():
-            create_project_with_event(session, "Committed project")
+            create_project_with_event(session, actor, "Committed project")
 
         assert session.scalar(select(func.count()).select_from(Project)) == 1
         assert session.scalar(select(func.count()).select_from(EventStreamEntry)) == 1
@@ -55,7 +59,8 @@ def test_outbox_publish_failure_is_retried_without_losing_event(
 ) -> None:
     factory = build_session_factory(build_engine(migrated_database_url))
     with factory() as session, session.begin():
-        create_project_with_event(session, "Retry project")
+        actor = seed_test_actor(session)
+        create_project_with_event(session, actor, "Retry project")
 
     dispatcher = OutboxDispatcher(
         factory,

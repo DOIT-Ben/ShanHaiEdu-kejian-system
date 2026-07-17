@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 
 from apps.api.database import utc_now
 from apps.api.errors import ApiError
-from apps.api.identity.models import SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID
+from apps.api.identity.context import ActorContext, ProjectAction
+from apps.api.identity.permissions import ProjectAccessService
 from apps.api.jobs.models import GenerationJob
 from apps.api.jobs.repository import GenerationJobRepository
 from apps.api.jobs.schemas import GenerationJobRead
@@ -20,13 +21,20 @@ from apps.api.reliability.idempotency import CommandResult, IdempotencyService
 
 
 class GenerationJobService:
-    def __init__(self, session: Session, *, idempotency_ttl_seconds: int) -> None:
+    def __init__(
+        self,
+        session: Session,
+        *,
+        actor: ActorContext,
+        idempotency_ttl_seconds: int,
+    ) -> None:
         self._session = session
-        self._repository = GenerationJobRepository(session, SYSTEM_ORGANIZATION_ID)
-        self._events = EventWriter(session, SYSTEM_ORGANIZATION_ID)
+        self._actor = actor
+        self._repository = GenerationJobRepository(session, actor.organization_id)
+        self._events = EventWriter(session, actor.organization_id)
         self._idempotency = IdempotencyService(
             session,
-            SYSTEM_ORGANIZATION_ID,
+            actor.organization_id,
             ttl_seconds=idempotency_ttl_seconds,
         )
 
@@ -37,6 +45,13 @@ class GenerationJobService:
         idempotency_key: str,
         request_id: str,
     ) -> GenerationJobRead:
+        job = self._require_job(job_id, for_update=False)
+        if job.project_id is None:
+            raise self._job_not_found()
+        ProjectAccessService(self._session, self._actor).require(
+            job.project_id,
+            ProjectAction.GENERATE,
+        )
         payload = {"job_id": str(job_id), "command": "cancel"}
 
         def command() -> CommandResult:
@@ -52,11 +67,13 @@ class GenerationJobService:
             self._transition(job, "cancel_requested")
             job.cancel_requested_at = utc_now()
             job.progress_message = "Cancellation requested"
+            job.updated_by = self._actor.principal_id
+            job.lock_version += 1
             self._append_job_event(job, request_id=request_id)
             return self._result(job, 202)
 
         result = self._idempotency.execute(
-            scope="generation_jobs.cancel",
+            scope=f"generation_jobs.cancel:{self._actor.principal_id}",
             key=idempotency_key,
             payload=payload,
             command=command,
@@ -64,6 +81,7 @@ class GenerationJobService:
         return GenerationJobRead.model_validate(result.body)
 
     def claim(self, job_id: UUID, *, worker_id: str, lease_seconds: int) -> GenerationJob | None:
+        self._require_system_actor()
         job = self._repository.get(job_id, for_update=True)
         if job is None or job.status in {"succeeded", "failed", "cancelled"}:
             return None
@@ -86,7 +104,7 @@ class GenerationJobService:
         job.lease_expires_at = now + timedelta(seconds=lease_seconds)
         job.attempt_count += 1
         job.progress_message = "Processing deterministic stage-zero task"
-        job.updated_by = SYSTEM_PRINCIPAL_ID
+        job.updated_by = self._actor.principal_id
         job.lock_version += 1
         self._append_job_event(job, request_id=f"worker:{worker_id}")
         return job
@@ -99,6 +117,7 @@ class GenerationJobService:
         progress_percent: int,
         message: str,
     ) -> GenerationJob | None:
+        self._require_system_actor()
         job = self._repository.get(job_id, for_update=True)
         if job is None or job.status != "running" or job.lease_owner != worker_id:
             return None
@@ -108,7 +127,7 @@ class GenerationJobService:
         else:
             job.progress_percent = progress_percent
             job.progress_message = message
-        job.updated_by = SYSTEM_PRINCIPAL_ID
+        job.updated_by = self._actor.principal_id
         job.lock_version += 1
         self._append_job_event(job, request_id=f"worker:{worker_id}")
         return job
@@ -120,6 +139,7 @@ class GenerationJobService:
         worker_id: str,
         error_code: str | None = None,
     ) -> GenerationJob | None:
+        self._require_system_actor()
         job = self._repository.get(job_id, for_update=True)
         if job is None or job.status in {"succeeded", "failed", "cancelled"}:
             return job
@@ -140,7 +160,7 @@ class GenerationJobService:
         job.finished_at = utc_now()
         job.lease_owner = None
         job.lease_expires_at = None
-        job.updated_by = SYSTEM_PRINCIPAL_ID
+        job.updated_by = self._actor.principal_id
         job.lock_version += 1
         self._append_job_event(job, request_id=f"worker:{worker_id}")
         return job
@@ -148,12 +168,20 @@ class GenerationJobService:
     def _require_job(self, job_id: UUID, *, for_update: bool) -> GenerationJob:
         job = self._repository.get(job_id, for_update=for_update)
         if job is None:
-            raise ApiError(
-                status_code=404,
-                code="GENERATION_JOB_NOT_FOUND",
-                message="The generation job was not found.",
-            )
+            raise self._job_not_found()
         return job
+
+    def _require_system_actor(self) -> None:
+        if not self._actor.is_system:
+            raise ValueError("worker job transitions require a system actor")
+
+    @staticmethod
+    def _job_not_found() -> ApiError:
+        return ApiError(
+            status_code=404,
+            code="GENERATION_JOB_NOT_FOUND",
+            message="The generation job was not found.",
+        )
 
     @staticmethod
     def _transition(job: GenerationJob, target: str) -> None:

@@ -10,9 +10,9 @@ from sqlalchemy.orm import Session
 
 from apps.api.database import utc_now
 from apps.api.errors import ApiError
-from apps.api.identity.models import SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID
+from apps.api.identity.context import ActorContext, ProjectAction
+from apps.api.identity.permissions import ProjectAccessService
 from apps.api.ids import new_uuid7
-from apps.api.projects.repository import ProjectRepository
 from apps.api.reliability.events import EventResource, EventWriter
 from apps.api.reliability.idempotency import CommandResult, IdempotencyService
 from apps.api.uploads.models import SourceMaterial, UploadSession
@@ -49,12 +49,14 @@ class UploadSessionService:
         *,
         session: Session,
         storage: ObjectStorage,
+        actor: ActorContext,
         bucket: str,
         ttl_seconds: int,
         max_size_bytes: int,
     ) -> None:
         self._session = session
         self._storage = storage
+        self._actor = actor
         self._bucket = bucket
         self._ttl_seconds = ttl_seconds
         self._max_size_bytes = max_size_bytes
@@ -76,7 +78,7 @@ class UploadSessionService:
         }
         idempotency = IdempotencyService(
             self._session,
-            SYSTEM_ORGANIZATION_ID,
+            self._actor.organization_id,
             ttl_seconds=self._ttl_seconds,
         )
         with self._session.begin():
@@ -92,7 +94,7 @@ class UploadSessionService:
         upload_id = new_uuid7()
         material_id = new_uuid7()
         key = (
-            f"organizations/{SYSTEM_ORGANIZATION_ID}/projects/{project_id}/materials/"
+            f"organizations/{self._actor.organization_id}/projects/{project_id}/materials/"
             f"{material_id}/uploads/{upload_id}/{filename}"
         )
         expires_at = utc_now() + timedelta(seconds=self._ttl_seconds)
@@ -117,7 +119,7 @@ class UploadSessionService:
                 expires_at=expires_at,
                 payload=payload,
             )
-            EventWriter(self._session, SYSTEM_ORGANIZATION_ID).append(
+            EventWriter(self._session, self._actor.organization_id).append(
                 project_id=project_id,
                 event_type="material.upload.created",
                 resource=EventResource(type="source_material", id=material_id),
@@ -141,14 +143,16 @@ class UploadSessionService:
         return UploadSessionRead.model_validate(result.body)
 
     def _require_project(self, project_id: UUID, *, for_update: bool = False) -> None:
-        project = ProjectRepository(self._session, SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID).get(
-            project_id, for_update=for_update
+        project = ProjectAccessService(self._session, self._actor).require(
+            project_id,
+            ProjectAction.EDIT,
+            for_update=for_update,
         )
-        if project is None or project.status == "archived":
+        if project.status == "archived":
             raise ApiError(
-                status_code=409 if for_update else 404,
-                code="PRECONDITION_NOT_MET" if for_update else "PROJECT_NOT_FOUND",
-                message="The project was not found or cannot accept uploads.",
+                status_code=409,
+                code="PRECONDITION_NOT_MET",
+                message="The project cannot accept uploads.",
             )
 
     def _presigned_url(self, key: str) -> str:
@@ -180,19 +184,19 @@ class UploadSessionService:
     ) -> None:
         material = SourceMaterial(
             id=material_id,
-            organization_id=SYSTEM_ORGANIZATION_ID,
+            organization_id=self._actor.organization_id,
             project_id=project_id,
             material_kind="textbook",
             file_asset_id=None,
             original_filename=filename,
             mime_type=media_type,
             upload_status="pending_upload",
-            created_by=SYSTEM_PRINCIPAL_ID,
-            updated_by=SYSTEM_PRINCIPAL_ID,
+            created_by=self._actor.principal_id,
+            updated_by=self._actor.principal_id,
         )
         upload = UploadSession(
             id=upload_id,
-            organization_id=SYSTEM_ORGANIZATION_ID,
+            organization_id=self._actor.organization_id,
             project_id=project_id,
             material_id=material_id,
             storage_bucket=self._bucket,
@@ -203,8 +207,8 @@ class UploadSessionService:
             expected_sha256=payload.sha256,
             status="created",
             expires_at=expires_at,
-            created_by=SYSTEM_PRINCIPAL_ID,
-            updated_by=SYSTEM_PRINCIPAL_ID,
+            created_by=self._actor.principal_id,
+            updated_by=self._actor.principal_id,
         )
         self._session.add_all((material, upload))
 

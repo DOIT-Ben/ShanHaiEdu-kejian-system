@@ -7,8 +7,11 @@ import socket
 from uuid import UUID, uuid4
 
 import dramatiq
+from sqlalchemy import select
 
 from apps.api.database import build_engine, build_session_factory
+from apps.api.identity.context import ActorContext, system_actor
+from apps.api.jobs.models import GenerationJob
 from apps.api.jobs.service import GenerationJobService
 from apps.api.settings import get_settings
 
@@ -22,10 +25,19 @@ def run_deterministic_job(job_id: UUID, *, worker_id: str | None = None) -> str:
     resolved_worker_id = worker_id or f"{socket.gethostname()}:{uuid4()}"
     engine = build_engine(settings.database_url.get_secret_value())
     factory = build_session_factory(engine)
+    actor: ActorContext | None = None
     try:
+        with factory() as session:
+            organization_id = session.scalar(
+                select(GenerationJob.organization_id).where(GenerationJob.id == job_id)
+            )
+        if organization_id is None:
+            return "ignored"
+        actor = system_actor(organization_id)
         with factory() as session, session.begin():
             claimed = GenerationJobService(
                 session,
+                actor=actor,
                 idempotency_ttl_seconds=settings.idempotency_ttl_seconds,
             ).claim(
                 job_id,
@@ -37,6 +49,7 @@ def run_deterministic_job(job_id: UUID, *, worker_id: str | None = None) -> str:
         with factory() as session, session.begin():
             GenerationJobService(
                 session,
+                actor=actor,
                 idempotency_ttl_seconds=settings.idempotency_ttl_seconds,
             ).update_progress(
                 job_id,
@@ -47,15 +60,19 @@ def run_deterministic_job(job_id: UUID, *, worker_id: str | None = None) -> str:
         with factory() as session, session.begin():
             GenerationJobService(
                 session,
+                actor=actor,
                 idempotency_ttl_seconds=settings.idempotency_ttl_seconds,
             ).complete(job_id, worker_id=resolved_worker_id)
         return "succeeded"
     except Exception:
         logger.exception("deterministic_job_failed", extra={"job_id": str(job_id)})
+        if actor is None:
+            raise
         try:
             with factory() as session, session.begin():
                 GenerationJobService(
                     session,
+                    actor=actor,
                     idempotency_ttl_seconds=settings.idempotency_ttl_seconds,
                 ).complete(
                     job_id,

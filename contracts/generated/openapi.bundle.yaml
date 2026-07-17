@@ -482,6 +482,7 @@ components:
       type: apiKey
       in: cookie
       name: shanhai_session
+      description: Server-issued Secure HttpOnly session resolved through the authentication adapter. Organization and user identity headers are not accepted.
   parameters:
     ProjectId:
       name: project_id
