@@ -23,6 +23,7 @@
 | `POST` | `/projects/{project_id}/archive` | 归档项目 |
 | `POST` | `/projects/{project_id}/materials/uploads` | 创建预签名上传会话 |
 | `POST` | `/projects/{project_id}/materials/{material_id}/confirm` | 确认上传并触发解析 |
+| `GET` | `/projects/{project_id}/materials/{material_id}/file-asset` | 查询稳定文件身份和不含对象存储位置的当前版本元数据 |
 | `GET` | `/projects/{project_id}/materials/{material_id}/parse-versions` | 查询解析版本与引用 |
 | `GET/PATCH` | `/projects/{project_id}/lessons` | 查询或原子调整课时顺序、基本信息和归档状态 |
 | `GET` | `/lessons/{lesson_id}` | 查询课时详情和四个分支配置 |

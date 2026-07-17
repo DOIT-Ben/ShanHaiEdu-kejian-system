@@ -8,6 +8,7 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
+from apps.api.assets import models as asset_models
 from apps.api.database import Base, sqlalchemy_url
 from apps.api.identity import models as identity_models
 from apps.api.jobs import models as job_models
@@ -21,6 +22,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 _registered_models = (
+    asset_models,
     identity_models,
     job_models,
     lesson_models,

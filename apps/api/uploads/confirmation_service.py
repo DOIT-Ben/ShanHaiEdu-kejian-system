@@ -12,6 +12,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from apps.api.assets.models import FileAsset, FileAssetVersion
 from apps.api.database import utc_now
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, ProjectAction
@@ -21,7 +22,7 @@ from apps.api.jobs.models import GenerationJob
 from apps.api.jobs.schemas import AcceptedJobData
 from apps.api.reliability.events import EventResource, EventWriter
 from apps.api.reliability.idempotency import CommandResult, IdempotencyService
-from apps.api.uploads.models import FileAsset, FileAssetVersion, SourceMaterial, UploadSession
+from apps.api.uploads.models import SourceMaterial, UploadSession
 from apps.api.uploads.schemas import ConfirmUploadRequest
 from apps.api.uploads.session_service import normalized_media_type
 from apps.api.uploads.storage import ObjectMetadata, ObjectStorage, ObjectStorageError
@@ -167,7 +168,11 @@ class UploadConfirmationService:
             project_id=project_id,
             event_type="material.upload.confirmed",
             resource=EventResource(type="source_material", id=material_id),
-            payload={"status": "confirmed"},
+            payload={
+                "status": "confirmed",
+                "file_asset_id": str(asset_id),
+                "file_asset_version_id": str(version_id),
+            },
             request_id=request_id,
         )
         events.append(

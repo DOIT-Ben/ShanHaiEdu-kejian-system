@@ -5,13 +5,15 @@ from dataclasses import replace
 import pytest
 from sqlalchemy import func, select
 
+from apps.api.assets.models import FileAsset, FileAssetVersion
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import ApiError
 from apps.api.jobs.models import GenerationJob
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
+from apps.api.reliability.models import EventStreamEntry
 from apps.api.uploads.confirmation_service import UploadConfirmationService
-from apps.api.uploads.models import FileAsset, FileAssetVersion, SourceMaterial, UploadSession
+from apps.api.uploads.models import SourceMaterial, UploadSession
 from apps.api.uploads.schemas import ConfirmUploadRequest, CreateUploadSessionRequest
 from apps.api.uploads.session_service import UploadSessionService
 from apps.api.uploads.storage import ObjectMetadata, ObjectStorageError
@@ -137,3 +139,88 @@ def test_upload_confirmation_validates_object_and_commits_atomically(
         assert material is not None and material.upload_status == "confirmed"
         assert material.file_asset_id is not None
         assert persisted_upload is not None and persisted_upload.status == "confirmed"
+        event = session.scalar(
+            select(EventStreamEntry).where(
+                EventStreamEntry.event_type == "material.upload.confirmed"
+            )
+        )
+        assert event is not None
+        assert event.summary_json["payload"] == {
+            "status": "confirmed",
+            "file_asset_id": str(material.file_asset_id),
+            "file_asset_version_id": str(version.id),
+        }
+
+
+def test_same_hash_in_different_projects_keeps_distinct_stable_asset_identities(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    storage = FakeObjectStorage()
+    with factory() as session:
+        with session.begin():
+            actor = seed_test_actor(session)
+            projects = [
+                ProjectRepository(session, actor).create(
+                    CreateProjectRequest(title=title, knowledge_point="One half")
+                )
+                for title in ("Project A", "Project B")
+            ]
+
+        material_ids = []
+        for index, project in enumerate(projects):
+            upload = UploadSessionService(
+                session=session,
+                storage=storage,
+                actor=actor,
+                bucket="shanhaiedu",
+                ttl_seconds=900,
+                max_size_bytes=10_000,
+            ).create_session(
+                project.id,
+                CreateUploadSessionRequest(
+                    filename="lesson.pdf",
+                    media_type="application/pdf",
+                    size_bytes=4,
+                    sha256=SHA256,
+                ),
+                idempotency_key=f"same-hash-upload-{index:03d}",
+                request_id=f"req-same-hash-upload-{index:03d}",
+            )
+            assert storage.last_presigned is not None
+            storage.put(
+                ObjectMetadata(
+                    bucket=storage.last_presigned.bucket,
+                    key=storage.last_presigned.key,
+                    etag=f"etag-{index}",
+                    size_bytes=4,
+                    media_type="application/pdf",
+                    sha256=SHA256,
+                )
+            )
+            UploadConfirmationService(
+                session=session,
+                storage=storage,
+                actor=actor,
+            ).confirm(
+                project_id=project.id,
+                material_id=upload.material_id,
+                idempotency_key=f"same-hash-confirm-{index:03d}",
+                payload=ConfirmUploadRequest(
+                    upload_session_id=upload.upload_session_id,
+                    etag=f"etag-{index}",
+                    size_bytes=4,
+                    sha256=SHA256,
+                ),
+                request_id=f"req-same-hash-confirm-{index:03d}",
+                idempotency_ttl_seconds=900,
+            )
+            material_ids.append(upload.material_id)
+
+        materials = list(
+            session.scalars(select(SourceMaterial).where(SourceMaterial.id.in_(material_ids)))
+        )
+        assert len(materials) == 2
+        assert len({material.file_asset_id for material in materials}) == 2
+        assert session.scalar(select(func.count()).select_from(FileAsset)) == 2
+        assert session.scalar(select(func.count()).select_from(FileAssetVersion)) == 2
