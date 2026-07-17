@@ -154,24 +154,25 @@ def _walk_tokens(tokens: list[Token]) -> Iterator[Token]:
 
 def _collect_headings(tokens: list[Token]) -> list[_Heading]:
     headings: list[_Heading] = []
+    nesting_depth = 0
     for index, token in enumerate(tokens):
-        if token.type != "heading_open" or token.map is None:
-            continue
-        inline = tokens[index + 1]
-        title = _inline_text(inline).strip()
-        if not title:
-            raise MarkdownTemplateError(
-                "MARKDOWN_EMPTY_SECTION_TITLE",
-                f"Heading on line {token.map[0] + 1} cannot be empty",
+        if token.type == "heading_open" and token.map is not None and nesting_depth == 0:
+            inline = tokens[index + 1]
+            title = _inline_text(inline).strip()
+            if not title:
+                raise MarkdownTemplateError(
+                    "MARKDOWN_EMPTY_SECTION_TITLE",
+                    f"Heading on line {token.map[0] + 1} cannot be empty",
+                )
+            headings.append(
+                _Heading(
+                    level=int(token.tag[1:]),
+                    title=title,
+                    start=token.map[0],
+                    end=token.map[1],
+                )
             )
-        headings.append(
-            _Heading(
-                level=int(token.tag[1:]),
-                title=title,
-                start=token.map[0],
-                end=token.map[1],
-            )
-        )
+        nesting_depth += token.nesting
     return headings
 
 

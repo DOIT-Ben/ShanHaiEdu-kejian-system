@@ -99,6 +99,32 @@ def test_parser_preserves_lists_quotes_tables_and_nested_headings() -> None:
     )
 
 
+def test_nested_quote_headings_do_not_change_template_structure() -> None:
+    source = b"""# Demo
+
+> ## Quoted example
+>
+> This remains preamble content.
+
+## Real section
+
+> ### Quoted child
+>
+> This remains section content.
+
+### Real child
+
+Body.
+"""
+
+    draft = parse_markdown_template(source, source_name="demo.md")
+
+    assert [section["title"] for section in draft["sections"]] == ["Real section"]
+    assert "## Quoted example" in draft["preamble_markdown"]
+    assert "> ### Quoted child" in draft["sections"][0]["body_markdown"]
+    assert [item["title"] for item in draft["sections"][0]["subsections"]] == ["Real child"]
+
+
 def test_missing_title_uses_filename_and_requires_review() -> None:
     draft = parse_markdown_template(
         "## 教学目标\n\n目标正文。\n".encode(),
