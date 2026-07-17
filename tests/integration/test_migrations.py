@@ -14,6 +14,7 @@ from tests.conftest import run_migration
 EXPECTED_TABLES = {
     "alembic_version",
     "approvals",
+    "asset_bindings",
     "artifact_drafts",
     "artifact_relations",
     "artifact_versions",
@@ -42,6 +43,7 @@ EXPECTED_TABLES = {
     "projects",
     "prompt_snapshots",
     "project_members",
+    "project_asset_slots",
     "event_stream_entries",
     "source_materials",
     "upload_sessions",
@@ -85,7 +87,23 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
     }
     assert "fk_artifact_versions_context_snapshot" in artifact_foreign_keys
     assert "fk_artifact_versions_prompt_snapshot" in artifact_foreign_keys
-    assert ScriptDirectory.from_config(config).get_current_head() == "a9e1f3c5b704"
+    binding_indexes = {index["name"] for index in database_inspector.get_indexes("asset_bindings")}
+    assert "uq_asset_bindings_active_slot_position" in binding_indexes
+    with engine.connect() as connection:
+        assert (
+            connection.scalar(
+                text(
+                    "SELECT count(*) FROM pg_trigger "
+                    "WHERE tgname IN ("
+                    "'trg_project_asset_slot_scope', "
+                    "'trg_asset_binding_scope', "
+                    "'trg_asset_binding_history'"
+                    ") AND NOT tgisinternal"
+                )
+            )
+            == 3
+        )
+    assert ScriptDirectory.from_config(config).get_current_head() == "b4a7c2d9e805"
     previous = os.environ.get("SHANHAI_DATABASE_URL")
     os.environ["SHANHAI_DATABASE_URL"] = postgres_database_url
     try:
