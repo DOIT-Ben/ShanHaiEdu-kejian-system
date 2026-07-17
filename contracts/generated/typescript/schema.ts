@@ -74,6 +74,58 @@ export interface paths {
         patch: operations["updateProject"];
         trace?: never;
     };
+    "/projects/{project_id}/lessons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询项目当前活动课时 */
+        get: operations["listProjectLessons"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 原子更新、重排或归档项目课时 */
+        patch: operations["updateProjectLessons"];
+        trace?: never;
+    };
+    "/lessons/{lesson_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 获取课时及分支配置 */
+        get: operations["getLesson"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lessons/{lesson_id}/branches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 更新课时分支开关 */
+        patch: operations["updateLessonBranches"];
+        trace?: never;
+    };
     "/projects/{project_id}/materials/uploads": {
         parameters: {
             query?: never;
@@ -371,6 +423,76 @@ export interface components {
             grade?: string | null;
             textbook_edition?: string | null;
             automation_mode?: components["schemas"]["AutomationMode"];
+        };
+        /** @enum {string} */
+        LessonBranchKey: "lesson_plan" | "intro_options" | "ppt" | "video";
+        LessonBranch: {
+            branch_key: components["schemas"]["LessonBranchKey"];
+            enabled: boolean;
+            /**
+             * @description Disabled branches never use the skipped status.
+             * @enum {string}
+             */
+            workflow_status: "disabled" | "not_ready";
+            settings: {
+                [key: string]: unknown;
+            };
+        };
+        Lesson: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            project_id: string;
+            lesson_key: string;
+            position: number;
+            title: string;
+            scope_summary: string;
+            objective_summary: string;
+            estimated_minutes: number | null;
+            /** Format: uuid */
+            source_division_version_id: string;
+            /** @enum {string} */
+            status: "active" | "archived";
+            lock_version: number;
+            branches: components["schemas"]["LessonBranch"][];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        LessonEnvelope: {
+            data: components["schemas"]["Lesson"];
+            request_id: string;
+        };
+        LessonCollectionData: {
+            items: components["schemas"]["Lesson"][];
+            lock_version: number;
+        };
+        LessonCollectionEnvelope: {
+            data: components["schemas"]["LessonCollectionData"];
+            request_id: string;
+        };
+        LessonCollectionItemUpdate: {
+            /** Format: uuid */
+            id: string;
+            position: number;
+            title: string;
+            scope_summary: string;
+            objective_summary: string;
+            estimated_minutes: number | null;
+        };
+        UpdateLessonCollectionRequest: {
+            items: components["schemas"]["LessonCollectionItemUpdate"][];
+        };
+        LessonBranchUpdate: {
+            branch_key: components["schemas"]["LessonBranchKey"];
+            enabled: boolean;
+            settings: {
+                [key: string]: unknown;
+            };
+        };
+        UpdateLessonBranchesRequest: {
+            branches: components["schemas"]["LessonBranchUpdate"][];
         };
         CreateUploadSessionRequest: {
             filename: string;
@@ -842,6 +964,116 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    listProjectLessons: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ordered active lesson collection */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LessonCollectionEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    updateProjectLessons: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": components["parameters"]["IfMatch"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLessonCollectionRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated ordered active lesson collection */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LessonCollectionEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    getLesson: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lesson_id: components["parameters"]["LessonId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lesson with all branch configurations */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LessonEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    updateLessonBranches: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": components["parameters"]["IfMatch"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                lesson_id: components["parameters"]["LessonId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLessonBranchesRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated lesson branch configuration */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LessonEnvelope"];
                 };
             };
             "4XX": components["responses"]["Error"];

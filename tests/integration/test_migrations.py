@@ -17,6 +17,8 @@ EXPECTED_TABLES = {
     "file_assets",
     "generation_jobs",
     "idempotency_records",
+    "lesson_branch_configs",
+    "lesson_units",
     "organization_members",
     "organizations",
     "outbox_events",
@@ -42,7 +44,7 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
     run_migration(postgres_database_url, "head")
     assert EXPECTED_TABLES.issubset(set(inspect(engine).get_table_names()))
 
-    assert ScriptDirectory.from_config(config).get_current_head() == "d7a4c12e91b3"
+    assert ScriptDirectory.from_config(config).get_current_head() == "e8f4a2b7c901"
     previous = os.environ.get("SHANHAI_DATABASE_URL")
     os.environ["SHANHAI_DATABASE_URL"] = postgres_database_url
     try:

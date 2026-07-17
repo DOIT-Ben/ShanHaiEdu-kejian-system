@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ShanHaiEdu Core Integration Surface
-  version: 2.1.0
+  version: 2.2.0
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
@@ -126,6 +126,93 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProjectEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/lessons:
+    get:
+      summary: 查询项目当前活动课时
+      operationId: listProjectLessons
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Ordered active lesson collection
+          headers:
+            ETag:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonCollectionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+    patch:
+      summary: 原子更新、重排或归档项目课时
+      operationId: updateProjectLessons
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLessonCollectionRequest'
+      responses:
+        '200':
+          description: Updated ordered active lesson collection
+          headers:
+            ETag:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonCollectionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /lessons/{lesson_id}:
+    get:
+      summary: 获取课时及分支配置
+      operationId: getLesson
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Lesson with all branch configurations
+          headers:
+            ETag:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /lessons/{lesson_id}/branches:
+    patch:
+      summary: 更新课时分支开关
+      operationId: updateLessonBranches
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLessonBranchesRequest'
+      responses:
+        '200':
+          description: Updated lesson branch configuration
+          headers:
+            ETag:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonEnvelope'
         '4XX':
           $ref: '#/components/responses/Error'
   /projects/{project_id}/materials/uploads:
@@ -560,6 +647,119 @@ components:
         textbook_edition: {type: [string, 'null']}
         automation_mode:
           $ref: '#/components/schemas/AutomationMode'
+    LessonBranchKey:
+      type: string
+      enum: [lesson_plan, intro_options, ppt, video]
+    LessonBranch:
+      type: object
+      additionalProperties: false
+      required: [branch_key, enabled, workflow_status, settings]
+      properties:
+        branch_key: {$ref: '#/components/schemas/LessonBranchKey'}
+        enabled: {type: boolean}
+        workflow_status:
+          type: string
+          enum: [disabled, not_ready]
+          description: Disabled branches never use the skipped status.
+        settings: {type: object, additionalProperties: true}
+    Lesson:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - project_id
+        - lesson_key
+        - position
+        - title
+        - scope_summary
+        - objective_summary
+        - estimated_minutes
+        - source_division_version_id
+        - status
+        - lock_version
+        - branches
+        - created_at
+        - updated_at
+      properties:
+        id: {type: string, format: uuid}
+        project_id: {type: string, format: uuid}
+        lesson_key: {type: string, minLength: 1, maxLength: 80}
+        position: {type: integer, minimum: 1}
+        title: {type: string, minLength: 1, maxLength: 255}
+        scope_summary: {type: string, minLength: 1}
+        objective_summary: {type: string, minLength: 1}
+        estimated_minutes: {type: [integer, 'null'], minimum: 1}
+        source_division_version_id: {type: string, format: uuid}
+        status: {type: string, enum: [active, archived]}
+        lock_version: {type: integer, minimum: 1}
+        branches:
+          type: array
+          minItems: 4
+          maxItems: 4
+          items: {$ref: '#/components/schemas/LessonBranch'}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    LessonEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/Lesson'}
+        request_id: {type: string, minLength: 1}
+    LessonCollectionData:
+      type: object
+      additionalProperties: false
+      required: [items, lock_version]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Lesson'}
+        lock_version: {type: integer, minimum: 1}
+    LessonCollectionEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/LessonCollectionData'}
+        request_id: {type: string, minLength: 1}
+    LessonCollectionItemUpdate:
+      type: object
+      additionalProperties: false
+      required: [id, position, title, scope_summary, objective_summary, estimated_minutes]
+      properties:
+        id: {type: string, format: uuid}
+        position: {type: integer, minimum: 1}
+        title: {type: string, minLength: 1, maxLength: 255}
+        scope_summary: {type: string, minLength: 1}
+        objective_summary: {type: string, minLength: 1}
+        estimated_minutes: {type: [integer, 'null'], minimum: 1}
+    UpdateLessonCollectionRequest:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items: {$ref: '#/components/schemas/LessonCollectionItemUpdate'}
+    LessonBranchUpdate:
+      type: object
+      additionalProperties: false
+      required: [branch_key, enabled, settings]
+      properties:
+        branch_key: {$ref: '#/components/schemas/LessonBranchKey'}
+        enabled: {type: boolean}
+        settings: {type: object, additionalProperties: true}
+    UpdateLessonBranchesRequest:
+      type: object
+      additionalProperties: false
+      required: [branches]
+      properties:
+        branches:
+          type: array
+          minItems: 1
+          maxItems: 4
+          items: {$ref: '#/components/schemas/LessonBranchUpdate'}
     CreateUploadSessionRequest:
       type: object
       additionalProperties: false

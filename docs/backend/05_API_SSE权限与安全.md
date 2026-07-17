@@ -24,7 +24,8 @@
 | `POST` | `/projects/{project_id}/materials/uploads` | 创建预签名上传会话 |
 | `POST` | `/projects/{project_id}/materials/{material_id}/confirm` | 确认上传并触发解析 |
 | `GET` | `/projects/{project_id}/materials/{material_id}/parse-versions` | 查询解析版本与引用 |
-| `GET/PATCH` | `/projects/{project_id}/lessons` | 查询或调整课时 |
+| `GET/PATCH` | `/projects/{project_id}/lessons` | 查询或原子调整课时顺序、基本信息和归档状态 |
+| `GET` | `/lessons/{lesson_id}` | 查询课时详情和四个分支配置 |
 | `PATCH` | `/lessons/{lesson_id}/branches` | 开关导入设计、PPT和视频分支 |
 | `GET` | `/lessons/{lesson_id}/intro-options` | 读取三类九套、打分和当前选择 |
 | `POST` | `/lessons/{lesson_id}/intro-options/generate` | 启动独立创意与锚定两阶段生成 |

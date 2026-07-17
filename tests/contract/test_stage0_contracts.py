@@ -105,6 +105,8 @@ def test_stage0_operations_preserve_idempotency_and_replay_headers() -> None:
         "createMaterialUploadSession",
         "confirmMaterialUpload",
         "cancelGenerationJob",
+        "updateProjectLessons",
+        "updateLessonBranches",
     }
     for operation_id in idempotent_operations:
         parameters = [
@@ -117,6 +119,12 @@ def test_stage0_operations_preserve_idempotency_and_replay_headers() -> None:
             resolve_local(openapi, item) for item in operations[operation_id]["parameters"]
         ]
         assert any(parameter.get("name") == "Last-Event-ID" for parameter in parameters)
+
+    for operation_id in ("updateProjectLessons", "updateLessonBranches"):
+        parameters = [
+            resolve_local(openapi, item) for item in operations[operation_id]["parameters"]
+        ]
+        assert any(parameter.get("name") == "If-Match" for parameter in parameters)
 
 
 def test_health_operations_use_api_base_and_are_unauthenticated() -> None:
