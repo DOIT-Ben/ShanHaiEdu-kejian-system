@@ -759,12 +759,12 @@ export interface components {
         PromptPreviewEnvelope: {
             data: {
                 /** Format: uuid */
-                prompt_snapshot_id: string;
-                content_hash: string;
+                prompt_snapshot_id?: string;
+                content_hash?: string;
                 editable_prompt: string;
                 locked_layers: components["schemas"]["PromptLockedLayerSummary"][];
                 context_summary: components["schemas"]["PromptContextSummary"][];
-                schema: {
+                schema?: {
                     [key: string]: unknown;
                 } | null;
             };
@@ -772,18 +772,18 @@ export interface components {
         };
         PromptLockedLayerSummary: {
             /** @enum {string} */
-            layer: "platform_safety" | "output_schema" | "provider_format";
-            key: string;
+            layer?: "platform_safety" | "output_schema" | "provider_format";
+            key?: string;
             /** @constant */
-            locked: true;
+            locked?: true;
         };
         PromptContextSummary: {
-            binding_key: string;
-            source: string;
+            binding_key?: string;
+            source?: string;
             /** @enum {string} */
-            exposure: "full" | "summary" | "hidden";
-            item_count: number;
-            content_hash: string;
+            exposure?: "full" | "summary" | "hidden";
+            item_count?: number;
+            content_hash?: string;
         };
         IntroSelectionEnvelope: {
             data: {

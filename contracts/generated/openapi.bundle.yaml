@@ -1581,12 +1581,9 @@ components:
           type: object
           additionalProperties: false
           required:
-            - prompt_snapshot_id
-            - content_hash
             - editable_prompt
             - locked_layers
             - context_summary
-            - schema
           properties:
             prompt_snapshot_id:
               type: string
@@ -1614,10 +1611,6 @@ components:
     PromptLockedLayerSummary:
       type: object
       additionalProperties: false
-      required:
-        - layer
-        - key
-        - locked
       properties:
         layer:
           type: string
@@ -1634,12 +1627,6 @@ components:
     PromptContextSummary:
       type: object
       additionalProperties: false
-      required:
-        - binding_key
-        - source
-        - exposure
-        - item_count
-        - content_hash
       properties:
         binding_key:
           type: string
