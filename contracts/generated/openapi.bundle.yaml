@@ -1365,7 +1365,6 @@ components:
         - id
         - source_material_id
         - file_asset_version_id
-        - generation_job_id
         - version_no
         - status
         - parser_name

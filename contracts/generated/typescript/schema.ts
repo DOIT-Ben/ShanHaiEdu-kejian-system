@@ -690,7 +690,7 @@ export interface components {
             /** Format: uuid */
             file_asset_version_id: string;
             /** Format: uuid */
-            generation_job_id: string | null;
+            generation_job_id?: string | null;
             version_no: number;
             /** @enum {string} */
             status: "pending" | "running" | "succeeded" | "failed";
