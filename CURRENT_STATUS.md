@@ -39,10 +39,10 @@
 ## 当前活跃任务
 
 - [Issue #4：重新外包生产级前端实现](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)
+- [Issue #10：模型网关接口与真实文本模型冒烟](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/10)
 
 ## 后续任务
 
-- [Issue #10：模型网关接口与真实文本模型冒烟](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/10)
 - [Issue #11：与Issue #4完成合同联调](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)
 
 ## 当前限制
