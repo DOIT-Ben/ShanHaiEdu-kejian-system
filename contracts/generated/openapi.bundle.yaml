@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ShanHaiEdu Core Integration Surface
-  version: 2.3.0
+  version: 2.4.0
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
@@ -310,6 +310,120 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkflowEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/artifacts:
+    post:
+      summary: 创建项目内容产物及活动草稿
+      operationId: createArtifact
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateArtifactRequest'
+      responses:
+        '201':
+          description: Artifact and its initial active draft created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /artifacts/{artifact_id}:
+    get:
+      summary: 读取产物当前草稿和版本指针
+      operationId: getArtifact
+      parameters:
+        - $ref: '#/components/parameters/ArtifactId'
+      responses:
+        '200':
+          description: Current artifact state
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /artifacts/{artifact_id}/drafts/{draft_branch}:
+    put:
+      summary: 乐观锁自动保存活动草稿
+      operationId: saveArtifactDraft
+      parameters:
+        - $ref: '#/components/parameters/ArtifactId'
+        - $ref: '#/components/parameters/DraftBranch'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveArtifactDraftRequest'
+      responses:
+        '200':
+          description: Draft saved
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactDraftEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /artifacts/{artifact_id}/versions:
+    post:
+      summary: 从活动草稿提交不可变版本
+      operationId: submitArtifactVersion
+      parameters:
+        - $ref: '#/components/parameters/ArtifactId'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitArtifactVersionRequest'
+      responses:
+        '201':
+          description: Immutable artifact version submitted for review
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactVersionEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /artifact-versions/{artifact_version_id}/approvals:
+    post:
+      summary: 追加产物版本审核动作
+      operationId: reviewArtifactVersion
+      parameters:
+        - $ref: '#/components/parameters/ArtifactVersionId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewArtifactVersionRequest'
+      responses:
+        '201':
+          description: Approval action appended and artifact pointers updated atomically
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalEnvelope'
         4XX:
           $ref: '#/components/responses/Error'
   /lessons/{lesson_id}/intro-options:
@@ -653,6 +767,28 @@ components:
       schema:
         type: string
         format: uuid
+    ArtifactId:
+      name: artifact_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ArtifactVersionId:
+      name: artifact_version_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DraftBranch:
+      name: draft_branch
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 80
     IdempotencyKey:
       name: Idempotency-Key
       in: header
@@ -1714,6 +1850,335 @@ components:
               format: uuid
         request_id:
           type: string
+    CreateArtifactRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - artifact_key
+        - artifact_type
+        - branch_key
+        - content_definition_version_id
+        - content
+      properties:
+        artifact_key:
+          type: string
+          minLength: 1
+          maxLength: 160
+        artifact_type:
+          type: string
+          minLength: 1
+          maxLength: 80
+        branch_key:
+          type: string
+          minLength: 1
+          maxLength: 80
+        content_definition_version_id:
+          type: string
+          format: uuid
+        lesson_unit_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        draft_branch:
+          type: string
+          minLength: 1
+          maxLength: 80
+          default: main
+        content:
+          type: object
+    SaveArtifactDraftRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - content
+      properties:
+        content:
+          type: object
+    SubmitArtifactVersionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        draft_branch:
+          type: string
+          minLength: 1
+          maxLength: 80
+          default: main
+    ReviewArtifactVersionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - action
+      properties:
+        action:
+          enum:
+            - approve
+            - request_changes
+            - revoke
+            - accept_stale
+        comment:
+          type:
+            - string
+            - 'null'
+          maxLength: 4000
+    ArtifactDraft:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - draft_branch
+        - content
+        - validation_report
+        - based_on_version_id
+        - autosaved_at
+        - lock_version
+      properties:
+        id:
+          type: string
+          format: uuid
+        draft_branch:
+          type: string
+        content:
+          type: object
+        validation_report:
+          type: object
+        based_on_version_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        autosaved_at:
+          type: string
+          format: date-time
+        lock_version:
+          type: integer
+          minimum: 1
+    ArtifactVersion:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - version_no
+        - content
+        - content_hash
+        - render_summary
+        - source_kind
+        - source_node_run_id
+        - context_snapshot_id
+        - prompt_snapshot_id
+        - validation_report
+        - created_at
+        - created_by
+      properties:
+        id:
+          type: string
+          format: uuid
+        version_no:
+          type: integer
+          minimum: 1
+        content:
+          type: object
+        content_hash:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        render_summary:
+          type: object
+        source_kind:
+          enum:
+            - manual
+            - model
+            - import
+            - system
+        source_node_run_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        context_snapshot_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        prompt_snapshot_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        validation_report:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+    Artifact:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - project_id
+        - lesson_unit_id
+        - branch_key
+        - artifact_key
+        - artifact_type
+        - content_definition_version_id
+        - status
+        - stale_reason
+        - lock_version
+        - current_draft
+        - current_submitted_version
+        - current_approved_version
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        lesson_unit_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        branch_key:
+          type: string
+        artifact_key:
+          type: string
+        artifact_type:
+          type: string
+        content_definition_version_id:
+          type: string
+          format: uuid
+        status:
+          enum:
+            - draft
+            - in_review
+            - approved
+            - stale
+            - archived
+        stale_reason:
+          type:
+            - object
+            - 'null'
+        lock_version:
+          type: integer
+          minimum: 1
+        current_draft:
+          oneOf:
+            - $ref: '#/components/schemas/ArtifactDraft'
+            - type: 'null'
+        current_submitted_version:
+          oneOf:
+            - $ref: '#/components/schemas/ArtifactVersion'
+            - type: 'null'
+        current_approved_version:
+          oneOf:
+            - $ref: '#/components/schemas/ArtifactVersion'
+            - type: 'null'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    Approval:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - artifact_version_id
+        - action
+        - actor_type
+        - actor_user_id
+        - comment
+        - quality_evidence
+        - policy_snapshot
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        artifact_version_id:
+          type: string
+          format: uuid
+        action:
+          enum:
+            - submit
+            - approve
+            - request_changes
+            - revoke
+            - accept_stale
+        actor_type:
+          enum:
+            - user
+            - system
+        actor_user_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        comment:
+          type:
+            - string
+            - 'null'
+        quality_evidence:
+          type: object
+        policy_snapshot:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+    ArtifactEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: '#/components/schemas/Artifact'
+        request_id:
+          type: string
+          minLength: 1
+    ArtifactDraftEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: '#/components/schemas/ArtifactDraft'
+        request_id:
+          type: string
+          minLength: 1
+    ArtifactVersionEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: '#/components/schemas/ArtifactVersion'
+        request_id:
+          type: string
+          minLength: 1
+    ApprovalEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: '#/components/schemas/Approval'
+        request_id:
+          type: string
+          minLength: 1
     error-envelope.schema:
       $schema: https://json-schema.org/draft/2020-12/schema
       $id: https://shanhaiedu.local/contracts/error-envelope.schema.json

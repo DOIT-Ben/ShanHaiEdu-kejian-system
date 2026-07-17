@@ -211,6 +211,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project_id}/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 创建项目内容产物及活动草稿 */
+        post: operations["createArtifact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artifacts/{artifact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取产物当前草稿和版本指针 */
+        get: operations["getArtifact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artifacts/{artifact_id}/drafts/{draft_branch}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 乐观锁自动保存活动草稿 */
+        put: operations["saveArtifactDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artifacts/{artifact_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 从活动草稿提交不可变版本 */
+        post: operations["submitArtifactVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artifact-versions/{artifact_version_id}/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 追加产物版本审核动作 */
+        post: operations["reviewArtifactVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/lessons/{lesson_id}/intro-options": {
         parameters: {
             query?: never;
@@ -772,6 +857,120 @@ export interface components {
             };
             request_id: string;
         };
+        CreateArtifactRequest: {
+            artifact_key: string;
+            artifact_type: string;
+            branch_key: string;
+            /** Format: uuid */
+            content_definition_version_id: string;
+            /** Format: uuid */
+            lesson_unit_id?: string | null;
+            /** @default main */
+            draft_branch: string;
+            content: Record<string, never>;
+        };
+        SaveArtifactDraftRequest: {
+            content: Record<string, never>;
+        };
+        SubmitArtifactVersionRequest: {
+            /** @default main */
+            draft_branch: string;
+        };
+        ReviewArtifactVersionRequest: {
+            /** @enum {unknown} */
+            action: "approve" | "request_changes" | "revoke" | "accept_stale";
+            comment?: string | null;
+        };
+        ArtifactDraft: {
+            /** Format: uuid */
+            id: string;
+            draft_branch: string;
+            content: Record<string, never>;
+            validation_report: Record<string, never>;
+            /** Format: uuid */
+            based_on_version_id: string | null;
+            /** Format: date-time */
+            autosaved_at: string;
+            lock_version: number;
+        };
+        ArtifactVersion: {
+            /** Format: uuid */
+            id: string;
+            version_no: number;
+            content: Record<string, never>;
+            content_hash: string;
+            render_summary: Record<string, never>;
+            /** @enum {unknown} */
+            source_kind: "manual" | "model" | "import" | "system";
+            /** Format: uuid */
+            source_node_run_id: string | null;
+            /** Format: uuid */
+            context_snapshot_id: string | null;
+            /** Format: uuid */
+            prompt_snapshot_id: string | null;
+            validation_report: Record<string, never>;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            created_by: string;
+        };
+        Artifact: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            project_id: string;
+            /** Format: uuid */
+            lesson_unit_id: string | null;
+            branch_key: string;
+            artifact_key: string;
+            artifact_type: string;
+            /** Format: uuid */
+            content_definition_version_id: string;
+            /** @enum {unknown} */
+            status: "draft" | "in_review" | "approved" | "stale" | "archived";
+            stale_reason: Record<string, never> | null;
+            lock_version: number;
+            current_draft: components["schemas"]["ArtifactDraft"] | null;
+            current_submitted_version: components["schemas"]["ArtifactVersion"] | null;
+            current_approved_version: components["schemas"]["ArtifactVersion"] | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        Approval: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            artifact_version_id: string;
+            /** @enum {unknown} */
+            action: "submit" | "approve" | "request_changes" | "revoke" | "accept_stale";
+            /** @enum {unknown} */
+            actor_type: "user" | "system";
+            /** Format: uuid */
+            actor_user_id: string | null;
+            comment: string | null;
+            quality_evidence: Record<string, never>;
+            policy_snapshot: Record<string, never>;
+            /** Format: date-time */
+            created_at: string;
+        };
+        ArtifactEnvelope: {
+            data: components["schemas"]["Artifact"];
+            request_id: string;
+        };
+        ArtifactDraftEnvelope: {
+            data: components["schemas"]["ArtifactDraft"];
+            request_id: string;
+        };
+        ArtifactVersionEnvelope: {
+            data: components["schemas"]["ArtifactVersion"];
+            request_id: string;
+        };
+        ApprovalEnvelope: {
+            data: components["schemas"]["Approval"];
+            request_id: string;
+        };
         /** ErrorEnvelope */
         "error-envelope.schema": {
             error: {
@@ -925,6 +1124,9 @@ export interface components {
         BatchId: string;
         MaterialId: string;
         JobId: string;
+        ArtifactId: string;
+        ArtifactVersionId: string;
+        DraftBranch: string;
         IdempotencyKey: string;
         IfMatch: string;
         LastEventId: string;
@@ -1324,6 +1526,150 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkflowEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    createArtifact: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateArtifactRequest"];
+            };
+        };
+        responses: {
+            /** @description Artifact and its initial active draft created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    getArtifact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                artifact_id: components["parameters"]["ArtifactId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current artifact state */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    saveArtifactDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": components["parameters"]["IfMatch"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                artifact_id: components["parameters"]["ArtifactId"];
+                draft_branch: components["parameters"]["DraftBranch"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveArtifactDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description Draft saved */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactDraftEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    submitArtifactVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": components["parameters"]["IfMatch"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                artifact_id: components["parameters"]["ArtifactId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitArtifactVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Immutable artifact version submitted for review */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactVersionEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    reviewArtifactVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                artifact_version_id: components["parameters"]["ArtifactVersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewArtifactVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Approval action appended and artifact pointers updated atomically */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalEnvelope"];
                 };
             };
             "4XX": components["responses"]["Error"];

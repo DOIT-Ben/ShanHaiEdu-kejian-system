@@ -13,6 +13,11 @@ from tests.conftest import run_migration
 
 EXPECTED_TABLES = {
     "alembic_version",
+    "approvals",
+    "artifact_drafts",
+    "artifact_relations",
+    "artifact_versions",
+    "artifacts",
     "branch_runs",
     "content_definition_versions",
     "content_package_versions",
@@ -56,7 +61,7 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
     run_migration(postgres_database_url, "head")
     assert EXPECTED_TABLES.issubset(set(inspect(engine).get_table_names()))
 
-    assert ScriptDirectory.from_config(config).get_current_head() == "a1b2c3d4e501"
+    assert ScriptDirectory.from_config(config).get_current_head() == "b7c9d1e3f502"
     previous = os.environ.get("SHANHAI_DATABASE_URL")
     os.environ["SHANHAI_DATABASE_URL"] = postgres_database_url
     try:

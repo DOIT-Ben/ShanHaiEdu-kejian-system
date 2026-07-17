@@ -13,6 +13,7 @@
     {"id": "node_running", "route": "/app/projects/:project_id/lessons/:lesson_id/work/:step_key", "description": "异步任务运行且刷新后恢复"},
     {"id": "node_partial", "route": "/app/projects/:project_id/lessons/:lesson_id/work/:step_key", "description": "批量页面或镜头部分成功"},
     {"id": "node_stale", "route": "/app/projects/:project_id/lessons/:lesson_id/work/:step_key", "description": "上游批准新版后的局部影响与三种处理"},
+    {"id": "artifact_review", "route": "/app/projects/:project_id/lessons/:lesson_id/work/:step_key", "description": "草稿自动保存、提交审核、批准、退回、撤销和接受过期"},
     {"id": "creation_independent", "route": "/app/creation/images", "description": "不绑定项目的独立图片创作"},
     {"id": "creation_from_package", "route": "/app/creation/batches/:batch_id", "description": "项目包批量导入、生成并保存回项目"},
     {"id": "save_conflict", "route": "/app/creation/batches/:batch_id", "description": "目标单值槽位已存在，选择替换或另存"},

@@ -1,0 +1,187 @@
+from __future__ import annotations
+
+import pytest
+
+from apps.api.artifacts.repository import ArtifactRepository
+from apps.api.artifacts.service import ArtifactService
+from apps.api.content_runtime.registry import BUILTIN_CONTENT_DEFINITION_VERSION_ID
+from apps.api.database import build_engine, build_session_factory
+from apps.api.errors import ApiError
+from apps.api.projects.repository import ProjectRepository
+from apps.api.projects.schemas import CreateProjectRequest
+from tests.fakes.identity import seed_test_actor
+
+
+def create_approved(session, actor, project_id, key: str, content: dict[str, object]):
+    service = ArtifactService(session, actor)
+    artifact = service.create(
+        project_id,
+        artifact_key=key,
+        artifact_type="test_content",
+        branch_key="lesson_plan",
+        content_definition_version_id=BUILTIN_CONTENT_DEFINITION_VERSION_ID,
+        draft_branch="main",
+        initial_content=content,
+        request_id=f"req-create-{key}",
+    )
+    draft = ArtifactRepository(session, actor).get_draft(artifact.id, "main")
+    assert draft is not None
+    version = service.submit(
+        artifact.id,
+        "main",
+        expected_lock_version=draft.lock_version,
+        source_kind="manual",
+        request_id=f"req-submit-{key}",
+    )
+    service.review(
+        version.id,
+        action="approve",
+        comment="approved",
+        request_id=f"req-approve-{key}",
+    )
+    return artifact, version
+
+
+def test_stale_propagates_only_along_real_relations_and_accept_stale_clears_it(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session:
+        with session.begin():
+            actor = seed_test_actor(session)
+            project = ProjectRepository(session, actor).create(
+                CreateProjectRequest(title="Fractions", knowledge_point="One half")
+            )
+            upstream, upstream_v1 = create_approved(
+                session, actor, project.id, "upstream", {"value": 1}
+            )
+            downstream, downstream_v1 = create_approved(
+                session, actor, project.id, "downstream", {"value": "derived"}
+            )
+            unrelated, _ = create_approved(
+                session, actor, project.id, "unrelated", {"value": "manual"}
+            )
+            ArtifactService(session, actor).add_relation(
+                from_version_id=upstream_v1.id,
+                to_version_id=downstream_v1.id,
+                relation_type="derives_from",
+                binding_key="lesson_scope",
+                impact_scope={"fields": ["value"]},
+            )
+            draft = ArtifactRepository(session, actor).get_draft(upstream.id, "main")
+            assert draft is not None
+            saved = ArtifactService(session, actor).save_draft(
+                upstream.id,
+                "main",
+                expected_lock_version=draft.lock_version,
+                content={"value": 2},
+                request_id="req-upstream-save",
+            )
+            upstream_v2 = ArtifactService(session, actor).submit(
+                upstream.id,
+                "main",
+                expected_lock_version=saved.lock_version,
+                source_kind="manual",
+                request_id="req-upstream-submit-v2",
+            )
+            ArtifactService(session, actor).review(
+                upstream_v2.id,
+                action="approve",
+                comment="new source",
+                request_id="req-upstream-approve-v2",
+            )
+
+        session.refresh(downstream)
+        session.refresh(unrelated)
+        assert downstream.status == "stale"
+        assert downstream.stale_reason_json == {
+            "replaced_upstream_version_id": str(upstream_v1.id),
+            "replacement_version_id": str(upstream_v2.id),
+            "bindings": [{"binding_key": "lesson_scope", "impact_scope": {"fields": ["value"]}}],
+        }
+        assert unrelated.status == "approved"
+        session.rollback()
+
+        with session.begin():
+            ArtifactService(session, actor).review(
+                downstream_v1.id,
+                action="accept_stale",
+                comment="Teacher confirmed reuse",
+                request_id="req-accept-stale",
+            )
+        session.refresh(downstream)
+        assert downstream.status == "approved"
+        assert downstream.stale_reason_json is None
+
+
+def test_relation_cycle_and_cross_tenant_visibility_are_rejected(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session, session.begin():
+        actor = seed_test_actor(session)
+        project = ProjectRepository(session, actor).create(
+            CreateProjectRequest(title="Fractions", knowledge_point="One half")
+        )
+        first, first_v = create_approved(session, actor, project.id, "first", {"value": 1})
+        _second, second_v = create_approved(session, actor, project.id, "second", {"value": 2})
+        service = ArtifactService(session, actor)
+        service.add_relation(
+            from_version_id=first_v.id,
+            to_version_id=second_v.id,
+            relation_type="references",
+            binding_key="first-to-second",
+            impact_scope={},
+        )
+        with pytest.raises(ApiError) as cycle:
+            service.add_relation(
+                from_version_id=second_v.id,
+                to_version_id=first_v.id,
+                relation_type="references",
+                binding_key="second-to-first",
+                impact_scope={},
+            )
+        assert cycle.value.code == "ARTIFACT_RELATION_CYCLE"
+
+        foreign_actor = actor.__class__(
+            organization_id=first.id,
+            principal_id=actor.principal_id,
+            user_id=None,
+            actor_type="system",
+        )
+        assert ArtifactRepository(session, foreign_actor).get(first.id) is None
+
+
+def test_revoking_an_upstream_approval_marks_real_downstream_stale(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session, session.begin():
+        actor = seed_test_actor(session)
+        project = ProjectRepository(session, actor).create(
+            CreateProjectRequest(title="Fractions", knowledge_point="One half")
+        )
+        _upstream, upstream_version = create_approved(
+            session, actor, project.id, "upstream-revoke", {"value": 1}
+        )
+        downstream, downstream_version = create_approved(
+            session, actor, project.id, "downstream-revoke", {"value": "derived"}
+        )
+        service = ArtifactService(session, actor)
+        service.add_relation(
+            from_version_id=upstream_version.id,
+            to_version_id=downstream_version.id,
+            relation_type="derives_from",
+            binding_key="revoked-source",
+            impact_scope={"fields": ["value"]},
+        )
+        service.review(
+            upstream_version.id,
+            action="revoke",
+            comment="Source approval is no longer valid",
+            request_id="req-revoke-upstream",
+        )
+
+        assert downstream.status == "stale"
+        assert downstream.stale_reason_json is not None
+        assert downstream.stale_reason_json["replacement_version_id"] is None

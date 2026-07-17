@@ -8,6 +8,7 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
+from apps.api.artifacts import models as artifact_models
 from apps.api.assets import models as asset_models
 from apps.api.content_runtime import models as content_runtime_models
 from apps.api.database import Base, sqlalchemy_url
@@ -24,6 +25,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 _registered_models = (
+    artifact_models,
     asset_models,
     content_runtime_models,
     identity_models,

@@ -229,7 +229,15 @@ class NodeRun(MutableAuditMixin, Base):
     automation_policy_snapshot_json: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=dict
     )
-    active_artifact_version_id: Mapped[UUID | None] = mapped_column(Uuid)
+    active_artifact_version_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey(
+            "artifact_versions.id",
+            name="fk_node_runs_active_artifact_version",
+            ondelete="RESTRICT",
+            use_alter=True,
+        ),
+    )
     stale_reason_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

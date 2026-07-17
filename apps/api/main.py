@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session, sessionmaker
 
+from apps.api.artifacts.router import router as artifacts_router
 from apps.api.assets.router import router as assets_router
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import register_error_handlers
@@ -57,6 +58,7 @@ def create_app(
     app.state.object_storage = resolved_object_storage
     app.state.authenticator = authenticator
     register_error_handlers(app)
+    app.include_router(artifacts_router)
     app.include_router(assets_router)
     app.include_router(projects_router)
     app.include_router(lessons_router)
