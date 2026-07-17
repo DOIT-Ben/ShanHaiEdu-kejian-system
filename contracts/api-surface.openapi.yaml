@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ShanHaiEdu Core Integration Surface
-  version: 2.4.0
+  version: 2.5.0
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
@@ -128,6 +128,85 @@ paths:
                 $ref: '#/components/schemas/ProjectEnvelope'
         '4XX':
           $ref: '#/components/responses/Error'
+  /projects/{project_id}/asset-slots:
+    get:
+      summary: 查询项目资产槽位及当前活动绑定
+      operationId: listProjectAssetSlots
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: lesson_unit_id
+          in: query
+          required: false
+          schema: {type: string, format: uuid}
+        - name: slot_key
+          in: query
+          required: false
+          schema: {type: string, minLength: 1, maxLength: 160}
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: Authorized project asset slot page
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProjectAssetSlotListEnvelope'}
+        '4XX': {$ref: '#/components/responses/Error'}
+  /projects/{project_id}/asset-package:
+    get:
+      summary: 查询项目资产包聚合视图
+      operationId: getProjectAssetPackage
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: lesson_unit_id
+          in: query
+          required: false
+          schema: {type: string, format: uuid}
+        - name: slot_key
+          in: query
+          required: false
+          schema: {type: string, minLength: 1, maxLength: 160}
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: Authorized project asset package page without storage URLs
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProjectAssetPackageEnvelope'}
+        '4XX': {$ref: '#/components/responses/Error'}
+  /asset-slots/{slot_id}/bindings:
+    post:
+      summary: 幂等绑定、追加或替换项目资产
+      operationId: bindProjectAsset
+      parameters:
+        - $ref: '#/components/parameters/AssetSlotId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BindAssetRequest'}
+      responses:
+        '201':
+          description: Asset binding created atomically with audit and outbox
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AssetBindingEnvelope'}
+        '4XX': {$ref: '#/components/responses/Error'}
+  /asset-bindings/{binding_id}/unbind:
+    post:
+      summary: 幂等停用项目资产绑定并保留历史
+      operationId: unbindProjectAsset
+      parameters:
+        - $ref: '#/components/parameters/AssetBindingId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Asset binding deactivated without deleting history
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AssetBindingEnvelope'}
+        '4XX': {$ref: '#/components/responses/Error'}
   /projects/{project_id}/lessons:
     get:
       summary: 查询项目当前活动课时
@@ -701,6 +780,16 @@ components:
       in: path
       required: true
       schema: {type: string, format: uuid}
+    AssetSlotId:
+      name: slot_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    AssetBindingId:
+      name: binding_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
     DraftBranch:
       name: draft_branch
       in: path
@@ -1010,6 +1099,131 @@ components:
       required: [data, request_id]
       properties:
         data: {$ref: '#/components/schemas/FileAsset'}
+        request_id: {type: string, minLength: 1}
+    AssetTargetContract:
+      type: object
+      additionalProperties: false
+      required: [allowed_mime_types, require_clean_scan]
+      properties:
+        allowed_mime_types:
+          type: array
+          uniqueItems: true
+          items: {type: string, pattern: '^[a-z0-9][a-z0-9!#$&^_.+-]*/(?:\*|[a-z0-9][a-z0-9!#$&^_.+-]*)$'}
+        require_clean_scan: {type: boolean}
+    AssetBinding:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - project_asset_slot_id
+        - file_asset_version_id
+        - source_artifact_version_id
+        - position
+        - is_active
+        - bound_at
+        - bound_by
+        - unbound_at
+        - unbound_by
+      properties:
+        id: {type: string, format: uuid}
+        project_asset_slot_id: {type: string, format: uuid}
+        file_asset_version_id: {type: string, format: uuid}
+        source_artifact_version_id: {type: [string, 'null'], format: uuid}
+        position: {type: integer, minimum: 0}
+        is_active: {type: boolean}
+        bound_at: {type: string, format: date-time}
+        bound_by: {type: string, format: uuid}
+        unbound_at: {type: [string, 'null'], format: date-time}
+        unbound_by: {type: [string, 'null'], format: uuid}
+    ProjectAssetSlot:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - project_id
+        - lesson_unit_id
+        - slot_key
+        - asset_type
+        - cardinality
+        - required
+        - status
+        - target_contract
+        - active_bindings
+      properties:
+        id: {type: string, format: uuid}
+        project_id: {type: string, format: uuid}
+        lesson_unit_id: {type: [string, 'null'], format: uuid}
+        slot_key: {type: string, minLength: 1, maxLength: 160}
+        asset_type: {type: string, minLength: 1, maxLength: 80}
+        cardinality: {type: string, enum: [one, many]}
+        required: {type: boolean}
+        status: {type: string, enum: [empty, satisfied]}
+        target_contract: {$ref: '#/components/schemas/AssetTargetContract'}
+        active_bindings:
+          type: array
+          items: {$ref: '#/components/schemas/AssetBinding'}
+    BindAssetRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - file_asset_version_id
+        - source_artifact_version_id
+        - replace_mode
+        - position
+      properties:
+        file_asset_version_id: {type: string, format: uuid}
+        source_artifact_version_id: {type: [string, 'null'], format: uuid}
+        replace_mode:
+          type: string
+          enum: [reject_if_occupied, replace_active, append]
+        position: {type: [integer, 'null'], minimum: 0}
+    AssetBindingEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/AssetBinding'}
+        request_id: {type: string, minLength: 1}
+    ProjectAssetSlotListEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, meta, request_id]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: {$ref: '#/components/schemas/ProjectAssetSlot'}
+        meta:
+          type: object
+          additionalProperties: false
+          required: [next_cursor]
+          properties:
+            next_cursor: {type: [string, 'null']}
+        request_id: {type: string, minLength: 1}
+    ProjectAssetPackageEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, meta, request_id]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [project_id, items]
+          properties:
+            project_id: {type: string, format: uuid}
+            items:
+              type: array
+              items: {$ref: '#/components/schemas/ProjectAssetSlot'}
+        meta:
+          type: object
+          additionalProperties: false
+          required: [next_cursor]
+          properties:
+            next_cursor: {type: [string, 'null']}
         request_id: {type: string, minLength: 1}
     MaterialParseVersion:
       type: object

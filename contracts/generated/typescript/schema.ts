@@ -74,6 +74,74 @@ export interface paths {
         patch: operations["updateProject"];
         trace?: never;
     };
+    "/projects/{project_id}/asset-slots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询项目资产槽位及当前活动绑定 */
+        get: operations["listProjectAssetSlots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/asset-package": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询项目资产包聚合视图 */
+        get: operations["getProjectAssetPackage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/asset-slots/{slot_id}/bindings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 幂等绑定、追加或替换项目资产 */
+        post: operations["bindProjectAsset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/asset-bindings/{binding_id}/unbind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 幂等停用项目资产绑定并保留历史 */
+        post: operations["unbindProjectAsset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project_id}/lessons": {
         parameters: {
             query?: never;
@@ -682,6 +750,80 @@ export interface components {
             data: components["schemas"]["FileAsset"];
             request_id: string;
         };
+        AssetTargetContract: {
+            allowed_mime_types: string[];
+            require_clean_scan: boolean;
+        };
+        AssetBinding: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            project_asset_slot_id: string;
+            /** Format: uuid */
+            file_asset_version_id: string;
+            /** Format: uuid */
+            source_artifact_version_id: string | null;
+            position: number;
+            is_active: boolean;
+            /** Format: date-time */
+            bound_at: string;
+            /** Format: uuid */
+            bound_by: string;
+            /** Format: date-time */
+            unbound_at: string | null;
+            /** Format: uuid */
+            unbound_by: string | null;
+        };
+        ProjectAssetSlot: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            project_id: string;
+            /** Format: uuid */
+            lesson_unit_id: string | null;
+            slot_key: string;
+            asset_type: string;
+            /** @enum {string} */
+            cardinality: "one" | "many";
+            required: boolean;
+            /** @enum {string} */
+            status: "empty" | "satisfied";
+            target_contract: components["schemas"]["AssetTargetContract"];
+            active_bindings: components["schemas"]["AssetBinding"][];
+        };
+        BindAssetRequest: {
+            /** Format: uuid */
+            file_asset_version_id: string;
+            /** Format: uuid */
+            source_artifact_version_id: string | null;
+            /** @enum {string} */
+            replace_mode: "reject_if_occupied" | "replace_active" | "append";
+            position: number | null;
+        };
+        AssetBindingEnvelope: {
+            data: components["schemas"]["AssetBinding"];
+            request_id: string;
+        };
+        ProjectAssetSlotListEnvelope: {
+            data: {
+                items: components["schemas"]["ProjectAssetSlot"][];
+            };
+            meta: {
+                next_cursor: string | null;
+            };
+            request_id: string;
+        };
+        ProjectAssetPackageEnvelope: {
+            data: {
+                /** Format: uuid */
+                project_id: string;
+                items: components["schemas"]["ProjectAssetSlot"][];
+            };
+            meta: {
+                next_cursor: string | null;
+            };
+            request_id: string;
+        };
         MaterialParseVersion: {
             /** Format: uuid */
             id: string;
@@ -1148,6 +1290,8 @@ export interface components {
         JobId: string;
         ArtifactId: string;
         ArtifactVersionId: string;
+        AssetSlotId: string;
+        AssetBindingId: string;
         DraftBranch: string;
         IdempotencyKey: string;
         IfMatch: string;
@@ -1315,6 +1459,116 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    listProjectAssetSlots: {
+        parameters: {
+            query?: {
+                lesson_unit_id?: string;
+                slot_key?: string;
+                "page[cursor]"?: components["parameters"]["PageCursor"];
+                "page[limit]"?: components["parameters"]["PageLimit"];
+            };
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized project asset slot page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectAssetSlotListEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    getProjectAssetPackage: {
+        parameters: {
+            query?: {
+                lesson_unit_id?: string;
+                slot_key?: string;
+                "page[cursor]"?: components["parameters"]["PageCursor"];
+                "page[limit]"?: components["parameters"]["PageLimit"];
+            };
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized project asset package page without storage URLs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectAssetPackageEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    bindProjectAsset: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                slot_id: components["parameters"]["AssetSlotId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BindAssetRequest"];
+            };
+        };
+        responses: {
+            /** @description Asset binding created atomically with audit and outbox */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetBindingEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    unbindProjectAsset: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                binding_id: components["parameters"]["AssetBindingId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Asset binding deactivated without deleting history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetBindingEnvelope"];
                 };
             };
             "4XX": components["responses"]["Error"];

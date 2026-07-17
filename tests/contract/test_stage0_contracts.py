@@ -118,6 +118,8 @@ def test_stage0_operations_preserve_idempotency_and_replay_headers() -> None:
         "cancelGenerationJob",
         "updateProjectLessons",
         "updateLessonBranches",
+        "bindProjectAsset",
+        "unbindProjectAsset",
     }
     for operation_id in idempotent_operations:
         parameters = [
@@ -136,6 +138,24 @@ def test_stage0_operations_preserve_idempotency_and_replay_headers() -> None:
             resolve_local(openapi, item) for item in operations[operation_id]["parameters"]
         ]
         assert any(parameter.get("name") == "If-Match" for parameter in parameters)
+
+
+def test_project_asset_contract_exposes_only_stable_non_storage_fields() -> None:
+    openapi = load_openapi()
+    operations = operations_by_id(openapi)
+    assert {
+        "listProjectAssetSlots",
+        "getProjectAssetPackage",
+        "bindProjectAsset",
+        "unbindProjectAsset",
+    }.issubset(operations)
+
+    binding = openapi["components"]["schemas"]["AssetBinding"]
+    slot = openapi["components"]["schemas"]["ProjectAssetSlot"]
+    rendered = json.dumps({"binding": binding, "slot": slot})
+    assert "storage_key" not in rendered
+    assert "storage_bucket" not in rendered
+    assert "url" not in rendered.lower()
 
 
 def test_health_operations_use_api_base_and_are_unauthenticated() -> None:

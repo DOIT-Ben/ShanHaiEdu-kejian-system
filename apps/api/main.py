@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.artifacts.router import router as artifacts_router
+from apps.api.assets.project_router import router as project_assets_router
 from apps.api.assets.router import router as assets_router
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import register_error_handlers
@@ -61,6 +62,7 @@ def create_app(
     register_error_handlers(app)
     app.include_router(artifacts_router)
     app.include_router(assets_router)
+    app.include_router(project_assets_router)
     app.include_router(projects_router)
     app.include_router(prompt_runtime_router)
     app.include_router(lessons_router)

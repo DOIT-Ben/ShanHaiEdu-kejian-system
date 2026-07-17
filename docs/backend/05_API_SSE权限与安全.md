@@ -64,6 +64,7 @@
 | `GET` | `/projects/{project_id}/asset-package` | 项目资产包聚合视图 |
 | `GET` | `/projects/{project_id}/asset-slots` | 槽位及当前绑定 |
 | `POST` | `/asset-slots/{slot_id}/bindings` | 手工绑定已有资产 |
+| `POST` | `/asset-bindings/{binding_id}/unbind` | 停用活动绑定并保留历史 |
 
 草稿 PATCH 必须带 `If-Match`。冲突返回 `409 EDIT_CONFLICT` 和服务器当前版本摘要，前端提供合并而不是覆盖。
 
