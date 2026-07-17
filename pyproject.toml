@@ -19,6 +19,7 @@ dependencies = [
   "uvicorn[standard]>=0.34,<1",
   "uuid6>=2024.7.10,<2026",
   "dramatiq[redis]>=2.2,<3",
+  "markdown-it-py>=3,<5",
 ]
 
 [dependency-groups]

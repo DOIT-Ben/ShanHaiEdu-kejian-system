@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shanhaiedu.local/contracts/markdown-template-draft.schema.json",
+  "title": "MarkdownTemplateDraft",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "adapter_version",
+    "state",
+    "source",
+    "title",
+    "preamble_markdown",
+    "sections",
+    "warnings"
+  ],
+  "properties": {
+    "adapter_version": {"const": "shanhai.markdown-template/v1"},
+    "state": {"enum": ["ready", "needs_review"]},
+    "source": {"$ref": "#/$defs/source"},
+    "title": {"type": "string", "minLength": 1, "maxLength": 255},
+    "preamble_markdown": {"type": "string"},
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/section"}
+    },
+    "warnings": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/warning"}
+    }
+  },
+  "$defs": {
+    "key": {"type": "string", "pattern": "^[a-z][a-z0-9.-]{1,159}$"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sha256", "byte_length"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 255},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "byte_length": {"type": "integer", "minimum": 1, "maximum": 2000000}
+      }
+    },
+    "sourceRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_line", "end_line"],
+      "properties": {
+        "start_line": {"type": "integer", "minimum": 1},
+        "end_line": {"type": "integer", "minimum": 1}
+      }
+    },
+    "subsection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subsection_key",
+        "title",
+        "body_markdown",
+        "source_range"
+      ],
+      "properties": {
+        "subsection_key": {"$ref": "#/$defs/key"},
+        "title": {"type": "string", "minLength": 1, "maxLength": 255},
+        "body_markdown": {"type": "string"},
+        "source_range": {"$ref": "#/$defs/sourceRange"}
+      }
+    },
+    "section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "section_key",
+        "title",
+        "role",
+        "content_mode",
+        "required",
+        "editable",
+        "repeatable",
+        "visible",
+        "body_markdown",
+        "subsections",
+        "source_range"
+      ],
+      "properties": {
+        "section_key": {"$ref": "#/$defs/key"},
+        "title": {"type": "string", "minLength": 1, "maxLength": 255},
+        "role": {
+          "enum": [
+            "overview",
+            "analysis",
+            "goals",
+            "preparation",
+            "process",
+            "assessment",
+            "contingency",
+            "intro_options",
+            "custom"
+          ]
+        },
+        "content_mode": {
+          "enum": ["fixed", "teacher_input", "ai_generated", "mixed"]
+        },
+        "required": {"type": "boolean"},
+        "editable": {"type": "boolean"},
+        "repeatable": {"type": "boolean"},
+        "visible": {"type": "boolean"},
+        "body_markdown": {"type": "string"},
+        "subsections": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/subsection"}
+        },
+        "source_range": {"$ref": "#/$defs/sourceRange"}
+      }
+    },
+    "warning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "enum": [
+            "TITLE_FROM_FILENAME",
+            "MULTIPLE_DOCUMENT_TITLES",
+            "CONTENT_BEFORE_FIRST_SECTION",
+            "UNKNOWN_SECTION_ROLE",
+            "DUPLICATE_SECTION_KEY",
+            "ORPHAN_SUBSECTION"
+          ]
+        },
+        "message": {"type": "string", "minLength": 1, "maxLength": 1000},
+        "line": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}
