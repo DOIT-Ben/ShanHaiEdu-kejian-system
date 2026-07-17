@@ -47,3 +47,4 @@ class Project(MutableAuditMixin, Base):
     owner_principal_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("principals.id", ondelete="RESTRICT"), nullable=False
     )
+    lesson_division_version_id: Mapped[UUID | None] = mapped_column(Uuid)

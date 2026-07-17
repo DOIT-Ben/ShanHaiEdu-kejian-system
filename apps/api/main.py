@@ -11,6 +11,7 @@ from apps.api.errors import register_error_handlers
 from apps.api.health import ReadinessProvider, build_readiness_service
 from apps.api.identity.authentication import Authenticator
 from apps.api.jobs.router import router as jobs_router
+from apps.api.lessons.router import router as lessons_router
 from apps.api.logging import configure_logging
 from apps.api.middleware import RequestContextMiddleware
 from apps.api.projects.router import router as projects_router
@@ -55,6 +56,7 @@ def create_app(
     app.state.authenticator = authenticator
     register_error_handlers(app)
     app.include_router(projects_router)
+    app.include_router(lessons_router)
     app.include_router(uploads_router)
     app.include_router(jobs_router)
 
