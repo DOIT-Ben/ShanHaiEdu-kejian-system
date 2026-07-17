@@ -4,16 +4,21 @@ from __future__ import annotations
 
 import hashlib
 import re
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import PurePosixPath
-from typing import Any, cast
+from typing import Any
 from urllib.parse import urlparse
 
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
 
+from workflow.markdown_template_render import (
+    render_markdown_template as render_markdown_template,
+)
+
 MAX_MARKDOWN_BYTES = 2_000_000
+MAX_HEADING_CHARS = 255
 ADAPTER_VERSION = "shanhai.markdown-template/v1"
 UNSAFE_LINK_SCHEMES = frozenset({"data", "file", "javascript", "vbscript"})
 
@@ -71,27 +76,6 @@ def parse_markdown_template(payload: bytes, *, source_name: str) -> dict[str, An
         "sections": parsed_sections,
         "warnings": warnings,
     }
-
-
-def render_markdown_template(draft: Mapping[str, Any]) -> str:
-    """Render the visible draft content as normalized Markdown."""
-
-    chunks = [f"# {cast(str, draft['title'])}"]
-    preamble = cast(str, draft["preamble_markdown"])
-    if preamble:
-        chunks.append(preamble)
-    sections = cast(list[dict[str, Any]], draft["sections"])
-    for section in sections:
-        chunks.append(f"## {section['title']}")
-        body = cast(str, section["body_markdown"])
-        if body:
-            chunks.append(body)
-        for subsection in cast(list[dict[str, Any]], section["subsections"]):
-            chunks.append(f"### {subsection['title']}")
-            subsection_body = cast(str, subsection["body_markdown"])
-            if subsection_body:
-                chunks.append(subsection_body)
-    return "\n\n".join(chunks).rstrip() + "\n"
 
 
 def _decode_source(payload: bytes) -> str:
@@ -163,6 +147,11 @@ def _collect_headings(tokens: list[Token]) -> list[_Heading]:
                 raise MarkdownTemplateError(
                     "MARKDOWN_EMPTY_SECTION_TITLE",
                     f"Heading on line {token.map[0] + 1} cannot be empty",
+                )
+            if len(title) > MAX_HEADING_CHARS:
+                raise MarkdownTemplateError(
+                    "MARKDOWN_HEADING_TOO_LONG",
+                    f"Heading on line {token.map[0] + 1} exceeds {MAX_HEADING_CHARS} characters",
                 )
             headings.append(
                 _Heading(
@@ -387,6 +376,8 @@ def _markdown_slice(lines: list[str], start: int, end: int) -> str:
 
 def _safe_source_name(source_name: str) -> str:
     name = PurePosixPath(source_name.replace("\\", "/")).name.strip()
+    name = re.sub(r"[\x00-\x1f\x7f]+", " ", name)
+    name = re.sub(r"\s+", " ", name).strip()
     return (name or "template.md")[:255]
 
 

@@ -136,6 +136,17 @@ def test_missing_title_uses_filename_and_requires_review() -> None:
     assert draft["warnings"][0]["code"] == "TITLE_FROM_FILENAME"
 
 
+def test_filename_title_fallback_cannot_inject_markdown_structure() -> None:
+    draft = parse_markdown_template(
+        b"## Section\n\nBody.\n",
+        source_name="../unsafe\n## injected.md",
+    )
+
+    assert draft["source"]["name"] == "unsafe ## injected.md"
+    assert draft["title"] == "unsafe ## injected"
+    assert render_markdown_template(draft).count("\n## ") == 1
+
+
 def test_unknown_and_duplicate_sections_get_deterministic_keys() -> None:
     source = """# Demo
 
@@ -199,6 +210,28 @@ def test_oversized_markdown_is_rejected() -> None:
     assert_error(b"x" * (MAX_MARKDOWN_BYTES + 1), "MARKDOWN_TOO_LARGE")
 
 
+def test_overlong_heading_is_rejected_before_it_can_violate_the_schema() -> None:
+    source = f"# Demo\n\n## {'x' * 256}\n\nBody.\n".encode()
+
+    assert_error(source, "MARKDOWN_HEADING_TOO_LONG")
+
+
+@pytest.mark.parametrize(
+    "destination",
+    [
+        "JaVaScRiPt:alert(1)",
+        "vbscript:msgbox(1)",
+        "file:///etc/passwd",
+        "data:text/html,unsafe",
+        "javascript&#58;alert(1)",
+    ],
+)
+def test_all_unsafe_link_schemes_are_rejected(destination: str) -> None:
+    source = f"# Demo\n\n## Section\n\n[x]({destination})\n".encode()
+
+    assert_error(source, "MARKDOWN_UNSAFE_LINK")
+
+
 def test_normalized_markdown_is_deterministic_and_round_trips_visible_content() -> None:
     draft = parse_markdown_template(FIXTURE.read_bytes(), source_name=FIXTURE.name)
 
@@ -209,6 +242,17 @@ def test_normalized_markdown_is_deterministic_and_round_trips_visible_content() 
     assert first == second
     assert first.endswith("\n")
     assert visible_signature(reparsed) == visible_signature(draft)
+
+
+def test_normalized_markdown_omits_sections_hidden_by_the_administrator() -> None:
+    draft = parse_markdown_template(FIXTURE.read_bytes(), source_name=FIXTURE.name)
+    hidden = draft["sections"][0]
+    hidden["visible"] = False
+
+    rendered = render_markdown_template(draft)
+
+    assert f"## {hidden['title']}" not in rendered
+    assert f"## {draft['sections'][1]['title']}" in rendered
 
 
 def test_draft_exposes_business_settings_without_schema_authoring() -> None:
