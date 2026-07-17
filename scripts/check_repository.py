@@ -50,6 +50,30 @@ FORBIDDEN_NAME = re.compile(
 MARKDOWN_LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 FRONTEND_CHECKSUMS = ROOT / "docs/frontend/CHECKSUMS.sha256"
 TEXT_CHECKSUM_SUFFIXES = {".css", ".json", ".md"}
+FULLWIDTH_COLON = "\N{FULLWIDTH COLON}"
+CURRENT_STATUS_SECTIONS = (
+    "# 当前项目状态",
+    "## 当前可演示成果",
+    "## 已完成",
+    "## 当前工作",
+    "## 当前阻塞",
+    "## 下一个阶段出口",
+    "## 接手提示",
+)
+BACKEND_BASELINE_EVIDENCE = (
+    "apps/api/main.py",
+    "workers/main.py",
+    "infra/compose.yaml",
+    ".github/workflows/backend-quality.yml",
+)
+STALE_BACKEND_CLAIMS = (
+    "尚未初始化可运行的后端平台基座和CI",
+    f"Issue #2{FULLWIDTH_COLON}Codex建立阶段0后端平台骨架和CI",
+)
+BACKEND_STAGE_ACKNOWLEDGEMENT = re.compile(
+    rf"^当前阶段{FULLWIDTH_COLON}.*阶段1",
+    re.MULTILINE,
+)
 
 
 def repository_files() -> list[Path]:
@@ -129,6 +153,34 @@ def check_markdown_links(files: list[Path], errors: list[str]) -> None:
                 errors.append(f"broken link: {path.relative_to(ROOT)} -> {raw}")
 
 
+def check_current_status(status: Path, root: Path, errors: list[str]) -> None:
+    try:
+        text = status.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        errors.append(f"cannot read CURRENT_STATUS.md: {exc}")
+        return
+
+    lines = set(text.splitlines())
+    for section in CURRENT_STATUS_SECTIONS:
+        if section not in lines:
+            errors.append(f"CURRENT_STATUS.md missing required section: {section}")
+
+    backend_baseline_exists = all(
+        (root / relative).is_file() for relative in BACKEND_BASELINE_EVIDENCE
+    )
+    if not backend_baseline_exists:
+        return
+
+    if BACKEND_STAGE_ACKNOWLEDGEMENT.search(text) is None:
+        errors.append(
+            "CURRENT_STATUS.md does not acknowledge the implemented stage 1 backend track"
+        )
+
+    for claim in STALE_BACKEND_CLAIMS:
+        if claim in text:
+            errors.append(f"CURRENT_STATUS.md contains a stale backend claim: {claim}")
+
+
 def check_checksum_manifest(manifest: Path, errors: list[str]) -> None:
     try:
         lines = manifest.read_text(encoding="utf-8").splitlines()
@@ -186,6 +238,7 @@ def main() -> int:
     check_json(files, errors)
     check_yaml(files, errors)
     check_markdown_links(files, errors)
+    check_current_status(ROOT / "CURRENT_STATUS.md", ROOT, errors)
     check_checksum_manifest(FRONTEND_CHECKSUMS, errors)
     report_size_triggers(files)
 

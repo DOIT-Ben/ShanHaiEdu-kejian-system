@@ -2,91 +2,60 @@
 
 更新时间：2026-07-17
 
-验证基线：`main`，提交以本文件所在版本为准
+验证基线：`main`，实现事实以本文件所在提交的代码、迁移和测试为准；任务状态以链接的GitHub Issue和Pull Request为准
 
-当前阶段：阶段0出口尚未关闭；阶段1后端轨道按Decision #18受控并行
+当前阶段：阶段0出口尚未关闭；阶段1后端轨道接近出口
 
 本文件只描述现在，不保存开发日志。任务细节、负责人、讨论和交接以GitHub Issue与Pull Request为准。
 
 ## 当前可演示成果
 
-- 已形成小学数学课件平台的统一产品、前端、后端、数据和工作流设计。
-- 已定义教材、课时、教案、三类九套导入、PPT、视频、创作中心和项目资产的端到端关系。
-- 已提供自动校验的OpenAPI、核心JSON Schema、Mock场景和生成客户端合同。
-- 已建立可运行的FastAPI、PostgreSQL、Redis、对象存储和Worker工程基座。
-- 已通过API和测试建立项目、上传会话、上传确认和任务持久化路径。
-- 已通过确定性Fake贯通事务Outbox、Worker租约、任务状态、SSE续传和命令幂等。
-- 已建立供应商解耦的文本模型网关、确定性Fake、配置驱动适配器和显式真实冒烟入口。
-- 已建立内置内容Release、不可变定义、项目固定版本和工作流运行/节点快照骨架。
-- 已建立项目内容产物草稿、不可变版本、审核动作和真实依赖过期传播。
-- 已建立教材PDF隔离解析Worker、不可变证据包和可恢复任务链路。
-- 已冻结Schema驱动生成模板内容包V1及其类型化合同、引用和校验工具。
-- 已提供当前前端外包交付包。
-
-当前尚无可运行的端到端业务应用，不得把设计文档或静态原型描述为MVP完成。
+- 后端已经具备可运行的FastAPI模块化单体、PostgreSQL、Redis、MinIO、Alembic、Worker、Outbox、SSE和幂等基座。
+- API和测试已经覆盖租户与用户边界、项目、课时与分支、上传、文件资产与不可变版本、内容发布、工作流运行、产物审核与依赖、Prompt与Context快照、教材PDF解析以及项目资产原子绑定。
+- OpenAPI、JSON Schema、生成TypeScript客户端、确定性Mock/Fake和后端CI已经进入自动门禁；文本模型网关已经完成受控真实冒烟。
+- 当前可以通过自动化测试和API/CLI验证后端链路，但尚未完成浏览器到真实API的阶段1纵向演示，不得描述为阶段1产品完成。
+- 生产前端仍在[Issue #4](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)与[Draft PR #33](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/33)中独立推进，尚未合并到`main`。
 
 ## 已完成
 
-- 产品与工作流现行口径统一。
-- 前端设计和外包验收口径统一。
-- 后端架构、领域、工作流、模型网关和数据库设计统一。
-- 旧版并行设计目录从当前树清除。
-- GitHub Issue/PR任务事实源、交接、分支、文档生命周期和里程碑规则已初始化。
-- Issue/PR模板、CODEOWNERS和仓库治理检查已加入当前基线。
-- Issue #6、#7、#8、#9、#10、#21、#22、#23、#24、#25、#27和#38已合并，阶段0后端基础设施、数据、合同、异步可靠性、文本模型网关、身份授权、课时/分支、文件资产/解析版本、内容/工作流运行时、产物版本/审核、教材PDF证据包以及Schema驱动生成模板合同进入`main`。
+- [Issue #2](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/2)的后端平台子任务#6至#10已经合并：目录与本地基础设施、数据模型与Alembic、Worker与可靠性、合同与CI、模型网关与真实文本冒烟。
+- [Issue #19](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/19)的#20至#28已经实际完成：阶段路线、身份授权、课时分支、文件资产、内容与工作流运行时、产物版本审核、Prompt与Context审计、教材解析和项目资产绑定。
+- 当前后端基座使用真实PostgreSQL约束和迁移验证，普通CI继续使用确定性Fake，不访问真实Provider。
+- 产品、前端、后端、数据和工作流仍以现行文档与`contracts/`为唯一当前口径，旧版并行设计不在当前树中保留。
 
-## 当前责任分工
+## 当前工作
 
-- Codex负责除生产前端之外的平台开发：API、数据库、Worker、工作流、模型网关、对象存储、基础设施、合同和CI。
-- 独立前端承接方只负责`apps/web`、Figma、Storybook、MSW、前端测试与真实API联调。
-- 双方通过OpenAPI、JSON Schema、SSE、错误合同和Mock场景协作，不越过目录和职责边界。
+- [Issue #44](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/44)与[PR #46](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/46)：Markdown TemplateDraft确定性编译，已进入评审。
+- [Issue #49](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/49)与[PR #52](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/52)：生成节点绑定合同与业务节点目录，已进入评审。
+- [Issue #48](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/48)：全流程生成节点与可配置模型I/O绑定的父任务；已标记`status:blocked`，结构化业务字段确认前不继续扩展实现。
+- [Issue #29](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/29)：阶段1后端纵向贯通与真实文本出口；已标记`status:blocked`，恢复前必须先确认只使用现有通用合同，或等待其所需结构化字段定稿。
+- [Issue #51](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/51)：教师端只展示可编辑业务提示词并隐藏内部结构合同，尚未启动。
+- [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)：与生产前端完成真实合同联调，等待前端达到联调条件。
 
-## 当前活跃任务
+## 当前阻塞
 
-- [Issue #4：重新外包生产级前端实现](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)
-- [Issue #19：完成阶段1最小可运行后端基座](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/19)
-- [Issue #42：实现Markdown TemplateDraft解析与规范化V1](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/42)
-
-## 下一实施任务
-
-- [Issue #26：实现上下文白名单、提示词快照和模型调用审计](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/26)
-- [Issue #28：实现项目资产槽位与原子绑定](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/28)
-
-Issue #38已冻结Decision #37批准的Schema驱动生成模板内容包V1，Issue #26可直接消费现行Prompt、Context、输出和投影引用合同；Issue #42的内容包编译集成在其核心适配器完成后继续。
-
-## 等待中的联调任务
-
-- [Issue #11：与Issue #4完成合同联调](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)
-
-## 受控并行边界
-
-[Decision #18](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/18)只调整实施时序，不改变阶段定义或出口：
-
-- Issue #2和Issue #11继续保持阶段0未完成事实；没有前端Draft PR时不启动#11，也不用后端临时页面替代联调。
-- 不依赖前端的阶段1后端任务按父Issue #19及其子Issue推进；先完成#21，再按依赖开放后续波次。
-- 同时处于实施、评审或仍有未合并Draft PR的后端主任务不超过三个。
-- 普通CI和业务测试使用确定性Fake；Provider适配变更和阶段出口使用受控真实冒烟。
-- Codex不修改或代写`apps/web`；阶段1后端通过不等于阶段1教师端或产品里程碑完成。
-
-## 当前限制
-
-- 新前端承接方尚未从Issue #4建立Draft PR和工程预览。
-- 图片、视频和TTS供应商的真实开发凭据尚未进入受控环境。
-
-这些限制不阻塞普通CI、确定性Fake和阶段1后端基础任务，但会阻止前端真实联调以及图片、视频和TTS阶段出口验收。
+- 教案、PPT、视频等业务结构化字段仍由产品负责人设计。#48后续任务不得提前固化这些字段；#29恢复前必须先消除其E2E范围是否消费未定字段的歧义。
+- #44和#49虽已有评审分支和全绿CI，但涉及结构化内容与节点合同；字段口径确认前不能仅因检查通过就视为产品合同已批准。
+- 阶段1完整出口仍缺少后端纵向E2E与阶段真实文本冒烟，以及生产前端的真实API联调。
+- 图片、视频和TTS真实Provider适配与凭据属于后续媒体阶段前置条件，不用Mock替代阶段验收。
 
 ## 下一个阶段出口
 
-阶段0完成必须同时满足：
+当前存在两个受控并行出口。
 
-- 团队治理文档、Issue/PR模板和仓库清洁校验合并到`main`。
-- 后端平台目录、基础CI和本地依赖能够启动。
-- 前端承接方建立`apps/web`工程、Storybook、MSW和可访问预览。
-- OpenAPI与JSON Schema进入自动校验。
-- 后端可以通过测试或命令行完成项目、上传、异步任务和SSE的最小贯通。
-- 前端可以基于合同完成对应Mock路径，并开始真实API联调。
+阶段1后端轨道出口必须满足：
 
-阶段1后端轨道已完成身份授权、课时/分支、文件资产/解析版本、内容/工作流运行时、产物版本/审核、教材PDF解析和Schema驱动生成模板合同；当前#42推进Markdown模板适配器，#26恢复Prompt/Context/用量审计，#28继续作为已解锁的项目资产槽位任务。完整依赖、测试和回退要求以父Issue #19为准。
+- 先明确#29只使用现有阶段1通用合同，或等待并确认它实际需要的结构化字段；不得用猜测字段完成出口。
+- 启动#29，使用真实PostgreSQL、Redis和MinIO完成项目、上传、教材解析、资产/课时/工作流、SSE续传与REST对账的纵向E2E。
+- 普通CI使用确定性Fake，阶段出口另外完成受控真实文本模型冒烟并记录脱敏证据。
+- Alembic空库升级、合同兼容、仓库治理、失败重试、取消和幂等检查全部通过。
+
+阶段0整体出口仍必须满足：
+
+- 生产前端工程达到Issue #4的阶段0范围并通过前端门禁，源码通过PR进入`main`。
+- 前端通过#11消费当前OpenAPI、JSON Schema和SSE合同，完成真实API联调；Mock不能作为出口。
+
+两个出口均关闭后，才进入阶段2“教材到教案纵向链路”，交付第一个真实教师价值闭环。#44、#49、#51和#48属于当前并行的后续合同准备工作，但不得在未经过对应Issue决策时自动扩大#29或阶段出口范围。
 
 ## 接手提示
 
@@ -98,4 +67,4 @@ Issue #38已冻结Decision #37批准的Schema驱动生成模板内容包V1，Iss
 4. 被分配的Issue和PR
 5. 与任务直接相关的模块文档、合同、代码和测试
 
-不要先通读Git历史或全部设计文档。
+结构化字段未确认前，不扩展#48后续实现，也不把#44或#49的工程检查通过解释为产品合同已经批准。恢复#29前先在Issue中确认其E2E是否能严格限定为现有通用合同。
