@@ -1,0 +1,130 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+/* 把设计令牌映射为 Tailwind 4 主题变量；组件一律使用这些语义类。 */
+@theme {
+  --color-brand-50: var(--sh-brand-50);
+  --color-brand-100: var(--sh-brand-100);
+  --color-brand-200: #c2d4ff;
+  --color-brand-300: var(--sh-brand-300);
+  --color-brand-500: var(--sh-brand-500);
+  --color-brand-600: var(--sh-brand-600);
+  --color-brand-700: var(--sh-brand-700);
+  --color-ink-strong: var(--sh-ink-strong);
+  --color-ink: var(--sh-ink-default);
+  --color-ink-muted: var(--sh-ink-muted);
+  --color-ink-faint: var(--sh-ink-faint);
+  --color-canvas: var(--sh-surface-canvas);
+  --color-surface: var(--sh-surface-base);
+  --color-surface-soft: var(--sh-surface-soft);
+  --color-surface-inverse: var(--sh-surface-inverse);
+  --color-line-subtle: var(--sh-line-subtle);
+  --color-line: var(--sh-line-default);
+  --color-line-strong: var(--sh-line-strong);
+  --color-success: var(--sh-success);
+  --color-success-50: #e9f6f0;
+  --color-success-100: #d3ecdf;
+  --color-success-200: #aeddc6;
+  --color-success-600: #16855b;
+  --color-success-700: #116a49;
+  --color-warning: var(--sh-warning);
+  --color-warning-50: #fdf3e3;
+  --color-warning-100: #fbe7c6;
+  --color-warning-200: #f5d194;
+  --color-warning-600: #b56a09;
+  --color-warning-700: #92550a;
+  --color-danger: var(--sh-danger);
+  --color-danger-50: #fceceb;
+  --color-danger-100: #f8d7d6;
+  --color-danger-200: #efb3b4;
+  --color-danger-600: #c73543;
+  --color-danger-700: #a52836;
+  --color-info: var(--sh-info);
+  --color-brand: var(--sh-brand-500);
+  --color-running: var(--sh-brand-600);
+  --color-running-surface: var(--sh-brand-50);
+  --color-divider: var(--sh-line-subtle);
+  --radius-sm: var(--sh-radius-sm);
+  --radius-md: var(--sh-radius-md);
+  --radius-lg: var(--sh-radius-lg);
+  --radius-xl: var(--sh-radius-xl);
+  --radius-control: var(--sh-radius-sm);
+  --radius-panel: var(--sh-radius-md);
+  --radius-card: var(--sh-radius-lg);
+  --radius-overlay: var(--sh-radius-lg);
+  --shadow-card: var(--sh-shadow-card);
+  --shadow-floating: var(--sh-shadow-floating);
+  --font-sans: var(--sh-font-sans);
+  --font-mono: var(--sh-font-mono);
+  --ease-standard: var(--sh-ease-standard);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--sh-surface-canvas);
+  color: var(--sh-ink-default);
+  font-family: var(--sh-font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--sh-brand-100);
+}
+
+.transition-token {
+  transition-timing-function: var(--sh-ease-standard);
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--sh-shadow-focus);
+  border-radius: var(--sh-radius-sm);
+}
+
+/* 主页品牌区允许的克制浅蓝渐变与淡山海纹理 */
+.sh-hero-gradient {
+  background:
+    radial-gradient(1200px 480px at 85% -10%, var(--sh-brand-100) 0%, transparent 60%),
+    linear-gradient(180deg, var(--sh-brand-50) 0%, var(--sh-surface-canvas) 82%);
+}
+
+.sh-mountain-texture {
+  background-image:
+    radial-gradient(closest-side, rgb(49 94 245 / 5%), transparent),
+    repeating-linear-gradient(115deg, rgb(20 33 61 / 2.5%) 0 2px, transparent 2px 26px);
+}
+
+/* 教案 / PPT 正文纯白画布 */
+.sh-paper-canvas {
+  background: #ffffff;
+}
+
+/* 视频播放区深色 */
+.sh-player-surface {
+  background: #10182b;
+}
+
+@keyframes sh-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.sh-skeleton {
+  animation: sh-pulse 1.6s var(--sh-ease-standard) infinite;
+  background: var(--sh-line-subtle);
+  border-radius: var(--sh-radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-skeleton {
+    animation: none;
+  }
+}

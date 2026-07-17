@@ -1,0 +1,2957 @@
+openapi: 3.1.0
+info:
+  title: ShanHaiEdu Frontend Integration Surface
+  version: 2.0.0
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+  description: >-
+    前端联调合同。以仓库根 contracts/api-surface.openapi.yaml 为核心子集，
+    其余路径为前端按 contracts/api-conventions.md 约定提出的兼容性扩展；
+    真实联调以后端生成 OpenAPI 为准，本文件不得改变核心合同已定义语义。
+servers:
+  - url: /api/v2
+security:
+  - cookieAuth: []
+paths:
+  # ── 会话 ──────────────────────────────────────────────
+  /auth/login:
+    post:
+      summary: 邮箱密码登录
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email, password]
+              properties:
+                email: {type: string, format: email}
+                password: {type: string, minLength: 8}
+      responses:
+        '200':
+          description: Session established via cookie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /auth/logout:
+    post:
+      summary: 退出登录
+      operationId: logout
+      responses:
+        '204':
+          description: Session cleared
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /auth/me:
+    get:
+      summary: 当前用户
+      operationId: getMe
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  # ── 主页 ──────────────────────────────────────────────
+  /home/overview:
+    get:
+      summary: 主页聚合（继续创作、待处理、最近成果）
+      operationId: getHomeOverview
+      responses:
+        '200':
+          description: Home overview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeOverviewEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  # ── 项目（核心合同） ─────────────────────────────────
+  /projects:
+    get:
+      summary: 查询项目列表
+      operationId: listProjects
+      parameters:
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: Project page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectListEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+    post:
+      summary: 创建单知识点项目
+      operationId: createProject
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}:
+    get:
+      summary: 获取项目详情
+      operationId: getProject
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Project
+          headers:
+            ETag:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+    patch:
+      summary: 更新项目设置
+      operationId: updateProject
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                title: {type: string, minLength: 1}
+                automation_mode:
+                  $ref: '#/components/schemas/AutomationMode'
+      responses:
+        '200':
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/workflow:
+    get:
+      summary: 获取项目工作台聚合状态
+      operationId: getProjectWorkflow
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Aggregated workbench state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/events/stream:
+    get:
+      summary: 订阅项目实时事件
+      operationId: streamProjectEvents
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: Last-Event-ID
+          in: header
+          required: false
+          schema: {type: string}
+      responses:
+        '200':
+          description: Server-sent event stream; data follows sse-event.schema.json
+          content:
+            text/event-stream:
+              schema: {type: string}
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /events/stream:
+    get:
+      summary: 订阅当前用户全局事件
+      operationId: streamUserEvents
+      parameters:
+        - name: Last-Event-ID
+          in: header
+          required: false
+          schema: {type: string}
+      responses:
+        '200':
+          description: Server-sent event stream; data follows sse-event.schema.json
+          content:
+            text/event-stream:
+              schema: {type: string}
+        '4XX':
+          $ref: '#/components/responses/Error'
+  # ── 教材上传与解析 ───────────────────────────────────
+  /projects/{project_id}/upload-sessions:
+    post:
+      summary: 创建教材直传会话
+      operationId: createUploadSession
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [file_name, size_bytes, mime_type]
+              properties:
+                file_name: {type: string, minLength: 1}
+                size_bytes: {type: integer, minimum: 1}
+                mime_type: {type: string, minLength: 1}
+      responses:
+        '201':
+          description: Upload session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadSessionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /upload-sessions/{upload_session_id}/complete:
+    post:
+      summary: 直传完成，触发扫描与解析
+      operationId: completeUploadSession
+      parameters:
+        - name: upload_session_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [size_bytes]
+              properties:
+                size_bytes: {type: integer, minimum: 1}
+                sha256: {type: [string, 'null']}
+      responses:
+        '202':
+          $ref: '#/components/responses/AcceptedJob'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/material:
+    get:
+      summary: 教材与解析证据
+      operationId: getProjectMaterial
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Material state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/material/confirm-scope:
+    post:
+      summary: 教师确认教材范围
+      operationId: confirmMaterialScope
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                note: {type: [string, 'null']}
+      responses:
+        '200':
+          description: Scope confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  # ── 课时划分与课时 ───────────────────────────────────
+  /projects/{project_id}/lesson-division:
+    get:
+      summary: 课时划分草稿
+      operationId: getLessonDivision
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Division draft
+          headers:
+            ETag:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonDivisionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+    put:
+      summary: 保存课时划分草稿（增删排序）
+      operationId: updateLessonDivision
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [entries]
+              properties:
+                entries:
+                  type: array
+                  minItems: 1
+                  items:
+                    $ref: '#/components/schemas/LessonDivisionEntryInput'
+      responses:
+        '200':
+          description: Division draft saved
+          headers:
+            ETag:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonDivisionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/lesson-division/approve:
+    post:
+      summary: 批准课时划分并创建课时
+      operationId: approveLessonDivision
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Division approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonDivisionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/lessons:
+    get:
+      summary: 项目课时列表
+      operationId: listLessons
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Lessons
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonListEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /lessons/{lesson_id}:
+    get:
+      summary: 课时详情与分支状态
+      operationId: getLesson
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Lesson
+          headers:
+            ETag:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+    patch:
+      summary: 启用或停用可选分支
+      operationId: updateLesson
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                ppt_enabled: {type: boolean}
+                video_enabled: {type: boolean}
+                intro_enabled: {type: boolean}
+      responses:
+        '200':
+          description: Lesson updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /lessons/{lesson_id}/node-runs:
+    get:
+      summary: 课时工作台步骤列表
+      operationId: listLessonNodeRuns
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Node runs of the lesson
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeRunListEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  # ── 节点运行（核心合同 + 扩展） ──────────────────────
+  /node-runs/{node_run_id}:
+    get:
+      summary: 节点运行详情（当前作品、任务、校验、版本）
+      operationId: getNodeRun
+      parameters:
+        - $ref: '#/components/parameters/NodeRunId'
+      responses:
+        '200':
+          description: Node run detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeRunDetailEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /node-runs/{node_run_id}/prompt-preview:
+    get:
+      summary: 获取节点最终业务提示词预览
+      operationId: getPromptPreview
+      parameters:
+        - $ref: '#/components/parameters/NodeRunId'
+      responses:
+        '200':
+          description: Editable business prompt and locked layer summaries
+          headers:
+            ETag:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromptPreviewEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /node-runs/{node_run_id}/prompt:
+    put:
+      summary: 保存教师修改后的业务提示词
+      operationId: savePromptRevision
+      parameters:
+        - $ref: '#/components/parameters/NodeRunId'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [editable_prompt]
+              properties:
+                editable_prompt: {type: string, minLength: 1}
+      responses:
+        '200':
+          description: New prompt revision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromptRevisionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /node-runs/{node_run_id}/start:
+    post:
+      summary: 启动节点运行
+      operationId: startNodeRun
+      parameters:
+        - $ref: '#/components/parameters/NodeRunId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prompt_revision_id: {type: string, format: uuid}
+      responses:
+        '202':
+          $ref: '#/components/responses/AcceptedJob'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /node-runs/{node_run_id}/transitions:
+    post:
+      summary: 跳过、恢复、采用旧版或确认过期
+      operationId: transitionNodeRun
+      parameters:
+        - $ref: '#/components/parameters/NodeRunId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [action]
+              properties:
+                action: {enum: [skip, resume, keep_current_version, acknowledge_stale]}
+                reason: {type: [string, 'null']}
+      responses:
+        '200':
+          description: Node run after transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeRunEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /node-runs/{node_run_id}/creation-packages:
+    post:
+      summary: 从项目节点创建不可变创作包
+      operationId: createCreationPackage
+      parameters:
+        - $ref: '#/components/parameters/NodeRunId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Immutable package created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data:
+                    $ref: '../../../contracts/creation-package.schema.json'
+                  request_id: {type: string}
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /node-runs/{node_run_id}/results:
+    get:
+      summary: 节点候选结果（封面、镜头、页面）
+      operationId: listNodeRunResults
+      parameters:
+        - $ref: '#/components/parameters/NodeRunId'
+        - name: item_key
+          in: query
+          required: false
+          schema: {type: string}
+      responses:
+        '200':
+          description: Generation results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationResultListEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  # ── 作品版本 ─────────────────────────────────────────
+  /artifact-versions/{artifact_version_id}:
+    get:
+      summary: 作品版本内容
+      operationId: getArtifactVersion
+      parameters:
+        - $ref: '#/components/parameters/ArtifactVersionId'
+      responses:
+        '200':
+          description: Artifact version
+          headers:
+            ETag:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactVersionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /artifact-versions/{artifact_version_id}/content:
+    put:
+      summary: 保存教师直接编辑的内容
+      operationId: updateArtifactContent
+      parameters:
+        - $ref: '#/components/parameters/ArtifactVersionId'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [content]
+              properties:
+                content: {type: object, additionalProperties: true}
+      responses:
+        '200':
+          description: Content saved
+          headers:
+            ETag:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactVersionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /artifact-versions/{artifact_version_id}/approve:
+    post:
+      summary: 批准作品版本
+      operationId: approveArtifactVersion
+      parameters:
+        - $ref: '#/components/parameters/ArtifactVersionId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                note: {type: [string, 'null']}
+                acknowledged_warning_keys:
+                  type: array
+                  items: {type: string}
+                acknowledgement_note: {type: [string, 'null']}
+      responses:
+        '200':
+          description: Approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactVersionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /artifact-versions/{artifact_version_id}/request-changes:
+    post:
+      summary: 提出修改并局部返修
+      operationId: requestArtifactChanges
+      parameters:
+        - $ref: '#/components/parameters/ArtifactVersionId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [instruction]
+              properties:
+                instruction: {type: string, minLength: 1}
+                scope_keys:
+                  type: array
+                  items: {type: string}
+      responses:
+        '202':
+          $ref: '#/components/responses/AcceptedJob'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  # ── 三类九套（核心合同 + 扩展） ──────────────────────
+  /lessons/{lesson_id}/intro-options:
+    get:
+      summary: 获取课时三类九套导入设计
+      operationId: getLessonIntroOptions
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Three categories and nine approved or draft introduction options
+          headers:
+            ETag:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data:
+                    $ref: '../../../contracts/intro-option-set.schema.json'
+                  request_id: {type: string}
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /lessons/{lesson_id}/intro-options/{option_key}:
+    patch:
+      summary: 修改某套方案的允许字段
+      operationId: updateIntroOption
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - name: option_key
+          in: path
+          required: true
+          schema: {type: string}
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                title: {type: string, minLength: 1}
+                independent_concept: {type: string, minLength: 1}
+                hook: {type: string, minLength: 1}
+                course_anchor: {type: string, minLength: 1}
+                classroom_first_question: {type: string, minLength: 1}
+                handoff_moment: {type: string, minLength: 1}
+                must_not_preteach:
+                  type: array
+                  items: {type: string, minLength: 1}
+      responses:
+        '200':
+          description: Updated option set
+          headers:
+            ETag:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data:
+                    $ref: '../../../contracts/intro-option-set.schema.json'
+                  request_id: {type: string}
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /lessons/{lesson_id}/intro-selections:
+    post:
+      summary: 选择一个课堂导入方案
+      operationId: selectLessonIntroOption
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [intro_option_set_version_id, option_key]
+              properties:
+                intro_option_set_version_id: {type: string, format: uuid}
+                option_key: {type: string}
+      responses:
+        '201':
+          description: Immutable active selection created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntroSelectionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /lessons/{lesson_id}/intro-selections/current:
+    get:
+      summary: 当前生效的导入方案选择
+      operationId: getCurrentIntroSelection
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Current selection or null
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data:
+                    oneOf:
+                      - $ref: '#/components/schemas/IntroSelection'
+                      - type: 'null'
+                  request_id: {type: string}
+        '4XX':
+          $ref: '#/components/responses/Error'
+  # ── PPT 页级 ─────────────────────────────────────────
+  /lessons/{lesson_id}/ppt-pages:
+    get:
+      summary: PPT 页面清单（含运行态）
+      operationId: listPptPages
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Page list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PptPageListEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /ppt-pages/{page_id}:
+    get:
+      summary: 单页四层规格与预览
+      operationId: getPptPage
+      parameters:
+        - $ref: '#/components/parameters/PptPageId'
+      responses:
+        '200':
+          description: Page detail
+          headers:
+            ETag:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PptPageEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+    put:
+      summary: 保存单页可编辑内容
+      operationId: updatePptPage
+      parameters:
+        - $ref: '#/components/parameters/PptPageId'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [spec]
+              properties:
+                spec:
+                  $ref: '../../../contracts/ppt-page-spec.schema.json'
+      responses:
+        '200':
+          description: Page saved
+          headers:
+            ETag:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PptPageEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /ppt-pages/{page_id}/regenerate:
+    post:
+      summary: 重新生成单页
+      operationId: regeneratePptPage
+      parameters:
+        - $ref: '#/components/parameters/PptPageId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                instruction: {type: [string, 'null']}
+      responses:
+        '202':
+          $ref: '#/components/responses/AcceptedJob'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /lessons/{lesson_id}/ppt-style-contract:
+    get:
+      summary: 整套 PPT 视觉合同
+      operationId: getPptStyleContract
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Style contract or null before cover approval
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data:
+                    oneOf:
+                      - $ref: '#/components/schemas/PptStyleContract'
+                      - type: 'null'
+                  request_id: {type: string}
+        '4XX':
+          $ref: '#/components/responses/Error'
+  # ── 视频 ─────────────────────────────────────────────
+  /lessons/{lesson_id}/video-project:
+    get:
+      summary: 视频项目状态（快照、风格合同、时间线）
+      operationId: getVideoProject
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Video project or null before intro selection
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data:
+                    oneOf:
+                      - $ref: '#/components/schemas/VideoProject'
+                      - type: 'null'
+                  request_id: {type: string}
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /video-projects/{video_project_id}/shots:
+    get:
+      summary: 细分镜与镜头运行态
+      operationId: listVideoShots
+      parameters:
+        - $ref: '#/components/parameters/VideoProjectId'
+      responses:
+        '200':
+          description: Shots
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoShotListEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /video-shots/{shot_id}:
+    put:
+      summary: 修改单个镜头合同
+      operationId: updateVideoShot
+      parameters:
+        - name: shot_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [shot]
+              properties:
+                shot:
+                  $ref: '../../../contracts/video-shot.schema.json'
+      responses:
+        '200':
+          description: Shot saved
+          headers:
+            ETag:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoShotEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /video-shots/{shot_id}/generate:
+    post:
+      summary: 为单个镜头生成候选片段
+      operationId: generateVideoShot
+      parameters:
+        - name: shot_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          $ref: '#/components/responses/AcceptedJob'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  # ── 通用创作中心（核心合同 + 扩展） ──────────────────
+  /creation-packages/{package_id}:
+    get:
+      summary: 读取不可变创作包
+      operationId: getCreationPackage
+      parameters:
+        - name: package_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Creation package
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data:
+                    $ref: '../../../contracts/creation-package.schema.json'
+                  request_id: {type: string}
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /creation-batches:
+    get:
+      summary: 我的创作批次
+      operationId: listCreationBatches
+      parameters:
+        - name: studio_type
+          in: query
+          required: false
+          schema: {enum: [image, video, presentation]}
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: Batches
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreationBatchListEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+    post:
+      summary: 创建通用创作批次
+      operationId: createCreationBatch
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [studio_type, title]
+              properties:
+                studio_type: {enum: [image, video, presentation]}
+                title: {type: string, minLength: 1}
+                creation_package_id: {type: [string, 'null'], format: uuid}
+      responses:
+        '201':
+          description: Creation batch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreationBatchEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /creation-batches/{batch_id}:
+    get:
+      summary: 批次详情（任务项与状态）
+      operationId: getCreationBatch
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+      responses:
+        '200':
+          description: Batch detail
+          headers:
+            ETag:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreationBatchEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /creation-batches/{batch_id}/items/{item_key}:
+    patch:
+      summary: 编辑批次内单项生成要求
+      operationId: updateCreationBatchItem
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - name: item_key
+          in: path
+          required: true
+          schema: {type: string}
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                title: {type: string, minLength: 1}
+                prompt: {type: object, additionalProperties: true}
+                output_spec: {type: object, additionalProperties: true}
+                reference_assets:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [asset_version_id, role]
+                    properties:
+                      asset_version_id: {type: string, format: uuid}
+                      role: {type: string}
+      responses:
+        '200':
+          description: Batch after item update
+          headers:
+            ETag:
+              schema: {type: string}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreationBatchEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /creation-batches/{batch_id}/generate:
+    post:
+      summary: 批量生成创作候选
+      operationId: generateCreationBatch
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [item_ids]
+              properties:
+                item_ids:
+                  type: array
+                  minItems: 1
+                  uniqueItems: true
+                  items: {type: string, format: uuid}
+      responses:
+        '202':
+          $ref: '#/components/responses/AcceptedJob'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /creation-batches/{batch_id}/results:
+    get:
+      summary: 批次候选结果
+      operationId: listCreationBatchResults
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - name: item_key
+          in: query
+          required: false
+          schema: {type: string}
+      responses:
+        '200':
+          description: Generation results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationResultListEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /generation-results/{result_id}/save-to-project:
+    post:
+      summary: 将候选结果保存到指定项目
+      operationId: saveGenerationResultToProject
+      parameters:
+        - name: result_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [project_id, slot_key, replace_mode]
+              properties:
+                project_id: {type: string, format: uuid}
+                slot_key: {type: string, minLength: 1}
+                replace_mode: {enum: [reject_if_occupied, replace_active, append]}
+      responses:
+        '200':
+          description: Result saved atomically
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaveOperationEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /generation-results/{result_id}/download:
+    post:
+      summary: 申请候选结果短期下载地址
+      operationId: downloadGenerationResult
+      parameters:
+        - name: result_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '201':
+          description: Short-lived download URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  # ── 任务中心 ─────────────────────────────────────────
+  /generation-jobs:
+    get:
+      summary: 我的生成任务
+      operationId: listGenerationJobs
+      parameters:
+        - name: project_id
+          in: query
+          required: false
+          schema: {type: string, format: uuid}
+        - name: active
+          in: query
+          required: false
+          schema: {type: boolean}
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: Jobs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationJobListEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /generation-jobs/{job_id}:
+    get:
+      summary: 任务详情
+      operationId: getGenerationJob
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationJobEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /generation-jobs/{job_id}/cancel:
+    post:
+      summary: 取消任务
+      operationId: cancelGenerationJob
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          $ref: '#/components/responses/AcceptedJob'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /generation-jobs/{job_id}/retry:
+    post:
+      summary: 失败任务重试
+      operationId: retryGenerationJob
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                item_keys:
+                  type: array
+                  items: {type: string}
+      responses:
+        '202':
+          $ref: '#/components/responses/AcceptedJob'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /generation-jobs/{job_id}/events/stream:
+    get:
+      summary: 订阅单任务事件
+      operationId: streamJobEvents
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - name: Last-Event-ID
+          in: header
+          required: false
+          schema: {type: string}
+      responses:
+        '200':
+          description: Server-sent event stream; data follows sse-event.schema.json
+          content:
+            text/event-stream:
+              schema: {type: string}
+        '4XX':
+          $ref: '#/components/responses/Error'
+  # ── 素材成果与交付 ───────────────────────────────────
+  /projects/{project_id}/assets:
+    get:
+      summary: 项目素材与成果
+      operationId: listProjectAssets
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: kind
+          in: query
+          required: false
+          schema: {enum: [image, video_clip, audio, subtitle, document, ppt_page]}
+        - name: lesson_id
+          in: query
+          required: false
+          schema: {type: string, format: uuid}
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: Assets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetListEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /asset-versions/{asset_version_id}/download:
+    post:
+      summary: 申请素材短期下载地址
+      operationId: downloadAssetVersion
+      parameters:
+        - name: asset_version_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '201':
+          description: Short-lived download URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/delivery:
+    get:
+      summary: 项目交付状态
+      operationId: getProjectDelivery
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Delivery state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/delivery/package:
+    post:
+      summary: 生成交付包
+      operationId: packageProjectDelivery
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          $ref: '#/components/responses/AcceptedJob'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  # ── 预算与自动化 ─────────────────────────────────────
+  /projects/{project_id}/budget-authorizations:
+    post:
+      summary: 授权继续消费预算
+      operationId: authorizeProjectBudget
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [max_minor_units]
+              properties:
+                max_minor_units: {type: integer, minimum: 0}
+                reason: {type: [string, 'null']}
+      responses:
+        '201':
+          description: Budget authorization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetAuthorizationEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/automation/resume:
+    post:
+      summary: 恢复被暂停的自动执行
+      operationId: resumeProjectAutomation
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          $ref: '#/components/responses/AcceptedJob'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  # ── 管理端 ───────────────────────────────────────────
+  /admin/content-packages:
+    get:
+      summary: 内容包列表
+      operationId: listContentPackages
+      parameters:
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: Content packages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentPackageListEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+    post:
+      summary: 导入内容包并触发系统检查
+      operationId: importContentPackage
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [title, domain, definition]
+              properties:
+                title: {type: string, minLength: 1}
+                domain: {enum: [lesson_plan, intro_options, ppt, video, quality, style, prompt]}
+                definition:
+                  $ref: '../../../contracts/content-definition.schema.json'
+      responses:
+        '202':
+          $ref: '#/components/responses/AcceptedJob'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /admin/content-packages/{content_package_id}:
+    get:
+      summary: 内容包详情（内容、结构预览、测试案例、版本、使用情况）
+      operationId: getContentPackage
+      parameters:
+        - $ref: '#/components/parameters/ContentPackageId'
+      responses:
+        '200':
+          description: Content package detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentPackageEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /admin/content-packages/{content_package_id}/dry-run:
+    post:
+      summary: 内容包试运行
+      operationId: dryRunContentPackage
+      parameters:
+        - $ref: '#/components/parameters/ContentPackageId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          $ref: '#/components/responses/AcceptedJob'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /admin/content-packages/{content_package_id}/publish:
+    post:
+      summary: 发布内容包新版本
+      operationId: publishContentPackage
+      parameters:
+        - $ref: '#/components/parameters/ContentPackageId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Published version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentPackageEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /admin/workflows:
+    get:
+      summary: 工作流列表
+      operationId: listWorkflows
+      responses:
+        '200':
+          description: Workflows
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminWorkflowListEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /admin/workflows/{workflow_id}:
+    get:
+      summary: 工作流步骤编排详情
+      operationId: getWorkflow
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Workflow detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminWorkflowEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /admin/model-services/overview:
+    get:
+      summary: 模型服务总览
+      operationId: getModelServiceOverview
+      responses:
+        '200':
+          description: Overview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelServiceOverviewEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /admin/providers:
+    get:
+      summary: 模型供应商（密钥仅状态与尾号）
+      operationId: listProviders
+      responses:
+        '200':
+          description: Providers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderListEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /admin/providers/{provider_id}:
+    patch:
+      summary: 更新供应商配置（密钥只写不读）
+      operationId: updateProvider
+      parameters:
+        - $ref: '#/components/parameters/ProviderId'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                display_name: {type: string, minLength: 1}
+                base_url: {type: string, minLength: 1}
+                secret:
+                  type: string
+                  minLength: 8
+                  description: 只写字段；任何响应不得回显。
+                enabled: {type: boolean}
+      responses:
+        '200':
+          description: Provider updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /admin/providers/{provider_id}/test:
+    post:
+      summary: 发起连接测试
+      operationId: testProvider
+      parameters:
+        - $ref: '#/components/parameters/ProviderId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          $ref: '#/components/responses/AcceptedJob'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /admin/models:
+    get:
+      summary: 模型目录与能力主备
+      operationId: listModels
+      responses:
+        '200':
+          description: Model catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelCatalogEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /admin/usage/overview:
+    get:
+      summary: 运行与费用总览
+      operationId: getUsageOverview
+      responses:
+        '200':
+          description: Usage overview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageOverviewEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /admin/model-runs:
+    get:
+      summary: 模型调用记录
+      operationId: listModelRuns
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: {enum: [succeeded, failed, running]}
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: Model runs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelRunListEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /admin/users:
+    get:
+      summary: 用户与角色
+      operationId: listUsers
+      parameters:
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: Users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserListEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /admin/audit-events:
+    get:
+      summary: 审计记录
+      operationId: listAuditEvents
+      parameters:
+        - name: action
+          in: query
+          required: false
+          schema: {type: string}
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: Audit events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEventListEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: shanhai_session
+  parameters:
+    ProjectId:
+      name: project_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    NodeRunId:
+      name: node_run_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    LessonId:
+      name: lesson_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    BatchId:
+      name: batch_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    JobId:
+      name: job_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    ArtifactVersionId:
+      name: artifact_version_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    PptPageId:
+      name: page_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    VideoProjectId:
+      name: video_project_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    ContentPackageId:
+      name: content_package_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    ProviderId:
+      name: provider_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: {type: string, minLength: 8, maxLength: 128}
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      schema: {type: string}
+    PageCursor:
+      name: page[cursor]
+      in: query
+      required: false
+      schema: {type: string}
+    PageLimit:
+      name: page[limit]
+      in: query
+      required: false
+      schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+  responses:
+    Error:
+      description: Error envelope
+      content:
+        application/json:
+          schema:
+            $ref: '../../../contracts/error-envelope.schema.json'
+    AcceptedJob:
+      description: Long-running job accepted
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AcceptedJobEnvelope'
+  schemas:
+    AutomationMode:
+      type: string
+      enum: [manual, assisted, automatic]
+    NodeStatus:
+      $ref: '../../../contracts/workflow-node-status.schema.json'
+    User:
+      type: object
+      required: [id, name, email, roles]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        email: {type: string, format: email}
+        roles:
+          type: array
+          items: {enum: [teacher, content_admin, model_admin, system_admin]}
+    SessionEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [user]
+          properties:
+            user: {$ref: '#/components/schemas/User'}
+        request_id: {type: string}
+    HomeOverviewEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [is_new_user, continue_items, pending_actions, recent_artifacts, running_jobs]
+          properties:
+            is_new_user: {type: boolean}
+            continue_items:
+              type: array
+              items:
+                type: object
+                required: [project_id, project_title, next_action, next_url]
+                properties:
+                  project_id: {type: string, format: uuid}
+                  project_title: {type: string}
+                  lesson_id: {type: [string, 'null'], format: uuid}
+                  lesson_title: {type: [string, 'null']}
+                  next_action: {type: string}
+                  next_url: {type: string}
+                  progress_summary: {type: [string, 'null']}
+                  cover_asset_url: {type: [string, 'null']}
+                  updated_at: {type: string, format: date-time}
+            pending_actions:
+              type: array
+              items:
+                type: object
+                required: [kind, title, url]
+                properties:
+                  kind: {enum: [review_required, cover_selection, shot_failed, delivery_ready, budget_pause, stale_content]}
+                  title: {type: string}
+                  detail: {type: [string, 'null']}
+                  url: {type: string}
+                  project_title: {type: [string, 'null']}
+                  occurred_at: {type: [string, 'null'], format: date-time}
+            recent_artifacts:
+              type: array
+              items:
+                type: object
+                required: [id, kind, title]
+                properties:
+                  id: {type: string, format: uuid}
+                  kind: {enum: [image, video_clip, ppt_page, document, audio]}
+                  title: {type: string}
+                  preview_url: {type: [string, 'null']}
+                  project_title: {type: [string, 'null']}
+                  url: {type: [string, 'null']}
+            running_jobs:
+              type: array
+              items: {$ref: '#/components/schemas/GenerationJob'}
+        request_id: {type: string}
+    Project:
+      type: object
+      additionalProperties: false
+      required: [id, title, subject, knowledge_point, status, automation_mode, created_at, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        title: {type: string}
+        subject: {const: primary_math}
+        grade: {type: [string, 'null']}
+        textbook_edition: {type: [string, 'null']}
+        knowledge_point: {type: string}
+        status: {enum: [draft, active, archived]}
+        automation_mode:
+          $ref: '#/components/schemas/AutomationMode'
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    ProjectEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/Project'}
+        request_id: {type: string}
+    ProjectListEnvelope:
+      type: object
+      required: [data, meta, request_id]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/Project'}}
+        meta:
+          type: object
+          properties:
+            next_cursor: {type: [string, 'null']}
+        request_id: {type: string}
+    CreateProjectRequest:
+      type: object
+      additionalProperties: false
+      required: [title, knowledge_point]
+      properties:
+        title: {type: string, minLength: 1}
+        knowledge_point: {type: string, minLength: 1}
+        grade: {type: [string, 'null']}
+        textbook_edition: {type: [string, 'null']}
+        automation_mode:
+          $ref: '#/components/schemas/AutomationMode'
+    NodeRun:
+      type: object
+      required: [id, node_key, status]
+      properties:
+        id: {type: string, format: uuid}
+        node_key: {type: string}
+        status: {$ref: '#/components/schemas/NodeStatus'}
+        title: {type: string}
+        lesson_id: {type: [string, 'null'], format: uuid}
+        current_artifact_version_id: {type: [string, 'null'], format: uuid}
+        active_job_id: {type: [string, 'null'], format: uuid}
+        skippable: {type: boolean}
+        stale_reason: {type: [object, 'null']}
+        updated_at: {type: [string, 'null'], format: date-time}
+    NodeRunEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/NodeRun'}
+        request_id: {type: string}
+    NodeRunListEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/NodeRun'}}
+        request_id: {type: string}
+    ValidationIssue:
+      type: object
+      required: [key, severity, message]
+      properties:
+        key: {type: string}
+        severity: {enum: [error, warning, info]}
+        message: {type: string}
+        field_path: {type: [string, 'null']}
+    ArtifactVersion:
+      type: object
+      required: [id, node_run_id, kind, review_status, version_no, content, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        node_run_id: {type: string, format: uuid}
+        kind: {type: string}
+        review_status: {enum: [draft, review_required, approved, rejected, superseded]}
+        version_no: {type: integer, minimum: 1}
+        is_current: {type: boolean}
+        content: {type: object, additionalProperties: true}
+        content_definition_version_id: {type: [string, 'null'], format: uuid}
+        validation_issues:
+          type: array
+          items: {$ref: '#/components/schemas/ValidationIssue'}
+        source: {enum: [generated, teacher_edited, imported]}
+        created_at: {type: string, format: date-time}
+        approved_at: {type: [string, 'null'], format: date-time}
+        approval_note: {type: [string, 'null']}
+    ArtifactVersionEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/ArtifactVersion'}
+        request_id: {type: string}
+    NodeRunDetailEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [node_run, versions]
+          properties:
+            node_run: {$ref: '#/components/schemas/NodeRun'}
+            artifact_version:
+              oneOf:
+                - $ref: '#/components/schemas/ArtifactVersion'
+                - type: 'null'
+            active_job:
+              oneOf:
+                - $ref: '#/components/schemas/GenerationJob'
+                - type: 'null'
+            versions:
+              type: array
+              items:
+                type: object
+                required: [id, version_no, review_status, created_at]
+                properties:
+                  id: {type: string, format: uuid}
+                  version_no: {type: integer}
+                  review_status: {enum: [draft, review_required, approved, rejected, superseded]}
+                  source: {enum: [generated, teacher_edited, imported]}
+                  created_at: {type: string, format: date-time}
+        request_id: {type: string}
+    WorkflowEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [project, lessons, node_runs]
+          properties:
+            project: {$ref: '#/components/schemas/Project'}
+            lessons:
+              type: array
+              items: {$ref: '#/components/schemas/Lesson'}
+            node_runs:
+              type: array
+              items: {$ref: '#/components/schemas/NodeRun'}
+            material:
+              oneOf:
+                - $ref: '#/components/schemas/Material'
+                - type: 'null'
+            automation:
+              oneOf:
+                - $ref: '#/components/schemas/AutomationState'
+                - type: 'null'
+        request_id: {type: string}
+    AutomationState:
+      type: object
+      required: [state]
+      properties:
+        state: {enum: [idle, running, paused]}
+        paused_reason:
+          oneOf:
+            - type: 'null'
+            - enum: [budget_confirmation_required, review_gate, hard_rule, failure]
+        paused_detail: {type: [string, 'null']}
+        pending_estimate:
+          type: [object, 'null']
+          properties:
+            minor_units: {type: integer}
+            currency: {type: string}
+            summary: {type: [string, 'null']}
+        spent_minor_units: {type: [integer, 'null']}
+        budget_minor_units: {type: [integer, 'null']}
+        currency: {type: [string, 'null']}
+    Material:
+      type: object
+      required: [id, project_id, status]
+      properties:
+        id: {type: string, format: uuid}
+        project_id: {type: string, format: uuid}
+        status: {enum: [uploading, scanning, parsing, parsed, scope_confirmed, failed]}
+        file_name: {type: [string, 'null']}
+        page_count: {type: [integer, 'null']}
+        knowledge_scope: {type: [string, 'null']}
+        evidence:
+          type: array
+          items:
+            type: object
+            required: [page_no, summary]
+            properties:
+              page_no: {type: integer}
+              summary: {type: string}
+              excerpt: {type: [string, 'null']}
+        failure_reason: {type: [string, 'null']}
+        uploaded_at: {type: [string, 'null'], format: date-time}
+    MaterialEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [material]
+          properties:
+            material:
+              oneOf:
+                - $ref: '#/components/schemas/Material'
+                - type: 'null'
+        request_id: {type: string}
+    UploadSessionEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [upload_session_id, upload_url, expires_at]
+          properties:
+            upload_session_id: {type: string, format: uuid}
+            upload_url: {type: string}
+            required_headers:
+              type: object
+              additionalProperties: {type: string}
+            expires_at: {type: string, format: date-time}
+        request_id: {type: string}
+    LessonDivisionEntryInput:
+      type: object
+      additionalProperties: false
+      required: [title, focus]
+      properties:
+        entry_id: {type: [string, 'null'], format: uuid}
+        title: {type: string, minLength: 1}
+        focus: {type: string, minLength: 1}
+        duration_minutes: {type: [integer, 'null'], minimum: 5}
+    LessonDivisionEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [status, entries]
+          properties:
+            status: {enum: [not_ready, draft, review_required, approved]}
+            source_evidence_note: {type: [string, 'null']}
+            entries:
+              type: array
+              items:
+                type: object
+                required: [entry_id, position, title, focus]
+                properties:
+                  entry_id: {type: string, format: uuid}
+                  position: {type: integer, minimum: 1}
+                  title: {type: string}
+                  focus: {type: string}
+                  duration_minutes: {type: [integer, 'null']}
+                  lesson_id: {type: [string, 'null'], format: uuid}
+        request_id: {type: string}
+    BranchState:
+      type: object
+      required: [state]
+      properties:
+        state: {enum: [disabled, skipped, not_ready, in_progress, review_required, approved, stale, failed]}
+        summary: {type: [string, 'null']}
+        next_step_key: {type: [string, 'null']}
+    Lesson:
+      type: object
+      required: [id, project_id, position, title, branches]
+      properties:
+        id: {type: string, format: uuid}
+        project_id: {type: string, format: uuid}
+        position: {type: integer, minimum: 1}
+        title: {type: string}
+        focus: {type: [string, 'null']}
+        duration_minutes: {type: [integer, 'null']}
+        branches:
+          type: object
+          required: [lesson_plan, intro_options, ppt, video]
+          properties:
+            lesson_plan: {$ref: '#/components/schemas/BranchState'}
+            intro_options: {$ref: '#/components/schemas/BranchState'}
+            ppt: {$ref: '#/components/schemas/BranchState'}
+            video: {$ref: '#/components/schemas/BranchState'}
+        updated_at: {type: [string, 'null'], format: date-time}
+    LessonEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/Lesson'}
+        request_id: {type: string}
+    LessonListEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/Lesson'}}
+        request_id: {type: string}
+    PromptPreviewEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [editable_prompt, locked_layers, context_summary]
+          properties:
+            editable_prompt: {type: string}
+            prompt_revision_id: {type: [string, 'null'], format: uuid}
+            locked_layers:
+              type: array
+              items:
+                type: object
+                required: [title, summary]
+                properties:
+                  title: {type: string}
+                  summary: {type: string}
+            context_summary:
+              type: array
+              items:
+                type: object
+                required: [title, detail]
+                properties:
+                  title: {type: string}
+                  detail: {type: string}
+            schema: {type: [object, 'null']}
+        request_id: {type: string}
+    PromptRevisionEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [prompt_revision_id, created_at]
+          properties:
+            prompt_revision_id: {type: string, format: uuid}
+            created_at: {type: string, format: date-time}
+        request_id: {type: string}
+    IntroSelection:
+      type: object
+      required: [selection_id, option_set_version_id, option_key, choice_mode, selected_at]
+      properties:
+        selection_id: {type: string, format: uuid}
+        option_set_version_id: {type: string, format: uuid}
+        option_key: {type: string}
+        choice_mode: {enum: [teacher_selected, policy_default]}
+        selected_at: {type: string, format: date-time}
+    IntroSelectionEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/IntroSelection'}
+        request_id: {type: string}
+    AcceptedJobEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [job_id, status, events_url]
+          properties:
+            job_id: {type: string, format: uuid}
+            status: {enum: [created, queued, running]}
+            events_url: {type: string}
+        request_id: {type: string}
+    GenerationJob:
+      type: object
+      required: [id, kind, status, title, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        kind: {type: string}
+        status: {enum: [queued, running, waiting_provider, downloading, partially_completed, completed, failed, cancel_requested, cancelled]}
+        title: {type: string}
+        project_id: {type: [string, 'null'], format: uuid}
+        lesson_id: {type: [string, 'null'], format: uuid}
+        node_run_id: {type: [string, 'null'], format: uuid}
+        batch_id: {type: [string, 'null'], format: uuid}
+        phase_label: {type: [string, 'null']}
+        completed_items: {type: [integer, 'null']}
+        total_items: {type: [integer, 'null']}
+        failed_item_keys:
+          type: array
+          items: {type: string}
+        error:
+          type: [object, 'null']
+          properties:
+            code: {type: string}
+            message: {type: string}
+            retryable: {type: boolean}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: [string, 'null'], format: date-time}
+        finished_at: {type: [string, 'null'], format: date-time}
+    GenerationJobEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/GenerationJob'}
+        request_id: {type: string}
+    GenerationJobListEnvelope:
+      type: object
+      required: [data, meta, request_id]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/GenerationJob'}}
+        meta:
+          type: object
+          properties:
+            next_cursor: {type: [string, 'null']}
+        request_id: {type: string}
+    GenerationResult:
+      type: object
+      required: [id, item_key, media_type, review_state, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        batch_id: {type: [string, 'null'], format: uuid}
+        node_run_id: {type: [string, 'null'], format: uuid}
+        item_key: {type: string}
+        media_type: {enum: [image, video, ppt_page, document, audio]}
+        review_state: {enum: [pending, adopted, discarded]}
+        technical_check: {enum: [passed, failed, pending]}
+        technical_check_detail: {type: [string, 'null']}
+        preview_url: {type: [string, 'null']}
+        duration_seconds: {type: [number, 'null']}
+        width: {type: [integer, 'null']}
+        height: {type: [integer, 'null']}
+        saved_binding_id: {type: [string, 'null'], format: uuid}
+        created_at: {type: string, format: date-time}
+    GenerationResultListEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/GenerationResult'}}
+        request_id: {type: string}
+    CreationBatchItem:
+      type: object
+      required: [id, item_key, position, title, status]
+      properties:
+        id: {type: string, format: uuid}
+        item_key: {type: string}
+        position: {type: integer, minimum: 1}
+        title: {type: string}
+        status: {enum: [draft, ready, queued, running, review_required, adopted, saved, failed]}
+        prompt: {type: object, additionalProperties: true}
+        output_spec: {type: object, additionalProperties: true}
+        reference_assets:
+          type: array
+          items:
+            type: object
+            required: [asset_version_id, role]
+            properties:
+              asset_version_id: {type: string, format: uuid}
+              role: {type: string}
+              preview_url: {type: [string, 'null']}
+        target_slot_key: {type: [string, 'null']}
+        consistency_key: {type: [string, 'null']}
+        adopted_result_id: {type: [string, 'null'], format: uuid}
+        saved_binding_id: {type: [string, 'null'], format: uuid}
+    CreationBatch:
+      type: object
+      required: [id, studio_type, title, status, items]
+      properties:
+        id: {type: string, format: uuid}
+        studio_type: {enum: [image, video, presentation]}
+        title: {type: string}
+        status: {enum: [draft, ready, running, partially_completed, completed, archived]}
+        creation_package_id: {type: [string, 'null'], format: uuid}
+        source_project_id: {type: [string, 'null'], format: uuid}
+        source_project_title: {type: [string, 'null']}
+        default_save_target: {type: [string, 'null']}
+        style_contract: {type: [object, 'null'], additionalProperties: true}
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/CreationBatchItem'}
+        active_job_id: {type: [string, 'null'], format: uuid}
+        created_at: {type: [string, 'null'], format: date-time}
+        updated_at: {type: [string, 'null'], format: date-time}
+    CreationBatchEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/CreationBatch'}
+        request_id: {type: string}
+    CreationBatchListEnvelope:
+      type: object
+      required: [data, meta, request_id]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/CreationBatch'}}
+        meta:
+          type: object
+          properties:
+            next_cursor: {type: [string, 'null']}
+        request_id: {type: string}
+    SaveOperationEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [operation_id, status, binding_id]
+          properties:
+            operation_id: {type: string, format: uuid}
+            status: {const: completed}
+            binding_id: {type: string, format: uuid}
+            clip_id: {type: [string, 'null'], format: uuid}
+            saved_to:
+              type: [object, 'null']
+              properties:
+                project_id: {type: string, format: uuid}
+                project_title: {type: [string, 'null']}
+                slot_key: {type: string}
+                slot_label: {type: [string, 'null']}
+        request_id: {type: string}
+    DownloadEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [url, expires_at]
+          properties:
+            url: {type: string}
+            expires_at: {type: string, format: date-time}
+            file_name: {type: [string, 'null']}
+        request_id: {type: string}
+    PptRuntimePage:
+      type: object
+      required: [page_id, page_key, position, page_type, status]
+      properties:
+        page_id: {type: string, format: uuid}
+        page_key: {type: string}
+        position: {type: integer, minimum: 1}
+        page_type: {type: string}
+        status: {enum: [draft, generating, review_required, approved, stale, failed]}
+        teaching_task: {type: [string, 'null']}
+        preview_url: {type: [string, 'null']}
+        is_stale: {type: boolean}
+        stale_reason: {type: [string, 'null']}
+    PptPageListEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/PptRuntimePage'}}
+        request_id: {type: string}
+    PptPageEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [page, spec]
+          properties:
+            page: {$ref: '#/components/schemas/PptRuntimePage'}
+            spec:
+              $ref: '../../../contracts/ppt-page-spec.schema.json'
+            asset_slots:
+              type: array
+              items:
+                type: object
+                required: [slot_key, status]
+                properties:
+                  slot_key: {type: string}
+                  status: {enum: [empty, pending, filled]}
+                  asset_version_id: {type: [string, 'null'], format: uuid}
+                  preview_url: {type: [string, 'null']}
+        request_id: {type: string}
+    PptStyleContract:
+      type: object
+      required: [id, source_cover_result_id, summary, rules, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        source_cover_result_id: {type: string, format: uuid}
+        summary: {type: string}
+        rules: {type: object, additionalProperties: true}
+        cover_preview_url: {type: [string, 'null']}
+        created_at: {type: string, format: date-time}
+    VideoProject:
+      type: object
+      required: [id, lesson_id, status, intro_snapshot]
+      properties:
+        id: {type: string, format: uuid}
+        lesson_id: {type: string, format: uuid}
+        status: {enum: [active, stale, archived]}
+        intro_snapshot:
+          type: object
+          required: [option_key, title, category]
+          properties:
+            option_key: {type: string}
+            title: {type: string}
+            category: {enum: [science, application, story]}
+            independent_concept: {type: string}
+            hook: {type: string}
+            viewer_value: {type: string}
+            course_anchor: {type: string}
+            classroom_first_question: {type: string}
+            handoff_moment: {type: string}
+            must_not_preteach:
+              type: array
+              items: {type: string}
+            suggested_medium: {type: [string, 'null']}
+            duration_seconds: {type: [integer, 'null']}
+        style_contract:
+          type: [object, 'null']
+          properties:
+            id: {type: string, format: uuid}
+            summary: {type: string}
+            rules: {type: object, additionalProperties: true}
+            master_image_url: {type: [string, 'null']}
+        target_duration_seconds: {type: [integer, 'null']}
+        created_at: {type: [string, 'null'], format: date-time}
+    VideoRuntimeShot:
+      type: object
+      required: [id, shot_key, position, status, shot]
+      properties:
+        id: {type: string, format: uuid}
+        shot_key: {type: string}
+        position: {type: integer, minimum: 1}
+        status: {enum: [draft, ready, generating, review_required, adopted, failed, stale]}
+        shot:
+          $ref: '../../../contracts/video-shot.schema.json'
+        candidate_count: {type: integer, minimum: 0}
+        current_clip:
+          type: [object, 'null']
+          properties:
+            clip_id: {type: string, format: uuid}
+            result_id: {type: string, format: uuid}
+            preview_url: {type: [string, 'null']}
+            saved_at: {type: string, format: date-time}
+        active_job_id: {type: [string, 'null'], format: uuid}
+        failure_reason: {type: [string, 'null']}
+    VideoShotListEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/VideoRuntimeShot'}}
+        request_id: {type: string}
+    VideoShotEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/VideoRuntimeShot'}
+        request_id: {type: string}
+    AssetVersion:
+      type: object
+      required: [id, kind, title, is_current, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        kind: {enum: [image, video_clip, audio, subtitle, document, ppt_page]}
+        title: {type: string}
+        usage_label: {type: [string, 'null']}
+        source_label: {type: [string, 'null']}
+        lesson_id: {type: [string, 'null'], format: uuid}
+        lesson_title: {type: [string, 'null']}
+        slot_key: {type: [string, 'null']}
+        is_current: {type: boolean}
+        preview_url: {type: [string, 'null']}
+        version_no: {type: [integer, 'null']}
+        created_at: {type: string, format: date-time}
+    AssetListEnvelope:
+      type: object
+      required: [data, meta, request_id]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/AssetVersion'}}
+            summary_cards:
+              type: array
+              items:
+                type: object
+                required: [kind, title, status]
+                properties:
+                  kind: {enum: [lesson_plan, ppt, video]}
+                  title: {type: string}
+                  status: {type: string}
+                  preview_url: {type: [string, 'null']}
+                  lesson_id: {type: [string, 'null'], format: uuid}
+        meta:
+          type: object
+          properties:
+            next_cursor: {type: [string, 'null']}
+        request_id: {type: string}
+    DeliveryEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [status, readiness]
+          properties:
+            status: {enum: [not_ready, ready, packaging, packaged, stale]}
+            readiness:
+              type: array
+              items:
+                type: object
+                required: [branch, label, state]
+                properties:
+                  branch: {enum: [lesson_plan, intro_options, ppt, video]}
+                  label: {type: string}
+                  state: {enum: [approved, pending, blocked, disabled, skipped]}
+                  lesson_id: {type: [string, 'null'], format: uuid}
+                  lesson_title: {type: [string, 'null']}
+                  blockers:
+                    type: array
+                    items: {type: string}
+            package:
+              type: [object, 'null']
+              properties:
+                version_no: {type: integer}
+                created_at: {type: string, format: date-time}
+                files:
+                  type: array
+                  items:
+                    type: object
+                    required: [file_key, title, kind, size_bytes]
+                    properties:
+                      file_key: {type: string}
+                      title: {type: string}
+                      kind: {enum: [docx, pdf, pptx, mp4, srt, report, archive]}
+                      size_bytes: {type: integer}
+                      asset_version_id: {type: [string, 'null'], format: uuid}
+        request_id: {type: string}
+    BudgetAuthorizationEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [budget_authorization_id, max_minor_units, created_at]
+          properties:
+            budget_authorization_id: {type: string, format: uuid}
+            max_minor_units: {type: integer}
+            currency: {type: string}
+            created_at: {type: string, format: date-time}
+        request_id: {type: string}
+    ContentPackage:
+      type: object
+      required: [id, title, domain, status, current_version_no, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        title: {type: string}
+        domain: {enum: [lesson_plan, intro_options, ppt, video, quality, style, prompt]}
+        status: {enum: [draft, checking, check_failed, dry_run, published]}
+        current_version_no: {type: integer, minimum: 0}
+        definition_key: {type: [string, 'null']}
+        updated_at: {type: string, format: date-time}
+    ContentPackageListEnvelope:
+      type: object
+      required: [data, meta, request_id]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/ContentPackage'}}
+        meta:
+          type: object
+          properties:
+            next_cursor: {type: [string, 'null']}
+        request_id: {type: string}
+    ContentPackageEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [package]
+          properties:
+            package: {$ref: '#/components/schemas/ContentPackage'}
+            definition:
+              oneOf:
+                - $ref: '../../../contracts/content-definition.schema.json'
+                - type: 'null'
+            validation_issues:
+              type: array
+              items: {$ref: '#/components/schemas/ValidationIssue'}
+            versions:
+              type: array
+              items:
+                type: object
+                required: [version_no, published_at]
+                properties:
+                  version_no: {type: integer}
+                  published_at: {type: string, format: date-time}
+                  note: {type: [string, 'null']}
+            test_cases:
+              type: array
+              items:
+                type: object
+                required: [key, title, status]
+                properties:
+                  key: {type: string}
+                  title: {type: string}
+                  status: {enum: [passed, failed, pending]}
+            usage:
+              type: array
+              items:
+                type: object
+                required: [project_title, version_no]
+                properties:
+                  project_title: {type: string}
+                  version_no: {type: integer}
+        request_id: {type: string}
+    AdminWorkflow:
+      type: object
+      required: [id, key, title, status, node_count, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        key: {type: string}
+        title: {type: string}
+        status: {enum: [draft, published]}
+        version_no: {type: [integer, 'null']}
+        node_count: {type: integer}
+        updated_at: {type: string, format: date-time}
+    AdminWorkflowListEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/AdminWorkflow'}}
+        request_id: {type: string}
+    AdminWorkflowEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [workflow, nodes]
+          properties:
+            workflow: {$ref: '#/components/schemas/AdminWorkflow'}
+            nodes:
+              type: array
+              items:
+                type: object
+                required: [node_key, title, capability]
+                properties:
+                  node_key: {type: string}
+                  title: {type: string}
+                  capability: {type: string}
+                  depends_on:
+                    type: array
+                    items: {type: string}
+                  human_gate: {type: boolean}
+                  skippable: {type: boolean}
+                  context_whitelist:
+                    type: array
+                    items: {type: string}
+                  budget_minor_units: {type: [integer, 'null']}
+                  retry_limit: {type: [integer, 'null']}
+            checks:
+              type: array
+              items: {$ref: '#/components/schemas/ValidationIssue'}
+        request_id: {type: string}
+    ModelServiceOverviewEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [today, backlog_count, degraded]
+          properties:
+            today:
+              type: object
+              required: [run_count, success_rate_percent, cost_minor_units, currency]
+              properties:
+                run_count: {type: integer}
+                success_rate_percent: {type: number}
+                average_duration_ms: {type: [integer, 'null']}
+                cost_minor_units: {type: integer}
+                currency: {type: string}
+            backlog_count: {type: integer}
+            degraded:
+              type: array
+              items:
+                type: object
+                required: [provider_id, provider_name, reason]
+                properties:
+                  provider_id: {type: string, format: uuid}
+                  provider_name: {type: string}
+                  reason: {type: string}
+            capability_primaries:
+              type: array
+              items:
+                type: object
+                required: [capability, provider_name, model_name]
+                properties:
+                  capability: {type: string}
+                  provider_name: {type: string}
+                  model_name: {type: string}
+                  fallback_provider_name: {type: [string, 'null']}
+        request_id: {type: string}
+    Provider:
+      type: object
+      required: [id, display_name, capabilities, enabled, secret_status]
+      properties:
+        id: {type: string, format: uuid}
+        display_name: {type: string}
+        capabilities:
+          type: array
+          items: {enum: [text, image, video, tts, layout]}
+        base_url: {type: [string, 'null']}
+        enabled: {type: boolean}
+        secret_status: {enum: [configured, missing, expiring]}
+        secret_tail: {type: [string, 'null'], maxLength: 6}
+        last_test:
+          type: [object, 'null']
+          properties:
+            status: {enum: [passed, failed]}
+            tested_at: {type: string, format: date-time}
+            detail: {type: [string, 'null']}
+        updated_at: {type: [string, 'null'], format: date-time}
+    ProviderEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/Provider'}
+        request_id: {type: string}
+    ProviderListEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/Provider'}}
+        request_id: {type: string}
+    ModelCatalogEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                required: [id, provider_id, provider_name, capability, model_name, role]
+                properties:
+                  id: {type: string, format: uuid}
+                  provider_id: {type: string, format: uuid}
+                  provider_name: {type: string}
+                  capability: {enum: [text, image, video, tts, layout]}
+                  model_name: {type: string}
+                  role: {enum: [primary, fallback, disabled]}
+                  concurrency_limit: {type: [integer, 'null']}
+                  timeout_ms: {type: [integer, 'null']}
+                  unit_cost_label: {type: [string, 'null']}
+        request_id: {type: string}
+    UsageOverviewEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [daily, alerts]
+          properties:
+            daily:
+              type: array
+              items:
+                type: object
+                required: [date, run_count, cost_minor_units]
+                properties:
+                  date: {type: string, format: date}
+                  run_count: {type: integer}
+                  failed_count: {type: [integer, 'null']}
+                  cost_minor_units: {type: integer}
+            currency: {type: string}
+            alerts:
+              type: array
+              items:
+                type: object
+                required: [kind, message]
+                properties:
+                  kind: {enum: [backlog, failure_rate, cost_anomaly, provider_degraded]}
+                  message: {type: string}
+                  action_url: {type: [string, 'null']}
+        request_id: {type: string}
+    ModelRunListEnvelope:
+      type: object
+      required: [data, meta, request_id]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                required: [id, capability, provider_name, status, started_at]
+                properties:
+                  id: {type: string, format: uuid}
+                  capability: {type: string}
+                  provider_name: {type: string}
+                  model_name: {type: [string, 'null']}
+                  status: {enum: [succeeded, failed, running]}
+                  duration_ms: {type: [integer, 'null']}
+                  cost_minor_units: {type: [integer, 'null']}
+                  project_title: {type: [string, 'null']}
+                  error_code: {type: [string, 'null']}
+                  started_at: {type: string, format: date-time}
+        meta:
+          type: object
+          properties:
+            next_cursor: {type: [string, 'null']}
+        request_id: {type: string}
+    AdminUserListEnvelope:
+      type: object
+      required: [data, meta, request_id]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                required: [id, name, email, roles, status]
+                properties:
+                  id: {type: string, format: uuid}
+                  name: {type: string}
+                  email: {type: string}
+                  roles:
+                    type: array
+                    items: {enum: [teacher, content_admin, model_admin, system_admin]}
+                  status: {enum: [active, disabled]}
+                  last_active_at: {type: [string, 'null'], format: date-time}
+        meta:
+          type: object
+          properties:
+            next_cursor: {type: [string, 'null']}
+        request_id: {type: string}
+    AuditEventListEnvelope:
+      type: object
+      required: [data, meta, request_id]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                required: [id, actor_name, action, resource_label, occurred_at]
+                properties:
+                  id: {type: string, format: uuid}
+                  actor_name: {type: string}
+                  action: {type: string}
+                  resource_label: {type: string}
+                  detail: {type: [string, 'null']}
+                  occurred_at: {type: string, format: date-time}
+        meta:
+          type: object
+          properties:
+            next_cursor: {type: [string, 'null']}
+        request_id: {type: string}
