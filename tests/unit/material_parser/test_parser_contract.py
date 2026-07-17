@@ -44,3 +44,12 @@ def test_fake_parser_exposes_stable_error_codes(tmp_path: Path) -> None:
         parser.parse(tmp_path / "ignored.pdf", source(), ParseLimits())
 
     assert error.value.code == "PDF_PARSE_TIMEOUT"
+
+
+def test_fake_parser_limits_text_block_count(tmp_path: Path) -> None:
+    parser = FakeMaterialParser(page_texts=("First", "Second"))
+
+    with pytest.raises(MaterialParserError) as error:
+        parser.parse(tmp_path / "ignored.pdf", source(), ParseLimits(max_text_blocks=1))
+
+    assert error.value.code == "PDF_TEXT_BLOCK_LIMIT_EXCEEDED"

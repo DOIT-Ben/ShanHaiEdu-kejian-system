@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     worker_lease_seconds: int = Field(default=60, ge=5, le=3600)
     material_parse_max_pages: int = Field(default=500, ge=1, le=5_000)
     material_parse_max_text_chars: int = Field(default=5_000_000, ge=1)
+    material_parse_max_text_blocks: int = Field(default=100_000, ge=1)
     material_parse_max_image_references: int = Field(default=10_000, ge=1)
     material_parse_timeout_seconds: float = Field(default=30, gt=0, le=300)
     outbox_retry_seconds: int = Field(default=5, ge=1, le=300)

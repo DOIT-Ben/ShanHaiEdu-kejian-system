@@ -24,6 +24,7 @@ class ParseLimits:
     max_file_bytes: int = 52_428_800
     max_pages: int = 500
     max_text_chars: int = 5_000_000
+    max_text_blocks: int = 100_000
     max_image_references: int = 10_000
     timeout_seconds: float = 30.0
 
@@ -33,6 +34,7 @@ class ParseLimits:
                 self.max_file_bytes,
                 self.max_pages,
                 self.max_text_chars,
+                self.max_text_blocks,
                 self.max_image_references,
             )
             <= 0
@@ -104,6 +106,8 @@ class FakeMaterialParser:
             raise MaterialParserError("PDF_PAGE_LIMIT_EXCEEDED")
         if sum(map(len, self._page_texts)) > limits.max_text_chars:
             raise MaterialParserError("PDF_TEXT_LIMIT_EXCEEDED")
+        if sum(bool(text) for text in self._page_texts) > limits.max_text_blocks:
+            raise MaterialParserError("PDF_TEXT_BLOCK_LIMIT_EXCEEDED")
         pages = [
             {
                 "page_number": page_number,

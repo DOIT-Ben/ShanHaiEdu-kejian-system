@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import tempfile
 from dataclasses import dataclass
+from math import ceil
 from pathlib import Path
 from uuid import UUID
 
@@ -66,13 +67,22 @@ class MaterialParseJobRunner:
         if terminal_status is not None:
             return terminal_status
         try:
-            self._update_progress(
+            self._validate_parse_input(parse_input.version)
+            progress_state = self._update_progress(
                 job_id,
                 worker_id=worker_id,
                 actor=actor,
                 progress_percent=20,
                 message="Downloading confirmed material PDF",
             )
+            if progress_state != "active":
+                return self._stop_inactive_execution(
+                    progress_state,
+                    job_id=job_id,
+                    parse_id=parse_id,
+                    worker_id=worker_id,
+                    actor=actor,
+                )
             with tempfile.TemporaryDirectory(
                 prefix="shanhai-material-parse-",
                 dir=self._temp_root,
@@ -84,13 +94,21 @@ class MaterialParseJobRunner:
                     destination=local_path,
                     max_bytes=self._limits.max_file_bytes,
                 )
-                self._update_progress(
+                progress_state = self._update_progress(
                     job_id,
                     worker_id=worker_id,
                     actor=actor,
                     progress_percent=45,
                     message="Parsing material PDF in an isolated process",
                 )
+                if progress_state != "active":
+                    return self._stop_inactive_execution(
+                        progress_state,
+                        job_id=job_id,
+                        parse_id=parse_id,
+                        worker_id=worker_id,
+                        actor=actor,
+                    )
                 result = self._parser.parse(
                     local_path,
                     MaterialParseSource(
@@ -135,6 +153,13 @@ class MaterialParseJobRunner:
             result=result,
         )
 
+    def _validate_parse_input(self, version: FileAssetVersion) -> None:
+        media_type = version.mime_type.lower().split(";", maxsplit=1)[0].strip()
+        if media_type != "application/pdf":
+            raise MaterialParserError("PDF_MIME_UNSUPPORTED")
+        if version.byte_size > self._limits.max_file_bytes:
+            raise MaterialParserError("PDF_SIZE_LIMIT_EXCEEDED")
+
     def _actor_for_job(self, job_id: UUID) -> ActorContext | None:
         with self._factory() as session:
             organization_id = session.scalar(
@@ -154,7 +179,10 @@ class MaterialParseJobRunner:
             claimed = jobs.claim(
                 job_id,
                 worker_id=worker_id,
-                lease_seconds=self._settings.worker_lease_seconds,
+                lease_seconds=max(
+                    self._settings.worker_lease_seconds,
+                    ceil(self._limits.timeout_seconds) + 30,
+                ),
             )
             if claimed is None:
                 return None
@@ -208,14 +236,41 @@ class MaterialParseJobRunner:
         actor: ActorContext,
         progress_percent: int,
         message: str,
-    ) -> None:
+    ) -> str:
         with self._factory() as session, session.begin():
-            self._jobs(session, actor).update_progress(
+            updated = self._jobs(session, actor).update_progress(
                 job_id,
                 worker_id=worker_id,
                 progress_percent=progress_percent,
                 message=message,
             )
+            if updated is not None:
+                return "cancelled" if updated.status == "cancel_requested" else "active"
+            persisted = session.get(GenerationJob, job_id)
+            if persisted is not None and (
+                persisted.status == "cancel_requested" or persisted.cancel_requested_at is not None
+            ):
+                return "cancelled"
+            return "lost"
+
+    def _stop_inactive_execution(
+        self,
+        state: str,
+        *,
+        job_id: UUID,
+        parse_id: UUID,
+        worker_id: str,
+        actor: ActorContext,
+    ) -> str:
+        if state == "cancelled":
+            return self._record_failure(
+                job_id,
+                parse_id=parse_id,
+                worker_id=worker_id,
+                actor=actor,
+                error_code="PDF_PARSE_CANCELLED",
+            )
+        return "ignored"
 
     def _record_success(
         self,
@@ -244,6 +299,8 @@ class MaterialParseJobRunner:
                     )
                 self._jobs(session, actor).complete(job_id, worker_id=worker_id)
                 return "cancelled"
+            if job.status != "running" or job.lease_owner != worker_id:
+                return "ignored"
             if parse.status == "running":
                 MaterialParseService(session, actor).complete(
                     parse_id,
@@ -270,6 +327,8 @@ class MaterialParseJobRunner:
             if job is None or parse is None:
                 raise RuntimeError("material parse execution state disappeared")
             cancelled = job.status == "cancel_requested" or job.cancel_requested_at is not None
+            if not cancelled and (job.status != "running" or job.lease_owner != worker_id):
+                return "ignored"
             persisted_error = "PDF_PARSE_CANCELLED" if cancelled else error_code
             if parse.status == "running":
                 MaterialParseService(session, actor).fail(
@@ -309,6 +368,7 @@ def run_material_parse_job(job_id: UUID, *, worker_id: str) -> str:
                 max_file_bytes=settings.max_upload_size_bytes,
                 max_pages=settings.material_parse_max_pages,
                 max_text_chars=settings.material_parse_max_text_chars,
+                max_text_blocks=settings.material_parse_max_text_blocks,
                 max_image_references=settings.material_parse_max_image_references,
                 timeout_seconds=settings.material_parse_timeout_seconds,
             ),

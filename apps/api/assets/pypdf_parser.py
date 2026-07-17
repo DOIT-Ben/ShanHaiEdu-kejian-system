@@ -1,14 +1,24 @@
-"""Timeout-bounded local PDF parser backed by pypdf."""
+"""Timeout-bounded local PDF parser backed by pypdf.
+
+API references:
+https://pypdf.readthedocs.io/en/latest/user/encryption-decryption.html
+https://pypdf.readthedocs.io/en/latest/user/extract-text.html
+https://pypdf.readthedocs.io/en/latest/user/extract-images.html
+"""
 
 from __future__ import annotations
 
 import hashlib
+import json
 import math
-import multiprocessing
+import os
+import socket
+import subprocess
+import sys
 from importlib.metadata import version
 from pathlib import Path
-from queue import Empty
-from typing import Any
+from typing import Any, cast
+from uuid import UUID
 
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
@@ -19,6 +29,20 @@ from apps.api.assets.material_parser import (
     MaterialParseSource,
     ParseLimits,
     build_parse_result,
+    validate_evidence_package,
+)
+
+STABLE_PDF_ERRORS = frozenset(
+    {
+        "PDF_DAMAGED",
+        "PDF_DANGEROUS_STRUCTURE",
+        "PDF_ENCRYPTED",
+        "PDF_EVIDENCE_INVALID",
+        "PDF_IMAGE_REFERENCE_LIMIT_EXCEEDED",
+        "PDF_PAGE_LIMIT_EXCEEDED",
+        "PDF_TEXT_BLOCK_LIMIT_EXCEEDED",
+        "PDF_TEXT_LIMIT_EXCEEDED",
+    }
 )
 
 
@@ -33,34 +57,26 @@ class PypdfMaterialParser:
         limits: ParseLimits,
     ) -> MaterialParseResult:
         _validate_source(path, source, limits)
-        context = multiprocessing.get_context("spawn")
-        queue = context.Queue(maxsize=1)
-        process = context.Process(
-            target=_parse_in_subprocess,
-            args=(str(path), source, limits, self.name, self.version, queue),
-            daemon=True,
-        )
-        process.start()
-        process.join(limits.timeout_seconds)
-        if process.is_alive():
-            process.terminate()
-            process.join(5)
-            if process.is_alive():
-                process.kill()
-                process.join(5)
-            queue.close()
-            queue.join_thread()
-            raise MaterialParserError("PDF_PARSE_TIMEOUT")
         try:
-            kind, payload = queue.get(timeout=1)
-        except Empty as exc:
-            raise MaterialParserError("PDF_DAMAGED") from exc
-        finally:
-            queue.close()
-            queue.join_thread()
-        if kind == "error":
-            raise MaterialParserError(str(payload))
-        return payload
+            completed = subprocess.run(
+                [sys.executable, "-I", "-m", __name__, "--child"],
+                input=json.dumps(
+                    _child_request(path, source, limits, self.name, self.version)
+                ).encode("utf-8"),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                timeout=limits.timeout_seconds,
+                check=False,
+                close_fds=True,
+                cwd=Path(__file__).resolve().parents[3],
+                env=_child_environment(),
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise MaterialParserError("PDF_PARSE_TIMEOUT") from exc
+        if completed.returncode != 0:
+            raise MaterialParserError("PDF_DAMAGED")
+        return _decode_child_response(completed.stdout, source)
 
 
 def _validate_source(path: Path, source: MaterialParseSource, limits: ParseLimits) -> None:
@@ -87,28 +103,42 @@ def _validate_source(path: Path, source: MaterialParseSource, limits: ParseLimit
         raise MaterialParserError("PDF_CHECKSUM_MISMATCH")
 
 
-def _parse_in_subprocess(
-    path: str,
-    source: MaterialParseSource,
-    limits: ParseLimits,
-    parser_name: str,
-    parser_version: str,
-    queue: Any,
-) -> None:
+def _child_main() -> int:
+    _disable_network()
     try:
+        request = json.loads(sys.stdin.buffer.read().decode("utf-8"))
+        source = MaterialParseSource(
+            file_asset_version_id=UUID(request["source"]["file_asset_version_id"]),
+            sha256=request["source"]["sha256"],
+            mime_type=request["source"]["mime_type"],
+            byte_size=request["source"]["byte_size"],
+        )
+        limits = ParseLimits(**request["limits"])
         result = _parse_pdf(
-            Path(path),
+            Path(request["path"]),
             source=source,
             limits=limits,
-            parser_name=parser_name,
-            parser_version=parser_version,
+            parser_name=request["parser_name"],
+            parser_version=request["parser_version"],
         )
     except MaterialParserError as exc:
-        queue.put(("error", exc.code))
+        response: dict[str, Any] = {"kind": "error", "code": exc.code}
     except (PdfReadError, OSError, TypeError, ValueError, KeyError):
-        queue.put(("error", "PDF_DAMAGED"))
+        response = {"kind": "error", "code": "PDF_DAMAGED"}
+    except Exception:
+        response = {"kind": "error", "code": "PDF_DAMAGED"}
     else:
-        queue.put(("result", result))
+        response = {
+            "kind": "result",
+            "result": {
+                "evidence": result.evidence,
+                "page_count": result.page_count,
+                "text_checksum": result.text_checksum,
+                "validation_report": result.validation_report,
+            },
+        }
+    sys.stdout.buffer.write(json.dumps(response, ensure_ascii=False).encode("utf-8"))
+    return 0
 
 
 def _parse_pdf(
@@ -133,6 +163,7 @@ def _parse_pdf(
     text_char_count = 0
     image_reference_count = 0
     for page_number, page in enumerate(reader.pages, start=1):
+        _reject_dangerous_page(page)
         blocks: list[dict[str, Any]] = []
 
         def visit_text(
@@ -146,6 +177,8 @@ def _parse_pdf(
         ) -> None:
             if not text:
                 return
+            if len(_blocks) >= limits.max_text_blocks:
+                raise MaterialParserError("PDF_TEXT_BLOCK_LIMIT_EXCEEDED")
             _blocks.append(
                 {
                     "block_id": f"p{_page_number}-text-{len(_blocks) + 1}",
@@ -165,13 +198,16 @@ def _parse_pdf(
                     "bbox": None,
                 }
             )
-        text_char_count += len(text)
+        evidence_text = "".join(str(block["text"]) for block in blocks)
+        text_char_count += len(evidence_text)
         if text_char_count > limits.max_text_chars:
             raise MaterialParserError("PDF_TEXT_LIMIT_EXCEEDED")
-        image_names = [str(name) for name in page.images.keys()]
-        image_reference_count += len(image_names)
-        if image_reference_count > limits.max_image_references:
-            raise MaterialParserError("PDF_IMAGE_REFERENCE_LIMIT_EXCEEDED")
+        image_names: list[str] = []
+        for name in page.images.keys():
+            image_reference_count += 1
+            if image_reference_count > limits.max_image_references:
+                raise MaterialParserError("PDF_IMAGE_REFERENCE_LIMIT_EXCEEDED")
+            image_names.append(str(name))
         pages.append(
             {
                 "page_number": page_number,
@@ -186,7 +222,7 @@ def _parse_pdf(
                 ],
             }
         )
-        page_texts.append(text)
+        page_texts.append(evidence_text)
     return build_parse_result(
         source=source,
         parser_name=parser_name,
@@ -210,6 +246,24 @@ def _reject_dangerous_structures(reader: PdfReader) -> None:
         raise MaterialParserError("PDF_DANGEROUS_STRUCTURE")
 
 
+def _reject_dangerous_page(page: Any) -> None:
+    if "/AA" in page:
+        raise MaterialParserError("PDF_DANGEROUS_STRUCTURE")
+    annotations = cast(list[Any], page.get("/Annots") or [])
+    for annotation_reference in annotations:
+        annotation = annotation_reference.get_object()
+        if annotation.get("/Subtype") in {"/FileAttachment", "/RichMedia"}:
+            raise MaterialParserError("PDF_DANGEROUS_STRUCTURE")
+        action = annotation.get("/A")
+        if action is not None and action.get_object().get("/S") in {
+            "/ImportData",
+            "/JavaScript",
+            "/Launch",
+            "/SubmitForm",
+        }:
+            raise MaterialParserError("PDF_DANGEROUS_STRUCTURE")
+
+
 def _point_bbox(text_matrix: Any) -> list[float] | None:
     try:
         x = float(text_matrix[4])
@@ -219,3 +273,88 @@ def _point_bbox(text_matrix: Any) -> list[float] | None:
     if not (math.isfinite(x) and math.isfinite(y)):
         return None
     return [x, y, x, y]
+
+
+def _child_request(
+    path: Path,
+    source: MaterialParseSource,
+    limits: ParseLimits,
+    parser_name: str,
+    parser_version: str,
+) -> dict[str, Any]:
+    return {
+        "path": str(path.resolve()),
+        "source": {
+            "file_asset_version_id": str(source.file_asset_version_id),
+            "sha256": source.sha256,
+            "mime_type": source.mime_type,
+            "byte_size": source.byte_size,
+        },
+        "limits": {
+            "max_file_bytes": limits.max_file_bytes,
+            "max_pages": limits.max_pages,
+            "max_text_chars": limits.max_text_chars,
+            "max_text_blocks": limits.max_text_blocks,
+            "max_image_references": limits.max_image_references,
+            "timeout_seconds": limits.timeout_seconds,
+        },
+        "parser_name": parser_name,
+        "parser_version": parser_version,
+    }
+
+
+def _child_environment() -> dict[str, str]:
+    allowed = ("SYSTEMROOT", "WINDIR", "COMSPEC", "TEMP", "TMP", "LANG")
+    environment = {name: os.environ[name] for name in allowed if name in os.environ}
+    environment.update({"PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"})
+    return environment
+
+
+def _disable_network() -> None:
+    def denied(*_args: Any, **_kwargs: Any) -> None:
+        raise OSError("network access is disabled in the PDF parser")
+
+    socket.socket = denied  # pyright: ignore[reportAssignmentType]
+    socket.create_connection = denied  # pyright: ignore[reportAssignmentType]
+
+
+def _decode_child_response(payload: bytes, source: MaterialParseSource) -> MaterialParseResult:
+    try:
+        response = json.loads(payload.decode("utf-8"))
+        if response["kind"] == "error":
+            code = str(response["code"])
+            raise MaterialParserError(code if code in STABLE_PDF_ERRORS else "PDF_DAMAGED")
+        result = response["result"]
+        raw_evidence = result["evidence"]
+        raw_validation_report = result["validation_report"]
+        if not isinstance(raw_evidence, dict) or not isinstance(raw_validation_report, dict):
+            raise TypeError("invalid parser result objects")
+        evidence = cast(dict[str, Any], raw_evidence)
+        page_count = int(result["page_count"])
+        text_checksum = str(result["text_checksum"])
+        validation_report = cast(dict[str, Any], raw_validation_report)
+    except MaterialParserError:
+        raise
+    except (KeyError, TypeError, ValueError, UnicodeError, json.JSONDecodeError) as exc:
+        raise MaterialParserError("PDF_DAMAGED") from exc
+    report = validate_evidence_package(evidence)
+    expected_source = evidence.get("source", {})
+    if (
+        not report["valid"]
+        or page_count != len(evidence.get("pages", []))
+        or expected_source.get("file_asset_version_id") != str(source.file_asset_version_id)
+        or expected_source.get("sha256") != source.sha256
+        or len(text_checksum) != 64
+        or any(character not in "0123456789abcdef" for character in text_checksum)
+    ):
+        raise MaterialParserError("PDF_EVIDENCE_INVALID")
+    return MaterialParseResult(
+        evidence=evidence,
+        page_count=page_count,
+        text_checksum=text_checksum,
+        validation_report=validation_report,
+    )
+
+
+if __name__ == "__main__":
+    raise SystemExit(_child_main())

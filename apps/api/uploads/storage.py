@@ -174,6 +174,7 @@ class MinioObjectStorage:
         if max_bytes <= 0:
             raise ValueError("object storage download limit must be positive")
         response = None
+        completed = False
         try:
             response = self._client.get_object(bucket, key)
             size_header = response.headers.get("content-length")
@@ -186,14 +187,17 @@ class MinioObjectStorage:
                     if bytes_written > max_bytes:
                         raise ObjectStorageError("object storage object exceeds download limit")
                     output.write(chunk)
+            completed = True
             return bytes_written
+        except ObjectStorageError:
+            raise
         except (S3Error, HTTPError, OSError, ValueError) as exc:
             raise ObjectStorageError("object storage download failed") from exc
         finally:
             if response is not None:
                 response.close()
                 response.release_conn()
-            if destination.exists() and destination.stat().st_size > max_bytes:
+            if not completed:
                 destination.unlink(missing_ok=True)
 
 
