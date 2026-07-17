@@ -1,0 +1,35 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "style_preset",
+  "metadata": {
+    "key": "style.education_flat",
+    "name": "清新扁平教育插画",
+    "domain": "primary_math",
+    "locale": "zh-CN",
+    "tags": ["education", "flat", "child-friendly"]
+  },
+  "spec": {
+    "preset_key": "style.education_flat",
+    "title": "清新扁平教育插画",
+    "description": "适合小学数学课堂的明亮、清晰、低干扰视觉语言。",
+    "modalities": ["image", "presentation"],
+    "visual_language": "简洁几何形体、清晰层级、儿童友好但不过度卡通化",
+    "palette": ["清新绿色", "明黄色", "少量珊瑚红"],
+    "mood": ["明快", "可信", "有秩序"],
+    "texture": ["柔和纸感", "低噪点"],
+    "negative_constraints": ["禁止水印", "禁止错误文字", "禁止廉价贴纸感"],
+    "extensions": {
+      "image": {
+        "medium": "vector-like digital illustration",
+        "composition_preferences": ["单一视觉焦点", "留出教学文字区域"],
+        "lighting": ["明亮自然光", "低戏剧性阴影"]
+      },
+      "presentation": {
+        "background_policy": "white",
+        "typography": "清晰无衬线中文字体",
+        "layout_density": "balanced",
+        "illustration_style": "与教育插画保持一致"
+      }
+    }
+  }
+}

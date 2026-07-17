@@ -1,0 +1,25 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "image_prompt.components",
+    "name": "结构化图片提示词",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "image_prompt.components",
+    "title": "结构化图片提示词",
+    "description": "模型先返回可校验字段，再投影成一段完整图片提示词。",
+    "definition_role": "prompt_components",
+    "fields": [
+      {"field_key": "content", "label": "内容", "type": "rich_text", "required": true, "editable": true, "deletable": false, "visibility": "primary"},
+      {"field_key": "composition", "label": "构图", "type": "text", "required": true, "editable": true, "deletable": false, "visibility": "advanced"},
+      {"field_key": "palette", "label": "色系", "type": "list", "required": true, "editable": true, "deletable": false, "visibility": "advanced"},
+      {"field_key": "texture", "label": "质感", "type": "list", "required": true, "editable": true, "deletable": false, "visibility": "advanced"},
+      {"field_key": "lighting", "label": "光线", "type": "text", "required": true, "editable": true, "deletable": false, "visibility": "advanced"},
+      {"field_key": "style", "label": "风格", "type": "text", "required": true, "editable": true, "deletable": false, "visibility": "secondary"},
+      {"field_key": "negative_constraints", "label": "负面约束", "type": "list", "required": true, "editable": true, "deletable": false, "visibility": "hidden"}
+    ]
+  }
+}

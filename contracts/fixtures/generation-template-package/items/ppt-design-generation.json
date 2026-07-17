@@ -1,0 +1,23 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "generation_template",
+  "metadata": {
+    "key": "ppt_design.generate",
+    "name": "生成PPT页级设计稿",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "ppt_design.generate",
+    "title": "生成PPT页级设计稿",
+    "model_capability": "text.structured.ppt_design",
+    "input_definition_ref": {"item_key": "ppt_design.input", "kind": "input_definition"},
+    "prompt_template_ref": {"item_key": "ppt_design.authoring", "kind": "prompt_template"},
+    "output_definition_ref": {"item_key": "ppt_design.page", "kind": "content_definition"},
+    "style_preset_refs": [{"item_key": "style.education_flat", "kind": "style_preset"}],
+    "projection_refs": [
+      {"role": "teacher_view", "template_ref": {"item_key": "ppt_design.teacher_markdown", "kind": "projection_template"}},
+      {"role": "export", "template_ref": {"item_key": "ppt_design.teacher_markdown", "kind": "projection_template"}}
+    ]
+  }
+}

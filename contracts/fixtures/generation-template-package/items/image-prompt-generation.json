@@ -1,0 +1,23 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "generation_template",
+  "metadata": {
+    "key": "image_prompt.generate",
+    "name": "生成教育插画提示词",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "image_prompt.generate",
+    "title": "生成教育插画提示词",
+    "model_capability": "text.structured.image_prompt",
+    "input_definition_ref": {"item_key": "image_prompt.input", "kind": "input_definition"},
+    "prompt_template_ref": {"item_key": "image_prompt.authoring", "kind": "prompt_template"},
+    "output_definition_ref": {"item_key": "image_prompt.components", "kind": "content_definition"},
+    "style_preset_refs": [{"item_key": "style.education_flat", "kind": "style_preset"}],
+    "projection_refs": [
+      {"role": "teacher_view", "template_ref": {"item_key": "image_prompt.teacher_text", "kind": "projection_template"}},
+      {"role": "provider_request", "template_ref": {"item_key": "image_prompt.teacher_text", "kind": "projection_template"}}
+    ]
+  }
+}

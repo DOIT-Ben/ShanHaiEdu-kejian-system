@@ -1,0 +1,92 @@
+{
+  "format_version": "1.0",
+  "package_key": "shanhai.primary_math.generation_examples",
+  "name": "小学数学生成模板示例",
+  "semantic_version": "1.0.0",
+  "runtime_constraint": ">=0.1.0 <1.0.0",
+  "change_summary": "提供教育插画结构化提示词和PPT页级设计稿的脱敏合同样例。",
+  "dependencies": [],
+  "items": [
+    {
+      "item_key": "image_prompt.input",
+      "kind": "input_definition",
+      "path": "items/image-prompt-input.json",
+      "schema_id": "https://shanhaiedu.local/contracts/input-definition.schema.json",
+      "sha256": "f2ddecc6527b8c0255c55c82bcc3f9cc71188397808c589e17a25ce11a9bc0ac"
+    },
+    {
+      "item_key": "style.education_flat",
+      "kind": "style_preset",
+      "path": "items/education-flat-style.json",
+      "schema_id": "https://shanhaiedu.local/contracts/style-preset.schema.json",
+      "sha256": "1457fb91564562e0be282a528fbc3682efd006f6c30f620b48e61d728a2b9ddd"
+    },
+    {
+      "item_key": "image_prompt.components",
+      "kind": "content_definition",
+      "path": "items/image-prompt-components.json",
+      "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
+      "sha256": "a153a47e709afa1496ec441ba93f4cedb2b98f4ce4b5bb208159750b7013eafa"
+    },
+    {
+      "item_key": "image_prompt.authoring",
+      "kind": "prompt_template",
+      "path": "items/image-prompt-authoring.json",
+      "schema_id": "https://shanhaiedu.local/contracts/prompt-template.schema.json",
+      "sha256": "9ac485c49bc8a50802e033f4ed04f3e370557627f5ab7c7e56c72e005b443e5d"
+    },
+    {
+      "item_key": "image_prompt.teacher_text",
+      "kind": "projection_template",
+      "path": "items/image-prompt-text-projection.json",
+      "schema_id": "https://shanhaiedu.local/contracts/projection-template.schema.json",
+      "sha256": "15ea5106b3964fb6bd382d87d7931b4b1d693dabaac3180adda972c71f13e24d"
+    },
+    {
+      "item_key": "image_prompt.generate",
+      "kind": "generation_template",
+      "path": "items/image-prompt-generation.json",
+      "schema_id": "https://shanhaiedu.local/contracts/generation-template.schema.json",
+      "sha256": "9944999592372a2b740c6f8f10d01098363ce6c5c39660536b23b4b0a968c658"
+    },
+    {
+      "item_key": "ppt_design.input",
+      "kind": "input_definition",
+      "path": "items/ppt-design-input.json",
+      "schema_id": "https://shanhaiedu.local/contracts/input-definition.schema.json",
+      "sha256": "e578cb33e9eaaaa2c12ed324a5c0a7f84aacb0850b347047d5825dc7892aea6b"
+    },
+    {
+      "item_key": "ppt_design.page",
+      "kind": "content_definition",
+      "path": "items/ppt-page-design.json",
+      "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
+      "sha256": "28e44c4f3cf0c223b2ea3cf22059430581eea628d9139ffc6930d2fcaa293f75"
+    },
+    {
+      "item_key": "ppt_design.authoring",
+      "kind": "prompt_template",
+      "path": "items/ppt-design-authoring.json",
+      "schema_id": "https://shanhaiedu.local/contracts/prompt-template.schema.json",
+      "sha256": "e39d2e7cbacba65a998edddfddc88a50410975b37415f2fe782c1aeed9230696"
+    },
+    {
+      "item_key": "ppt_design.teacher_markdown",
+      "kind": "projection_template",
+      "path": "items/ppt-design-markdown-projection.json",
+      "schema_id": "https://shanhaiedu.local/contracts/projection-template.schema.json",
+      "sha256": "28a9dd43df3562fc4e734a60e4be8b6f34faba8edbf7c77d906c8630574d69e3"
+    },
+    {
+      "item_key": "ppt_design.generate",
+      "kind": "generation_template",
+      "path": "items/ppt-design-generation.json",
+      "schema_id": "https://shanhaiedu.local/contracts/generation-template.schema.json",
+      "sha256": "68616ae0ef815dddf14c33b01ceb1cdb1632675b267cd21aad09977a10dd02fb"
+    }
+  ],
+  "entrypoints": [
+    "image_prompt.generate",
+    "ppt_design.generate"
+  ]
+}

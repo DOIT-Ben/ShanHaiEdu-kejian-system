@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shanhaiedu.local/contracts/content-item.schema.json",
+  "title": "ContentItem",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["api_version", "kind", "metadata", "spec"],
+  "properties": {
+    "api_version": {"const": "shanhai.edu/v1"},
+    "kind": {
+      "enum": [
+        "input_definition",
+        "content_definition",
+        "style_preset",
+        "prompt_template",
+        "projection_template",
+        "generation_template"
+      ]
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "name"],
+      "properties": {
+        "key": {"$ref": "#/$defs/key"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 255},
+        "description": {"type": "string", "maxLength": 2000},
+        "domain": {"$ref": "#/$defs/key"},
+        "locale": {"type": "string", "pattern": "^[a-z]{2}(?:-[A-Z]{2})?$"},
+        "tags": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 80}
+        }
+      }
+    },
+    "spec": {"type": "object"}
+  },
+  "$defs": {
+    "key": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{1,159}$"}
+  }
+}
