@@ -5,6 +5,8 @@
     {"id": "project_empty", "route": "/app/projects/:project_id", "description": "教材尚未上传的项目主页"},
     {"id": "lesson_collection", "route": "/app/projects/:project_id", "description": "课时列表读取、重排、信息修改和软归档"},
     {"id": "lesson_branch_disabled", "route": "/app/projects/:project_id/lessons/:lesson_id", "description": "关闭可选分支后保留历史并展示disabled而非skipped"},
+    {"id": "material_file_asset", "route": "/app/projects/:project_id", "description": "教材稳定文件身份、当前版本元数据和扫描状态"},
+    {"id": "material_parse_versions", "route": "/app/projects/:project_id", "description": "教材解析失败重试、版本历史和校验摘要"},
     {"id": "lesson_plan_edit", "route": "/app/projects/:project_id/lessons/:lesson_id/work/lesson-plan", "description": "动态十二部分默认教案，可增删允许字段"},
     {"id": "intro_options", "route": "/app/projects/:project_id/lessons/:lesson_id/work/intro-options", "description": "三类九套打分、独立审核和选择；不阻塞教案"},
     {"id": "prompt_review", "route": "/app/projects/:project_id/lessons/:lesson_id/work/:step_key", "description": "系统提示词可见、教师修改、输出审核"},

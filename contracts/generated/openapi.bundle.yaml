@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ShanHaiEdu Core Integration Surface
-  version: 2.2.0
+  version: 2.3.0
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
@@ -259,6 +259,42 @@ paths:
       responses:
         '202':
           $ref: '#/components/responses/AcceptedJob'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/materials/{material_id}/file-asset:
+    get:
+      summary: 获取教材稳定文件资产与当前版本元数据
+      operationId: getSourceMaterialFileAsset
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/MaterialId'
+      responses:
+        '200':
+          description: Stable file identity and safe current-version metadata
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileAssetEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/materials/{material_id}/parse-versions:
+    get:
+      summary: 查询教材解析版本摘要
+      operationId: listMaterialParseVersions
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/MaterialId'
+      responses:
+        '200':
+          description: Newest-first material parse version summaries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialParseVersionListEnvelope'
         4XX:
           $ref: '#/components/responses/Error'
   /projects/{project_id}/workflow:
@@ -1067,6 +1103,213 @@ components:
         sha256:
           type: string
           pattern: ^[a-f0-9]{64}$
+    FileAssetVersion:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - version_no
+        - mime_type
+        - byte_size
+        - sha256
+        - width
+        - height
+        - duration_ms
+        - page_count
+        - scan_status
+        - derived_from_version_id
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        version_no:
+          type: integer
+          minimum: 1
+        mime_type:
+          type: string
+          minLength: 1
+        byte_size:
+          type: integer
+          minimum: 0
+        sha256:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+        width:
+          type:
+            - integer
+            - 'null'
+          minimum: 1
+        height:
+          type:
+            - integer
+            - 'null'
+          minimum: 1
+        duration_ms:
+          type:
+            - integer
+            - 'null'
+          minimum: 0
+        page_count:
+          type:
+            - integer
+            - 'null'
+          minimum: 1
+        scan_status:
+          type: string
+          enum:
+            - pending
+            - clean
+            - rejected
+        derived_from_version_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+    FileAsset:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - asset_key
+        - asset_kind
+        - status
+        - retention_class
+        - lock_version
+        - current_version
+      properties:
+        id:
+          type: string
+          format: uuid
+        asset_key:
+          type: string
+          minLength: 1
+        asset_kind:
+          type: string
+          minLength: 1
+        status:
+          type: string
+          enum:
+            - pending
+            - active
+            - rejected
+        retention_class:
+          type: string
+          minLength: 1
+        lock_version:
+          type: integer
+          minimum: 1
+        current_version:
+          $ref: '#/components/schemas/FileAssetVersion'
+    FileAssetEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          $ref: '#/components/schemas/FileAsset'
+        request_id:
+          type: string
+          minLength: 1
+    MaterialParseVersion:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - source_material_id
+        - file_asset_version_id
+        - version_no
+        - status
+        - parser_name
+        - parser_version
+        - page_count
+        - text_checksum
+        - validation_report
+        - error_code
+        - created_at
+        - started_at
+        - completed_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        source_material_id:
+          type: string
+          format: uuid
+        file_asset_version_id:
+          type: string
+          format: uuid
+        version_no:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum:
+            - pending
+            - running
+            - succeeded
+            - failed
+        parser_name:
+          type: string
+          minLength: 1
+        parser_version:
+          type: string
+          minLength: 1
+        page_count:
+          type:
+            - integer
+            - 'null'
+          minimum: 1
+        text_checksum:
+          type:
+            - string
+            - 'null'
+          pattern: ^[a-f0-9]{64}$
+        validation_report:
+          type: object
+          additionalProperties: true
+        error_code:
+          type:
+            - string
+            - 'null'
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        completed_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    MaterialParseVersionListEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            - items
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/MaterialParseVersion'
+        request_id:
+          type: string
+          minLength: 1
     NodeRun:
       type: object
       required:

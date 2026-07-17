@@ -11,11 +11,9 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
-    Integer,
     String,
     Uuid,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from apps.api.database import Base, MutableAuditMixin
@@ -84,72 +82,3 @@ class UploadSession(MutableAuditMixin, Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-
-
-class FileAsset(MutableAuditMixin, Base):
-    __tablename__ = "file_assets"
-    __table_args__ = (
-        CheckConstraint("status IN ('pending', 'active', 'rejected')", name="status_allowed"),
-        CheckConstraint("lock_version >= 1", name="lock_version_positive"),
-        Index(
-            "uq_file_assets_organization_asset_key_active",
-            "organization_id",
-            "asset_key",
-            unique=True,
-            postgresql_where="deleted_at IS NULL",
-        ),
-    )
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
-    organization_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False
-    )
-    asset_key: Mapped[str] = mapped_column(String(255), nullable=False)
-    asset_kind: Mapped[str] = mapped_column(String(80), nullable=False)
-    current_version_id: Mapped[UUID | None] = mapped_column(
-        Uuid,
-        ForeignKey(
-            "file_asset_versions.id",
-            name="fk_file_assets_current_version_id_file_asset_versions",
-            ondelete="RESTRICT",
-            use_alter=True,
-        ),
-    )
-    status: Mapped[str] = mapped_column(String(20), nullable=False)
-    retention_class: Mapped[str] = mapped_column(String(40), nullable=False)
-
-
-class FileAssetVersion(Base):
-    __tablename__ = "file_asset_versions"
-    __table_args__ = (
-        CheckConstraint("version_no > 0", name="version_positive"),
-        CheckConstraint("byte_size >= 0", name="byte_size_nonnegative"),
-        CheckConstraint(
-            "scan_status IN ('pending', 'clean', 'rejected')", name="scan_status_allowed"
-        ),
-        Index("uq_file_asset_versions_asset_version", "file_asset_id", "version_no", unique=True),
-        Index(
-            "uq_file_asset_versions_storage_object", "storage_bucket", "storage_key", unique=True
-        ),
-    )
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
-    organization_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False
-    )
-    file_asset_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("file_assets.id", ondelete="RESTRICT"), nullable=False
-    )
-    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
-    storage_bucket: Mapped[str] = mapped_column(String(63), nullable=False)
-    storage_key: Mapped[str] = mapped_column(String(1024), nullable=False)
-    mime_type: Mapped[str] = mapped_column(String(255), nullable=False)
-    byte_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
-    etag: Mapped[str] = mapped_column(String(255), nullable=False)
-    scan_status: Mapped[str] = mapped_column(String(20), nullable=False)
-    metadata_json: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    created_by: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("principals.id", ondelete="RESTRICT"), nullable=False
-    )

@@ -160,6 +160,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project_id}/materials/{material_id}/file-asset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 获取教材稳定文件资产与当前版本元数据 */
+        get: operations["getSourceMaterialFileAsset"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/materials/{material_id}/parse-versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询教材解析版本摘要 */
+        get: operations["listMaterialParseVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project_id}/workflow": {
         parameters: {
             query?: never;
@@ -525,6 +559,70 @@ export interface components {
             etag: string;
             size_bytes: number;
             sha256: string;
+        };
+        FileAssetVersion: {
+            /** Format: uuid */
+            id: string;
+            version_no: number;
+            mime_type: string;
+            byte_size: number;
+            sha256: string;
+            width: number | null;
+            height: number | null;
+            duration_ms: number | null;
+            page_count: number | null;
+            /** @enum {string} */
+            scan_status: "pending" | "clean" | "rejected";
+            /** Format: uuid */
+            derived_from_version_id: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        FileAsset: {
+            /** Format: uuid */
+            id: string;
+            asset_key: string;
+            asset_kind: string;
+            /** @enum {string} */
+            status: "pending" | "active" | "rejected";
+            retention_class: string;
+            lock_version: number;
+            current_version: components["schemas"]["FileAssetVersion"];
+        };
+        FileAssetEnvelope: {
+            data: components["schemas"]["FileAsset"];
+            request_id: string;
+        };
+        MaterialParseVersion: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            source_material_id: string;
+            /** Format: uuid */
+            file_asset_version_id: string;
+            version_no: number;
+            /** @enum {string} */
+            status: "pending" | "running" | "succeeded" | "failed";
+            parser_name: string;
+            parser_version: string;
+            page_count: number | null;
+            text_checksum: string | null;
+            validation_report: {
+                [key: string]: unknown;
+            };
+            error_code: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            started_at: string | null;
+            /** Format: date-time */
+            completed_at: string | null;
+        };
+        MaterialParseVersionListEnvelope: {
+            data: {
+                items: components["schemas"]["MaterialParseVersion"][];
+            };
+            request_id: string;
         };
         NodeRun: {
             /** Format: uuid */
@@ -1127,6 +1225,55 @@ export interface operations {
         };
         responses: {
             202: components["responses"]["AcceptedJob"];
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    getSourceMaterialFileAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+                material_id: components["parameters"]["MaterialId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stable file identity and safe current-version metadata */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileAssetEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    listMaterialParseVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+                material_id: components["parameters"]["MaterialId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Newest-first material parse version summaries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaterialParseVersionListEnvelope"];
+                };
+            };
             "4XX": components["responses"]["Error"];
         };
     };

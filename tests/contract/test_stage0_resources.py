@@ -58,6 +58,8 @@ async def test_project_upload_and_job_api_matches_stage0_contract(
         "cancelGenerationJob",
         "streamGenerationJobEvents",
         "streamProjectEvents",
+        "getSourceMaterialFileAsset",
+        "listMaterialParseVersions",
     }.issubset(operation_ids)
     transport = httpx.ASGITransport(app=app)
     try:
