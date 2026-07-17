@@ -8,6 +8,7 @@ from apps.api.main import create_app
 from apps.api.projects.models import Project
 from apps.api.settings import Settings
 from tests.conftest import run_migration
+from tests.fakes.identity import configure_test_identity
 
 
 async def test_project_command_replays_and_conflicts_by_request_digest(
@@ -16,6 +17,7 @@ async def test_project_command_replays_and_conflicts_by_request_digest(
     run_migration(postgres_database_url, "head")
     settings = Settings(_env_file=None, environment="test", database_url=postgres_database_url)
     app = create_app(settings=settings)
+    configure_test_identity(app)
     transport = httpx.ASGITransport(app=app)
     payload = {"title": "Fractions", "knowledge_point": "One half"}
     try:

@@ -11,7 +11,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.dependencies import get_session
 from apps.api.errors import ApiError
-from apps.api.identity.models import SYSTEM_ORGANIZATION_ID
+from apps.api.identity.context import ActorContext, ProjectAction
+from apps.api.identity.dependencies import get_actor_context
+from apps.api.identity.permissions import ProjectAccessService
 from apps.api.jobs.repository import GenerationJobRepository
 from apps.api.jobs.schemas import GenerationJobEnvelope, GenerationJobRead
 from apps.api.jobs.service import GenerationJobService
@@ -25,15 +27,23 @@ router = APIRouter(prefix="/api/v2/generation-jobs", tags=["generation-jobs"])
 def get_generation_job(
     job_id: UUID,
     request: Request,
+    actor: Annotated[ActorContext, Depends(get_actor_context)],
     session: Annotated[Session, Depends(get_session)],
 ) -> GenerationJobEnvelope:
-    job = GenerationJobRepository(session, SYSTEM_ORGANIZATION_ID).get(job_id)
+    job = GenerationJobRepository(session, actor.organization_id).get(job_id)
     if job is None:
         raise ApiError(
             status_code=404,
             code="GENERATION_JOB_NOT_FOUND",
             message="The generation job was not found.",
         )
+    if job.project_id is None:
+        raise ApiError(
+            status_code=404,
+            code="GENERATION_JOB_NOT_FOUND",
+            message="The generation job was not found.",
+        )
+    ProjectAccessService(session, actor).require(job.project_id, ProjectAction.VIEW)
     return GenerationJobEnvelope(
         data=GenerationJobRead.model_validate(job),
         request_id=request.state.request_id,
@@ -50,12 +60,14 @@ def cancel_generation_job(
     job_id: UUID,
     request: Request,
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=128)],
+    actor: Annotated[ActorContext, Depends(get_actor_context)],
     session: Annotated[Session, Depends(get_session)],
 ) -> GenerationJobEnvelope:
     settings = cast(Settings, request.app.state.settings)
     with session.begin():
         job = GenerationJobService(
             session,
+            actor=actor,
             idempotency_ttl_seconds=settings.idempotency_ttl_seconds,
         ).request_cancel(
             job_id,
@@ -73,6 +85,7 @@ def cancel_generation_job(
 def stream_generation_job_events(
     job_id: UUID,
     request: Request,
+    actor: Annotated[ActorContext, Depends(get_actor_context)],
     last_event_id: Annotated[str | None, Header(alias="Last-Event-ID")] = None,
 ) -> StreamingResponse:
     factory = cast(sessionmaker[Session] | None, request.app.state.session_factory)
@@ -85,14 +98,15 @@ def stream_generation_job_events(
         )
     cursor = parse_last_event_id(last_event_id)
     with factory() as session:
-        job = GenerationJobRepository(session, SYSTEM_ORGANIZATION_ID).get(job_id)
+        job = GenerationJobRepository(session, actor.organization_id).get(job_id)
         if job is None or job.project_id is None:
             raise ApiError(
                 status_code=404,
                 code="GENERATION_JOB_NOT_FOUND",
                 message="The generation job was not found.",
             )
-        EventReplayRepository(session).replay(
+        ProjectAccessService(session, actor).require(job.project_id, ProjectAction.VIEW)
+        EventReplayRepository(session, actor.organization_id).replay(
             project_id=job.project_id,
             after_sequence=cursor,
             resource=("generation_job", job.id),
@@ -103,6 +117,7 @@ def stream_generation_job_events(
     return StreamingResponse(
         stream_events(
             factory,
+            organization_id=actor.organization_id,
             project_id=project_id,
             after_sequence=cursor,
             resource=("generation_job", job_id),

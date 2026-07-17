@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import register_error_handlers
 from apps.api.health import ReadinessProvider, build_readiness_service
+from apps.api.identity.authentication import Authenticator
 from apps.api.jobs.router import router as jobs_router
 from apps.api.logging import configure_logging
 from apps.api.middleware import RequestContextMiddleware
@@ -23,6 +24,7 @@ def create_app(
     readiness: ReadinessProvider | None = None,
     session_factory: sessionmaker[Session] | None = None,
     object_storage: ObjectStorage | None = None,
+    authenticator: Authenticator | None = None,
 ) -> FastAPI:
     resolved_settings = settings or get_settings()
     configure_logging(
@@ -50,6 +52,7 @@ def create_app(
     app.state.database_engine = database_engine
     app.state.session_factory = resolved_session_factory
     app.state.object_storage = resolved_object_storage
+    app.state.authenticator = authenticator
     register_error_handlers(app)
     app.include_router(projects_router)
     app.include_router(uploads_router)

@@ -9,6 +9,8 @@ from fastapi import APIRouter, Depends, Header, Request, status
 from sqlalchemy.orm import Session
 
 from apps.api.dependencies import get_object_storage, get_session
+from apps.api.identity.context import ActorContext
+from apps.api.identity.dependencies import get_actor_context
 from apps.api.jobs.schemas import AcceptedJobEnvelope
 from apps.api.settings import Settings
 from apps.api.uploads.confirmation_service import UploadConfirmationService
@@ -27,11 +29,13 @@ def session_service(
     request: Request,
     session: Session,
     storage: ObjectStorage,
+    actor: ActorContext,
 ) -> UploadSessionService:
     settings = cast(Settings, request.app.state.settings)
     return UploadSessionService(
         session=session,
         storage=storage,
+        actor=actor,
         bucket=settings.object_storage_bucket,
         ttl_seconds=settings.upload_session_ttl_seconds,
         max_size_bytes=settings.max_upload_size_bytes,
@@ -49,10 +53,11 @@ def create_upload_session(
     payload: CreateUploadSessionRequest,
     request: Request,
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=128)],
+    actor: Annotated[ActorContext, Depends(get_actor_context)],
     session: Annotated[Session, Depends(get_session)],
     storage: Annotated[ObjectStorage, Depends(get_object_storage)],
 ) -> UploadSessionEnvelope:
-    created = session_service(request, session, storage).create_session(
+    created = session_service(request, session, storage, actor).create_session(
         project_id,
         payload,
         idempotency_key=idempotency_key,
@@ -73,10 +78,11 @@ def confirm_upload(
     payload: ConfirmUploadRequest,
     request: Request,
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=128)],
+    actor: Annotated[ActorContext, Depends(get_actor_context)],
     session: Annotated[Session, Depends(get_session)],
     storage: Annotated[ObjectStorage, Depends(get_object_storage)],
 ) -> AcceptedJobEnvelope:
-    accepted = UploadConfirmationService(session=session, storage=storage).confirm(
+    accepted = UploadConfirmationService(session=session, storage=storage, actor=actor).confirm(
         project_id=project_id,
         material_id=material_id,
         idempotency_key=idempotency_key,

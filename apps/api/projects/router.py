@@ -11,7 +11,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.dependencies import get_session
 from apps.api.errors import ApiError
-from apps.api.identity.models import SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID
+from apps.api.identity.context import ActorContext, ProjectAction
+from apps.api.identity.dependencies import get_actor_context
+from apps.api.identity.permissions import ProjectAccessService
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import (
     CreateProjectRequest,
@@ -29,10 +31,6 @@ from apps.api.settings import Settings
 router = APIRouter(prefix="/api/v2/projects", tags=["projects"])
 
 
-def repository(session: Session) -> ProjectRepository:
-    return ProjectRepository(session, SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID)
-
-
 @router.post(
     "",
     response_model=ProjectEnvelope,
@@ -43,13 +41,14 @@ def create_project(
     payload: CreateProjectRequest,
     request: Request,
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=128)],
+    actor: Annotated[ActorContext, Depends(get_actor_context)],
     session: Annotated[Session, Depends(get_session)],
 ) -> ProjectEnvelope:
     settings = cast(Settings, request.app.state.settings)
 
     def command() -> CommandResult:
-        project = repository(session).create(payload)
-        EventWriter(session, SYSTEM_ORGANIZATION_ID).append(
+        project = ProjectRepository(session, actor).create(payload)
+        EventWriter(session, actor.organization_id).append(
             project_id=project.id,
             event_type="project.created",
             resource=EventResource(type="project", id=project.id),
@@ -66,10 +65,10 @@ def create_project(
     with session.begin():
         result = IdempotencyService(
             session,
-            SYSTEM_ORGANIZATION_ID,
+            actor.organization_id,
             ttl_seconds=settings.idempotency_ttl_seconds,
         ).execute(
-            scope="projects.create",
+            scope=f"projects.create:{actor.principal_id}",
             key=idempotency_key,
             payload=payload.model_dump(mode="json"),
             command=command,
@@ -83,6 +82,7 @@ def create_project(
 @router.get("", response_model=ProjectListEnvelope, operation_id="listProjects")
 def list_projects(
     request: Request,
+    actor: Annotated[ActorContext, Depends(get_actor_context)],
     session: Annotated[Session, Depends(get_session)],
     page_cursor: Annotated[str | None, Query(alias="page[cursor]")] = None,
     page_limit: Annotated[int, Query(alias="page[limit]", ge=1, le=100)] = 20,
@@ -96,7 +96,10 @@ def list_projects(
             message="The page cursor is invalid.",
             details={"field": "page[cursor]"},
         ) from exc
-    projects, next_cursor = repository(session).list_page(cursor=cursor, limit=page_limit)
+    projects, next_cursor = ProjectRepository(session, actor).list_page(
+        cursor=cursor,
+        limit=page_limit,
+    )
     return ProjectListEnvelope(
         data=ProjectListData(items=[ProjectRead.model_validate(project) for project in projects]),
         meta=PageMeta(next_cursor=next_cursor),
@@ -109,15 +112,10 @@ def get_project(
     project_id: UUID,
     request: Request,
     response: Response,
+    actor: Annotated[ActorContext, Depends(get_actor_context)],
     session: Annotated[Session, Depends(get_session)],
 ) -> ProjectEnvelope:
-    project = repository(session).get(project_id)
-    if project is None:
-        raise ApiError(
-            status_code=404,
-            code="PROJECT_NOT_FOUND",
-            message="The project was not found.",
-        )
+    project = ProjectAccessService(session, actor).require(project_id, ProjectAction.VIEW)
     response.headers["ETag"] = f'W/"{project.lock_version}"'
     return ProjectEnvelope(
         data=ProjectRead.model_validate(project),
@@ -133,6 +131,7 @@ def get_project(
 def stream_project_events(
     project_id: UUID,
     request: Request,
+    actor: Annotated[ActorContext, Depends(get_actor_context)],
     last_event_id: Annotated[str | None, Header(alias="Last-Event-ID")] = None,
 ) -> StreamingResponse:
     factory = cast(sessionmaker[Session] | None, request.app.state.session_factory)
@@ -145,14 +144,8 @@ def stream_project_events(
         )
     cursor = parse_last_event_id(last_event_id)
     with factory() as session:
-        project = repository(session).get(project_id)
-        if project is None:
-            raise ApiError(
-                status_code=404,
-                code="PROJECT_NOT_FOUND",
-                message="The project was not found.",
-            )
-        EventReplayRepository(session).replay(
+        ProjectAccessService(session, actor).require(project_id, ProjectAction.VIEW)
+        EventReplayRepository(session, actor.organization_id).replay(
             project_id=project_id,
             after_sequence=cursor,
             limit=1,
@@ -161,6 +154,7 @@ def stream_project_events(
     return StreamingResponse(
         stream_events(
             factory,
+            organization_id=actor.organization_id,
             project_id=project_id,
             after_sequence=cursor,
             resource=None,

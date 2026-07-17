@@ -7,22 +7,26 @@ from uuid import UUID
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
+from apps.api.database import utc_now
+from apps.api.identity.context import ActorContext
+from apps.api.identity.models import ProjectMember
 from apps.api.ids import new_uuid7
 from apps.api.projects.models import Project
 from apps.api.projects.schemas import CreateProjectRequest
 
 
 class ProjectRepository:
-    def __init__(self, session: Session, organization_id: UUID, principal_id: UUID) -> None:
+    def __init__(self, session: Session, actor: ActorContext) -> None:
         self._session = session
-        self._organization_id = organization_id
-        self._principal_id = principal_id
+        self._actor = actor
 
     def create(self, request: CreateProjectRequest) -> Project:
+        if self._actor.user_id is None or self._actor.is_system:
+            raise ValueError("project creation requires a user actor")
         project_id = new_uuid7()
         project = Project(
             id=project_id,
-            organization_id=self._organization_id,
+            organization_id=self._actor.organization_id,
             project_no=f"PRJ-{project_id.hex[-12:].upper()}",
             title=request.title,
             subject="primary_math",
@@ -33,11 +37,20 @@ class ProjectRepository:
             default_language="zh-CN",
             status="draft",
             automation_mode=request.automation_mode,
-            owner_principal_id=self._principal_id,
-            created_by=self._principal_id,
-            updated_by=self._principal_id,
+            owner_principal_id=self._actor.principal_id,
+            created_by=self._actor.principal_id,
+            updated_by=self._actor.principal_id,
         )
         self._session.add(project)
+        self._session.flush()
+        membership = ProjectMember(
+            id=new_uuid7(),
+            project_id=project_id,
+            user_id=self._actor.user_id,
+            role="owner",
+            created_at=utc_now(),
+        )
+        self._session.add(membership)
         self._session.flush()
         return project
 
@@ -58,7 +71,14 @@ class ProjectRepository:
         return page, next_cursor
 
     def _active_projects(self) -> Select[tuple[Project]]:
-        return select(Project).where(
-            Project.organization_id == self._organization_id,
+        statement = select(Project).where(
+            Project.organization_id == self._actor.organization_id,
             Project.deleted_at.is_(None),
         )
+        if self._actor.user_id is not None and not self._actor.is_system:
+            statement = statement.join(
+                ProjectMember,
+                (ProjectMember.project_id == Project.id)
+                & (ProjectMember.user_id == self._actor.user_id),
+            )
+        return statement

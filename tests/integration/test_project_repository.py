@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from uuid import uuid4
 
 import pytest
@@ -7,10 +8,10 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from apps.api.database import build_engine, build_session_factory
-from apps.api.identity.models import SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID
 from apps.api.projects.models import Project
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
+from tests.fakes.identity import seed_test_actor
 
 
 def test_project_repository_enforces_tenant_and_rolls_back_unique_failure(
@@ -20,26 +21,26 @@ def test_project_repository_enforces_tenant_and_rolls_back_unique_failure(
     request = CreateProjectRequest(title="Fractions", knowledge_point="Understanding one half")
     with factory() as session:
         with session.begin():
-            first = ProjectRepository(session, SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID).create(
-                request
-            )
+            actor = seed_test_actor(session)
+            first = ProjectRepository(session, actor).create(request)
         first_id = first.id
         project_no = first.project_no
 
         with pytest.raises(IntegrityError):
             with session.begin():
-                duplicate = ProjectRepository(
-                    session, SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID
-                ).create(request)
+                duplicate = ProjectRepository(session, actor).create(request)
                 duplicate.project_no = project_no
                 session.flush()
 
         assert session.scalar(select(func.count()).select_from(Project)) == 1
+        assert ProjectRepository(session, actor).get(first_id) is not None
         assert (
-            ProjectRepository(session, SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID).get(first_id)
-            is not None
+            ProjectRepository(
+                session,
+                replace(actor, organization_id=uuid4()),
+            ).get(first_id)
+            is None
         )
-        assert ProjectRepository(session, uuid4(), SYSTEM_PRINCIPAL_ID).get(first_id) is None
 
         session.rollback()
         with pytest.raises(IntegrityError):

@@ -135,6 +135,7 @@ SSE 只用于提示状态变化。任何关键操作完成后，前端以资源 
 - `GENERATION_REJECTED`
 - `BUDGET_CONFIRMATION_REQUIRED`
 - `STALE_SOURCE_CONFIRMATION_REQUIRED`
+- `AUTHENTICATION_REQUIRED`
 - `PERMISSION_DENIED`
 - `UPLOAD_REJECTED`
 
@@ -159,9 +160,13 @@ SSE 只用于提示状态变化。任何关键操作完成后，前端以资源 
 ### 鉴权与会话
 
 - 首选 OIDC/OAuth2；Web 使用 Secure、HttpOnly、SameSite Cookie。
+- 认证供应商通过服务端端口接入；未配置认证器或缺少有效会话时，受保护接口默认拒绝。
+- 可信身份解析为统一 `ActorContext`；测试身份只通过FastAPI依赖覆盖注入，不存在运行时测试Header旁路。
 - Cookie 写请求必须有 CSRF 防护；CORS 只允许明确来源。
 - 高风险管理操作要求近期重新认证或 MFA。
 - API 每次按组织、项目成员和资源归属校验，不能信任前端传入的组织 ID。
+- 跨组织或非成员访问项目资源返回404；同项目内角色不足返回403。
+- Worker和自动化保留系统主体用于审计，但数据访问仍使用目标任务所属组织作为租户作用域。
 
 ### 文件与对象存储
 

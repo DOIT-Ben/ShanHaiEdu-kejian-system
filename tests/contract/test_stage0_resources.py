@@ -12,6 +12,7 @@ from tests.contract.test_stage0_contracts import (
     response_schema,
     validate,
 )
+from tests.fakes.identity import configure_test_identity
 from tests.fakes.object_storage import FakeObjectStorage
 
 SHA256 = "a" * 64
@@ -40,6 +41,7 @@ async def test_project_upload_and_job_api_matches_stage0_contract(
         database_url=postgres_database_url,
     )
     app = create_app(settings=settings, object_storage=storage)
+    configure_test_identity(app)
     operation_ids = [
         operation["operationId"]
         for path in app.openapi()["paths"].values()

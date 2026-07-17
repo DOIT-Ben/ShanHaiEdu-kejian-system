@@ -14,7 +14,8 @@ from sqlalchemy.orm import Session
 
 from apps.api.database import utc_now
 from apps.api.errors import ApiError
-from apps.api.identity.models import SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID
+from apps.api.identity.context import ActorContext, ProjectAction
+from apps.api.identity.permissions import ProjectAccessService
 from apps.api.ids import new_uuid7
 from apps.api.jobs.models import GenerationJob
 from apps.api.jobs.schemas import AcceptedJobData
@@ -46,9 +47,16 @@ def normalized_etag(value: str) -> str:
 
 
 class UploadConfirmationService:
-    def __init__(self, *, session: Session, storage: ObjectStorage) -> None:
+    def __init__(
+        self,
+        *,
+        session: Session,
+        storage: ObjectStorage,
+        actor: ActorContext,
+    ) -> None:
         self._session = session
         self._storage = storage
+        self._actor = actor
 
     def confirm(
         self,
@@ -67,10 +75,14 @@ class UploadConfirmationService:
         }
         idempotency = IdempotencyService(
             self._session,
-            SYSTEM_ORGANIZATION_ID,
+            self._actor.organization_id,
             ttl_seconds=idempotency_ttl_seconds,
         )
         with self._session.begin():
+            ProjectAccessService(self._session, self._actor).require(
+                project_id,
+                ProjectAction.GENERATE,
+            )
             replay = idempotency.lookup(
                 scope="material_uploads.confirm",
                 key=idempotency_key,
@@ -130,11 +142,16 @@ class UploadConfirmationService:
         payload: ConfirmUploadRequest,
         request_id: str,
     ) -> CommandResult:
+        ProjectAccessService(self._session, self._actor).require(
+            project_id,
+            ProjectAction.GENERATE,
+            for_update=True,
+        )
         upload = self._find_upload(project_id, material_id, upload_session_id)
         if upload is None or upload.status != "created" or upload.expires_at <= utc_now():
             raise self._upload_rejected("The upload session is no longer confirmable.")
         material = self._session.get(SourceMaterial, material_id)
-        if material is None or material.organization_id != SYSTEM_ORGANIZATION_ID:
+        if material is None or material.organization_id != self._actor.organization_id:
             raise self._upload_rejected("The upload material is unavailable.")
         job = self._persist_confirmation(
             upload=upload,
@@ -145,7 +162,7 @@ class UploadConfirmationService:
             idempotency_key=idempotency_key,
             payload=payload,
         )
-        events = EventWriter(self._session, SYSTEM_ORGANIZATION_ID)
+        events = EventWriter(self._session, self._actor.organization_id)
         events.append(
             project_id=project_id,
             event_type="material.upload.confirmed",
@@ -176,7 +193,7 @@ class UploadConfirmationService:
         asset_id = new_uuid7()
         version_id = new_uuid7()
         destination_key = (
-            f"organizations/{SYSTEM_ORGANIZATION_ID}/file-assets/{asset_id}/"
+            f"organizations/{self._actor.organization_id}/file-assets/{asset_id}/"
             f"versions/{version_id}/source.pdf"
         )
         try:
@@ -227,7 +244,7 @@ class UploadConfirmationService:
             UploadSession.id == upload_id,
             UploadSession.project_id == project_id,
             UploadSession.material_id == material_id,
-            UploadSession.organization_id == SYSTEM_ORGANIZATION_ID,
+            UploadSession.organization_id == self._actor.organization_id,
             UploadSession.deleted_at.is_(None),
         )
         if lock:
@@ -264,19 +281,19 @@ class UploadConfirmationService:
     ) -> FileAsset:
         asset = FileAsset(
             id=asset_id,
-            organization_id=SYSTEM_ORGANIZATION_ID,
+            organization_id=self._actor.organization_id,
             asset_key=f"material:{material.id}",
             asset_kind="source_material",
             status="active",
             retention_class="project_source",
-            created_by=SYSTEM_PRINCIPAL_ID,
-            updated_by=SYSTEM_PRINCIPAL_ID,
+            created_by=self._actor.principal_id,
+            updated_by=self._actor.principal_id,
         )
         self._session.add(asset)
         self._session.flush()
         version = FileAssetVersion(
             id=version_id,
-            organization_id=SYSTEM_ORGANIZATION_ID,
+            organization_id=self._actor.organization_id,
             file_asset_id=asset.id,
             version_no=1,
             storage_bucket=metadata.bucket,
@@ -288,15 +305,15 @@ class UploadConfirmationService:
             scan_status="pending",
             metadata_json={},
             created_at=created_at,
-            created_by=SYSTEM_PRINCIPAL_ID,
+            created_by=self._actor.principal_id,
         )
         self._session.add(version)
         self._session.flush()
         asset.current_version_id = version.id
         return asset
 
-    @staticmethod
     def _mark_confirmed(
+        self,
         upload: UploadSession,
         material: SourceMaterial,
         asset: FileAsset,
@@ -305,12 +322,12 @@ class UploadConfirmationService:
         material.file_asset_id = asset.id
         material.upload_status = "confirmed"
         material.confirmed_at = confirmed_at
-        material.confirmed_by = SYSTEM_PRINCIPAL_ID
-        material.updated_by = SYSTEM_PRINCIPAL_ID
+        material.confirmed_by = self._actor.principal_id
+        material.updated_by = self._actor.principal_id
         material.lock_version += 1
         upload.status = "confirmed"
         upload.confirmed_at = confirmed_at
-        upload.updated_by = SYSTEM_PRINCIPAL_ID
+        upload.updated_by = self._actor.principal_id
         upload.lock_version += 1
 
     def _create_job(
@@ -322,7 +339,7 @@ class UploadConfirmationService:
     ) -> GenerationJob:
         return GenerationJob(
             id=new_uuid7(),
-            organization_id=SYSTEM_ORGANIZATION_ID,
+            organization_id=self._actor.organization_id,
             project_id=upload.project_id,
             source_material_id=material.id,
             job_type="material.inspect",
@@ -332,8 +349,8 @@ class UploadConfirmationService:
             idempotency_key=idempotency_key,
             request_hash=self._request_hash(upload, payload),
             priority=100,
-            created_by=SYSTEM_PRINCIPAL_ID,
-            updated_by=SYSTEM_PRINCIPAL_ID,
+            created_by=self._actor.principal_id,
+            updated_by=self._actor.principal_id,
         )
 
     def _validate_confirmation_payload(

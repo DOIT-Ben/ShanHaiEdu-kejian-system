@@ -12,7 +12,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.errors import ApiError
-from apps.api.identity.models import SYSTEM_ORGANIZATION_ID
 from apps.api.reliability.models import EventStreamEntry
 
 
@@ -37,8 +36,9 @@ def parse_last_event_id(value: str | None) -> int:
 
 
 class EventReplayRepository:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, organization_id: UUID) -> None:
         self._session = session
+        self._organization_id = organization_id
 
     def replay(
         self,
@@ -52,7 +52,7 @@ class EventReplayRepository:
         statement = (
             select(EventStreamEntry)
             .where(
-                EventStreamEntry.organization_id == SYSTEM_ORGANIZATION_ID,
+                EventStreamEntry.organization_id == self._organization_id,
                 EventStreamEntry.project_id == project_id,
                 EventStreamEntry.sequence_no > after_sequence,
             )
@@ -71,7 +71,7 @@ class EventReplayRepository:
             return
         minimum = self._session.scalar(
             select(func.min(EventStreamEntry.sequence_no)).where(
-                EventStreamEntry.organization_id == SYSTEM_ORGANIZATION_ID,
+                EventStreamEntry.organization_id == self._organization_id,
                 EventStreamEntry.project_id == project_id,
             )
         )
@@ -96,6 +96,7 @@ def encode_heartbeat() -> str:
 def stream_events(
     session_factory: sessionmaker[Session],
     *,
+    organization_id: UUID,
     project_id: UUID,
     after_sequence: int,
     resource: tuple[Literal["generation_job"], UUID] | None,
@@ -106,7 +107,7 @@ def stream_events(
     last_activity = time.monotonic()
     while True:
         with session_factory() as session:
-            entries = EventReplayRepository(session).replay(
+            entries = EventReplayRepository(session, organization_id).replay(
                 project_id=project_id,
                 after_sequence=cursor,
                 resource=resource,
