@@ -4,7 +4,7 @@
 
 验证基线：`main`，提交以本文件所在版本为准
 
-当前阶段：阶段0——协作与工程基线
+当前阶段：阶段0出口尚未关闭；阶段1后端轨道按Decision #18受控并行
 
 本文件只描述现在，不保存开发日志。任务细节、负责人、讨论和交接以GitHub Issue与Pull Request为准。
 
@@ -40,17 +40,32 @@
 ## 当前活跃任务
 
 - [Issue #4：重新外包生产级前端实现](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)
+- [Issue #19：完成阶段1最小可运行后端基座](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/19)
 
-## 后续任务
+## 下一实施任务
+
+- [Issue #21：建立租户、用户和项目授权边界](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/21)
+
+## 等待中的联调任务
 
 - [Issue #11：与Issue #4完成合同联调](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)
+
+## 受控并行边界
+
+[Decision #18](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/18)只调整实施时序，不改变阶段定义或出口：
+
+- Issue #2和Issue #11继续保持阶段0未完成事实；没有前端Draft PR时不启动#11，也不用后端临时页面替代联调。
+- 不依赖前端的阶段1后端任务按父Issue #19及其子Issue推进；先完成#21，再按依赖开放后续波次。
+- 同时处于实施、评审或仍有未合并Draft PR的后端主任务不超过三个。
+- 普通CI和业务测试使用确定性Fake；Provider适配变更和阶段出口使用受控真实冒烟。
+- Codex不修改或代写`apps/web`；阶段1后端通过不等于阶段1教师端或产品里程碑完成。
 
 ## 当前限制
 
 - 新前端承接方尚未从Issue #4建立Draft PR和工程预览。
 - 图片、视频和TTS供应商的真实开发凭据尚未进入受控环境。
 
-这些限制不阻塞普通CI和确定性Fake后端任务，但会阻止前端真实联调和阶段0真实文本模型出口验收。
+这些限制不阻塞普通CI、确定性Fake和阶段1后端基础任务，但会阻止前端真实联调以及图片、视频和TTS阶段出口验收。
 
 ## 下一个阶段出口
 
@@ -62,6 +77,8 @@
 - OpenAPI与JSON Schema进入自动校验。
 - 后端可以通过测试或命令行完成项目、上传、异步任务和SSE的最小贯通。
 - 前端可以基于合同完成对应Mock路径，并开始真实API联调。
+
+阶段1后端轨道的下一门禁是#21合并；随后才开放课时、文件资产和内容/工作流运行时三个并行任务。完整依赖、测试和回退要求以父Issue #19为准。
 
 ## 接手提示
 
