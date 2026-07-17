@@ -729,6 +729,7 @@ dependencies = [
     { name = "dramatiq", extra = ["redis"] },
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "jsonschema", extra = ["format"] },
     { name = "minio" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic-settings" },
@@ -740,7 +741,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "jsonschema", extra = ["format"] },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -755,6 +755,7 @@ requires-dist = [
     { name = "dramatiq", extras = ["redis"], specifier = ">=2.2,<3" },
     { name = "fastapi", specifier = ">=0.115,<1" },
     { name = "httpx", specifier = ">=0.28,<1" },
+    { name = "jsonschema", extras = ["format"], specifier = ">=4.25,<5" },
     { name = "minio", specifier = ">=7.2,<8" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
     { name = "pydantic-settings", specifier = ">=2.8,<3" },
@@ -766,7 +767,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "jsonschema", extras = ["format"], specifier = ">=4.25,<5" },
     { name = "pyright", specifier = ">=1.1.400,<2" },
     { name = "pytest", specifier = ">=8.3,<10" },
     { name = "pytest-asyncio", specifier = ">=0.25,<2" },
