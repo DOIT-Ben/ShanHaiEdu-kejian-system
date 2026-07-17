@@ -41,7 +41,7 @@ def test_job_facts_do_not_require_redis(migrated_database_url: str) -> None:
                 organization_id=SYSTEM_ORGANIZATION_ID,
                 project_id=project.id,
                 source_material_id=material.id,
-                job_type="material.inspect",
+                job_type="material.parse",
                 status="queued",
                 progress_percent=0,
                 priority=100,

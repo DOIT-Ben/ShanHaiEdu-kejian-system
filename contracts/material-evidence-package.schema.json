@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shanhaiedu.example/contracts/material-evidence-package.schema.json",
+  "title": "Material evidence package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "source", "parser", "pages"],
+  "properties": {
+    "schema_version": {"const": "material-evidence-package.v1"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file_asset_version_id", "sha256", "mime_type", "byte_size"],
+      "properties": {
+        "file_asset_version_id": {"type": "string", "format": "uuid"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "mime_type": {"const": "application/pdf"},
+        "byte_size": {"type": "integer", "minimum": 1}
+      }
+    },
+    "parser": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 120},
+        "version": {"type": "string", "minLength": 1, "maxLength": 80}
+      }
+    },
+    "pages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/page"}
+    }
+  },
+  "$defs": {
+    "bbox": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "array",
+          "prefixItems": [
+            {"type": "number"},
+            {"type": "number"},
+            {"type": "number"},
+            {"type": "number"}
+          ],
+          "items": false,
+          "minItems": 4,
+          "maxItems": 4
+        }
+      ]
+    },
+    "text_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["block_id", "text", "text_checksum", "bbox"],
+      "properties": {
+        "block_id": {"type": "string", "minLength": 1, "maxLength": 120},
+        "text": {"type": "string"},
+        "text_checksum": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "bbox": {"$ref": "#/$defs/bbox"}
+      }
+    },
+    "image_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image_id", "object_name", "kind"],
+      "properties": {
+        "image_id": {"type": "string", "minLength": 1, "maxLength": 120},
+        "object_name": {"type": "string", "minLength": 1, "maxLength": 512},
+        "kind": {"const": "embedded"}
+      }
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["page_number", "text_blocks", "image_references"],
+      "properties": {
+        "page_number": {"type": "integer", "minimum": 1},
+        "text_blocks": {"type": "array", "items": {"$ref": "#/$defs/text_block"}},
+        "image_references": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/image_reference"}
+        }
+      }
+    }
+  }
+}

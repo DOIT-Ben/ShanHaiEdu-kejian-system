@@ -1365,6 +1365,7 @@ components:
         - id
         - source_material_id
         - file_asset_version_id
+        - generation_job_id
         - version_no
         - status
         - parser_name
@@ -1385,6 +1386,11 @@ components:
           format: uuid
         file_asset_version_id:
           type: string
+          format: uuid
+        generation_job_id:
+          type:
+            - string
+            - 'null'
           format: uuid
         version_no:
           type: integer

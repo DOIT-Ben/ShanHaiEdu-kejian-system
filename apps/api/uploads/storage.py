@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from datetime import timedelta
+from pathlib import Path
 from typing import Protocol
 
 import certifi
@@ -53,6 +54,15 @@ class ObjectStorage(Protocol):
     ) -> ObjectMetadata: ...
 
     def delete(self, *, bucket: str, key: str) -> None: ...
+
+    def download_to_path(
+        self,
+        *,
+        bucket: str,
+        key: str,
+        destination: Path,
+        max_bytes: int,
+    ) -> int: ...
 
 
 class MinioObjectStorage:
@@ -152,6 +162,39 @@ class MinioObjectStorage:
             self._client.remove_object(bucket, key)
         except (S3Error, HTTPError) as exc:
             raise ObjectStorageError("object storage cleanup failed") from exc
+
+    def download_to_path(
+        self,
+        *,
+        bucket: str,
+        key: str,
+        destination: Path,
+        max_bytes: int,
+    ) -> int:
+        if max_bytes <= 0:
+            raise ValueError("object storage download limit must be positive")
+        response = None
+        try:
+            response = self._client.get_object(bucket, key)
+            size_header = response.headers.get("content-length")
+            if size_header is not None and int(size_header) > max_bytes:
+                raise ObjectStorageError("object storage object exceeds download limit")
+            bytes_written = 0
+            with destination.open("wb") as output:
+                while chunk := response.read(64 * 1024):
+                    bytes_written += len(chunk)
+                    if bytes_written > max_bytes:
+                        raise ObjectStorageError("object storage object exceeds download limit")
+                    output.write(chunk)
+            return bytes_written
+        except (S3Error, HTTPError, OSError, ValueError) as exc:
+            raise ObjectStorageError("object storage download failed") from exc
+        finally:
+            if response is not None:
+                response.close()
+                response.release_conn()
+            if destination.exists() and destination.stat().st_size > max_bytes:
+                destination.unlink(missing_ok=True)
 
 
 def build_object_storage(settings: Settings) -> ObjectStorage | None:

@@ -76,6 +76,27 @@ class FileAssetRepository:
             statement = statement.with_for_update(of=MaterialParseVersion)
         return self._session.scalar(statement)
 
+    def get_parse_for_job(
+        self,
+        generation_job_id: UUID,
+        *,
+        for_update: bool = False,
+    ) -> MaterialParseVersion | None:
+        statement = (
+            select(MaterialParseVersion)
+            .join(SourceMaterial, SourceMaterial.id == MaterialParseVersion.source_material_id)
+            .where(
+                MaterialParseVersion.generation_job_id == generation_job_id,
+                MaterialParseVersion.organization_id == self._actor.organization_id,
+                SourceMaterial.organization_id == self._actor.organization_id,
+                SourceMaterial.deleted_at.is_(None),
+            )
+        )
+        statement = self._scope_to_member(statement, SourceMaterial.project_id)
+        if for_update:
+            statement = statement.with_for_update(of=MaterialParseVersion)
+        return self._session.scalar(statement)
+
     def list_parse_versions(
         self,
         project_id: UUID,

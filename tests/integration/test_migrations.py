@@ -61,7 +61,21 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
     run_migration(postgres_database_url, "head")
     assert EXPECTED_TABLES.issubset(set(inspect(engine).get_table_names()))
 
-    assert ScriptDirectory.from_config(config).get_current_head() == "b7c9d1e3f502"
+    database_inspector = inspect(engine)
+    parse_columns = {
+        column["name"] for column in database_inspector.get_columns("material_parse_versions")
+    }
+    parse_indexes = {
+        index["name"] for index in database_inspector.get_indexes("material_parse_versions")
+    }
+    parse_foreign_keys = {
+        foreign_key["name"]
+        for foreign_key in database_inspector.get_foreign_keys("material_parse_versions")
+    }
+    assert "generation_job_id" in parse_columns
+    assert "uq_material_parse_versions_generation_job" in parse_indexes
+    assert "fk_material_parse_versions_generation_job" in parse_foreign_keys
+    assert ScriptDirectory.from_config(config).get_current_head() == "c8d0e2f4a603"
     previous = os.environ.get("SHANHAI_DATABASE_URL")
     os.environ["SHANHAI_DATABASE_URL"] = postgres_database_url
     try:
