@@ -434,9 +434,9 @@ export interface components {
             status: "draft" | "active" | "archived";
             automation_mode: components["schemas"]["AutomationMode"];
             /** Format: uuid */
-            content_release_id: string;
+            content_release_id?: string;
             /** Format: uuid */
-            workflow_definition_version_id: string;
+            workflow_definition_version_id?: string;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -632,17 +632,18 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
-            workflow_run_id: string;
+            workflow_run_id?: string;
             /** Format: uuid */
-            branch_run_id: string | null;
+            branch_run_id?: string | null;
             node_key: string;
-            run_no: number;
+            run_no?: number;
             status: components["schemas"]["workflow-node-status.schema"];
-            stale_reason: Record<string, never> | null;
+            title?: string;
+            stale_reason?: Record<string, never> | null;
             /** Format: date-time */
-            started_at: string | null;
+            started_at?: string | null;
             /** Format: date-time */
-            finished_at: string | null;
+            finished_at?: string | null;
         };
         WorkflowRun: {
             /** Format: uuid */
@@ -662,7 +663,7 @@ export interface components {
         WorkflowEnvelope: {
             data: {
                 project: components["schemas"]["Project"];
-                workflow_run: components["schemas"]["WorkflowRun"] | null;
+                workflow_run?: components["schemas"]["WorkflowRun"] | null;
                 lessons: Record<string, never>[];
                 node_runs: components["schemas"]["NodeRun"][];
             };

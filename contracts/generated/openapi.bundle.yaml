@@ -719,8 +719,6 @@ components:
         - knowledge_point
         - status
         - automation_mode
-        - content_release_id
-        - workflow_definition_version_id
         - created_at
         - updated_at
       properties:
@@ -1323,14 +1321,8 @@ components:
       additionalProperties: false
       required:
         - id
-        - workflow_run_id
-        - branch_run_id
         - node_key
-        - run_no
         - status
-        - stale_reason
-        - started_at
-        - finished_at
       properties:
         id:
           type: string
@@ -1350,6 +1342,8 @@ components:
           minimum: 1
         status:
           $ref: '#/components/schemas/workflow-node-status.schema'
+        title:
+          type: string
         stale_reason:
           type:
             - object
@@ -1416,7 +1410,6 @@ components:
           additionalProperties: false
           required:
             - project
-            - workflow_run
             - lessons
             - node_runs
           properties:
