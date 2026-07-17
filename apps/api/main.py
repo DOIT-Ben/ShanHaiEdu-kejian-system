@@ -19,6 +19,7 @@ from apps.api.projects.router import router as projects_router
 from apps.api.settings import Settings, get_settings
 from apps.api.uploads.router import router as uploads_router
 from apps.api.uploads.storage import ObjectStorage, build_object_storage
+from apps.api.workflows.router import router as workflows_router
 
 
 def create_app(
@@ -61,6 +62,7 @@ def create_app(
     app.include_router(lessons_router)
     app.include_router(uploads_router)
     app.include_router(jobs_router)
+    app.include_router(workflows_router)
 
     @app.get("/health/live", tags=["system"], include_in_schema=False)
     @app.get("/api/v2/health/live", tags=["system"], operation_id="getLiveness")

@@ -638,7 +638,17 @@ components:
     Project:
       type: object
       additionalProperties: false
-      required: [id, title, subject, knowledge_point, status, automation_mode, created_at, updated_at]
+      required:
+        - id
+        - title
+        - subject
+        - knowledge_point
+        - status
+        - automation_mode
+        - content_release_id
+        - workflow_definition_version_id
+        - created_at
+        - updated_at
       properties:
         id: {type: string, format: uuid}
         title: {type: string}
@@ -649,6 +659,8 @@ components:
         status: {enum: [draft, active, archived]}
         automation_mode:
           $ref: '#/components/schemas/AutomationMode'
+        content_release_id: {type: string, format: uuid}
+        workflow_definition_version_id: {type: string, format: uuid}
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
     ProjectEnvelope:
@@ -937,22 +949,61 @@ components:
         request_id: {type: string, minLength: 1}
     NodeRun:
       type: object
-      required: [id, node_key, status]
+      additionalProperties: false
+      required:
+        - id
+        - workflow_run_id
+        - branch_run_id
+        - node_key
+        - run_no
+        - status
+        - stale_reason
+        - started_at
+        - finished_at
       properties:
         id: {type: string, format: uuid}
+        workflow_run_id: {type: string, format: uuid}
+        branch_run_id: {type: [string, 'null'], format: uuid}
         node_key: {type: string}
+        run_no: {type: integer, minimum: 1}
         status: {$ref: './workflow-node-status.schema.json'}
-        title: {type: string}
         stale_reason: {type: [object, 'null']}
+        started_at: {type: [string, 'null'], format: date-time}
+        finished_at: {type: [string, 'null'], format: date-time}
+    WorkflowRun:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - run_no
+        - status
+        - content_release_id
+        - workflow_definition_version_id
+        - started_at
+        - completed_at
+      properties:
+        id: {type: string, format: uuid}
+        run_no: {type: integer, minimum: 1}
+        status: {type: string, enum: [active, paused, completed, failed, cancelled]}
+        content_release_id: {type: string, format: uuid}
+        workflow_definition_version_id: {type: string, format: uuid}
+        started_at: {type: string, format: date-time}
+        completed_at: {type: [string, 'null'], format: date-time}
     WorkflowEnvelope:
       type: object
+      additionalProperties: false
       required: [data, request_id]
       properties:
         data:
           type: object
-          required: [project, lessons, node_runs]
+          additionalProperties: false
+          required: [project, workflow_run, lessons, node_runs]
           properties:
             project: {$ref: '#/components/schemas/Project'}
+            workflow_run:
+              oneOf:
+                - {$ref: '#/components/schemas/WorkflowRun'}
+                - {type: 'null'}
             lessons: {type: array, items: {type: object}}
             node_runs: {type: array, items: {$ref: '#/components/schemas/NodeRun'}}
         request_id: {type: string}

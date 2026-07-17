@@ -7,6 +7,7 @@ from uuid import UUID
 import httpx
 from sqlalchemy.orm import Session
 
+from apps.api.content_runtime.registry import BUILTIN_RUNTIME_DEFAULTS
 from apps.api.database import build_session_factory
 from apps.api.identity.context import AuthenticatedIdentity, system_actor
 from apps.api.identity.dependencies import get_authenticated_identity
@@ -328,6 +329,10 @@ def test_worker_uses_system_principal_with_tenant_scoped_job(
                 status="draft",
                 automation_mode="assisted",
                 owner_principal_id=OWNER_PRINCIPAL,
+                content_release_id=BUILTIN_RUNTIME_DEFAULTS.content_release_id,
+                workflow_definition_version_id=(
+                    BUILTIN_RUNTIME_DEFAULTS.workflow_definition_version_id
+                ),
                 created_by=OWNER_PRINCIPAL,
                 updated_by=OWNER_PRINCIPAL,
             )

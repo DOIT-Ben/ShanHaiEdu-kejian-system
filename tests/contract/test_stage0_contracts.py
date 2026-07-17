@@ -63,7 +63,18 @@ def response_schema(
             return load_json(CONTRACTS / reference[2:])
     wrapped = deepcopy(schema)
     wrapped["components"] = deepcopy(openapi["components"])
-    return wrapped
+    return resolve_external_refs(wrapped)
+
+
+def resolve_external_refs(value: Any) -> Any:
+    if isinstance(value, list):
+        return [resolve_external_refs(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    reference = value.get("$ref")
+    if isinstance(reference, str) and reference.startswith("./"):
+        return resolve_external_refs(load_json(CONTRACTS / reference[2:]))
+    return {key: resolve_external_refs(item) for key, item in value.items()}
 
 
 def validate(instance: dict[str, Any], schema: dict[str, Any]) -> None:

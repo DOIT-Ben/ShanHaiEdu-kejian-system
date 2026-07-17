@@ -23,7 +23,11 @@ class WorkflowGraph:
     nodes: tuple[WorkflowNodeDefinition, ...]
 
 
-def validate_workflow_graph(graph: WorkflowGraph) -> tuple[str, ...]:
+def validate_workflow_graph(
+    graph: WorkflowGraph,
+    *,
+    available_contract_refs: frozenset[str] | None = None,
+) -> tuple[str, ...]:
     keys = [node.node_key for node in graph.nodes]
     if len(keys) != len(set(keys)):
         raise WorkflowDefinitionError("workflow graph contains duplicate node_key values")
@@ -36,6 +40,14 @@ def validate_workflow_graph(graph: WorkflowGraph) -> tuple[str, ...]:
             raise WorkflowDefinitionError(
                 f"workflow node {node.node_key} has missing dependencies: {sorted(missing)}"
             )
+        if available_contract_refs is not None:
+            referenced = set(node.input_contract_refs) | set(node.output_contract_refs)
+            missing_contracts = referenced - available_contract_refs
+            if missing_contracts:
+                raise WorkflowDefinitionError(
+                    f"workflow node {node.node_key} has missing contract refs: "
+                    f"{sorted(missing_contracts)}"
+                )
 
     ordered: list[str] = []
     visiting: set[str] = set()
