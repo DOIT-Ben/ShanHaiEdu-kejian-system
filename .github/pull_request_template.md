@@ -32,6 +32,15 @@ Closes #
 
 真实界面或产物：
 
+## CURRENT_STATUS新鲜度
+
+以下两项必须且只能勾选一项：
+
+- [ ] `status-update-required`：本PR导致进入新里程碑、可演示能力实质变化、新增或解除阶段阻塞，或下一阶段出口改变；已同步`CURRENT_STATUS.md`。
+- [ ] `status-update-not-required`：本PR不改变上述状态事实。
+
+判断依据：
+
 ## 迁移与回退
 
 数据或合同兼容方式：
