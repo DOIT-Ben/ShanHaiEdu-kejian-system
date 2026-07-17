@@ -22,9 +22,11 @@
 - `prompt-template.schema.json`：业务Prompt分层、Context白名单和教师修订策略。
 - `projection-template.schema.json`：结构化事实到完整提示词和教师可读文档的确定性投影。
 - `generation-template.schema.json`：输入、风格、Prompt、输出、投影和逻辑能力的组合。
+- `workflow-node-generation-binding.schema.json`：业务节点执行类型、生成模板、三类参考策略、校验修复和审核策略的声明式绑定目录。
 - `markdown-template-draft.schema.json`：普通Markdown导入后的可审核模板草稿。
 - `mock-scenarios.json`：前端必须覆盖的关键 Mock 场景。
 - `fixtures/stage0/`：项目、上传、任务、工作流聚合、错误和SSE的确定性合同样例。
+- `fixtures/workflow-node-generation-bindings/`：覆盖教材、课时、教案、三类九套、PPT、图片、视频、音频和交付的完整脱敏节点目录样例。
 - `generated/`：由当前OpenAPI确定性生成的bundle和TypeScript类型，不是第二份手工合同。
 - `typescript/client.ts`：基于生成paths和openapi-fetch的共享客户端工厂。
 
@@ -36,8 +38,10 @@
 4. 未在合同中定义的供应商字段只能停留在后端适配层，不能泄漏为前端依赖。
 5. Schema ID 和枚举值一经发布不得改变语义。
 6. 内容包导出稳定键、类型、版本和语义哈希，不导出数据库UUID、密钥、平台安全层正文、Provider私有参数、项目数据或运行快照。
-7. 教师可见完整提示词和Markdown是结构化事实的投影；教师自由修改保存为运行修订，不形成第二套内容模板。
+7. 教师公共界面只获得一段完整、可修改的业务提示词；内部模板、handbook、Context装配细节、输出Schema、校验修复和Provider格式只保存在服务端，不进入教师公共投影。
 8. Markdown只作为管理员导入与预览格式；发布前必须编译为结构化内容定义，不能直接成为运行时事实源。
+9. 教师提示词修订不能改变字段、类型、必填项和十段/十二段等结构；结构调整只能由管理员发布新的不可变内容与生成模板版本。
+10. 节点未显式声明Context或参考资产时一律禁止装配；规范资料、结构化Context和媒体参考资产必须分别校验与快照。
 
 ## 本地命令
 
@@ -65,4 +69,11 @@ uv run python scripts/inspect_markdown_template.py contracts\fixtures\markdown-t
 uv run python scripts/update_content_package_hashes.py contracts\fixtures\generation-template-package
 uv run python scripts/validate_content_package.py contracts\fixtures\generation-template-package
 uv run pytest tests\contract\test_generation_template_contracts.py
+```
+
+校验全流程节点绑定目录：
+
+```powershell
+uv run python scripts\validate_workflow_node_catalog.py contracts\fixtures\workflow-node-generation-bindings\primary-math-courseware.json
+uv run pytest tests\contract\test_workflow_node_generation_binding.py
 ```
