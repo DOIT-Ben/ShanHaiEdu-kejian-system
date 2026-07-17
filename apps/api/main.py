@@ -17,6 +17,7 @@ from apps.api.lessons.router import router as lessons_router
 from apps.api.logging import configure_logging
 from apps.api.middleware import RequestContextMiddleware
 from apps.api.projects.router import router as projects_router
+from apps.api.prompt_runtime.router import router as prompt_runtime_router
 from apps.api.settings import Settings, get_settings
 from apps.api.uploads.router import router as uploads_router
 from apps.api.uploads.storage import ObjectStorage, build_object_storage
@@ -61,6 +62,7 @@ def create_app(
     app.include_router(artifacts_router)
     app.include_router(assets_router)
     app.include_router(projects_router)
+    app.include_router(prompt_runtime_router)
     app.include_router(lessons_router)
     app.include_router(uploads_router)
     app.include_router(jobs_router)

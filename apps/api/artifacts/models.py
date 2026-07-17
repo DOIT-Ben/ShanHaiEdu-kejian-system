@@ -128,8 +128,22 @@ class ArtifactVersion(Base):
     source_node_run_id: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("node_runs.id", ondelete="RESTRICT")
     )
-    context_snapshot_id: Mapped[UUID | None] = mapped_column(Uuid)
-    prompt_snapshot_id: Mapped[UUID | None] = mapped_column(Uuid)
+    context_snapshot_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey(
+            "context_snapshots.id",
+            name="fk_artifact_versions_context_snapshot",
+            ondelete="RESTRICT",
+        ),
+    )
+    prompt_snapshot_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey(
+            "prompt_snapshots.id",
+            name="fk_artifact_versions_prompt_snapshot",
+            ondelete="RESTRICT",
+        ),
+    )
     validation_report_json: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=dict
     )

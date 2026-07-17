@@ -2,14 +2,25 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class ModelCapability(StrEnum):
     TEXT_SMOKE = "text.smoke"
+
+
+@dataclass(frozen=True, slots=True)
+class ModelAuditContext:
+    organization_id: UUID
+    user_id: UUID | None
+    project_id: UUID
+    node_run_id: UUID
+    generation_job_id: UUID | None
 
 
 class GatewayErrorCode(StrEnum):
@@ -53,7 +64,7 @@ class ModelUsage(BaseModel):
     completion_tokens: int = Field(ge=0)
     total_tokens: int = Field(ge=0)
     cost: Decimal | None = Field(default=None, ge=0)
-    currency: str = "USD"
+    currency: str = Field(default="USD", pattern=r"^[A-Z]{3}$")
 
 
 class TextProviderResult(BaseModel):
