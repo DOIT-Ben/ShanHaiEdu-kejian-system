@@ -128,7 +128,7 @@ def write_compiled_content_package(
         ) from exc
     finally:
         if temporary.exists():
-            shutil.rmtree(temporary)
+            shutil.rmtree(temporary, ignore_errors=True)
 
 
 def _validate_instance(value: Mapping[str, Any], schema_path: Path, code: str) -> None:
@@ -288,6 +288,8 @@ def _build_leaf_output_field(
         **_common_output_field(key, label, section),
         "type": field_type,
     }
+    if field_type == "repeatable":
+        value["repeatable"] = True
     mode = cast(str, section["content_mode"])
     if body and mode in {"fixed", "teacher_input", "mixed"}:
         value["default_value"] = body

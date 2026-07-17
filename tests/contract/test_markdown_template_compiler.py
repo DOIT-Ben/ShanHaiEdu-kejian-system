@@ -145,6 +145,24 @@ def test_hidden_sections_remain_structured_but_are_absent_from_teacher_projectio
     assert "board" not in projection["allowed_variables"]
 
 
+def test_repeatable_section_without_subsections_keeps_explicit_repeatable_semantics() -> None:
+    draft = ready_draft()
+    draft["sections"][2]["repeatable"] = True
+    compiled = compile_markdown_template(
+        draft,
+        compilation_profile(),
+        contracts_root=CONTRACTS,
+    )
+    output_fields = cast(
+        list[dict[str, Any]],
+        item_spec(compiled, "math_comic_lesson.output")["fields"],
+    )
+
+    goals = field_by_key(output_fields, "goals")
+    assert goals["type"] == "repeatable"
+    assert goals["repeatable"] is True
+
+
 def test_imported_body_never_becomes_a_role_or_hidden_prompt_layer() -> None:
     draft = ready_draft()
     imported_body = draft["sections"][5]["subsections"][0]["body_markdown"]
