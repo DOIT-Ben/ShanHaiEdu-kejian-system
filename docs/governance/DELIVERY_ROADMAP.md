@@ -203,6 +203,18 @@ MVP通过后增加：
 
 ## 8. 并行策略
 
+### 受控阶段重叠
+
+当一个阶段只被独立的前端或消费者联调门禁阻塞时，可以通过Decision Issue授权下一阶段中不依赖该门禁的后端基础任务提前启动。受控重叠必须同时满足：
+
+- 前一阶段和被阻塞任务继续保持未完成状态，不得用后端测试替代浏览器或消费者验收。
+- 下一阶段使用独立Milestone、父Issue和可独立验收的子Issue；每个子Issue仍使用短分支、仓库外worktree和Draft PR。
+- 合同、核心数据和统一状态机先于业务分支；依赖未满足的任务保持`status:ready`。
+- 所有阶段合计同时进行的后端主任务不超过三个；普通CI使用确定性Fake，Provider变更和阶段出口使用真实冒烟。
+- 发现产品、合同或数据语义冲突时停止受影响任务，回到Decision Issue裁决，不同时支持相反口径。
+
+当前应用由[Decision #18](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/18)授权：阶段0的Issue #2/#11保持未完成，阶段1后端按[父Issue #19](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/19)的依赖波次推进，不修改或代写`apps/web`。
+
 ### 可以并行
 
 - 前端基于已发布OpenAPI、Schema和MSW实现完整界面。
