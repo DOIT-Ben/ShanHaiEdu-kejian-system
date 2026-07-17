@@ -149,7 +149,7 @@ class SqlAlchemyAttemptAuditSink:
                     actual_cost=result.usage.cost,
                     currency=result.usage.currency,
                     latency_ms=latency_ms,
-                    provider_model=result.actual_model,
+                    provider_model=_bounded(result.actual_model, 160),
                 )
             )
 

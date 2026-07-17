@@ -99,6 +99,39 @@ async def test_adapter_rejects_invalid_success_shape() -> None:
     assert captured.value.code == GatewayErrorCode.INVALID_RESPONSE
 
 
+@pytest.mark.parametrize(
+    ("model", "cost"),
+    [
+        ("m" * 161, 0.001),
+        ("provider/actual-model", "1000000000000.000000"),
+    ],
+)
+async def test_adapter_rejects_audit_metadata_outside_database_bounds(
+    model: str,
+    cost: float | str,
+) -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "id": "provider-request-out-of-bounds",
+                "model": model,
+                "choices": [{"message": {"content": "SMOKE_OK"}, "finish_reason": "stop"}],
+                "usage": {
+                    "prompt_tokens": 5,
+                    "completion_tokens": 2,
+                    "total_tokens": 7,
+                    "cost": cost,
+                },
+            },
+        )
+
+    with pytest.raises(ModelGatewayError) as captured:
+        await provider(handler).complete(request())
+
+    assert captured.value.code == GatewayErrorCode.INVALID_RESPONSE
+
+
 async def test_non_json_provider_outage_remains_retryable() -> None:
     def handler(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(503, text="upstream unavailable")

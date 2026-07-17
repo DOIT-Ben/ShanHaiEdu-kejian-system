@@ -9,12 +9,17 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from apps.api.database import build_engine, build_session_factory, utc_now
 from apps.api.ids import new_uuid7
-from apps.api.model_gateway.audit import SqlAlchemyAttemptAuditSink
+from apps.api.model_gateway.audit import (
+    AttemptRequestAudit,
+    AttemptSuccessAudit,
+    SqlAlchemyAttemptAuditSink,
+)
 from apps.api.model_gateway.audit_models import GenerationAttempt, UsageRecord
 from apps.api.model_gateway.contracts import (
     ModelAuditContext,
     ModelCapability,
     ModelGatewayError,
+    ModelUsage,
     TextModelRequest,
 )
 from apps.api.model_gateway.fake import DeterministicFakeTextProvider, FakeScenario
@@ -154,6 +159,67 @@ def test_attempt_requires_consistent_terminal_fields(migrated_database_url: str)
         )
         with pytest.raises(IntegrityError):
             session.flush()
+
+
+def test_success_audit_bounds_provider_model_before_persistence(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session, session.begin():
+        actor = seed_test_actor(session)
+        project = ProjectRepository(session, actor).create(
+            CreateProjectRequest(title="Fractions", knowledge_point="One half")
+        )
+        run = WorkflowRuntimeService(session, actor).start_project_run(project.id)
+        node = WorkflowRuntimeService(session, actor).create_project_node_run(
+            run.id,
+            node_key="prepare",
+            status=NodeStatus.READY,
+        )
+
+    context = ModelAuditContext(
+        organization_id=actor.organization_id,
+        user_id=actor.user_id,
+        project_id=project.id,
+        node_run_id=node.id,
+        generation_job_id=None,
+    )
+    sink = SqlAlchemyAttemptAuditSink(factory)
+    attempt_id = sink.start(
+        context,
+        AttemptRequestAudit(
+            request_id="req-bounded-model",
+            capability="text.smoke",
+            request_hash="d" * 64,
+        ),
+        provider_name="provider-test",
+        provider_model="configured-model",
+        route_reason="configured_primary",
+    )
+    sink.succeed(
+        attempt_id,
+        context,
+        AttemptSuccessAudit(
+            provider_request_id="provider-request-bounded",
+            actual_model="m" * 161,
+            finish_reason="stop",
+            usage=ModelUsage(
+                prompt_tokens=5,
+                completion_tokens=2,
+                total_tokens=7,
+                cost=Decimal("0.001"),
+            ),
+        ),
+        latency_ms=12,
+    )
+
+    with factory() as session:
+        usage = session.scalar(
+            select(UsageRecord).where(UsageRecord.generation_attempt_id == attempt_id)
+        )
+
+    assert usage is not None
+    assert usage.provider_model == "m" * 160
 
 
 async def test_fake_gateway_success_and_failure_share_persistent_safe_audit(
