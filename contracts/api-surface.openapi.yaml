@@ -1033,6 +1033,7 @@ components:
         id: {type: string, format: uuid}
         source_material_id: {type: string, format: uuid}
         file_asset_version_id: {type: string, format: uuid}
+        generation_job_id: {type: [string, 'null'], format: uuid}
         version_no: {type: integer, minimum: 1}
         status: {type: string, enum: [pending, running, succeeded, failed]}
         parser_name: {type: string, minLength: 1}

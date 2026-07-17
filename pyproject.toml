@@ -11,6 +11,7 @@ dependencies = [
   "httpx>=0.28,<1",
   "jsonschema[format]>=4.25,<5",
   "minio>=7.2,<8",
+  "pypdf>=5.9,<7",
   "psycopg[binary]>=3.2,<4",
   "pydantic-settings>=2.8,<3",
   "redis>=6,<8",

@@ -34,6 +34,7 @@ class MaterialParseService:
         *,
         parser_name: str,
         parser_version: str,
+        generation_job_id: UUID | None = None,
     ) -> MaterialParseVersion:
         if not parser_name.strip() or len(parser_name) > 120:
             raise self._invalid_output("The parser name is invalid.")
@@ -45,11 +46,25 @@ class MaterialParseService:
         version = self._repository.get_file_version(file_asset_version_id)
         if version is None or version.file_asset_id != material.file_asset_id:
             raise self._invalid_source("The file version does not belong to the source material.")
+        if generation_job_id is not None:
+            existing = self._repository.get_parse_for_job(generation_job_id, for_update=True)
+            if existing is not None:
+                if (
+                    existing.source_material_id != source_material_id
+                    or existing.file_asset_version_id != file_asset_version_id
+                    or existing.parser_name != parser_name
+                    or existing.parser_version != parser_version
+                ):
+                    raise self._invalid_source(
+                        "The generation job is already bound to a different parse input."
+                    )
+                return existing
         parse = MaterialParseVersion(
             id=new_uuid7(),
             organization_id=self._actor.organization_id,
             source_material_id=material.id,
             file_asset_version_id=version.id,
+            generation_job_id=generation_job_id,
             version_no=self._repository.next_parse_version_no(material.id),
             status=ParseStatus.PENDING.value,
             parser_name=parser_name,

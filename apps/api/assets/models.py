@@ -143,6 +143,11 @@ class MaterialParseVersion(Base):
             "organization_id",
             "source_material_id",
         ),
+        Index(
+            "uq_material_parse_versions_generation_job",
+            "generation_job_id",
+            unique=True,
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
@@ -160,6 +165,14 @@ class MaterialParseVersion(Base):
             ondelete="RESTRICT",
         ),
         nullable=False,
+    )
+    generation_job_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey(
+            "generation_jobs.id",
+            name="fk_material_parse_versions_generation_job",
+            ondelete="RESTRICT",
+        ),
     )
     version_no: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False)

@@ -40,7 +40,7 @@ def seed_queued_job(session) -> tuple[GenerationJob, ActorContext]:
         organization_id=SYSTEM_ORGANIZATION_ID,
         project_id=project.id,
         source_material_id=material.id,
-        job_type="material.inspect",
+        job_type="material.parse",
         status="queued",
         progress_percent=0,
         priority=100,

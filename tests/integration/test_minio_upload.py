@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import timedelta
+from pathlib import Path
 from uuid import uuid4
 
 import httpx
@@ -13,7 +14,7 @@ from apps.api.uploads.storage import ObjectStorageError, build_object_storage
 
 
 @pytest.mark.integration
-def test_real_minio_presign_put_and_stat() -> None:
+def test_real_minio_presign_put_stat_copy_and_bounded_download(tmp_path: Path) -> None:
     settings = Settings(_env_file=None)
     if not (
         settings.object_storage_endpoint
@@ -60,6 +61,23 @@ def test_real_minio_presign_put_and_stat() -> None:
         )
         assert copied.key == immutable_key
         assert copied.sha256 == sha256
+        download_path = tmp_path / "downloaded.pdf"
+        assert storage.download_to_path(
+            bucket=settings.object_storage_bucket,
+            key=immutable_key,
+            destination=download_path,
+            max_bytes=len(content),
+        ) == len(content)
+        assert download_path.read_bytes() == content
+        rejected_path = tmp_path / "rejected.pdf"
+        with pytest.raises(ObjectStorageError):
+            storage.download_to_path(
+                bucket=settings.object_storage_bucket,
+                key=immutable_key,
+                destination=rejected_path,
+                max_bytes=len(content) - 1,
+            )
+        assert not rejected_path.exists()
         storage.delete(bucket=settings.object_storage_bucket, key=key)
         with pytest.raises(ObjectStorageError):
             storage.stat(bucket=settings.object_storage_bucket, key=key)

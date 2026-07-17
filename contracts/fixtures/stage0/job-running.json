@@ -2,7 +2,7 @@
   "data": {
     "id": "0198f1a0-7c10-7000-8000-000000000004",
     "project_id": "0198f1a0-7c10-7000-8000-000000000001",
-    "job_type": "material.inspect",
+    "job_type": "material.parse",
     "status": "running",
     "progress_percent": 40,
     "progress_message": "Inspecting uploaded material",

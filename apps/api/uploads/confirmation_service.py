@@ -347,7 +347,7 @@ class UploadConfirmationService:
             organization_id=self._actor.organization_id,
             project_id=upload.project_id,
             source_material_id=material.id,
-            job_type="material.inspect",
+            job_type="material.parse",
             status="queued",
             progress_percent=0,
             progress_message="Upload confirmed; inspection queued",

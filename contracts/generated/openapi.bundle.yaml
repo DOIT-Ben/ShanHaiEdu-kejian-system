@@ -1386,6 +1386,11 @@ components:
         file_asset_version_id:
           type: string
           format: uuid
+        generation_job_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
         version_no:
           type: integer
           minimum: 1

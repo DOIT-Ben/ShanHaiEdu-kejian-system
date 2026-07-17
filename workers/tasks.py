@@ -14,6 +14,7 @@ from apps.api.identity.context import ActorContext, system_actor
 from apps.api.jobs.models import GenerationJob
 from apps.api.jobs.service import GenerationJobService
 from apps.api.settings import get_settings
+from workers.material_parse import run_material_parse_job
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,24 @@ def run_deterministic_job(job_id: UUID, *, worker_id: str | None = None) -> str:
         engine.dispose()
 
 
+def run_generation_job(job_id: UUID, *, worker_id: str | None = None) -> str:
+    settings = get_settings()
+    if settings.database_url is None:
+        raise RuntimeError("worker database persistence is not configured")
+    resolved_worker_id = worker_id or f"{socket.gethostname()}:{uuid4()}"
+    engine = build_engine(settings.database_url.get_secret_value())
+    try:
+        with build_session_factory(engine)() as session:
+            job_type = session.scalar(
+                select(GenerationJob.job_type).where(GenerationJob.id == job_id)
+            )
+    finally:
+        engine.dispose()
+    if job_type == "material.parse":
+        return run_material_parse_job(job_id, worker_id=resolved_worker_id)
+    return run_deterministic_job(job_id, worker_id=resolved_worker_id)
+
+
 @dramatiq.actor(max_retries=5, min_backoff=1_000, max_backoff=30_000)
 def process_generation_job(job_id: str) -> None:
-    run_deterministic_job(UUID(job_id))
+    run_generation_job(UUID(job_id))

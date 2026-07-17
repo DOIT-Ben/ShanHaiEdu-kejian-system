@@ -140,6 +140,23 @@ SSE 只用于提示状态变化。任何关键操作完成后，前端以资源 
 - `AUTHENTICATION_REQUIRED`
 - `PERMISSION_DENIED`
 - `UPLOAD_REJECTED`
+- `PDF_MIME_UNSUPPORTED`
+- `PDF_SIZE_LIMIT_EXCEEDED`
+- `PDF_SIZE_MISMATCH`
+- `PDF_SIGNATURE_INVALID`
+- `PDF_CHECKSUM_MISMATCH`
+- `PDF_ENCRYPTED`
+- `PDF_DANGEROUS_STRUCTURE`
+- `PDF_PAGE_LIMIT_EXCEEDED`
+- `PDF_TEXT_LIMIT_EXCEEDED`
+- `PDF_TEXT_BLOCK_LIMIT_EXCEEDED`
+- `PDF_IMAGE_REFERENCE_LIMIT_EXCEEDED`
+- `PDF_PARSE_TIMEOUT`
+- `PDF_DAMAGED`
+- `PDF_EVIDENCE_INVALID`
+- `PDF_SOURCE_UNAVAILABLE`
+- `PDF_PARSE_CANCELLED`
+- `PDF_PARSE_INTERNAL_ERROR`
 
 `details` 只返回安全且能帮助用户纠正的问题；供应商完整错误进入受限日志和 Attempt 记录。
 
@@ -174,6 +191,7 @@ SSE 只用于提示状态变化。任何关键操作完成后，前端以资源 
 
 - 上传限制 MIME、扩展名、大小、页数、像素和时长，并进行恶意文件扫描。
 - Office/PDF 解析在无网络、低权限容器运行；禁止宏和嵌入脚本。
+- 本地 PDF 适配器使用独立隔离解释器、环境变量白名单、禁用 socket 入口、超时强杀和内容数量上限；生产部署仍必须在非 root、无外网、只挂载单个输入文件且配置 CPU/内存配额的媒体 Worker 容器中运行，应用级隔离不替代操作系统沙箱。
 - 预签名上传绑定对象键、大小和过期时间；确认时验证哈希和元数据。
 - 下载地址短期有效；私有桶禁止公开列目录。
 - 远程参考图只接受已上传资产；如支持 URL 导入，必须经 SSRF 防护代理，拦截内网和元数据地址。

@@ -113,6 +113,7 @@ def serialize_parse(parse: MaterialParseVersion) -> MaterialParseVersionRead:
             "id": parse.id,
             "source_material_id": parse.source_material_id,
             "file_asset_version_id": parse.file_asset_version_id,
+            "generation_job_id": parse.generation_job_id,
             "version_no": parse.version_no,
             "status": parse.status,
             "parser_name": parse.parser_name,

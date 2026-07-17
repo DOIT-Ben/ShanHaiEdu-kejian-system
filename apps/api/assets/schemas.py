@@ -43,6 +43,7 @@ class MaterialParseVersionRead(BaseModel):
     id: UUID
     source_material_id: UUID
     file_asset_version_id: UUID
+    generation_job_id: UUID | None = None
     version_no: int
     status: Literal["pending", "running", "succeeded", "failed"]
     parser_name: str
