@@ -12,9 +12,12 @@ EXPECTED_TABLES = {
     "file_asset_versions",
     "file_assets",
     "generation_jobs",
+    "idempotency_records",
     "organizations",
+    "outbox_events",
     "principals",
     "projects",
+    "event_stream_entries",
     "source_materials",
     "upload_sessions",
 }
@@ -32,4 +35,4 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
     run_migration(postgres_database_url, "head")
     assert EXPECTED_TABLES.issubset(set(inspect(engine).get_table_names()))
 
-    assert ScriptDirectory.from_config(config).get_current_head() == "3f62a6e7d901"
+    assert ScriptDirectory.from_config(config).get_current_head() == "c6b7d8e9f001"

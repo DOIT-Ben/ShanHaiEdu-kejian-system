@@ -55,35 +55,13 @@ class IdempotencyService:
     ) -> CommandResult:
         request_hash = canonical_request_hash(payload)
         self._lock_key(scope, key)
-        existing = self._session.scalar(
-            select(IdempotencyRecord).where(
-                IdempotencyRecord.organization_id == self._organization_id,
-                IdempotencyRecord.scope == scope,
-                IdempotencyRecord.idempotency_key == key,
-            )
-        )
-        now = utc_now()
-        if existing is not None and existing.expires_at <= now:
-            self._session.delete(existing)
-            self._session.flush()
-            existing = None
-        if existing is not None:
-            if existing.request_hash != request_hash:
-                raise ApiError(
-                    status_code=409,
-                    code="IDEMPOTENCY_CONFLICT",
-                    message="The idempotency key was already used for a different request.",
-                    details={"scope": scope},
-                )
-            return CommandResult(
-                status_code=existing.response_status,
-                body=existing.response_body_json,
-                resource_type=existing.resource_type,
-                resource_id=existing.resource_id,
-                replayed=True,
-            )
+        existing = self._find(scope, key)
+        replay = self._replay(existing, request_hash, scope)
+        if replay is not None:
+            return replay
 
         result = command()
+        now = utc_now()
         record = IdempotencyRecord(
             id=new_uuid7(),
             organization_id=self._organization_id,
@@ -100,6 +78,55 @@ class IdempotencyService:
         self._session.add(record)
         self._session.flush()
         return replace(result, replayed=False)
+
+    def lookup(
+        self,
+        *,
+        scope: str,
+        key: str,
+        payload: Mapping[str, Any],
+    ) -> CommandResult | None:
+        request_hash = canonical_request_hash(payload)
+        self._lock_key(scope, key)
+        return self._replay(self._find(scope, key), request_hash, scope)
+
+    def _find(self, scope: str, key: str) -> IdempotencyRecord | None:
+        existing = self._session.scalar(
+            select(IdempotencyRecord).where(
+                IdempotencyRecord.organization_id == self._organization_id,
+                IdempotencyRecord.scope == scope,
+                IdempotencyRecord.idempotency_key == key,
+            )
+        )
+        now = utc_now()
+        if existing is not None and existing.expires_at <= now:
+            self._session.delete(existing)
+            self._session.flush()
+            existing = None
+        return existing
+
+    @staticmethod
+    def _replay(
+        existing: IdempotencyRecord | None,
+        request_hash: str,
+        scope: str,
+    ) -> CommandResult | None:
+        if existing is None:
+            return None
+        if existing.request_hash != request_hash:
+            raise ApiError(
+                status_code=409,
+                code="IDEMPOTENCY_CONFLICT",
+                message="The idempotency key was already used for a different request.",
+                details={"scope": scope},
+            )
+        return CommandResult(
+            status_code=existing.response_status,
+            body=existing.response_body_json,
+            resource_type=existing.resource_type,
+            resource_id=existing.resource_id,
+            replayed=True,
+        )
 
     def _lock_key(self, scope: str, key: str) -> None:
         digest = hashlib.sha256(f"{self._organization_id}:{scope}:{key}".encode()).digest()

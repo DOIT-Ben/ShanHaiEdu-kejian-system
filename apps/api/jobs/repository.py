@@ -15,11 +15,12 @@ class GenerationJobRepository:
         self._session = session
         self._organization_id = organization_id
 
-    def get(self, job_id: UUID) -> GenerationJob | None:
-        return self._session.scalar(
-            select(GenerationJob).where(
-                GenerationJob.id == job_id,
-                GenerationJob.organization_id == self._organization_id,
-                GenerationJob.deleted_at.is_(None),
-            )
+    def get(self, job_id: UUID, *, for_update: bool = False) -> GenerationJob | None:
+        statement = select(GenerationJob).where(
+            GenerationJob.id == job_id,
+            GenerationJob.organization_id == self._organization_id,
+            GenerationJob.deleted_at.is_(None),
         )
+        if for_update:
+            statement = statement.with_for_update()
+        return self._session.scalar(statement)

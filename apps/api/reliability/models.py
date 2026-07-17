@@ -78,6 +78,7 @@ class OutboxEvent(Base):
     last_error: Mapped[str | None] = mapped_column(String(200))
     lease_owner: Mapped[str | None] = mapped_column(String(160))
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class EventStreamEntry(Base):

@@ -18,6 +18,8 @@ from apps.api.identity.models import SYSTEM_ORGANIZATION_ID, SYSTEM_PRINCIPAL_ID
 from apps.api.ids import new_uuid7
 from apps.api.jobs.models import GenerationJob
 from apps.api.jobs.schemas import AcceptedJobData
+from apps.api.reliability.events import EventResource, EventWriter
+from apps.api.reliability.idempotency import CommandResult, IdempotencyService
 from apps.api.uploads.models import FileAsset, FileAssetVersion, SourceMaterial, UploadSession
 from apps.api.uploads.schemas import ConfirmUploadRequest
 from apps.api.uploads.session_service import normalized_media_type
@@ -55,10 +57,31 @@ class UploadConfirmationService:
         material_id: UUID,
         idempotency_key: str,
         payload: ConfirmUploadRequest,
+        request_id: str,
+        idempotency_ttl_seconds: int,
     ) -> AcceptedJobData:
-        snapshot = self._snapshot(project_id, material_id, payload.upload_session_id)
+        idempotency_payload = {
+            "project_id": str(project_id),
+            "material_id": str(material_id),
+            **payload.model_dump(mode="json"),
+        }
+        idempotency = IdempotencyService(
+            self._session,
+            SYSTEM_ORGANIZATION_ID,
+            ttl_seconds=idempotency_ttl_seconds,
+        )
+        with self._session.begin():
+            replay = idempotency.lookup(
+                scope="material_uploads.confirm",
+                key=idempotency_key,
+                payload=idempotency_payload,
+            )
+        if replay is not None:
+            return AcceptedJobData.model_validate(replay.body)
+
+        with self._session.begin():
+            snapshot = self._snapshot(project_id, material_id, payload.upload_session_id)
         self._validate_confirmation_payload(snapshot, payload)
-        self._session.rollback()
         try:
             metadata = self._storage.stat(bucket=snapshot.bucket, key=snapshot.key)
         except ObjectStorageError as exc:
@@ -68,29 +91,85 @@ class UploadConfirmationService:
 
         try:
             with self._session.begin():
-                upload = self._find_upload(project_id, material_id, payload.upload_session_id)
-                if upload is None or upload.status != "created" or upload.expires_at <= utc_now():
-                    raise self._upload_rejected("The upload session is no longer confirmable.")
-                material = self._session.get(SourceMaterial, material_id)
-                if material is None or material.organization_id != SYSTEM_ORGANIZATION_ID:
-                    raise self._upload_rejected("The upload material is unavailable.")
-                job = self._persist_confirmation(
-                    upload=upload,
-                    material=material,
-                    asset_id=asset_id,
-                    version_id=version_id,
-                    metadata=immutable,
-                    idempotency_key=idempotency_key,
-                    payload=payload,
+                result = idempotency.execute(
+                    scope="material_uploads.confirm",
+                    key=idempotency_key,
+                    payload=idempotency_payload,
+                    command=lambda: self._confirmation_command(
+                        project_id=project_id,
+                        material_id=material_id,
+                        upload_session_id=payload.upload_session_id,
+                        asset_id=asset_id,
+                        version_id=version_id,
+                        metadata=immutable,
+                        idempotency_key=idempotency_key,
+                        payload=payload,
+                        request_id=request_id,
+                    ),
                 )
+                accepted = AcceptedJobData.model_validate(result.body)
+            if result.replayed:
+                self._delete_best_effort(immutable.bucket, immutable.key, role="replayed_copy")
         except Exception:
             self._delete_best_effort(immutable.bucket, immutable.key, role="immutable_copy")
             raise
-        self._delete_best_effort(snapshot.bucket, snapshot.key, role="temporary_upload")
-        return AcceptedJobData(
+        if not result.replayed:
+            self._delete_best_effort(snapshot.bucket, snapshot.key, role="temporary_upload")
+        return accepted
+
+    def _confirmation_command(
+        self,
+        *,
+        project_id: UUID,
+        material_id: UUID,
+        upload_session_id: UUID,
+        asset_id: UUID,
+        version_id: UUID,
+        metadata: ObjectMetadata,
+        idempotency_key: str,
+        payload: ConfirmUploadRequest,
+        request_id: str,
+    ) -> CommandResult:
+        upload = self._find_upload(project_id, material_id, upload_session_id)
+        if upload is None or upload.status != "created" or upload.expires_at <= utc_now():
+            raise self._upload_rejected("The upload session is no longer confirmable.")
+        material = self._session.get(SourceMaterial, material_id)
+        if material is None or material.organization_id != SYSTEM_ORGANIZATION_ID:
+            raise self._upload_rejected("The upload material is unavailable.")
+        job = self._persist_confirmation(
+            upload=upload,
+            material=material,
+            asset_id=asset_id,
+            version_id=version_id,
+            metadata=metadata,
+            idempotency_key=idempotency_key,
+            payload=payload,
+        )
+        events = EventWriter(self._session, SYSTEM_ORGANIZATION_ID)
+        events.append(
+            project_id=project_id,
+            event_type="material.upload.confirmed",
+            resource=EventResource(type="source_material", id=material_id),
+            payload={"status": "confirmed"},
+            request_id=request_id,
+        )
+        events.append(
+            project_id=project_id,
+            event_type="generation.job.queued",
+            resource=EventResource(type="generation_job", id=job.id),
+            payload={"status": "queued", "job_type": job.job_type},
+            request_id=request_id,
+        )
+        accepted = AcceptedJobData(
             job_id=job.id,
             status="queued",
             events_url=f"/api/v2/generation-jobs/{job.id}/events/stream",
+        )
+        return CommandResult(
+            status_code=202,
+            body=accepted.model_dump(mode="json"),
+            resource_type="generation_job",
+            resource_id=job.id,
         )
 
     def _copy_to_immutable(self, snapshot: UploadSnapshot) -> tuple[UUID, UUID, ObjectMetadata]:

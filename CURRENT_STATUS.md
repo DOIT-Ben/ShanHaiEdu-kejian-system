@@ -12,7 +12,10 @@
 
 - 已形成小学数学课件平台的统一产品、前端、后端、数据和工作流设计。
 - 已定义教材、课时、教案、三类九套导入、PPT、视频、创作中心和项目资产的端到端关系。
-- 已提供OpenAPI与核心JSON Schema合同。
+- 已提供自动校验的OpenAPI、核心JSON Schema、Mock场景和生成客户端合同。
+- 已建立可运行的FastAPI、PostgreSQL、Redis、对象存储和Worker工程基座。
+- 已通过API和测试建立项目、上传会话、上传确认和任务持久化路径。
+- 已通过确定性Fake贯通事务Outbox、Worker租约、任务状态、SSE续传和命令幂等。
 - 已提供当前前端外包交付包。
 
 当前尚无可运行的端到端业务应用，不得把设计文档或静态原型描述为MVP完成。
@@ -25,6 +28,7 @@
 - 旧版并行设计目录从当前树清除。
 - GitHub Issue/PR任务事实源、交接、分支、文档生命周期和里程碑规则已初始化。
 - Issue/PR模板、CODEOWNERS和仓库治理检查已加入当前基线。
+- Issue #6、#7、#8和#9已合并，阶段0后端基础设施、数据、合同和异步可靠性基座进入`main`。
 
 ## 当前责任分工
 
@@ -32,18 +36,21 @@
 - 独立前端承接方只负责`apps/web`、Figma、Storybook、MSW、前端测试与真实API联调。
 - 双方通过OpenAPI、JSON Schema、SSE、错误合同和Mock场景协作，不越过目录和职责边界。
 
-## 待启动任务
+## 当前活跃任务
 
-- [Issue #2：Codex建立阶段0后端平台骨架和CI](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/2)
 - [Issue #4：重新外包生产级前端实现](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)
 
-## 当前阻塞
+## 后续任务
 
-- 尚未初始化可运行的后端平台基座和CI。
+- [Issue #10：模型网关接口与真实文本模型冒烟](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/10)
+- [Issue #11：与Issue #4完成合同联调](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)
+
+## 当前限制
+
 - 新前端承接方尚未从Issue #4建立Draft PR和工程预览。
 - 文本、图片、视频和TTS供应商的真实开发凭据尚未进入受控环境。
 
-这些阻塞不影响治理初始化，但会阻止阶段1业务运行验收。
+这些限制不阻塞普通CI和确定性Fake后端任务，但会阻止前端真实联调和阶段0真实文本模型出口验收。
 
 ## 下一个阶段出口
 
