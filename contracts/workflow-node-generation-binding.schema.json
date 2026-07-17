@@ -1,0 +1,385 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shanhaiedu.local/contracts/workflow-node-generation-binding.schema.json",
+  "title": "WorkflowNodeGenerationBindingCatalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "api_version",
+    "catalog_key",
+    "workflow_key",
+    "semantic_version",
+    "nodes"
+  ],
+  "properties": {
+    "api_version": {"const": "shanhai.workflow-node-generation-binding/v1"},
+    "catalog_key": {"$ref": "#/$defs/key"},
+    "workflow_key": {"$ref": "#/$defs/key"},
+    "semantic_version": {"$ref": "#/$defs/semanticVersion"},
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 500,
+      "items": {"$ref": "#/$defs/node"}
+    }
+  },
+  "$defs": {
+    "key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{1,159}$"
+    },
+    "contractRef": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{1,79}:[a-z][a-z0-9_.-]{1,159}$"
+    },
+    "semanticVersion": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "generationTemplateRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item_key", "kind"],
+      "properties": {
+        "item_key": {"$ref": "#/$defs/key"},
+        "kind": {"const": "generation_template"}
+      }
+    },
+    "promptExposurePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "teacher_business_prompt",
+        "internal_template",
+        "output_contract",
+        "validation_and_repair",
+        "provider_format",
+        "structure_change_authority"
+      ],
+      "properties": {
+        "teacher_business_prompt": {
+          "enum": ["editable", "hidden", "not_applicable"]
+        },
+        "internal_template": {"const": "server_only"},
+        "output_contract": {"const": "server_only"},
+        "validation_and_repair": {"const": "server_only"},
+        "provider_format": {"const": "server_only"},
+        "structure_change_authority": {"const": "administrator_release_only"}
+      }
+    },
+    "instructionRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "content_key",
+        "content_kind",
+        "semantic_version",
+        "role",
+        "exposure"
+      ],
+      "properties": {
+        "content_key": {"$ref": "#/$defs/key"},
+        "content_kind": {
+          "enum": ["handbook", "rule_set", "anchor_library", "style_preset"]
+        },
+        "semantic_version": {"$ref": "#/$defs/semanticVersion"},
+        "role": {"enum": ["method", "quality", "safety", "anchor", "style"]},
+        "exposure": {"const": "server_only"}
+      }
+    },
+    "instructionPolicy": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "refs"],
+          "properties": {
+            "mode": {"const": "none"},
+            "refs": {"type": "array", "maxItems": 0}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "refs"],
+          "properties": {
+            "mode": {"const": "declared"},
+            "refs": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 100,
+              "items": {"$ref": "#/$defs/instructionRef"}
+            }
+          }
+        }
+      ]
+    },
+    "contextPolicy": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "allowed_sources", "forbidden_sources"],
+          "properties": {
+            "mode": {"const": "none"},
+            "allowed_sources": {"type": "array", "maxItems": 0},
+            "forbidden_sources": {"type": "array", "maxItems": 0}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "allowed_sources", "forbidden_sources"],
+          "properties": {
+            "mode": {"const": "declared"},
+            "allowed_sources": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 100,
+              "items": {"$ref": "#/$defs/key"}
+            },
+            "forbidden_sources": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {"$ref": "#/$defs/key"}
+            }
+          }
+        }
+      ]
+    },
+    "referenceRole": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role_key",
+        "requirement",
+        "media_types",
+        "min_items",
+        "max_items",
+        "order_mode",
+        "allowed_sources",
+        "provider_exposure"
+      ],
+      "properties": {
+        "role_key": {"$ref": "#/$defs/key"},
+        "requirement": {"enum": ["optional", "required"]},
+        "media_types": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {"enum": ["image", "video", "audio", "document"]}
+        },
+        "min_items": {"type": "integer", "minimum": 0, "maximum": 100},
+        "max_items": {"type": "integer", "minimum": 1, "maximum": 100},
+        "order_mode": {"enum": ["stable_by_role_then_version", "user_selected"]},
+        "allowed_sources": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "enum": [
+              "artifact_version",
+              "asset_slot_current",
+              "creation_result",
+              "user_upload"
+            ]
+          }
+        },
+        "provider_exposure": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "enum": ["signed_url", "provider_file_id", "inline_bytes", "derived_text"]
+          }
+        }
+      }
+    },
+    "referenceAssetPolicy": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "roles"],
+          "properties": {
+            "mode": {"const": "none"},
+            "roles": {"type": "array", "maxItems": 0}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "roles"],
+          "properties": {
+            "mode": {"enum": ["optional", "required"]},
+            "roles": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 50,
+              "items": {"$ref": "#/$defs/referenceRole"}
+            }
+          }
+        }
+      ]
+    },
+    "repairPolicy": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {"mode": {"const": "none"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "repair_template_ref", "max_attempts"],
+          "properties": {
+            "mode": {"const": "template"},
+            "repair_template_ref": {"$ref": "#/$defs/generationTemplateRef"},
+            "max_attempts": {"type": "integer", "minimum": 1, "maximum": 3}
+          }
+        }
+      ]
+    },
+    "approvalPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "required_before_downstream"],
+      "properties": {
+        "mode": {"enum": ["none", "human_required", "policy_allowed"]},
+        "required_before_downstream": {"type": "boolean"}
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node_key",
+        "title",
+        "phase",
+        "execution_kind",
+        "input_contract_refs",
+        "output_contract_refs",
+        "prompt_exposure_policy",
+        "instruction_policy",
+        "context_policy",
+        "reference_asset_policy",
+        "validator_refs",
+        "repair_policy",
+        "approval_policy"
+      ],
+      "properties": {
+        "node_key": {"$ref": "#/$defs/key"},
+        "title": {"type": "string", "minLength": 1, "maxLength": 255},
+        "phase": {
+          "enum": [
+            "material",
+            "lesson",
+            "lesson_plan",
+            "intro",
+            "ppt",
+            "video",
+            "audio",
+            "delivery"
+          ]
+        },
+        "execution_kind": {
+          "enum": ["model_generation", "deterministic", "human_gate"]
+        },
+        "model_capability": {
+          "type": "string",
+          "pattern": "^(text|vision|image|video|audio)\\.[a-z][a-z0-9_.-]{1,159}$"
+        },
+        "generation_template_ref": {"$ref": "#/$defs/generationTemplateRef"},
+        "executor_ref": {
+          "type": "string",
+          "pattern": "^executor\\.[a-z][a-z0-9_.-]{1,159}$"
+        },
+        "input_contract_refs": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {"$ref": "#/$defs/contractRef"}
+        },
+        "output_contract_refs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {"$ref": "#/$defs/contractRef"}
+        },
+        "prompt_exposure_policy": {"$ref": "#/$defs/promptExposurePolicy"},
+        "instruction_policy": {"$ref": "#/$defs/instructionPolicy"},
+        "context_policy": {"$ref": "#/$defs/contextPolicy"},
+        "reference_asset_policy": {"$ref": "#/$defs/referenceAssetPolicy"},
+        "validator_refs": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {"$ref": "#/$defs/key"}
+        },
+        "repair_policy": {"$ref": "#/$defs/repairPolicy"},
+        "approval_policy": {"$ref": "#/$defs/approvalPolicy"}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"execution_kind": {"const": "model_generation"}},
+            "required": ["execution_kind"]
+          },
+          "then": {
+            "required": ["model_capability", "generation_template_ref"],
+            "not": {"required": ["executor_ref"]}
+          }
+        },
+        {
+          "if": {
+            "properties": {"execution_kind": {"const": "deterministic"}},
+            "required": ["execution_kind"]
+          },
+          "then": {
+            "required": ["executor_ref"],
+            "not": {
+              "anyOf": [
+                {"required": ["model_capability"]},
+                {"required": ["generation_template_ref"]}
+              ]
+            },
+            "properties": {
+              "repair_policy": {
+                "type": "object",
+                "properties": {"mode": {"const": "none"}},
+                "required": ["mode"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"execution_kind": {"const": "human_gate"}},
+            "required": ["execution_kind"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {"required": ["model_capability"]},
+                {"required": ["generation_template_ref"]},
+                {"required": ["executor_ref"]}
+              ]
+            },
+            "properties": {
+              "repair_policy": {
+                "type": "object",
+                "properties": {"mode": {"const": "none"}},
+                "required": ["mode"]
+              },
+              "approval_policy": {
+                "type": "object",
+                "properties": {"mode": {"const": "human_required"}},
+                "required": ["mode"]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
