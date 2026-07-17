@@ -69,7 +69,20 @@
           "uniqueItems": true,
           "items": {"enum": ["style_preset", "content_definition"]}
         },
-        "validation": {"type": "object"}
+        "validation": {"$ref": "#/$defs/validation"}
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min_length": {"type": "integer", "minimum": 0},
+        "max_length": {"type": "integer", "minimum": 1},
+        "minimum": {"type": "number"},
+        "maximum": {"type": "number"},
+        "min_items": {"type": "integer", "minimum": 0},
+        "max_items": {"type": "integer", "minimum": 1},
+        "pattern": {"type": "string", "minLength": 1}
       }
     }
   }

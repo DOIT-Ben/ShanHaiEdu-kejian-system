@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -38,6 +39,13 @@ DEFAULT_CONTEXT_SOURCES = frozenset(
         "material.approved_parse",
         "project.teacher_preferences",
     }
+)
+PROJECTION_VARIABLE = re.compile(r"\{\{([a-z][a-z0-9_.-]{1,159})\}\}")
+MAX_CONTENT_PACKAGE_JSON_BYTES = 5_000_000
+WINDOWS_RESERVED_NAMES = frozenset(
+    {"AUX", "CON", "NUL", "PRN"}
+    | {f"COM{number}" for number in range(1, 10)}
+    | {f"LPT{number}" for number in range(1, 10)}
 )
 
 
@@ -77,7 +85,7 @@ def validate_content_package(
     """Validate an extracted package directory against the V1 source contract."""
 
     root = package_root.resolve()
-    manifest = _load_object(root / "manifest.json")
+    manifest = _load_object(resolve_content_package_item_path(root, "manifest.json"))
     _validate_schema(
         manifest,
         _load_object(contracts_root / "content-package-manifest.schema.json"),
@@ -103,6 +111,8 @@ def validate_content_package(
     _validate_references(entries, kinds)
     _validate_entrypoints(cast(list[str], manifest["entrypoints"]), kinds)
     _validate_context_sources(entries, allowed_context_sources)
+    _validate_logical_keys(entries)
+    _validate_projection_variables(entries)
     return ValidatedContentPackage(manifest=manifest, items=entries)
 
 
@@ -146,8 +156,17 @@ def _validate_manifest_item(
 
 def _load_object(path: Path) -> dict[str, Any]:
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        with path.open("rb") as stream:
+            payload = stream.read(MAX_CONTENT_PACKAGE_JSON_BYTES + 1)
+        if len(payload) > MAX_CONTENT_PACKAGE_JSON_BYTES:
+            raise ContentPackageValidationError(
+                "PACKAGE_JSON_TOO_LARGE",
+                f"JSON document exceeds size limit: {path.name}",
+            )
+        value = json.loads(payload.decode("utf-8"))
+    except ContentPackageValidationError:
+        raise
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ContentPackageValidationError(
             "PACKAGE_JSON_INVALID",
             f"cannot read JSON object: {path.name}",
@@ -176,7 +195,16 @@ def resolve_content_package_item_path(root: Path, relative: str) -> Path:
 
     root = root.resolve()
     pure_path = PurePosixPath(relative)
-    if pure_path.is_absolute() or ".." in pure_path.parts or "\\" in relative:
+    raw_parts = relative.split("/")
+    if (
+        pure_path.is_absolute()
+        or any(part in {"", ".", ".."} for part in raw_parts)
+        or "\\" in relative
+        or any(part.endswith(".") for part in raw_parts)
+        or any(
+            part.split(".", maxsplit=1)[0].upper() in WINDOWS_RESERVED_NAMES for part in raw_parts
+        )
+    ):
         raise ContentPackageValidationError(
             "PACKAGE_PATH_INVALID",
             f"unsafe package path: {relative}",
@@ -250,3 +278,77 @@ def _validate_context_sources(
                     "PACKAGE_CONTEXT_SOURCE_FORBIDDEN",
                     f"{item_key} requests unregistered context source {source}",
                 )
+
+
+def _validate_logical_keys(entries: Mapping[str, dict[str, Any]]) -> None:
+    for item_key, item in entries.items():
+        kind = cast(str, item["kind"])
+        spec = cast(dict[str, Any], item["spec"])
+        if kind == "input_definition":
+            _require_unique_values(item_key, spec["fields"], "field_key")
+        elif kind == "content_definition":
+            fields = cast(list[dict[str, Any]], spec["fields"])
+            _require_unique_strings(
+                item_key,
+                [field["field_key"] for field in _iter_content_fields(fields)],
+                "field_key",
+            )
+        elif kind == "prompt_template":
+            _require_unique_values(item_key, spec["sections"], "section_key")
+            _require_unique_values(item_key, spec["context_bindings"], "binding_key")
+        elif kind == "generation_template":
+            _require_unique_values(item_key, spec["projection_refs"], "role")
+
+
+def _validate_projection_variables(entries: Mapping[str, dict[str, Any]]) -> None:
+    for item_key, item in entries.items():
+        if item["kind"] != "projection_template":
+            continue
+        spec = cast(dict[str, Any], item["spec"])
+        source_key = cast(str, spec["source_definition_ref"]["item_key"])
+        source_spec = cast(dict[str, Any], entries[source_key]["spec"])
+        source_fields = {
+            field["field_key"]
+            for field in _iter_content_fields(cast(list[dict[str, Any]], source_spec["fields"]))
+        }
+        allowed = set(cast(list[str], spec["allowed_variables"]))
+        if not allowed.issubset(source_fields):
+            raise ContentPackageValidationError(
+                "PACKAGE_PROJECTION_VARIABLE_FORBIDDEN",
+                f"{item_key} allows variables outside {source_key}",
+            )
+        template = spec.get("template")
+        if not isinstance(template, str):
+            continue
+        variables = set(PROJECTION_VARIABLE.findall(template))
+        if template.count("{{") != len(PROJECTION_VARIABLE.findall(template)) or not (
+            variables.issubset(allowed)
+        ):
+            raise ContentPackageValidationError(
+                "PACKAGE_PROJECTION_VARIABLE_FORBIDDEN",
+                f"{item_key} template uses undeclared variables",
+            )
+
+
+def _iter_content_fields(fields: list[dict[str, Any]]) -> Iterator[dict[str, Any]]:
+    for field in fields:
+        yield field
+        children = cast(list[dict[str, Any]], field.get("children", []))
+        yield from _iter_content_fields(children)
+
+
+def _require_unique_values(
+    item_key: str,
+    values: object,
+    key: str,
+) -> None:
+    items = cast(list[dict[str, Any]], values)
+    _require_unique_strings(item_key, [cast(str, item[key]) for item in items], key)
+
+
+def _require_unique_strings(item_key: str, values: list[str], key: str) -> None:
+    if len(values) != len(set(values)):
+        raise ContentPackageValidationError(
+            "PACKAGE_DUPLICATE_LOGICAL_KEY",
+            f"{item_key} contains duplicate {key}",
+        )

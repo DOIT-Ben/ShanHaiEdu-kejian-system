@@ -9,6 +9,7 @@ from typing import Any, cast
 import pytest
 
 from workflow.content_package import (
+    MAX_CONTENT_PACKAGE_JSON_BYTES,
     ContentPackageValidationError,
     canonical_json_sha256,
     validate_content_package,
@@ -139,6 +140,22 @@ def test_hash_mismatch_is_rejected(tmp_path: Path) -> None:
     assert_rejected(package_root, "PACKAGE_HASH_MISMATCH")
 
 
+def test_schema_id_mismatch_is_rejected(tmp_path: Path) -> None:
+    package_root = copy_example(tmp_path)
+    manifest = load_json(package_root / "manifest.json")
+    manifest["items"][0]["schema_id"] = manifest["items"][1]["schema_id"]
+    write_json(package_root / "manifest.json", manifest)
+    assert_rejected(package_root, "PACKAGE_SCHEMA_ID_MISMATCH")
+
+
+def test_entrypoint_must_reference_generation_template(tmp_path: Path) -> None:
+    package_root = copy_example(tmp_path)
+    manifest = load_json(package_root / "manifest.json")
+    manifest["entrypoints"] = ["image_prompt.input"]
+    write_json(package_root / "manifest.json", manifest)
+    assert_rejected(package_root, "PACKAGE_ENTRYPOINT_INVALID")
+
+
 def test_unresolved_reference_is_rejected(tmp_path: Path) -> None:
     package_root = copy_example(tmp_path)
 
@@ -167,3 +184,53 @@ def test_unregistered_context_source_is_rejected(tmp_path: Path) -> None:
 
     update_item(package_root, "image_prompt.authoring", mutate)
     assert_rejected(package_root, "PACKAGE_CONTEXT_SOURCE_FORBIDDEN")
+
+
+def test_duplicate_logical_field_key_is_rejected(tmp_path: Path) -> None:
+    package_root = copy_example(tmp_path)
+
+    def mutate(item: dict[str, Any]) -> None:
+        item["spec"]["fields"].append(dict(item["spec"]["fields"][0]))
+
+    update_item(package_root, "image_prompt.input", mutate)
+    assert_rejected(package_root, "PACKAGE_DUPLICATE_LOGICAL_KEY")
+
+
+def test_projection_template_cannot_use_undeclared_variable(tmp_path: Path) -> None:
+    package_root = copy_example(tmp_path)
+
+    def mutate(item: dict[str, Any]) -> None:
+        item["spec"]["template"] += "{{provider_secret}}"
+
+    update_item(package_root, "image_prompt.teacher_text", mutate)
+    assert_rejected(package_root, "PACKAGE_PROJECTION_VARIABLE_FORBIDDEN")
+
+
+def test_projection_allowlist_must_come_from_source_definition(tmp_path: Path) -> None:
+    package_root = copy_example(tmp_path)
+
+    def mutate(item: dict[str, Any]) -> None:
+        item["spec"]["allowed_variables"].append("provider_secret")
+
+    update_item(package_root, "image_prompt.teacher_text", mutate)
+    assert_rejected(package_root, "PACKAGE_PROJECTION_VARIABLE_FORBIDDEN")
+
+
+def test_invalid_utf8_uses_stable_package_error(tmp_path: Path) -> None:
+    package_root = copy_example(tmp_path)
+    (package_root / "manifest.json").write_bytes(b"\xff\xfe")
+    assert_rejected(package_root, "PACKAGE_JSON_INVALID")
+
+
+def test_oversized_json_is_rejected_before_parsing(tmp_path: Path) -> None:
+    package_root = copy_example(tmp_path)
+    (package_root / "manifest.json").write_bytes(b"x" * (MAX_CONTENT_PACKAGE_JSON_BYTES + 1))
+    assert_rejected(package_root, "PACKAGE_JSON_TOO_LARGE")
+
+
+def test_windows_device_path_is_rejected(tmp_path: Path) -> None:
+    package_root = copy_example(tmp_path)
+    manifest = load_json(package_root / "manifest.json")
+    manifest["items"][0]["path"] = "items/CON.json"
+    write_json(package_root / "manifest.json", manifest)
+    assert_rejected(package_root, "PACKAGE_PATH_INVALID")
