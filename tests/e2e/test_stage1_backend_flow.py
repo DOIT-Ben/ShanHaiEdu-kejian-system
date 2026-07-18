@@ -3,9 +3,12 @@ from __future__ import annotations
 import hashlib
 import importlib
 import io
+import json
 import os
+import socket
 import subprocess
 import sys
+import threading
 import time
 from dataclasses import replace
 from datetime import timedelta
@@ -15,9 +18,11 @@ from uuid import UUID
 import dramatiq
 import httpx
 import pytest
+import uvicorn
 from dramatiq.brokers.redis import RedisBroker
 from dramatiq.worker import Worker
 from pypdf import PdfWriter
+from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 from redis import Redis
 from redis.exceptions import RedisError
 from sqlalchemy import func, select
@@ -61,7 +66,6 @@ from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.prompt_runtime.service import PromptSnapshotService
 from apps.api.reliability.models import OutboxEvent
 from apps.api.reliability.outbox import OutboxDispatcher
-from apps.api.reliability.sse import EventReplayRepository, parse_last_event_id
 from apps.api.settings import Settings, get_settings
 from apps.api.uploads.confirmation_service import UploadConfirmationService
 from apps.api.uploads.schemas import ConfirmUploadRequest, CreateUploadSessionRequest
@@ -81,14 +85,118 @@ from workflow.prompt_runtime import (
 
 pytestmark = pytest.mark.integration
 
+PDF_PAGE_TEXTS = ("Stage one evidence page one", "Stage one evidence page two")
+
 
 def generated_pdf() -> bytes:
     output = io.BytesIO()
     writer = PdfWriter()
-    writer.add_blank_page(width=612, height=792)
-    writer.add_blank_page(width=612, height=792)
+    font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }
+    )
+    font_reference = writer._add_object(font)
+    for text in PDF_PAGE_TEXTS:
+        page = writer.add_blank_page(width=612, height=792)
+        page[NameObject("/Resources")] = DictionaryObject(
+            {NameObject("/Font"): DictionaryObject({NameObject("/F1"): font_reference})}
+        )
+        content = DecodedStreamObject()
+        content.set_data(f"BT /F1 18 Tf 72 720 Td ({text}) Tj ET".encode("ascii"))
+        page[NameObject("/Contents")] = writer._add_object(content)
     writer.write(output)
     return output.getvalue()
+
+
+def start_live_api(app) -> tuple[uvicorn.Server, threading.Thread, str]:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.bind(("127.0.0.1", 0))
+        port = listener.getsockname()[1]
+    server = uvicorn.Server(
+        uvicorn.Config(
+            app,
+            host="127.0.0.1",
+            port=port,
+            log_level="error",
+            lifespan="off",
+        )
+    )
+    thread = threading.Thread(target=server.run, name="stage1-e2e-api", daemon=True)
+    thread.start()
+    deadline = time.monotonic() + 10
+    while not server.started:
+        if not thread.is_alive() or time.monotonic() >= deadline:
+            server.should_exit = True
+            thread.join(timeout=5)
+            raise AssertionError("Stage1 live API did not start within 10 seconds")
+        time.sleep(0.05)
+    return server, thread, f"http://127.0.0.1:{port}"
+
+
+def stop_live_api(server: uvicorn.Server, thread: threading.Thread) -> None:
+    server.should_exit = True
+    thread.join(timeout=2)
+    if thread.is_alive():
+        server.force_exit = True
+        thread.join(timeout=8)
+    assert not thread.is_alive(), "Stage1 live API did not stop within 10 seconds"
+
+
+async def read_sse_events(
+    client: httpx.AsyncClient,
+    path: str,
+    *,
+    last_event_id: int,
+    stop_after: int | None = None,
+    stop_status: str | None = None,
+) -> list[dict[str, object]]:
+    events: list[dict[str, object]] = []
+    async with client.stream(
+        "GET",
+        path,
+        headers={"Last-Event-ID": str(last_event_id)},
+    ) as response:
+        assert response.status_code == 200, await response.aread()
+        assert response.headers["content-type"].startswith("text/event-stream")
+        current: dict[str, object] = {}
+        async for line in response.aiter_lines():
+            if line.startswith(":"):
+                continue
+            if line:
+                field, _, value = line.partition(":")
+                if field == "id":
+                    current["id"] = int(value.strip())
+                elif field == "event":
+                    current["event"] = value.strip()
+                elif field == "data":
+                    current["data"] = json.loads(value.strip())
+                continue
+            if not current:
+                continue
+            assert {"id", "event", "data"} <= current.keys()
+            events.append(current)
+            payload = current["data"]
+            status = payload.get("payload", {}).get("status") if isinstance(payload, dict) else None
+            if (stop_after is not None and len(events) >= stop_after) or status == stop_status:
+                break
+            current = {}
+    return events
+
+
+def delete_test_objects(factory, storage, organization_id: UUID) -> None:
+    with factory() as session:
+        objects = list(
+            session.execute(
+                select(FileAssetVersion.storage_bucket, FileAssetVersion.storage_key).where(
+                    FileAssetVersion.organization_id == organization_id
+                )
+            ).tuples()
+        )
+    for bucket, key in objects:
+        storage.delete(bucket=bucket, key=key)
 
 
 def stage1_settings(database_url: str) -> Settings:
@@ -169,12 +277,12 @@ async def test_stage1_backend_vertical_flow_uses_real_services_and_fake_model(
     actor = configure_test_identity(app)
     storage = app.state.object_storage
     assert storage is not None
+    factory = build_session_factory(app.state.database_engine)
     redis_client = Redis.from_url(settings.redis_url.get_secret_value(), decode_responses=True)
     assert redis_client.ping() is True
     transport = httpx.ASGITransport(app=app)
     payload = generated_pdf()
     checksum = hashlib.sha256(payload).hexdigest()
-    immutable_object: tuple[str, str] | None = None
 
     try:
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
@@ -245,14 +353,41 @@ async def test_stage1_backend_vertical_flow_uses_real_services_and_fake_model(
             assert confirm_replay.json()["data"] == confirmed.json()["data"]
             job_id = UUID(confirmed.json()["data"]["job_id"])
 
-        factory = build_session_factory(app.state.database_engine)
         monkeypatch.setenv("SHANHAI_DATABASE_URL", postgres_database_url)
         monkeypatch.setenv("SHANHAI_ENVIRONMENT", "test")
         get_settings.cache_clear()
         dispatch_material_job_through_redis(factory, settings, job_id)
 
+        server, server_thread, base_url = start_live_api(app)
+        try:
+            async with httpx.AsyncClient(base_url=base_url, timeout=10) as live_client:
+                stream_path = f"/api/v2/generation-jobs/{job_id}/events/stream"
+                first_events = await read_sse_events(
+                    live_client,
+                    stream_path,
+                    last_event_id=0,
+                    stop_after=1,
+                )
+                assert len(first_events) == 1
+                first_event_id = int(first_events[0]["id"])
+                resumed_events = await read_sse_events(
+                    live_client,
+                    stream_path,
+                    last_event_id=first_event_id,
+                    stop_status="succeeded",
+                )
+                assert resumed_events
+                resumed_ids = [int(event["id"]) for event in resumed_events]
+                assert resumed_ids == sorted(set(resumed_ids))
+                assert all(event_id > first_event_id for event_id in resumed_ids)
+                final_event = resumed_events[-1]["data"]
+                assert isinstance(final_event, dict)
+                assert final_event["payload"]["status"] == "succeeded"
+                job_response = await live_client.get(f"/api/v2/generation-jobs/{job_id}")
+        finally:
+            stop_live_api(server, server_thread)
+
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            job_response = await client.get(f"/api/v2/generation-jobs/{job_id}")
             file_response = await client.get(
                 f"/api/v2/projects/{project_id}/materials/{upload['material_id']}/file-asset"
             )
@@ -269,7 +404,37 @@ async def test_stage1_backend_vertical_flow_uses_real_services_and_fake_model(
         with factory() as session, session.begin():
             persisted_version = session.get(FileAssetVersion, UUID(file_version["id"]))
             assert persisted_version is not None
-            immutable_object = (persisted_version.storage_bucket, persisted_version.storage_key)
+            persisted_parse = session.get(MaterialParseVersion, UUID(parses[0]["id"]))
+            assert persisted_parse is not None and persisted_parse.content_json is not None
+            evidence = persisted_parse.content_json
+            assert evidence["source"] == {
+                "file_asset_version_id": str(persisted_version.id),
+                "sha256": checksum,
+                "mime_type": "application/pdf",
+                "byte_size": len(payload),
+            }
+            assert [page["page_number"] for page in evidence["pages"]] == [1, 2]
+            extracted_texts = [
+                "".join(block["text"] for block in page["text_blocks"])
+                for page in evidence["pages"]
+            ]
+            assert extracted_texts == list(PDF_PAGE_TEXTS)
+            for page in evidence["pages"]:
+                for block in page["text_blocks"]:
+                    assert (
+                        block["text_checksum"]
+                        == hashlib.sha256(block["text"].encode("utf-8")).hexdigest()
+                    )
+            assert (
+                persisted_parse.text_checksum
+                == hashlib.sha256("\f".join(PDF_PAGE_TEXTS).encode("utf-8")).hexdigest()
+            )
+            assert persisted_parse.validation_report_json == {
+                "valid": True,
+                "schema_version": "material-evidence-package.v1",
+                "errors": [],
+            }
+            assert persisted_parse.file_asset_version_id == persisted_version.id
             lesson = LessonService(session, actor).synchronize_approved_division(
                 project_id,
                 ApprovedLessonDivision(
@@ -441,18 +606,6 @@ async def test_stage1_backend_vertical_flow_uses_real_services_and_fake_model(
             assert session.scalar(select(func.count()).select_from(MaterialParseVersion)) == 1
             assert session.scalar(select(func.count()).select_from(GenerationAttempt)) == 1
             assert session.scalar(select(func.count()).select_from(UsageRecord)) == 1
-            events = EventReplayRepository(session, actor.organization_id).replay(
-                project_id=project_id,
-                after_sequence=parse_last_event_id("0"),
-                resource=("generation_job", job_id),
-            )
-            assert events[-1].summary_json["payload"]["status"] == "succeeded"
-            resumed = EventReplayRepository(session, actor.organization_id).replay(
-                project_id=project_id,
-                after_sequence=parse_last_event_id(str(events[-2].sequence_no)),
-                resource=("generation_job", job_id),
-            )
-            assert [event.sequence_no for event in resumed] == [events[-1].sequence_no]
             hidden = ProjectAssetService(
                 session,
                 replace(actor, organization_id=UUID("01990000-0000-7000-8000-000000000099")),
@@ -469,8 +622,7 @@ async def test_stage1_backend_vertical_flow_uses_real_services_and_fake_model(
             assert denied.value.code == "ASSET_SLOT_NOT_FOUND"
     finally:
         redis_client.close()
-        if immutable_object is not None:
-            storage.delete(bucket=immutable_object[0], key=immutable_object[1])
+        delete_test_objects(factory, storage, actor.organization_id)
         app.state.database_engine.dispose()
 
 
@@ -525,6 +677,53 @@ def dispatch_material_job_through_redis(factory, settings: Settings, job_id: UUI
         else:
             worker_tasks.process_generation_job = original_actor
         get_settings.cache_clear()
+
+
+def fail_material_dispatch_while_redis_is_down(
+    factory,
+    settings: Settings,
+    job_id: UUID,
+) -> None:
+    original_broker = dramatiq.get_broker()
+    broker = RedisBroker(url=settings.redis_url.get_secret_value())
+    dramatiq.set_broker(broker)
+    existing_tasks = sys.modules.get("workers.tasks")
+    original_actor = existing_tasks.process_generation_job if existing_tasks is not None else None
+    worker_tasks = (
+        importlib.reload(existing_tasks)
+        if existing_tasks is not None
+        else importlib.import_module("workers.tasks")
+    )
+    try:
+        dispatcher = OutboxDispatcher(
+            factory,
+            worker_id="stage1-redis-outage",
+            lease_seconds=settings.worker_lease_seconds,
+            retry_seconds=1,
+        )
+
+        def publish(event: OutboxEvent) -> None:
+            if event.topic == "generation.job.queued" and event.aggregate_id == job_id:
+                worker_tasks.process_generation_job.send(str(job_id))
+
+        dispatcher.dispatch_batch(publish)
+        with factory() as session:
+            target = session.scalar(
+                select(OutboxEvent).where(
+                    OutboxEvent.topic == "generation.job.queued",
+                    OutboxEvent.aggregate_id == job_id,
+                )
+            )
+            assert target is not None and target.status == "pending"
+            assert target.attempt_count == 1
+            assert target.last_error is not None
+    finally:
+        broker.close()
+        dramatiq.set_broker(original_broker)
+        if original_actor is None:
+            importlib.reload(worker_tasks)
+        else:
+            worker_tasks.process_generation_job = original_actor
 
 
 def settings_parse_limits(settings: Settings):
@@ -610,7 +809,6 @@ def test_cancel_and_expired_worker_lease_recover_without_duplicate_parse(
     storage = app.state.object_storage
     assert storage is not None
     factory = build_session_factory(app.state.database_engine)
-    immutable_objects: list[tuple[str, str]] = []
     try:
         cancelled_job_id = seed_real_material_job(
             factory, storage, actor, settings, suffix="cancelled"
@@ -660,19 +858,14 @@ def test_cancel_and_expired_worker_lease_recover_without_duplicate_parse(
             assert recovered is not None and recovered.status == "succeeded"
             assert recovered.attempt_count == 2
             assert session.scalar(select(func.count()).select_from(MaterialParseVersion)) == 1
-            immutable_objects = list(
-                session.execute(
-                    select(FileAssetVersion.storage_bucket, FileAssetVersion.storage_key)
-                ).tuples()
-            )
     finally:
-        for bucket, key in immutable_objects:
-            storage.delete(bucket=bucket, key=key)
+        delete_test_objects(factory, storage, actor.organization_id)
         app.state.database_engine.dispose()
 
 
 def test_redis_restart_leaves_postgres_outbox_recoverable(
     postgres_database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     if os.environ.get("SHANHAI_E2E_ALLOW_SERVICE_RESTART") != "1":
         pytest.skip("set SHANHAI_E2E_ALLOW_SERVICE_RESTART=1 for the controlled Redis restart")
@@ -680,34 +873,27 @@ def test_redis_restart_leaves_postgres_outbox_recoverable(
     settings = stage1_settings(postgres_database_url)
     app = create_app(settings=settings)
     actor = configure_test_identity(app)
+    storage = app.state.object_storage
+    assert storage is not None
     factory = build_session_factory(app.state.database_engine)
     redis_client = Redis.from_url(settings.redis_url.get_secret_value(), decode_responses=True)
     compose = ["docker", "compose", "-f", "infra/compose.yaml"]
     try:
-        with factory() as session, session.begin():
-            from apps.api.reliability.events import EventResource, EventWriter
-
-            project = ProjectRepository(session, actor).create(
-                CreateProjectRequest(title="Redis recovery", knowledge_point="Durable outbox")
-            )
-            EventWriter(session, actor.organization_id).append(
-                project_id=project.id,
-                event_type="stage1.redis.recovery",
-                resource=EventResource(type="project", id=project.id),
-                payload={"status": "queued"},
-                request_id="req-stage1-redis-recovery",
-            )
+        job_id = seed_real_material_job(
+            factory,
+            storage,
+            actor,
+            settings,
+            suffix="redis-recovery",
+        )
+        monkeypatch.setenv("SHANHAI_DATABASE_URL", postgres_database_url)
+        monkeypatch.setenv("SHANHAI_ENVIRONMENT", "test")
+        get_settings.cache_clear()
 
         subprocess.run([*compose, "stop", "redis"], check=True, timeout=30)
         with pytest.raises(RedisError):
             redis_client.ping()
-        dispatcher = OutboxDispatcher(
-            factory,
-            worker_id="stage1-redis-outage",
-            lease_seconds=5,
-            retry_seconds=1,
-        )
-        assert dispatcher.dispatch_batch(lambda _: redis_client.ping()) == 0
+        fail_material_dispatch_while_redis_is_down(factory, settings, job_id)
 
         subprocess.run([*compose, "start", "redis"], check=True, timeout=30)
         deadline = time.monotonic() + 30
@@ -721,17 +907,42 @@ def test_redis_restart_leaves_postgres_outbox_recoverable(
                 raise AssertionError("Redis did not recover within 30 seconds")
             time.sleep(0.25)
         time.sleep(1.1)
-        assert dispatcher.dispatch_batch(lambda _: redis_client.ping()) >= 1
+        dispatch_material_job_through_redis(factory, settings, job_id)
         with factory() as session:
+            job = session.get(GenerationJob, job_id)
+            assert job is not None and job.status == "succeeded"
+            assert (
+                session.scalar(
+                    select(func.count())
+                    .select_from(MaterialParseVersion)
+                    .where(MaterialParseVersion.generation_job_id == job_id)
+                )
+                == 1
+            )
+            recovered_outbox = session.scalar(
+                select(OutboxEvent).where(
+                    OutboxEvent.topic == "generation.job.queued",
+                    OutboxEvent.aggregate_id == job_id,
+                )
+            )
+            assert recovered_outbox is not None
+            assert recovered_outbox.status == "published"
+            assert recovered_outbox.attempt_count == 2
             assert (
                 session.scalar(
                     select(func.count())
                     .select_from(OutboxEvent)
-                    .where(OutboxEvent.status == "pending")
+                    .where(
+                        OutboxEvent.topic == "generation.job.queued",
+                        OutboxEvent.aggregate_id == job_id,
+                        OutboxEvent.status == "pending",
+                    )
                 )
                 == 0
             )
     finally:
         subprocess.run([*compose, "start", "redis"], check=False, timeout=30)
         redis_client.close()
+        delete_test_objects(factory, storage, actor.organization_id)
         app.state.database_engine.dispose()
+        get_settings.cache_clear()
