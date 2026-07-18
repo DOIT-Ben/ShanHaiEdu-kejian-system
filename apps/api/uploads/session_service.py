@@ -22,6 +22,7 @@ from apps.api.uploads.schemas import CreateUploadSessionRequest, UploadSessionRe
 from apps.api.uploads.storage import ObjectStorage, ObjectStorageError
 
 ALLOWED_MEDIA_TYPES = frozenset({"application/pdf"})
+MIN_PRESIGNED_URL_TTL = timedelta(seconds=1)
 
 
 class PersistedUploadSessionResult(BaseModel):
@@ -189,7 +190,7 @@ class UploadSessionService:
             key = upload.storage_key
             expires_at = upload.expires_at
         remaining = expires_at - utc_now()
-        if remaining <= timedelta(0):
+        if remaining < MIN_PRESIGNED_URL_TTL:
             raise ApiError(
                 status_code=409,
                 code="PRECONDITION_NOT_MET",

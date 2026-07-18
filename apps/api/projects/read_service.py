@@ -20,15 +20,20 @@ class ProjectReadService:
         self._actor = actor
 
     def present(self, project: Project) -> ProjectRead:
-        return self.present_many((project,))[0]
+        data, _ = self.present_with_policy_version(project)
+        return data
+
+    def present_with_policy_version(self, project: Project) -> tuple[ProjectRead, int]:
+        mode, policy_version = self._current_policies([project.id])[project.id]
+        return self._present(project, mode), policy_version
 
     def present_many(self, projects: Sequence[Project]) -> list[ProjectRead]:
         if not projects:
             return []
-        modes = self._current_modes([project.id for project in projects])
-        return [self._present(project, modes[project.id]) for project in projects]
+        policies = self._current_policies([project.id for project in projects])
+        return [self._present(project, policies[project.id][0]) for project in projects]
 
-    def _current_modes(self, project_ids: list[UUID]) -> dict[UUID, str]:
+    def _current_policies(self, project_ids: list[UUID]) -> dict[UUID, tuple[str, int]]:
         latest = (
             select(
                 AutomationPolicy.project_id,
@@ -42,7 +47,11 @@ class ProjectReadService:
             .subquery()
         )
         rows = self._session.execute(
-            select(AutomationPolicy.project_id, AutomationPolicy.mode)
+            select(
+                AutomationPolicy.project_id,
+                AutomationPolicy.mode,
+                AutomationPolicy.policy_version,
+            )
             .join(
                 latest,
                 and_(
@@ -52,8 +61,8 @@ class ProjectReadService:
             )
             .where(AutomationPolicy.organization_id == self._actor.organization_id)
         )
-        modes = {project_id: mode for project_id, mode in rows}
-        missing = [project_id for project_id in project_ids if project_id not in modes]
+        policies = {project_id: (mode, policy_version) for project_id, mode, policy_version in rows}
+        missing = [project_id for project_id in project_ids if project_id not in policies]
         if missing:
             raise ApiError(
                 status_code=409,
@@ -61,7 +70,7 @@ class ProjectReadService:
                 message="The project automation policy has not been initialized.",
                 details={"project_ids": [str(project_id) for project_id in missing]},
             )
-        return modes
+        return policies
 
     @staticmethod
     def _present(project: Project, execution_mode: str) -> ProjectRead:

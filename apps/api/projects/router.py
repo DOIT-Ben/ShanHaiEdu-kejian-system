@@ -117,7 +117,12 @@ def list_projects(
     )
 
 
-@router.get("/{project_id}", response_model=ProjectEnvelope, operation_id="getProject")
+@router.get(
+    "/{project_id}",
+    response_model=ProjectEnvelope,
+    operation_id="getProject",
+    responses={200: {"headers": {"ETag": {"schema": {"type": "string"}}}}},
+)
 def get_project(
     project_id: UUID,
     request: Request,
@@ -126,9 +131,10 @@ def get_project(
     session: Annotated[Session, Depends(get_session)],
 ) -> ProjectEnvelope:
     project = ProjectAccessService(session, actor).require(project_id, ProjectAction.VIEW)
-    response.headers["ETag"] = f'W/"{project.lock_version}"'
+    data, policy_version = ProjectReadService(session, actor).present_with_policy_version(project)
+    response.headers["ETag"] = f'W/"{project.lock_version}-{policy_version}"'
     return ProjectEnvelope(
-        data=ProjectReadService(session, actor).present(project),
+        data=data,
         request_id=request.state.request_id,
     )
 
