@@ -21,6 +21,7 @@ from apps.api.model_gateway.contracts import (
     ModelGatewayError,
     ModelUsage,
     TextModelRequest,
+    TextProviderResult,
 )
 from apps.api.model_gateway.fake import DeterministicFakeTextProvider, FakeScenario
 from apps.api.model_gateway.gateway import ModelGateway
@@ -29,6 +30,15 @@ from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.workflows.service import WorkflowRuntimeService
 from tests.fakes.identity import seed_test_actor
 from workflow.node_state import NodeStatus
+
+
+class UnexpectedFailureProvider:
+    provider_name = "unexpected-failure-fake"
+    model_name = "unexpected-failure-v1"
+
+    async def complete(self, request: TextModelRequest) -> TextProviderResult:
+        del request
+        raise RuntimeError("private provider failure detail")
 
 
 def test_attempt_numbers_are_unique_and_usage_is_append_only(
@@ -309,3 +319,60 @@ async def test_fake_gateway_success_and_failure_share_persistent_safe_audit(
     )
     assert private_prompt not in persisted
     assert result.text not in persisted
+
+
+async def test_unexpected_provider_failure_is_normalized_and_audited(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session, session.begin():
+        actor = seed_test_actor(session)
+        project = ProjectRepository(session, actor).create(
+            CreateProjectRequest(title="Fractions", knowledge_point="One half")
+        )
+        run = WorkflowRuntimeService(session, actor).start_project_run(project.id)
+        node = WorkflowRuntimeService(session, actor).create_project_node_run(
+            run.id,
+            node_key="prepare",
+            status=NodeStatus.READY,
+        )
+
+    audit_context = ModelAuditContext(
+        organization_id=actor.organization_id,
+        user_id=actor.user_id,
+        project_id=project.id,
+        node_run_id=node.id,
+        generation_job_id=None,
+    )
+    gateway = ModelGateway(
+        {ModelCapability.TEXT_SMOKE: UnexpectedFailureProvider()},
+        audit_sink=SqlAlchemyAttemptAuditSink(factory),
+    )
+    with pytest.raises(ModelGatewayError) as failed:
+        await gateway.generate_text(
+            TextModelRequest(
+                capability=ModelCapability.TEXT_SMOKE,
+                request_id="req-unexpected-provider-failure",
+                prompt="PRIVATE_UNEXPECTED_FAILURE_PROMPT",
+            ),
+            audit_context=audit_context,
+        )
+
+    assert failed.value.code.value == "MODEL_PROVIDER_UNAVAILABLE"
+    with factory() as session:
+        attempt = session.scalar(
+            select(GenerationAttempt).where(
+                GenerationAttempt.request_id == "req-unexpected-provider-failure"
+            )
+        )
+        usage = session.scalar(
+            select(UsageRecord).where(UsageRecord.generation_attempt_id == attempt.id)
+        )
+
+    assert attempt is not None
+    assert attempt.status == "failed"
+    assert attempt.finished_at is not None
+    assert attempt.error_code == "MODEL_PROVIDER_UNAVAILABLE"
+    assert "private provider failure detail" not in json.dumps(attempt.error_details_json)
+    assert usage is not None
+    assert usage.input_units_json == {"prompt_tokens": 0}
