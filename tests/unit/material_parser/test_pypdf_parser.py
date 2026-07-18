@@ -23,7 +23,7 @@ def two_page_text_pdf() -> bytes:
             NameObject("/BaseFont"): NameObject("/Helvetica"),
         }
     )
-    font_reference = writer._add_object(font)
+    font_reference = writer._add_object(font)  # pyright: ignore[reportPrivateUsage]
     for text in ("First block", "Second block"):
         page = writer.add_blank_page(width=612, height=792)
         page[NameObject("/Resources")] = DictionaryObject(
@@ -31,7 +31,9 @@ def two_page_text_pdf() -> bytes:
         )
         content = DecodedStreamObject()
         content.set_data(f"BT /F1 18 Tf 72 720 Td ({text}) Tj ET".encode("ascii"))
-        page[NameObject("/Contents")] = writer._add_object(content)
+        page[NameObject("/Contents")] = writer._add_object(  # pyright: ignore[reportPrivateUsage]
+            content
+        )
     writer.write(output)
     return output.getvalue()
 

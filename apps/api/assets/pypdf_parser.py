@@ -161,6 +161,7 @@ def _parse_pdf(
     pages: list[dict[str, Any]] = []
     page_texts: list[str] = []
     text_char_count = 0
+    text_block_count = 0
     image_reference_count = 0
     for page_number, page in enumerate(reader.pages, start=1):
         _reject_dangerous_page(page)
@@ -175,10 +176,12 @@ def _parse_pdf(
             _blocks: list[dict[str, Any]] = blocks,
             _page_number: int = page_number,
         ) -> None:
+            nonlocal text_block_count
             if not text:
                 return
-            if len(_blocks) >= limits.max_text_blocks:
+            if text_block_count >= limits.max_text_blocks:
                 raise MaterialParserError("PDF_TEXT_BLOCK_LIMIT_EXCEEDED")
+            text_block_count += 1
             _blocks.append(
                 {
                     "block_id": f"p{_page_number}-text-{len(_blocks) + 1}",
@@ -190,6 +193,9 @@ def _parse_pdf(
 
         text = page.extract_text(visitor_text=visit_text) or ""
         if text and not blocks:
+            if text_block_count >= limits.max_text_blocks:
+                raise MaterialParserError("PDF_TEXT_BLOCK_LIMIT_EXCEEDED")
+            text_block_count += 1
             blocks.append(
                 {
                     "block_id": f"p{page_number}-text-1",
