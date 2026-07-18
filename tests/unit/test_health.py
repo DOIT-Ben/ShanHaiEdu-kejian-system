@@ -5,7 +5,12 @@ from typing import cast
 
 import httpx
 
-from apps.api.health import DependencyStatus, ReadinessReport, build_readiness_service
+from apps.api.health import (
+    DependencyStatus,
+    ReadinessReport,
+    build_readiness_service,
+    psycopg_dsn,
+)
 from apps.api.logging import JsonFormatter
 from apps.api.main import create_app
 from apps.api.request_context import REQUEST_ID_HEADER, request_id_context
@@ -23,6 +28,13 @@ class StubReadiness:
             status="available" if self._ready else "unavailable",
         )
         return ReadinessReport(ready=self._ready, dependencies=(dependency,))
+
+
+def test_psycopg_probe_normalizes_sqlalchemy_postgresql_driver() -> None:
+    assert (
+        psycopg_dsn("postgresql+psycopg://worker:secret@db.example:5432/shanhai")
+        == "postgresql://worker:secret@db.example:5432/shanhai"
+    )
 
 
 async def test_liveness_is_independent_and_preserves_request_id() -> None:
