@@ -324,6 +324,71 @@ def test_creation_source_and_target_boundaries_are_enforced(
         assert forbidden_target.value.code == "PROJECT_TARGET_FORBIDDEN"
 
 
+def test_standalone_creation_is_private_to_its_creator_even_on_idempotent_replay(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session, session.begin():
+        owner = seed_test_actor(session)
+        other = seed_test_actor(
+            session,
+            user_id=uuid4(),
+            principal_id=uuid4(),
+            member_id=uuid4(),
+            email="other-teacher@example.test",
+            display_name="Other Teacher",
+        )
+        owner_service = CreationService(session, owner, idempotency_ttl_seconds=3600)
+        batch = owner_service.create_batch(
+            StandaloneCreateCreationBatchRequest(
+                source_kind="standalone",
+                studio_type="image",
+                title="Owner-only image",
+            ),
+            idempotency_key="standalone-private-batch-001",
+            request_id="req-standalone-private-batch",
+        )
+        item = CreationItem(
+            id=new_uuid7(),
+            organization_id=owner.organization_id,
+            creation_batch_id=batch.id,
+            creation_package_item_id=None,
+            item_key="private.image.01",
+            title="Private image",
+            status="draft",
+            current_prompt_version_id=None,
+            active_adoption_id=None,
+            target_slot_key=None,
+            created_by=owner.principal_id,
+            updated_by=owner.principal_id,
+        )
+        session.add(item)
+        session.flush()
+        payload = SavePromptVersionRequest(
+            business_prompt="Show a private classroom image.",
+            reference_asset_version_ids=[],
+            output_spec={"mime_type": "image/png"},
+            generation_profile="balanced",
+        )
+        owner_service.save_prompt_version(
+            item.id,
+            payload,
+            idempotency_key="standalone-private-prompt-001",
+            request_id="req-standalone-private-prompt-owner",
+        )
+
+        other_service = CreationService(session, other, idempotency_ttl_seconds=3600)
+        for key in ("standalone-private-prompt-001", "standalone-private-prompt-002"):
+            with pytest.raises(ApiError) as forbidden:
+                other_service.save_prompt_version(
+                    item.id,
+                    payload,
+                    idempotency_key=key,
+                    request_id=f"req-{key}",
+                )
+            assert forbidden.value.code == "PERMISSION_DENIED"
+
+
 def test_standalone_creation_can_save_an_adopted_result_to_an_authorized_project(
     migrated_database_url: str,
 ) -> None:
