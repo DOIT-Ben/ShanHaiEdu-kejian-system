@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -33,6 +35,16 @@ def test_development_can_boot_without_dependency_configuration() -> None:
     assert settings.database_url is None
     assert settings.redis_url is None
     assert settings.object_storage_health_url is None
+
+
+def test_env_example_is_a_loadable_local_quick_start_configuration() -> None:
+    settings = Settings(_env_file=Path(".env.example"))
+
+    assert settings.environment == "development"
+    assert settings.text_provider_name is None
+    assert settings.text_provider_base_url is None
+    assert settings.text_provider_model is None
+    assert settings.text_provider_secret_env == "NEWAPI_TEXT_API_KEY"
 
 
 def test_production_requires_all_dependency_configuration() -> None:
