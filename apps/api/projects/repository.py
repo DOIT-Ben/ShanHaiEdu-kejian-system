@@ -47,7 +47,7 @@ class ProjectRepository:
             knowledge_point=request.knowledge_point,
             default_language="zh-CN",
             status="draft",
-            automation_mode=(
+            legacy_automation_mode=(
                 request.automation_mode
                 or ("automatic" if request.execution_mode == "automatic" else "assisted")
             ),

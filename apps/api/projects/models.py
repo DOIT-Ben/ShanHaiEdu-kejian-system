@@ -46,7 +46,12 @@ class Project(MutableAuditMixin, Base):
     knowledge_point: Mapped[str] = mapped_column(String(255), nullable=False)
     default_language: Mapped[str] = mapped_column(String(20), nullable=False, default="zh-CN")
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
-    automation_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="assisted")
+    legacy_automation_mode: Mapped[str] = mapped_column(
+        "automation_mode",
+        String(20),
+        nullable=False,
+        default="assisted",
+    )
     owner_principal_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("principals.id", ondelete="RESTRICT"), nullable=False
     )

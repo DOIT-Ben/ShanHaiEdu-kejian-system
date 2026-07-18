@@ -383,7 +383,7 @@ def test_worker_uses_system_principal_with_tenant_scoped_job(
                 knowledge_point="One half",
                 default_language="zh-CN",
                 status="draft",
-                automation_mode="assisted",
+                legacy_automation_mode="assisted",
                 owner_principal_id=OWNER_PRINCIPAL,
                 content_release_id=BUILTIN_RUNTIME_DEFAULTS.content_release_id,
                 workflow_definition_version_id=(

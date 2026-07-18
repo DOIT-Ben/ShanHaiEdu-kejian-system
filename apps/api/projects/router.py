@@ -20,6 +20,7 @@ from apps.api.projects.policy_schemas import (
     UpdateAutomationPolicyRequest,
 )
 from apps.api.projects.policy_service import AutomationPolicyService
+from apps.api.projects.read_service import ProjectReadService
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import (
     CreateProjectRequest,
@@ -55,6 +56,7 @@ def create_project(
 
     def command() -> CommandResult:
         project = ProjectRepository(session, actor).create(payload)
+        data = ProjectReadService(session, actor).present(project)
         EventWriter(session, actor.organization_id).append(
             project_id=project.id,
             event_type="project.created",
@@ -64,7 +66,7 @@ def create_project(
         )
         return CommandResult(
             status_code=201,
-            body=ProjectRead.model_validate(project).model_dump(mode="json"),
+            body=data.model_dump(mode="json"),
             resource_type="project",
             resource_id=project.id,
         )
@@ -109,7 +111,7 @@ def list_projects(
         limit=page_limit,
     )
     return ProjectListEnvelope(
-        data=ProjectListData(items=[ProjectRead.model_validate(project) for project in projects]),
+        data=ProjectListData(items=ProjectReadService(session, actor).present_many(projects)),
         meta=PageMeta(next_cursor=next_cursor),
         request_id=request.state.request_id,
     )
@@ -126,7 +128,7 @@ def get_project(
     project = ProjectAccessService(session, actor).require(project_id, ProjectAction.VIEW)
     response.headers["ETag"] = f'W/"{project.lock_version}"'
     return ProjectEnvelope(
-        data=ProjectRead.model_validate(project),
+        data=ProjectReadService(session, actor).present(project),
         request_id=request.state.request_id,
     )
 
