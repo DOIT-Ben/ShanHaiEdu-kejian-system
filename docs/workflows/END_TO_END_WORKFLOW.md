@@ -40,6 +40,15 @@ flowchart TD
 
 当前脱敏节点目录合同覆盖教材、课时、教案、三类九套、PPT、图片、视频、TTS、装配和交付。它固定业务阶段与权限边界，不固定供应商模型名或私有参数。
 
+### 执行方式边界
+
+完整课件只有一个`WorkflowDefinition`。用户侧提供两种执行方式：
+
+- `automatic`：自动运行策略允许的节点，只在人工必审、预算、质量、安全或失败门禁暂停；
+- `guided`：主要节点产生结果后暂停，教师可编辑、确认并继续。
+
+两者共享同一个项目、`WorkflowRun`、`NodeRun`、产物版本、任务、依赖、质量门禁和资产槽位。节点级自动启动、采用、写回和审核由不可变`AutomationPolicy`快照控制；任意组合的暂停策略不形成第三套工作流或第三种领域模式。
+
 ## 2. 教材、课时和教案
 
 ```text
@@ -116,26 +125,33 @@ flowchart TD
 项目模式：
 
 ```text
-批准的上游内容
-→ 编译CreationPackage
-→ 导入可编辑CreationBatch
+WorkflowRun / NodeRun中的批准上游内容
+→ 编译包含来源与固定目标槽位的不可变CreationPackage
+→ 导入project来源的CreationBatch / CreationItem
+→ 保存业务Prompt版本并冻结本次PromptSnapshot
 → 批量提交GenerationJob
-→ 候选GenerationResult
-→ 用户或授权策略选择
-→ SaveToProjectOperation
-→ 项目当前作品和素材
+→ 产生Candidate
+→ 用户或授权策略Adopt候选
+→ 幂等执行SaveToProjectOperation
+→ AssetBinding更新并解锁下游或传播stale
 ```
+
+项目批次必须携带`project_id`、`workflow_run_id`、`source_node_run_id`、`creation_package_id`和`target_slot`。目标来自创作包，普通生成或写回请求不能改成其他项目或槽位；需要跨项目复用时先转为独立资产，再执行显式鉴权的附加操作。
 
 独立模式：
 
 ```text
 用户进入创作中心
 → 输入生成要求和参考素材
-→ 生成候选
-→ 下载或选择项目保存
+→ 保存业务Prompt版本
+→ 生成并采用候选
+→ 下载或保存到个人资料
+→ 可选：显式选择有权限项目与槽位并写回
 ```
 
-全自动模式只有在策略允许、质量阈值通过、没有人工门禁且预算充足时自动选择和保存，否则进入等待确认。
+独立批次不伪造项目、工作流或节点来源。`save_prompt_version`、`generate`、`adopt`和`save_to_project`是四个独立命令：采用不等于写回，保存Prompt版本不触发生成，写回必须重新鉴权并保留完整血缘。
+
+`automatic`只有在策略允许、质量阈值通过、没有人工门禁且预算充足时自动采用和写回，否则进入等待确认；`guided`在主要节点结果形成后等待教师确认。
 
 ## 6. 修改和过期
 

@@ -1,10 +1,10 @@
 # 当前项目状态
 
-更新时间：2026-07-17
+更新时间：2026-07-18
 
 验证基线：`main`，实现事实以本文件所在提交的代码、迁移和测试为准；任务状态以链接的GitHub Issue和Pull Request为准
 
-当前阶段：阶段0出口尚未关闭；阶段1后端轨道接近出口
+当前阶段：阶段0出口尚未关闭；阶段1后端轨道正在完成产品、合同和实现口径校准
 
 本文件只描述现在，不保存开发日志。任务细节、负责人、讨论和交接以GitHub Issue与Pull Request为准。
 
@@ -20,13 +20,17 @@
 
 - [Issue #2](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/2)的后端平台子任务#6至#10已经合并：目录与本地基础设施、数据模型与Alembic、Worker与可靠性、合同与CI、模型网关与真实文本冒烟。
 - [Issue #19](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/19)的#20至#28已经实际完成：阶段路线、身份授权、课时分支、文件资产、内容与工作流运行时、产物版本审核、Prompt与Context审计、教材解析和项目资产绑定。
+- [Issue #49](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/49)与[PR #52](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/52)已经合并：模型生成、确定性执行和人工门禁使用统一节点绑定合同，完整节点目录进入主线。
+- [Decision #55](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/55)已经批准：以后统一采用一个标准工作流内核、`automatic/guided`两种用户执行方式、项目/独立创作判别合同和四个独立创作动作。
 - 当前后端基座使用真实PostgreSQL约束和迁移验证，普通CI继续使用确定性Fake，不访问真实Provider。
 - 产品、前端、后端、数据和工作流仍以现行文档与`contracts/`为唯一当前口径，旧版并行设计不在当前树中保留。
 
 ## 当前工作
 
-- [Issue #44](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/44)与[PR #46](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/46)：Markdown TemplateDraft确定性编译，已进入评审。
-- [Issue #49](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/49)与[PR #52](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/52)：生成节点绑定合同与业务节点目录，已进入评审。
+- [Issue #44](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/44)与[PR #46](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/46)：Markdown TemplateDraft确定性编译的五项CI已通过，但当前与`main`存在合并冲突，需重新rebase后继续评审。
+- [Issue #56](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/56)：就地统一产品、工作流、后端和合同说明，当前短分支实施中。
+- [Issue #57](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/57)：校准OpenAPI、JSON Schema、生成客户端和Mock合同，等待#56合并。
+- [Issue #58](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/58)：审查并修正必要的后端模型、服务、迁移和回归测试，等待#57合并。
 - [Issue #48](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/48)：全流程生成节点与可配置模型I/O绑定的父任务；已标记`status:blocked`，结构化业务字段确认前不继续扩展实现。
 - [Issue #29](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/29)：阶段1后端纵向贯通与真实文本出口；已标记`status:blocked`，恢复前必须先确认只使用现有通用合同，或等待其所需结构化字段定稿。
 - [Issue #51](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/51)：教师端只展示可编辑业务提示词并隐藏内部结构合同，尚未启动。
@@ -34,14 +38,21 @@
 
 ## 当前阻塞
 
-- 教案、PPT、视频等业务结构化字段仍由产品负责人设计。#48后续任务不得提前固化这些字段；#29恢复前必须先消除其E2E范围是否消费未定字段的歧义。
-- #44和#49虽已有评审分支和全绿CI，但涉及结构化内容与节点合同；字段口径确认前不能仅因检查通过就视为产品合同已批准。
+- 教案、PPT、视频等具体业务结构化字段仍由产品负责人设计。#48后续任务不得提前固化这些字段；#56至#58只统一通用工作流、创作生命周期和保存边界，不猜测具体字段。
+- #44仍在评审；它负责通用Markdown模板编译，不代表具体业务字段已经批准。
+- 当前`main`中的OpenAPI、数据库和后端仍使用旧执行枚举与创作端点；#57和#58负责兼容迁移。在两项合并前不得把本轮目标文档描述为已实现运行时行为。
 - 阶段1完整出口仍缺少后端纵向E2E与阶段真实文本冒烟，以及生产前端的真实API联调。
 - 图片、视频和TTS真实Provider适配与凭据属于后续媒体阶段前置条件，不用Mock替代阶段验收。
 
 ## 下一个阶段出口
 
-当前存在两个受控并行出口。
+当前先关闭一个口径校准门禁，再恢复两个受控出口。
+
+口径校准门禁必须按顺序满足：
+
+- #56合并后，现行产品、工作流、后端和合同说明只保留#55批准的新口径。
+- #57基于该口径更新OpenAPI、JSON Schema、生成客户端和Mock，并通过兼容性与消费者合同测试。
+- #58审查现有后端实现，只增加维持新合同所需的最小模型、迁移、服务和测试变更。
 
 阶段1后端轨道出口必须满足：
 
@@ -55,7 +66,7 @@
 - 生产前端工程达到Issue #4的阶段0范围并通过前端门禁，源码通过PR进入`main`。
 - 前端通过#11消费当前OpenAPI、JSON Schema和SSE合同，完成真实API联调；Mock不能作为出口。
 
-两个出口均关闭后，才进入阶段2“教材到教案纵向链路”，交付第一个真实教师价值闭环。#44、#49、#51和#48属于当前并行的后续合同准备工作，但不得在未经过对应Issue决策时自动扩大#29或阶段出口范围。
+口径校准门禁和两个出口均关闭后，才进入阶段2“教材到教案纵向链路”，交付第一个真实教师价值闭环。#44、#51和#48属于后续合同准备工作，不得在未经过对应Issue决策时自动扩大#29或阶段出口范围。
 
 ## 接手提示
 
@@ -67,4 +78,4 @@
 4. 被分配的Issue和PR
 5. 与任务直接相关的模块文档、合同、代码和测试
 
-结构化字段未确认前，不扩展#48后续实现，也不把#44或#49的工程检查通过解释为产品合同已经批准。恢复#29前先在Issue中确认其E2E是否能严格限定为现有通用合同。
+结构化字段未确认前，不扩展#48后续实现，也不把#44的工程检查通过解释为具体业务字段已经批准。当前先按#56 → #57 → #58完成通用口径校准；恢复#29前再确认其E2E严格限定为已合并合同。
