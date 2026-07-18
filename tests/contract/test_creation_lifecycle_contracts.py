@@ -101,11 +101,21 @@ def test_project_limits_and_policy_etags_match_runtime_contract() -> None:
 
     runtime = create_app(settings=Settings(_env_file=None, environment="test")).openapi()
     runtime_operations = operations_by_id(runtime)
+    runtime_schemas = runtime["components"]["schemas"]
+    assert (
+        runtime_schemas["SavePromptVersionRequest"]["properties"]["reference_asset_version_ids"][
+            "uniqueItems"
+        ]
+        is True
+    )
+    assert (
+        runtime_schemas["LegacyGenerateCreationBatchRequest"]["properties"]["item_ids"][
+            "uniqueItems"
+        ]
+        is True
+    )
     update = runtime_operations["updateProjectAutomationPolicy"]
-    parameters = {
-        parameter["name"]: parameter
-        for parameter in update["parameters"]
-    }
+    parameters = {parameter["name"]: parameter for parameter in update["parameters"]}
     assert parameters["Idempotency-Key"]["schema"]["maxLength"] == 128
     for operation_id in ("getProjectAutomationPolicy", "updateProjectAutomationPolicy"):
         assert "ETag" in runtime_operations[operation_id]["responses"]["200"]["headers"]

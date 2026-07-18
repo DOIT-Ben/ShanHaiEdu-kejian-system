@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 StudioType = Literal["image", "video", "presentation"]
 ReplaceModeValue = Literal["reject_if_occupied", "replace_active", "append"]
@@ -108,9 +108,19 @@ class SavePromptVersionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     business_prompt: str = Field(min_length=1, max_length=50000)
-    reference_asset_version_ids: list[UUID] = Field(max_length=20)
+    reference_asset_version_ids: list[UUID] = Field(
+        max_length=20,
+        json_schema_extra={"uniqueItems": True},
+    )
     output_spec: dict[str, object]
     generation_profile: Literal["quality", "balanced", "speed"]
+
+    @field_validator("reference_asset_version_ids")
+    @classmethod
+    def require_unique_reference_assets(cls, values: list[UUID]) -> list[UUID]:
+        if len(values) != len(set(values)):
+            raise ValueError("reference_asset_version_ids must be unique")
+        return values
 
 
 class PromptVersionRead(BaseModel):
@@ -154,7 +164,17 @@ class GenerateCreationBatchRequest(BaseModel):
 class LegacyGenerateCreationBatchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    item_ids: list[UUID] = Field(min_length=1)
+    item_ids: list[UUID] = Field(
+        min_length=1,
+        json_schema_extra={"uniqueItems": True},
+    )
+
+    @field_validator("item_ids")
+    @classmethod
+    def require_unique_items(cls, values: list[UUID]) -> list[UUID]:
+        if len(values) != len(set(values)):
+            raise ValueError("item_ids must be unique")
+        return values
 
 
 class AdoptGenerationResultRequest(BaseModel):

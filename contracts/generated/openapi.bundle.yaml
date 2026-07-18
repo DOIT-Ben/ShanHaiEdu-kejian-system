@@ -118,6 +118,7 @@ paths:
                 title:
                   type: string
                   minLength: 1
+                  maxLength: 255
                 execution_mode:
                   $ref: '#/components/schemas/AutomationPolicyMode'
                 automation_mode:
@@ -148,6 +149,10 @@ paths:
       responses:
         '200':
           description: Versioned policy controlling pauses and automatic actions
+          headers:
+            ETag:
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -170,6 +175,10 @@ paths:
       responses:
         '200':
           description: Updated automation policy
+          headers:
+            ETag:
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -1316,17 +1325,21 @@ components:
         title:
           type: string
           minLength: 1
+          maxLength: 255
         knowledge_point:
           type: string
           minLength: 1
+          maxLength: 255
         grade:
           type:
             - string
             - 'null'
+          maxLength: 40
         textbook_edition:
           type:
             - string
             - 'null'
+          maxLength: 120
         automation_mode:
           $ref: '#/components/schemas/AutomationMode'
         execution_mode:
@@ -2469,6 +2482,7 @@ components:
         title:
           type: string
           minLength: 1
+          maxLength: 255
         creation_package_id:
           type:
             - string
@@ -2490,6 +2504,7 @@ components:
         title:
           type: string
           minLength: 1
+          maxLength: 255
         creation_package_id:
           type: string
           format: uuid
@@ -2508,6 +2523,7 @@ components:
         title:
           type: string
           minLength: 1
+          maxLength: 255
     CreateCreationBatchRequest:
       oneOf:
         - $ref: '#/components/schemas/ProjectCreateCreationBatchRequest'

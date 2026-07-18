@@ -137,6 +137,7 @@ def get_project(
     "/{project_id}/automation-policy",
     response_model=AutomationPolicyEnvelope,
     operation_id="getProjectAutomationPolicy",
+    responses={200: {"headers": {"ETag": {"schema": {"type": "string"}}}}},
 )
 def get_project_automation_policy(
     project_id: UUID,
@@ -154,13 +155,17 @@ def get_project_automation_policy(
     "/{project_id}/automation-policy",
     response_model=AutomationPolicyEnvelope,
     operation_id="updateProjectAutomationPolicy",
+    responses={200: {"headers": {"ETag": {"schema": {"type": "string"}}}}},
 )
 def update_project_automation_policy(
     project_id: UUID,
     payload: UpdateAutomationPolicyRequest,
     request: Request,
     response: Response,
-    idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8)],
+    idempotency_key: Annotated[
+        str,
+        Header(alias="Idempotency-Key", min_length=8, max_length=128),
+    ],
     if_match: Annotated[str, Header(alias="If-Match")],
     actor: Annotated[ActorContext, Depends(get_actor_context)],
     session: Annotated[Session, Depends(get_session)],
