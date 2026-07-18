@@ -23,6 +23,26 @@ SECTION_LABELS = {
     "teaching_reflection": "十二、教学反思",
 }
 
+PROVIDER_POLICY_LABELS = {
+    "deterministic_fake_only": "只运行确定性 Fake 和合同测试",
+    "real_text_image_video_smoke_tts_deferred": "补真实文本、图片和视频冒烟；TTS 延后独立验收",
+}
+
+
+def _page_range(value: object) -> str:
+    if not isinstance(value, list) or not value or not all(isinstance(item, int) for item in value):
+        raise ValueError("golden page range must be a non-empty integer list")
+    pages = cast(list[int], value)
+    if pages == list(range(pages[0], pages[-1] + 1)):
+        return str(pages[0]) if len(pages) == 1 else f"{pages[0]}～{pages[-1]}"
+    return "、".join(str(page) for page in pages)
+
+
+def _provider_policy(value: object) -> str:
+    if not isinstance(value, str) or value not in PROVIDER_POLICY_LABELS:
+        raise ValueError(f"unsupported golden Provider policy: {value!r}")
+    return f"{PROVIDER_POLICY_LABELS[value]} (`{value}`)"
+
 
 def _summary(value: Any) -> str:
     if isinstance(value, list):
@@ -105,6 +125,7 @@ def _render_intro(golden: Mapping[str, Any]) -> list[str]:
 
 def _render_ppt(golden: Mapping[str, Any]) -> list[str]:
     ppt = cast(Mapping[str, Any], golden["ppt"])
+    page_specs = cast(list[dict[str, Any]], ppt["page_specs"])
     page_type_labels = {
         "cover": "封面",
         "introduction": "导入",
@@ -115,12 +136,12 @@ def _render_ppt(golden: Mapping[str, Any]) -> list[str]:
         "summary": "总结",
     }
     lines = [
-        "## 5. 10 页 PPT 示例",
+        f"## 5. {len(page_specs)} 页 PPT 示例",
         "",
         "| 页码 | 页面类型 | 教学任务 | 主视觉 |",
         "| --- | --- | --- | --- |",
     ]
-    for page in cast(list[dict[str, Any]], ppt["page_specs"]):
+    for page in page_specs:
         visual = cast(Mapping[str, Any], page["main_visual"])
         page_type = f"{page_type_labels[page['page_type']]} (`{page['page_type']}`)"
         lines.append(
@@ -128,11 +149,13 @@ def _render_ppt(golden: Mapping[str, Any]) -> list[str]:
             f"| {cell(visual['description'])} |"
         )
     style = cast(Mapping[str, Any], ppt["style_contract"])
+    image_rules = cast(list[str], style["image_rules"])
     lines.extend(
         [
             "",
-            f"**统一风格：** {style['typography']} 正文背景固定为 "
-            f"`{style['body_background_color']}`；AI 图片不烘焙准确文字、数字和公式。",
+            f"**统一风格：** {style['typography']} 正文背景模式 "
+            f"`{style['body_background_mode']}`，颜色 `{style['body_background_color']}`；"
+            f"图片规则：{display(image_rules)}。",
             "",
         ]
     )
@@ -143,7 +166,7 @@ def _render_video_header(video: Mapping[str, Any]) -> list[str]:
     master = cast(Mapping[str, Any], video["master_script"])
     rough = cast(Mapping[str, Any], video["rough_storyboard"])
     lines = [
-        "## 6. 50 秒视频示例",
+        f"## 6. {master['target_duration_seconds']} 秒视频示例",
         "",
         f"**标题：**《{master['title']}》  **叙事目的：** {master['narrative_purpose']}",
         "",
@@ -166,9 +189,16 @@ def _render_video_assets(video: Mapping[str, Any]) -> list[str]:
         "prop": "道具",
         "creature": "生物",
     }
+    categories = cast(Mapping[str, list[str]], inventory["categories"])
+    empty_category_labels = [
+        asset_type_labels.get(key, key) for key, asset_keys in categories.items() if not asset_keys
+    ]
+    category_summary = f"{len(categories)}类资产"
+    if empty_category_labels:
+        category_summary += f"（本例没有{'、'.join(empty_category_labels)}类）"
     lines = [
         "",
-        "四类资产（本例没有生物类）：",
+        f"{category_summary}：",
         "",
         "| 类型 | 资产 | 用途 |",
         "| --- | --- | --- |",
@@ -226,6 +256,8 @@ def render_golden_case(golden: Mapping[str, Any]) -> str:
     project = cast(Mapping[str, Any], golden["project"])
     preferences = cast(Mapping[str, Any], golden["teacher_preferences"])
     boundary = cast(Mapping[str, Any], golden["knowledge_boundary"])
+    verification = cast(Mapping[str, Any], source["verification"])
+    delivery = cast(Mapping[str, Any], golden["delivery_expectations"])
     project_line = (
         f"- 项目：{project['grade']}《{project['topic']}》，"
         f"{project['lesson_duration_minutes']} 分钟。"
@@ -238,13 +270,15 @@ def render_golden_case(golden: Mapping[str, Any]) -> str:
     lines = generated_header("“1～5的认识”黄金测试示例")
     lines.extend(
         [
-            "Fixture 不代表真实媒体已经生成；它固定的是输入、结构、提示词、依赖和质量预期。",
+            f"Fixture 声明：{delivery['golden_fixture_claim']}",
             "",
             "## 1. 教材与项目输入",
             "",
             f"- 教材：`{source['file_name']}`，共 {source['pdf_page_count']} 页。",
-            "- 黄金范围：物理页 3～5，对应印刷页 14～16。",
-            f"- SHA-256：`{source['sha256']}`。原教材不提交仓库。",
+            f"- 黄金范围：物理页 {_page_range(source['pdf_page_indexes'])}，"
+            f"对应印刷页 {_page_range(source['printed_pages'])}。",
+            f"- SHA-256：`{source['sha256']}`。原教材已提交仓库："
+            f"{yes_no(verification['raw_source_committed'])}。",
             project_line,
             mode_line,
             "",
@@ -260,9 +294,10 @@ def render_golden_case(golden: Mapping[str, Any]) -> str:
             *_render_video(golden),
             "## 7. 阶段验收边界",
             "",
-            "- 普通 CI：只运行确定性 Fake 和合同测试。",
-            "- 当前媒体阶段出口：必须补真实文本、图片和视频冒烟；TTS待音频Provider可用后独立验收。",
-            "- 当前示例不会伪装成已生成 DOCX、PPTX、图片、音频或 MP4。",
+            f"- 普通 CI Provider 策略："
+            f"{_provider_policy(delivery['ordinary_ci_provider_policy'])}。",
+            f"- 里程碑出口 Provider 策略："
+            f"{_provider_policy(delivery['milestone_exit_provider_policy'])}。",
             "",
         ]
     )

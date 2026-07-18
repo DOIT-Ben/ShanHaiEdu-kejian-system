@@ -1,10 +1,14 @@
 # ruff: noqa: RUF001
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 from typing import Any, cast
 
+import pytest
+
+from scripts.golden_case_guide_renderer import render_golden_case
 from scripts.render_builtin_generation_guide import (
     CHAPTER_NODE_KEYS,
     render_generation_guide,
@@ -72,8 +76,38 @@ def test_generation_guide_is_bounded_and_contains_readable_golden_case() -> None
     assert "物理页 3～5" in golden_text
     assert "三类九套" in golden_text
     assert "10 页 PPT" in golden_text
-    assert "50 秒视频" in golden_text
-    assert "Fixture 不代表真实媒体已经生成" in golden_text
+    assert "90 秒视频" in golden_text
+    assert "本Fixture只证明合同、上下文和结构可独立启动" in golden_text
     assert "尚未授课，保留反思问题，待教师课后填写" in golden_text
     assert "封面 (`cover`)" in golden_text
     assert "not_taught" not in golden_text
+
+
+def test_golden_case_guide_projects_machine_fields_without_stale_copies() -> None:
+    golden = copy.deepcopy(load_json(GOLDEN_CASE))
+    golden["source"]["pdf_page_indexes"] = [7, 9]
+    golden["source"]["printed_pages"] = [21, 23]
+    golden["source"]["verification"]["raw_source_committed"] = True
+    golden["ppt"]["style_contract"]["body_background_mode"] = "patterned_test"
+    golden["ppt"]["style_contract"]["image_rules"] = ["仅测试机器字段投影"]
+    golden["video"]["asset_inventory"]["categories"]["creature"] = ["ASSET-CREATURE-TEST"]
+    golden["delivery_expectations"]["golden_fixture_claim"] = "变异后的交付声明。"
+
+    rendered = render_golden_case(golden)
+
+    assert "物理页 7、9，对应印刷页 21、23" in rendered
+    assert "原教材已提交仓库：是" in rendered
+    assert "`patterned_test`" in rendered
+    assert "仅测试机器字段投影" in rendered
+    assert "本例没有生物类" not in rendered
+    assert "变异后的交付声明" in rendered
+    assert "`deterministic_fake_only`" in rendered
+    assert "`real_text_image_video_smoke_tts_deferred`" in rendered
+
+
+def test_golden_case_guide_rejects_unknown_provider_policy() -> None:
+    golden = copy.deepcopy(load_json(GOLDEN_CASE))
+    golden["delivery_expectations"]["ordinary_ci_provider_policy"] = "unsupported"
+
+    with pytest.raises(ValueError, match="unsupported golden Provider policy"):
+        render_golden_case(golden)
