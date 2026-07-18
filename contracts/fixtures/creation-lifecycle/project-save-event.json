@@ -1,0 +1,18 @@
+{
+  "event_id": "018f1000-0000-7000-8000-000000000051",
+  "sequence_no": 41,
+  "event_type": "creation.project_save.completed",
+  "occurred_at": "2026-07-18T03:06:00Z",
+  "project_id": "018f1000-0000-7000-8000-000000000003",
+  "resource": {
+    "type": "save_to_project_operation",
+    "id": "018f1000-0000-7000-8000-000000000041"
+  },
+  "payload": {
+    "adoption_id": "018f1000-0000-7000-8000-000000000031",
+    "binding_id": "018f1000-0000-7000-8000-000000000042",
+    "target_project_id": "018f1000-0000-7000-8000-000000000003",
+    "target_slot_key": "lesson.01.ppt.page.05.main_visual"
+  },
+  "request_id": "req-project-save-001"
+}

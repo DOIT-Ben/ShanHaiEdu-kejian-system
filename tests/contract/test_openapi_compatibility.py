@@ -37,14 +37,14 @@ def test_removed_operation_is_breaking() -> None:
 def test_required_property_and_changed_enum_values_are_breaking() -> None:
     base = load_current_contract()
     current = deepcopy(base)
-    project = current["components"]["schemas"]["Project"]
+    project = current["components"]["schemas"]["LegacyProject"]
     project["required"].append("grade")
     project["properties"]["status"]["enum"].remove("archived")
 
     errors = find_breaking_changes(base, current)
 
-    assert "components.schemas.Project: required properties changed" in errors
-    assert "components.schemas.Project.status: enum values changed" in errors
+    assert "components.schemas.LegacyProject: required properties changed" in errors
+    assert "components.schemas.LegacyProject.status: enum values changed" in errors
 
 
 def test_path_parameter_removal_and_new_required_parameter_are_breaking() -> None:
@@ -91,3 +91,60 @@ def test_request_and_response_schema_changes_are_breaking() -> None:
 
     assert "POST /projects request body application/json: type changed" in errors
     assert "GET /projects response 200 application/json: type changed" in errors
+
+
+def test_one_of_wrapper_is_compatible_when_legacy_branch_remains() -> None:
+    base = load_current_contract()
+    current = deepcopy(base)
+    original = deepcopy(
+        current["paths"]["/projects"]["post"]["requestBody"]["content"]["application/json"][
+            "schema"
+        ]
+    )
+    current["paths"]["/projects"]["post"]["requestBody"]["content"]["application/json"][
+        "schema"
+    ] = {
+        "oneOf": [
+            original,
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["title", "knowledge_point", "execution_mode"],
+                "properties": {
+                    "title": {"type": "string"},
+                    "knowledge_point": {"type": "string"},
+                    "execution_mode": {"enum": ["guided", "automatic"]},
+                },
+            },
+        ]
+    }
+
+    assert find_breaking_changes(base, current) == []
+
+
+def test_one_of_wrapper_is_breaking_when_legacy_branch_is_removed() -> None:
+    base = load_current_contract()
+    current = deepcopy(base)
+    current["paths"]["/projects"]["post"]["requestBody"]["content"]["application/json"][
+        "schema"
+    ] = {
+        "oneOf": [
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["title", "knowledge_point", "execution_mode"],
+                "properties": {
+                    "title": {"type": "string"},
+                    "knowledge_point": {"type": "string"},
+                    "execution_mode": {"enum": ["guided", "automatic"]},
+                },
+            }
+        ]
+    }
+
+    errors = find_breaking_changes(base, current)
+
+    assert (
+        "POST /projects request body application/json: no backward-compatible schema branch remains"
+        in errors
+    )

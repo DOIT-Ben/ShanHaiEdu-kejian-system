@@ -4,10 +4,10 @@
   "title": "MockScenarioRegistry",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "scenarios", "stage0_contract_scenarios"],
+  "required": ["schema_version", "scenarios", "stage0_contract_scenarios", "creation_contract_scenarios"],
   "properties": {
     "$schema": {"type": "string"},
-    "schema_version": {"const": "1.1"},
+    "schema_version": {"const": "1.2"},
     "scenarios": {
       "type": "array",
       "items": {
@@ -30,6 +30,16 @@
           {"$ref": "#/$defs/schema_fixture"}
         ]
       }
+    },
+    "creation_contract_scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {"$ref": "#/$defs/operation_response"},
+          {"$ref": "#/$defs/schema_fixture"}
+        ]
+      }
     }
   },
   "$defs": {
@@ -38,7 +48,7 @@
       "required": ["id", "fixture"],
       "properties": {
         "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
-        "fixture": {"type": "string", "pattern": "^fixtures/stage0/[a-z0-9-]+\\.json$"}
+        "fixture": {"type": "string", "pattern": "^fixtures/(stage0|creation-lifecycle)/[a-z0-9-]+\\.json$"}
       }
     },
     "operation_response": {
@@ -53,7 +63,7 @@
             "operation_id": {"type": "string", "minLength": 1},
             "response_status": {"type": "string", "pattern": "^([1-5][0-9]{2}|[1-5]XX)$"},
             "media_type": {"type": "string", "minLength": 1},
-            "fixture": {"type": "string", "pattern": "^fixtures/stage0/[a-z0-9-]+\\.json$"}
+            "fixture": {"type": "string", "pattern": "^fixtures/(stage0|creation-lifecycle)/[a-z0-9-]+\\.json$"}
           }
         }
       ]
@@ -68,7 +78,7 @@
           "properties": {
             "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
             "schema_file": {"type": "string", "pattern": "^[a-z0-9-]+\\.schema\\.json$"},
-            "fixture": {"type": "string", "pattern": "^fixtures/stage0/[a-z0-9-]+\\.json$"}
+            "fixture": {"type": "string", "pattern": "^fixtures/(stage0|creation-lifecycle)/[a-z0-9-]+\\.json$"}
           }
         }
       ]

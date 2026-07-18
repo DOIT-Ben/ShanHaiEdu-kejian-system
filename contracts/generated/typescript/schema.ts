@@ -74,6 +74,24 @@ export interface paths {
         patch: operations["updateProject"];
         trace?: never;
     };
+    "/projects/{project_id}/automation-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询项目当前自动化策略 */
+        get: operations["getProjectAutomationPolicy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** 调整项目自动化策略 */
+        patch: operations["updateProjectAutomationPolicy"];
+        trace?: never;
+    };
     "/projects/{project_id}/asset-slots": {
         parameters: {
             query?: never;
@@ -458,7 +476,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 创建通用创作批次 */
+        /**
+         * 创建通用创作批次
+         * @description New consumers must send the source_kind discriminated contract. The legacy branch is accepted only during migration and is deprecated.
+         */
         post: operations["createCreationBatch"];
         delete?: never;
         options?: never;
@@ -475,8 +496,91 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 批量生成创作候选 */
+        /**
+         * 批量生成创作候选
+         * @description The current branch pins each item to an immutable prompt_version_id. The legacy item_ids branch remains accepted during migration and is deprecated.
+         */
         post: operations["generateCreationBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/creation-items/{item_id}/prompt-versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 保存创作条目业务提示词版本
+         * @description Saves the editable business prompt without starting generation.
+         */
+        post: operations["saveCreationPromptVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/creation-items/{item_id}/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 基于固定提示词版本生成候选
+         * @description Freezes the selected prompt version and inputs into a generation job snapshot.
+         */
+        post: operations["generateCreationItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/generation-results/{result_id}/adoptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 采用候选但不写回项目
+         * @description Records a teacher or automation-policy adoption; it never creates an asset binding.
+         */
+        post: operations["adoptGenerationResult"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/adoptions/{adoption_id}/save-to-project": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 把已采用候选写回项目
+         * @description Project-source adoptions use the immutable CreationPackage target and reject target overrides. Standalone adoptions require an explicitly authorized project and slot.
+         */
+        post: operations["saveAdoptionToProject"];
         delete?: never;
         options?: never;
         head?: never;
@@ -492,7 +596,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 将候选结果保存到指定项目 */
+        /**
+         * 兼容旧客户端的候选直接写回入口
+         * @deprecated
+         * @description Legacy adapter only. The server must audit adoption and save as separate facts. New clients use POST /generation-results/{result_id}/adoptions followed by POST /adoptions/{adoption_id}/save-to-project.
+         */
         post: operations["saveGenerationResultToProject"];
         delete?: never;
         options?: never;
@@ -572,9 +680,43 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @enum {string} */
+        /**
+         * @deprecated
+         * @description Legacy project field. manual maps to guided with automatic node actions disabled; assisted maps to guided while preserving node rules; automatic remains automatic.
+         * @enum {string}
+         */
         AutomationMode: "manual" | "assisted" | "automatic";
-        Project: {
+        /** @enum {string} */
+        AutomationPolicyMode: "guided" | "automatic";
+        AutomationNodeRule: {
+            node_key: string;
+            auto_start?: boolean;
+            auto_submit?: boolean;
+            auto_approve?: boolean;
+            auto_adopt?: boolean;
+            auto_save_to_project?: boolean;
+            pause_after?: boolean;
+        };
+        AutomationPolicy: {
+            /** Format: uuid */
+            project_id: string;
+            /** Format: uuid */
+            workflow_definition_version_id: string;
+            mode: components["schemas"]["AutomationPolicyMode"];
+            node_rules: components["schemas"]["AutomationNodeRule"][];
+            policy_version: number;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        AutomationPolicyEnvelope: {
+            data: components["schemas"]["AutomationPolicy"];
+            request_id: string;
+        };
+        UpdateAutomationPolicyRequest: {
+            mode?: components["schemas"]["AutomationPolicyMode"];
+            node_rules?: components["schemas"]["AutomationNodeRule"][];
+        };
+        LegacyProject: {
             /** Format: uuid */
             id: string;
             title: string;
@@ -595,6 +737,28 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
+        CurrentProject: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            /** @constant */
+            subject: "primary_math";
+            grade?: string | null;
+            textbook_edition?: string | null;
+            knowledge_point: string;
+            /** @enum {unknown} */
+            status: "draft" | "active" | "archived";
+            execution_mode: components["schemas"]["AutomationPolicyMode"];
+            /** Format: uuid */
+            content_release_id?: string;
+            /** Format: uuid */
+            workflow_definition_version_id?: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        Project: components["schemas"]["LegacyProject"] | components["schemas"]["CurrentProject"];
         ProjectEnvelope: {
             data: components["schemas"]["Project"];
             request_id: string;
@@ -614,6 +778,7 @@ export interface components {
             grade?: string | null;
             textbook_edition?: string | null;
             automation_mode?: components["schemas"]["AutomationMode"];
+            execution_mode?: components["schemas"]["AutomationPolicyMode"];
         };
         /** @enum {string} */
         LessonBranchKey: "lesson_plan" | "intro_options" | "ppt" | "video";
@@ -997,7 +1162,119 @@ export interface components {
             };
             request_id: string;
         };
-        CreationBatchEnvelope: {
+        /** @enum {string} */
+        StudioType: "image" | "video" | "presentation";
+        /** @deprecated */
+        LegacyCreateCreationBatchRequest: {
+            studio_type: components["schemas"]["StudioType"];
+            title: string;
+            /** Format: uuid */
+            creation_package_id?: string | null;
+        };
+        ProjectCreateCreationBatchRequest: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            source_kind: "project";
+            studio_type: components["schemas"]["StudioType"];
+            title: string;
+            /** Format: uuid */
+            creation_package_id: string;
+        };
+        StandaloneCreateCreationBatchRequest: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            source_kind: "standalone";
+            studio_type: components["schemas"]["StudioType"];
+            title: string;
+        };
+        CreateCreationBatchRequest: components["schemas"]["ProjectCreateCreationBatchRequest"] | components["schemas"]["StandaloneCreateCreationBatchRequest"];
+        CompatibleCreateCreationBatchRequest: components["schemas"]["LegacyCreateCreationBatchRequest"] | components["schemas"]["CreateCreationBatchRequest"];
+        /** @deprecated */
+        LegacyGenerateCreationBatchRequest: {
+            item_ids: string[];
+        };
+        BatchGenerationItem: {
+            /** Format: uuid */
+            item_id: string;
+            /** Format: uuid */
+            prompt_version_id: string;
+            /** @default 1 */
+            candidate_count: number;
+        };
+        GenerateCreationBatchRequest: {
+            items: components["schemas"]["BatchGenerationItem"][];
+        };
+        CompatibleGenerateCreationBatchRequest: components["schemas"]["LegacyGenerateCreationBatchRequest"] | components["schemas"]["GenerateCreationBatchRequest"];
+        ProjectCreationItem: {
+            /** Format: uuid */
+            id: string;
+            item_key: string;
+            title: string;
+            /** @enum {unknown} */
+            status: "draft" | "ready" | "generating" | "review_required" | "adopted" | "saved" | "failed";
+            /** Format: uuid */
+            current_prompt_version_id?: string | null;
+            /** Format: uuid */
+            active_adoption_id?: string | null;
+            target_slot_key: string;
+        };
+        StandaloneCreationItem: {
+            /** Format: uuid */
+            id: string;
+            item_key: string;
+            title: string;
+            /** @enum {unknown} */
+            status: "draft" | "ready" | "generating" | "review_required" | "adopted" | "saved" | "failed";
+            /** Format: uuid */
+            current_prompt_version_id?: string | null;
+            /** Format: uuid */
+            active_adoption_id?: string | null;
+        };
+        CreationPackageSource: {
+            /** Format: uuid */
+            project_id: string;
+            /** Format: uuid */
+            workflow_run_id: string;
+            /** Format: uuid */
+            source_node_run_id: string;
+        };
+        ProjectCreationBatch: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            source_kind: "project";
+            /** Format: uuid */
+            creation_package_id: string;
+            source: components["schemas"]["CreationPackageSource"];
+            studio_type: components["schemas"]["StudioType"];
+            title: string;
+            /** @enum {unknown} */
+            status: "draft" | "ready" | "running" | "partially_completed" | "completed" | "archived";
+            items: components["schemas"]["ProjectCreationItem"][];
+        };
+        StandaloneCreationBatch: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            source_kind: "standalone";
+            studio_type: components["schemas"]["StudioType"];
+            title: string;
+            /** @enum {unknown} */
+            status: "draft" | "ready" | "running" | "partially_completed" | "completed" | "archived";
+            items: components["schemas"]["StandaloneCreationItem"][];
+        };
+        CreationBatch: components["schemas"]["ProjectCreationBatch"] | components["schemas"]["StandaloneCreationBatch"];
+        LegacyCreationBatchEnvelope: {
             data: {
                 /** Format: uuid */
                 id: string;
@@ -1008,6 +1285,110 @@ export interface components {
                 status: "draft" | "ready" | "running" | "partially_completed" | "completed" | "archived";
                 items: Record<string, never>[];
             };
+            request_id: string;
+        };
+        CurrentCreationBatchEnvelope: {
+            data: components["schemas"]["CreationBatch"];
+            request_id: string;
+        };
+        CreationBatchEnvelope: components["schemas"]["LegacyCreationBatchEnvelope"] | components["schemas"]["CurrentCreationBatchEnvelope"];
+        /**
+         * @description Provider-neutral teacher-facing generation tier.
+         * @enum {string}
+         */
+        GenerationProfile: "quality" | "balanced" | "speed";
+        SavePromptVersionRequest: {
+            business_prompt: string;
+            reference_asset_version_ids: string[];
+            output_spec: {
+                [key: string]: unknown;
+            };
+            generation_profile: components["schemas"]["GenerationProfile"];
+        };
+        PromptVersion: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            creation_item_id: string;
+            version_no: number;
+            business_prompt: string;
+            reference_asset_version_ids: string[];
+            output_spec: {
+                [key: string]: unknown;
+            };
+            generation_profile: components["schemas"]["GenerationProfile"];
+            content_hash: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        PromptVersionEnvelope: {
+            data: components["schemas"]["PromptVersion"];
+            request_id: string;
+        };
+        GenerateCreationItemRequest: {
+            /** Format: uuid */
+            prompt_version_id: string;
+            /** @default 1 */
+            candidate_count: number;
+        };
+        AdoptGenerationResultRequest: {
+            reason?: string | null;
+        };
+        Adoption: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            creation_item_id: string;
+            /** Format: uuid */
+            generation_result_id: string;
+            /** @enum {unknown} */
+            adoption_mode: "teacher" | "automation_policy";
+            reason?: string | null;
+            /** Format: date-time */
+            adopted_at: string;
+        };
+        AdoptionEnvelope: {
+            data: components["schemas"]["Adoption"];
+            request_id: string;
+        };
+        /** @enum {string} */
+        ReplaceMode: "reject_if_occupied" | "replace_active" | "append";
+        ProjectSourceSaveRequest: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            source_kind: "project";
+            replace_mode: components["schemas"]["ReplaceMode"];
+        };
+        StandaloneSourceSaveRequest: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            source_kind: "standalone";
+            /** Format: uuid */
+            project_id: string;
+            slot_key: string;
+            replace_mode: components["schemas"]["ReplaceMode"];
+        };
+        SaveAdoptionToProjectRequest: components["schemas"]["ProjectSourceSaveRequest"] | components["schemas"]["StandaloneSourceSaveRequest"];
+        SaveToProjectOperation: {
+            /** Format: uuid */
+            operation_id: string;
+            /** Format: uuid */
+            adoption_id: string;
+            /** @constant */
+            status: "completed";
+            /** Format: uuid */
+            binding_id: string;
+            /** Format: uuid */
+            target_project_id: string;
+            target_slot_key: string;
+            idempotent_replay: boolean;
+        };
+        SaveToProjectOperationEnvelope: {
+            data: components["schemas"]["SaveToProjectOperation"];
             request_id: string;
         };
         SaveOperationEnvelope: {
@@ -1215,8 +1596,41 @@ export interface components {
                 };
             };
         };
-        /** CreationPackage */
-        "creation-package.schema": {
+        reference_asset: {
+            /** Format: uuid */
+            asset_version_id: string;
+            role: string;
+        };
+        legacy_item: {
+            item_key: string;
+            position: number;
+            title: string;
+            prompt: {
+                [key: string]: unknown;
+            };
+            reference_assets?: components["schemas"]["reference_asset"][];
+            output_spec: {
+                [key: string]: unknown;
+            };
+            target_slot_key?: string | null;
+            consistency_key?: string | null;
+        };
+        current_item: {
+            item_key: string;
+            position: number;
+            title: string;
+            business_prompt: string;
+            prompt: {
+                [key: string]: unknown;
+            };
+            reference_assets?: components["schemas"]["reference_asset"][];
+            output_spec: {
+                [key: string]: unknown;
+            };
+            target_slot_key: string;
+            consistency_key?: string | null;
+        };
+        legacy_package: {
             /** Format: uuid */
             package_id: string;
             /** @enum {unknown} */
@@ -1236,30 +1650,155 @@ export interface components {
             style_contract?: {
                 [key: string]: unknown;
             } | null;
-            items: {
-                item_key: string;
-                position: number;
-                title: string;
-                prompt: {
-                    [key: string]: unknown;
-                };
-                reference_assets?: {
-                    /** Format: uuid */
-                    asset_version_id: string;
-                    role: string;
-                }[];
-                output_spec: {
-                    [key: string]: unknown;
-                };
-                target_slot_key?: string | null;
-                consistency_key?: string | null;
-            }[];
+            items: components["schemas"]["legacy_item"][];
             target_rules?: {
                 [key: string]: unknown;
             };
             /** Format: date-time */
             created_at: string;
         };
+        current_package: {
+            /** @constant */
+            schema_version: "2.0";
+            /** Format: uuid */
+            package_id: string;
+            /** @enum {unknown} */
+            package_type: "image" | "video" | "presentation";
+            /** @enum {unknown} */
+            status: "building" | "ready" | "invalid" | "expired";
+            source: {
+                /** Format: uuid */
+                project_id: string;
+                /** Format: uuid */
+                workflow_run_id: string;
+                /** Format: uuid */
+                lesson_unit_id?: string | null;
+                /** Format: uuid */
+                source_node_run_id: string;
+                /** @default false */
+                is_stale: boolean;
+            };
+            /** Format: uuid */
+            context_snapshot_id: string;
+            /** Format: uuid */
+            source_prompt_snapshot_id: string;
+            style_contract?: {
+                [key: string]: unknown;
+            } | null;
+            items: components["schemas"]["current_item"][];
+            target_rules: {
+                replace_modes: ("reject_if_occupied" | "replace_active" | "append")[];
+                /** @default true */
+                allow_download: boolean;
+            };
+            content_hash: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        /** CreationPackage */
+        "creation-package.schema": {
+            $defs: {
+                reference_asset: {
+                    /** Format: uuid */
+                    asset_version_id: string;
+                    role: string;
+                };
+                legacy_item: {
+                    item_key: string;
+                    position: number;
+                    title: string;
+                    prompt: {
+                        [key: string]: unknown;
+                    };
+                    reference_assets?: components["schemas"]["reference_asset"][];
+                    output_spec: {
+                        [key: string]: unknown;
+                    };
+                    target_slot_key?: string | null;
+                    consistency_key?: string | null;
+                };
+                legacy_package: {
+                    /** Format: uuid */
+                    package_id: string;
+                    /** @enum {unknown} */
+                    package_type: "image" | "video" | "presentation";
+                    /** @enum {unknown} */
+                    status: "building" | "ready" | "invalid" | "expired";
+                    source: {
+                        /** Format: uuid */
+                        project_id: string;
+                        /** Format: uuid */
+                        lesson_unit_id?: string | null;
+                        /** Format: uuid */
+                        node_run_id: string;
+                        /** @default false */
+                        is_stale: boolean;
+                    };
+                    style_contract?: {
+                        [key: string]: unknown;
+                    } | null;
+                    items: components["schemas"]["legacy_item"][];
+                    target_rules?: {
+                        [key: string]: unknown;
+                    };
+                    /** Format: date-time */
+                    created_at: string;
+                };
+                current_item: {
+                    item_key: string;
+                    position: number;
+                    title: string;
+                    business_prompt: string;
+                    prompt: {
+                        [key: string]: unknown;
+                    };
+                    reference_assets?: components["schemas"]["reference_asset"][];
+                    output_spec: {
+                        [key: string]: unknown;
+                    };
+                    target_slot_key: string;
+                    consistency_key?: string | null;
+                };
+                current_package: {
+                    /** @constant */
+                    schema_version: "2.0";
+                    /** Format: uuid */
+                    package_id: string;
+                    /** @enum {unknown} */
+                    package_type: "image" | "video" | "presentation";
+                    /** @enum {unknown} */
+                    status: "building" | "ready" | "invalid" | "expired";
+                    source: {
+                        /** Format: uuid */
+                        project_id: string;
+                        /** Format: uuid */
+                        workflow_run_id: string;
+                        /** Format: uuid */
+                        lesson_unit_id?: string | null;
+                        /** Format: uuid */
+                        source_node_run_id: string;
+                        /** @default false */
+                        is_stale: boolean;
+                    };
+                    /** Format: uuid */
+                    context_snapshot_id: string;
+                    /** Format: uuid */
+                    source_prompt_snapshot_id: string;
+                    style_contract?: {
+                        [key: string]: unknown;
+                    } | null;
+                    items: components["schemas"]["current_item"][];
+                    target_rules: {
+                        replace_modes: ("reject_if_occupied" | "replace_active" | "append")[];
+                        /** @default true */
+                        allow_download: boolean;
+                    };
+                    content_hash: string;
+                    /** Format: date-time */
+                    created_at: string;
+                };
+            };
+        } & (components["schemas"]["legacy_package"] | components["schemas"]["current_package"]);
     };
     responses: {
         /** @description Error envelope */
@@ -1286,6 +1825,9 @@ export interface components {
         NodeRunId: string;
         LessonId: string;
         BatchId: string;
+        CreationItemId: string;
+        GenerationResultId: string;
+        AdoptionId: string;
         MaterialId: string;
         JobId: string;
         ArtifactId: string;
@@ -1447,6 +1989,7 @@ export interface operations {
             content: {
                 "application/json": {
                     title?: string;
+                    execution_mode?: components["schemas"]["AutomationPolicyMode"];
                     automation_mode?: components["schemas"]["AutomationMode"];
                 };
             };
@@ -1459,6 +2002,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    getProjectAutomationPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Versioned policy controlling pauses and automatic actions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationPolicyEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    updateProjectAutomationPolicy: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": components["parameters"]["IfMatch"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAutomationPolicyRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated automation policy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationPolicyEnvelope"];
                 };
             };
             "4XX": components["responses"]["Error"];
@@ -2096,13 +2692,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    /** @enum {unknown} */
-                    studio_type: "image" | "video" | "presentation";
-                    title: string;
-                    /** Format: uuid */
-                    creation_package_id?: string | null;
-                };
+                "application/json": components["schemas"]["CompatibleCreateCreationBatchRequest"];
             };
         };
         responses: {
@@ -2131,13 +2721,119 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    item_ids: string[];
-                };
+                "application/json": components["schemas"]["CompatibleGenerateCreationBatchRequest"];
             };
         };
         responses: {
             202: components["responses"]["AcceptedJob"];
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    saveCreationPromptVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                item_id: components["parameters"]["CreationItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavePromptVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Immutable prompt version saved */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptVersionEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    generateCreationItem: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                item_id: components["parameters"]["CreationItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateCreationItemRequest"];
+            };
+        };
+        responses: {
+            202: components["responses"]["AcceptedJob"];
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    adoptGenerationResult: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                result_id: components["parameters"]["GenerationResultId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdoptGenerationResultRequest"];
+            };
+        };
+        responses: {
+            /** @description Adoption recorded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdoptionEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    saveAdoptionToProject: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                adoption_id: components["parameters"]["AdoptionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveAdoptionToProjectRequest"];
+            };
+        };
+        responses: {
+            /** @description Adopted candidate saved atomically */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaveToProjectOperationEnvelope"];
+                };
+            };
             "4XX": components["responses"]["Error"];
         };
     };

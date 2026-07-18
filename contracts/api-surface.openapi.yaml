@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ShanHaiEdu Core Integration Surface
-  version: 2.5.0
+  version: 2.6.0
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
@@ -117,8 +117,16 @@ paths:
               additionalProperties: false
               properties:
                 title: {type: string, minLength: 1}
+                execution_mode:
+                  $ref: '#/components/schemas/AutomationPolicyMode'
                 automation_mode:
                   $ref: '#/components/schemas/AutomationMode'
+              not:
+                type: object
+                properties:
+                  automation_mode: {}
+                  execution_mode: {}
+                required: [automation_mode, execution_mode]
       responses:
         '200':
           description: Updated project
@@ -126,6 +134,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProjectEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/automation-policy:
+    get:
+      summary: 查询项目当前自动化策略
+      operationId: getProjectAutomationPolicy
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Versioned policy controlling pauses and automatic actions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutomationPolicyEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+    patch:
+      summary: 调整项目自动化策略
+      operationId: updateProjectAutomationPolicy
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAutomationPolicyRequest'
+      responses:
+        '200':
+          description: Updated automation policy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutomationPolicyEnvelope'
         '4XX':
           $ref: '#/components/responses/Error'
   /projects/{project_id}/asset-slots:
@@ -589,6 +634,9 @@ paths:
     post:
       summary: 创建通用创作批次
       operationId: createCreationBatch
+      description: >-
+        New consumers must send the source_kind discriminated contract. The legacy branch is
+        accepted only during migration and is deprecated.
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -596,13 +644,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              additionalProperties: false
-              required: [studio_type, title]
-              properties:
-                studio_type: {enum: [image, video, presentation]}
-                title: {type: string, minLength: 1}
-                creation_package_id: {type: [string, 'null'], format: uuid}
+              $ref: '#/components/schemas/CompatibleCreateCreationBatchRequest'
       responses:
         '201':
           description: Creation batch
@@ -616,6 +658,9 @@ paths:
     post:
       summary: 批量生成创作候选
       operationId: generateCreationBatch
+      description: >-
+        The current branch pins each item to an immutable prompt_version_id. The legacy item_ids
+        branch remains accepted during migration and is deprecated.
       parameters:
         - $ref: '#/components/parameters/BatchId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -624,24 +669,111 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              additionalProperties: false
-              required: [item_ids]
-              properties:
-                item_ids:
-                  type: array
-                  minItems: 1
-                  uniqueItems: true
-                  items: {type: string, format: uuid}
+              $ref: '#/components/schemas/CompatibleGenerateCreationBatchRequest'
       responses:
         '202':
           $ref: '#/components/responses/AcceptedJob'
         '4XX':
           $ref: '#/components/responses/Error'
+  /creation-items/{item_id}/prompt-versions:
+    post:
+      summary: 保存创作条目业务提示词版本
+      operationId: saveCreationPromptVersion
+      description: Saves the editable business prompt without starting generation.
+      parameters:
+        - $ref: '#/components/parameters/CreationItemId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SavePromptVersionRequest'
+      responses:
+        '201':
+          description: Immutable prompt version saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromptVersionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /creation-items/{item_id}/generate:
+    post:
+      summary: 基于固定提示词版本生成候选
+      operationId: generateCreationItem
+      description: Freezes the selected prompt version and inputs into a generation job snapshot.
+      parameters:
+        - $ref: '#/components/parameters/CreationItemId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateCreationItemRequest'
+      responses:
+        '202':
+          $ref: '#/components/responses/AcceptedJob'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /generation-results/{result_id}/adoptions:
+    post:
+      summary: 采用候选但不写回项目
+      operationId: adoptGenerationResult
+      description: Records a teacher or automation-policy adoption; it never creates an asset binding.
+      parameters:
+        - $ref: '#/components/parameters/GenerationResultId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdoptGenerationResultRequest'
+      responses:
+        '201':
+          description: Adoption recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdoptionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /adoptions/{adoption_id}/save-to-project:
+    post:
+      summary: 把已采用候选写回项目
+      operationId: saveAdoptionToProject
+      description: >-
+        Project-source adoptions use the immutable CreationPackage target and reject target
+        overrides. Standalone adoptions require an explicitly authorized project and slot.
+      parameters:
+        - $ref: '#/components/parameters/AdoptionId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveAdoptionToProjectRequest'
+      responses:
+        '200':
+          description: Adopted candidate saved atomically
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaveToProjectOperationEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
   /generation-results/{result_id}/save-to-project:
     post:
-      summary: 将候选结果保存到指定项目
+      summary: 兼容旧客户端的候选直接写回入口
       operationId: saveGenerationResultToProject
+      deprecated: true
+      description: >-
+        Legacy adapter only. The server must audit adoption and save as separate facts. New clients
+        use POST /generation-results/{result_id}/adoptions followed by
+        POST /adoptions/{adoption_id}/save-to-project.
       parameters:
         - name: result_id
           in: path
@@ -760,6 +892,21 @@ components:
       in: path
       required: true
       schema: {type: string, format: uuid}
+    CreationItemId:
+      name: item_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    GenerationResultId:
+      name: result_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    AdoptionId:
+      name: adoption_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
     MaterialId:
       name: material_id
       in: path
@@ -837,7 +984,61 @@ components:
     AutomationMode:
       type: string
       enum: [manual, assisted, automatic]
-    Project:
+      deprecated: true
+      description: >-
+        Legacy project field. manual maps to guided with automatic node actions disabled;
+        assisted maps to guided while preserving node rules; automatic remains automatic.
+    AutomationPolicyMode:
+      type: string
+      enum: [guided, automatic]
+    AutomationNodeRule:
+      type: object
+      additionalProperties: false
+      required: [node_key]
+      properties:
+        node_key: {type: string, minLength: 1, maxLength: 120}
+        auto_start: {type: boolean}
+        auto_submit: {type: boolean}
+        auto_approve: {type: boolean}
+        auto_adopt: {type: boolean}
+        auto_save_to_project: {type: boolean}
+        pause_after: {type: boolean}
+    AutomationPolicy:
+      type: object
+      additionalProperties: false
+      required:
+        - project_id
+        - workflow_definition_version_id
+        - mode
+        - node_rules
+        - policy_version
+        - updated_at
+      properties:
+        project_id: {type: string, format: uuid}
+        workflow_definition_version_id: {type: string, format: uuid}
+        mode: {$ref: '#/components/schemas/AutomationPolicyMode'}
+        node_rules:
+          type: array
+          items: {$ref: '#/components/schemas/AutomationNodeRule'}
+        policy_version: {type: integer, minimum: 1}
+        updated_at: {type: string, format: date-time}
+    AutomationPolicyEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/AutomationPolicy'}
+        request_id: {type: string, minLength: 1}
+    UpdateAutomationPolicyRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        mode: {$ref: '#/components/schemas/AutomationPolicyMode'}
+        node_rules:
+          type: array
+          items: {$ref: '#/components/schemas/AutomationNodeRule'}
+    LegacyProject:
       type: object
       additionalProperties: false
       required:
@@ -863,6 +1064,36 @@ components:
         workflow_definition_version_id: {type: string, format: uuid}
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
+    CurrentProject:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - title
+        - subject
+        - knowledge_point
+        - status
+        - execution_mode
+        - created_at
+        - updated_at
+      properties:
+        id: {type: string, format: uuid}
+        title: {type: string}
+        subject: {const: primary_math}
+        grade: {type: [string, 'null']}
+        textbook_edition: {type: [string, 'null']}
+        knowledge_point: {type: string}
+        status: {enum: [draft, active, archived]}
+        execution_mode:
+          $ref: '#/components/schemas/AutomationPolicyMode'
+        content_release_id: {type: string, format: uuid}
+        workflow_definition_version_id: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    Project:
+      oneOf:
+        - $ref: '#/components/schemas/LegacyProject'
+        - $ref: '#/components/schemas/CurrentProject'
     ProjectEnvelope:
       type: object
       required: [data, request_id]
@@ -894,6 +1125,14 @@ components:
         textbook_edition: {type: [string, 'null']}
         automation_mode:
           $ref: '#/components/schemas/AutomationMode'
+        execution_mode:
+          $ref: '#/components/schemas/AutomationPolicyMode'
+      not:
+        type: object
+        properties:
+          automation_mode: {}
+          execution_mode: {}
+        required: [automation_mode, execution_mode]
     LessonBranchKey:
       type: string
       enum: [lesson_plan, intro_options, ppt, video]
@@ -1452,7 +1691,146 @@ components:
               type: array
               items: {$ref: '#/components/schemas/DependencyReadiness'}
         request_id: {type: string, minLength: 1}
-    CreationBatchEnvelope:
+    StudioType:
+      type: string
+      enum: [image, video, presentation]
+    LegacyCreateCreationBatchRequest:
+      type: object
+      deprecated: true
+      additionalProperties: false
+      required: [studio_type, title]
+      properties:
+        studio_type: {$ref: '#/components/schemas/StudioType'}
+        title: {type: string, minLength: 1}
+        creation_package_id: {type: [string, 'null'], format: uuid}
+    ProjectCreateCreationBatchRequest:
+      type: object
+      additionalProperties: false
+      required: [source_kind, studio_type, title, creation_package_id]
+      properties:
+        source_kind: {const: project}
+        studio_type: {$ref: '#/components/schemas/StudioType'}
+        title: {type: string, minLength: 1}
+        creation_package_id: {type: string, format: uuid}
+    StandaloneCreateCreationBatchRequest:
+      type: object
+      additionalProperties: false
+      required: [source_kind, studio_type, title]
+      properties:
+        source_kind: {const: standalone}
+        studio_type: {$ref: '#/components/schemas/StudioType'}
+        title: {type: string, minLength: 1}
+    CreateCreationBatchRequest:
+      oneOf:
+        - $ref: '#/components/schemas/ProjectCreateCreationBatchRequest'
+        - $ref: '#/components/schemas/StandaloneCreateCreationBatchRequest'
+      discriminator:
+        propertyName: source_kind
+        mapping:
+          project: '#/components/schemas/ProjectCreateCreationBatchRequest'
+          standalone: '#/components/schemas/StandaloneCreateCreationBatchRequest'
+    CompatibleCreateCreationBatchRequest:
+      oneOf:
+        - $ref: '#/components/schemas/LegacyCreateCreationBatchRequest'
+        - $ref: '#/components/schemas/CreateCreationBatchRequest'
+    LegacyGenerateCreationBatchRequest:
+      type: object
+      deprecated: true
+      additionalProperties: false
+      required: [item_ids]
+      properties:
+        item_ids:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: {type: string, format: uuid}
+    BatchGenerationItem:
+      type: object
+      additionalProperties: false
+      required: [item_id, prompt_version_id]
+      properties:
+        item_id: {type: string, format: uuid}
+        prompt_version_id: {type: string, format: uuid}
+        candidate_count: {type: integer, minimum: 1, maximum: 8, default: 1}
+    GenerateCreationBatchRequest:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: {$ref: '#/components/schemas/BatchGenerationItem'}
+    CompatibleGenerateCreationBatchRequest:
+      oneOf:
+        - $ref: '#/components/schemas/LegacyGenerateCreationBatchRequest'
+        - $ref: '#/components/schemas/GenerateCreationBatchRequest'
+    ProjectCreationItem:
+      type: object
+      additionalProperties: false
+      required: [id, item_key, title, status, target_slot_key]
+      properties:
+        id: {type: string, format: uuid}
+        item_key: {type: string, minLength: 1, maxLength: 160}
+        title: {type: string, minLength: 1}
+        status: {enum: [draft, ready, generating, review_required, adopted, saved, failed]}
+        current_prompt_version_id: {type: [string, 'null'], format: uuid}
+        active_adoption_id: {type: [string, 'null'], format: uuid}
+        target_slot_key: {type: string, minLength: 1, maxLength: 160}
+    StandaloneCreationItem:
+      type: object
+      additionalProperties: false
+      required: [id, item_key, title, status]
+      properties:
+        id: {type: string, format: uuid}
+        item_key: {type: string, minLength: 1, maxLength: 160}
+        title: {type: string, minLength: 1}
+        status: {enum: [draft, ready, generating, review_required, adopted, saved, failed]}
+        current_prompt_version_id: {type: [string, 'null'], format: uuid}
+        active_adoption_id: {type: [string, 'null'], format: uuid}
+    CreationPackageSource:
+      type: object
+      additionalProperties: false
+      required: [project_id, workflow_run_id, source_node_run_id]
+      properties:
+        project_id: {type: string, format: uuid}
+        workflow_run_id: {type: string, format: uuid}
+        source_node_run_id: {type: string, format: uuid}
+    ProjectCreationBatch:
+      type: object
+      additionalProperties: false
+      required: [id, source_kind, creation_package_id, source, studio_type, title, status, items]
+      properties:
+        id: {type: string, format: uuid}
+        source_kind: {const: project}
+        creation_package_id: {type: string, format: uuid}
+        source: {$ref: '#/components/schemas/CreationPackageSource'}
+        studio_type: {$ref: '#/components/schemas/StudioType'}
+        title: {type: string}
+        status: {enum: [draft, ready, running, partially_completed, completed, archived]}
+        items: {type: array, minItems: 1, items: {$ref: '#/components/schemas/ProjectCreationItem'}}
+    StandaloneCreationBatch:
+      type: object
+      additionalProperties: false
+      required: [id, source_kind, studio_type, title, status, items]
+      properties:
+        id: {type: string, format: uuid}
+        source_kind: {const: standalone}
+        studio_type: {$ref: '#/components/schemas/StudioType'}
+        title: {type: string}
+        status: {enum: [draft, ready, running, partially_completed, completed, archived]}
+        items: {type: array, items: {$ref: '#/components/schemas/StandaloneCreationItem'}}
+    CreationBatch:
+      oneOf:
+        - $ref: '#/components/schemas/ProjectCreationBatch'
+        - $ref: '#/components/schemas/StandaloneCreationBatch'
+      discriminator:
+        propertyName: source_kind
+        mapping:
+          project: '#/components/schemas/ProjectCreationBatch'
+          standalone: '#/components/schemas/StandaloneCreationBatch'
+    LegacyCreationBatchEnvelope:
       type: object
       required: [data, request_id]
       properties:
@@ -1465,7 +1843,157 @@ components:
             title: {type: string}
             status: {enum: [draft, ready, running, partially_completed, completed, archived]}
             items: {type: array, items: {type: object}}
+          not:
+            type: object
+            properties:
+              source_kind: {}
+            required: [source_kind]
         request_id: {type: string}
+    CurrentCreationBatchEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/CreationBatch'}
+        request_id: {type: string, minLength: 1}
+    CreationBatchEnvelope:
+      oneOf:
+        - $ref: '#/components/schemas/LegacyCreationBatchEnvelope'
+        - $ref: '#/components/schemas/CurrentCreationBatchEnvelope'
+    GenerationProfile:
+      type: string
+      enum: [quality, balanced, speed]
+      description: Provider-neutral teacher-facing generation tier.
+    SavePromptVersionRequest:
+      type: object
+      additionalProperties: false
+      required: [business_prompt, reference_asset_version_ids, output_spec, generation_profile]
+      properties:
+        business_prompt: {type: string, minLength: 1, maxLength: 50000}
+        reference_asset_version_ids:
+          type: array
+          maxItems: 20
+          uniqueItems: true
+          items: {type: string, format: uuid}
+        output_spec: {type: object, additionalProperties: true}
+        generation_profile: {$ref: '#/components/schemas/GenerationProfile'}
+    PromptVersion:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - creation_item_id
+        - version_no
+        - business_prompt
+        - reference_asset_version_ids
+        - output_spec
+        - generation_profile
+        - content_hash
+        - created_at
+      properties:
+        id: {type: string, format: uuid}
+        creation_item_id: {type: string, format: uuid}
+        version_no: {type: integer, minimum: 1}
+        business_prompt: {type: string, minLength: 1}
+        reference_asset_version_ids:
+          type: array
+          uniqueItems: true
+          items: {type: string, format: uuid}
+        output_spec: {type: object, additionalProperties: true}
+        generation_profile: {$ref: '#/components/schemas/GenerationProfile'}
+        content_hash: {type: string, pattern: '^[a-f0-9]{64}$'}
+        created_at: {type: string, format: date-time}
+    PromptVersionEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/PromptVersion'}
+        request_id: {type: string, minLength: 1}
+    GenerateCreationItemRequest:
+      type: object
+      additionalProperties: false
+      required: [prompt_version_id]
+      properties:
+        prompt_version_id: {type: string, format: uuid}
+        candidate_count: {type: integer, minimum: 1, maximum: 8, default: 1}
+    AdoptGenerationResultRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        reason: {type: [string, 'null'], maxLength: 1000}
+    Adoption:
+      type: object
+      additionalProperties: false
+      required: [id, creation_item_id, generation_result_id, adoption_mode, adopted_at]
+      properties:
+        id: {type: string, format: uuid}
+        creation_item_id: {type: string, format: uuid}
+        generation_result_id: {type: string, format: uuid}
+        adoption_mode: {enum: [teacher, automation_policy]}
+        reason: {type: [string, 'null']}
+        adopted_at: {type: string, format: date-time}
+    AdoptionEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/Adoption'}
+        request_id: {type: string, minLength: 1}
+    ReplaceMode:
+      type: string
+      enum: [reject_if_occupied, replace_active, append]
+    ProjectSourceSaveRequest:
+      type: object
+      additionalProperties: false
+      required: [source_kind, replace_mode]
+      properties:
+        source_kind: {const: project}
+        replace_mode: {$ref: '#/components/schemas/ReplaceMode'}
+    StandaloneSourceSaveRequest:
+      type: object
+      additionalProperties: false
+      required: [source_kind, project_id, slot_key, replace_mode]
+      properties:
+        source_kind: {const: standalone}
+        project_id: {type: string, format: uuid}
+        slot_key: {type: string, minLength: 1, maxLength: 160}
+        replace_mode: {$ref: '#/components/schemas/ReplaceMode'}
+    SaveAdoptionToProjectRequest:
+      oneOf:
+        - $ref: '#/components/schemas/ProjectSourceSaveRequest'
+        - $ref: '#/components/schemas/StandaloneSourceSaveRequest'
+      discriminator:
+        propertyName: source_kind
+        mapping:
+          project: '#/components/schemas/ProjectSourceSaveRequest'
+          standalone: '#/components/schemas/StandaloneSourceSaveRequest'
+    SaveToProjectOperation:
+      type: object
+      additionalProperties: false
+      required:
+        - operation_id
+        - adoption_id
+        - status
+        - binding_id
+        - target_project_id
+        - target_slot_key
+        - idempotent_replay
+      properties:
+        operation_id: {type: string, format: uuid}
+        adoption_id: {type: string, format: uuid}
+        status: {const: completed}
+        binding_id: {type: string, format: uuid}
+        target_project_id: {type: string, format: uuid}
+        target_slot_key: {type: string, minLength: 1, maxLength: 160}
+        idempotent_replay: {type: boolean}
+    SaveToProjectOperationEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/SaveToProjectOperation'}
+        request_id: {type: string, minLength: 1}
     SaveOperationEnvelope:
       type: object
       required: [data, request_id]

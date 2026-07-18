@@ -1,6 +1,6 @@
 {
   "$schema": "./mock-scenarios.schema.json",
-  "schema_version": "1.1",
+  "schema_version": "1.2",
   "scenarios": [
     {"id": "project_empty", "route": "/app/projects/:project_id", "description": "教材尚未上传的项目主页"},
     {"id": "lesson_collection", "route": "/app/projects/:project_id", "description": "课时列表读取、重排、信息修改和软归档"},
@@ -14,11 +14,16 @@
     {"id": "node_partial", "route": "/app/projects/:project_id/lessons/:lesson_id/work/:step_key", "description": "批量页面或镜头部分成功"},
     {"id": "node_stale", "route": "/app/projects/:project_id/lessons/:lesson_id/work/:step_key", "description": "上游批准新版后的局部影响与三种处理"},
     {"id": "artifact_review", "route": "/app/projects/:project_id/lessons/:lesson_id/work/:step_key", "description": "草稿自动保存、提交审核、批准、退回、撤销和接受过期"},
-    {"id": "creation_independent", "route": "/app/creation/images", "description": "不绑定项目的独立图片创作"},
-    {"id": "creation_from_package", "route": "/app/creation/batches/:batch_id", "description": "项目包批量导入、生成并保存回项目"},
-    {"id": "save_conflict", "route": "/app/creation/batches/:batch_id", "description": "目标单值槽位已存在，选择替换或另存"},
+    {"id": "creation_independent", "route": "/app/creation/images", "description": "standalone批次不携带项目、工作流或节点来源"},
+    {"id": "creation_from_package", "route": "/app/creation/batches/:batch_id", "description": "project批次固定CreationPackage来源和目标槽位"},
+    {"id": "creation_prompt_saved", "route": "/app/creation/batches/:batch_id", "description": "保存完整生成指令版本但不触发生成"},
+    {"id": "creation_candidate_adopted", "route": "/app/creation/batches/:batch_id", "description": "采用候选但尚未写回项目"},
+    {"id": "creation_standalone_attach", "route": "/app/creation/batches/:batch_id", "description": "独立候选显式选择有权限项目和槽位后写回"},
+    {"id": "creation_target_override_rejected", "route": "/app/creation/batches/:batch_id", "description": "project批次尝试覆盖CreationPackage目标时被拒绝"},
+    {"id": "save_conflict", "route": "/app/creation/batches/:batch_id", "description": "目标单值槽位已存在，按固定目标选择拒绝或替换"},
     {"id": "sse_recovery", "route": "/app/tasks", "description": "事件断线、游标续传、REST 对账"},
-    {"id": "budget_pause", "route": "/app/projects/:project_id", "description": "全自动因预算确认暂停"},
+    {"id": "budget_pause", "route": "/app/projects/:project_id", "description": "automatic因预算确认暂停"},
+    {"id": "guided_pause", "route": "/app/projects/:project_id", "description": "guided在主要节点结果形成后等待教师确认"},
     {"id": "admin_content_publish", "route": "/admin/content", "description": "内容包导入、校验、评测和发布"}
   ],
   "stage0_contract_scenarios": [
@@ -75,6 +80,58 @@
       "response_status": "200",
       "media_type": "application/json",
       "fixture": "fixtures/stage0/project-workflow.json"
+    }
+  ],
+  "creation_contract_scenarios": [
+    {
+      "id": "project_batch_created",
+      "operation_id": "createCreationBatch",
+      "response_status": "201",
+      "media_type": "application/json",
+      "fixture": "fixtures/creation-lifecycle/project-batch-created.json"
+    },
+    {
+      "id": "standalone_batch_created",
+      "operation_id": "createCreationBatch",
+      "response_status": "201",
+      "media_type": "application/json",
+      "fixture": "fixtures/creation-lifecycle/standalone-batch-created.json"
+    },
+    {
+      "id": "prompt_version_saved",
+      "operation_id": "saveCreationPromptVersion",
+      "response_status": "201",
+      "media_type": "application/json",
+      "fixture": "fixtures/creation-lifecycle/prompt-version-saved.json"
+    },
+    {
+      "id": "candidate_adopted",
+      "operation_id": "adoptGenerationResult",
+      "response_status": "201",
+      "media_type": "application/json",
+      "fixture": "fixtures/creation-lifecycle/candidate-adopted.json"
+    },
+    {
+      "id": "project_save_completed",
+      "operation_id": "saveAdoptionToProject",
+      "response_status": "200",
+      "media_type": "application/json",
+      "fixture": "fixtures/creation-lifecycle/project-save-completed.json"
+    },
+    {
+      "id": "project_creation_package_v2",
+      "schema_file": "creation-package.schema.json",
+      "fixture": "fixtures/creation-lifecycle/project-creation-package-current.json"
+    },
+    {
+      "id": "project_save_event",
+      "schema_file": "creation-lifecycle-event.schema.json",
+      "fixture": "fixtures/creation-lifecycle/project-save-event.json"
+    },
+    {
+      "id": "downstream_stale_event",
+      "schema_file": "creation-lifecycle-event.schema.json",
+      "fixture": "fixtures/creation-lifecycle/downstream-stale-event.json"
     }
   ]
 }

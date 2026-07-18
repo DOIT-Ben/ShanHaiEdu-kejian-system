@@ -1,0 +1,11 @@
+{
+  "data": {
+    "id": "018f1000-0000-7000-8000-000000000031",
+    "creation_item_id": "018f1000-0000-7000-8000-000000000006",
+    "generation_result_id": "018f1000-0000-7000-8000-000000000032",
+    "adoption_mode": "teacher",
+    "reason": "画面与本页教学任务一致",
+    "adopted_at": "2026-07-18T03:05:00Z"
+  },
+  "request_id": "req-adoption-001"
+}

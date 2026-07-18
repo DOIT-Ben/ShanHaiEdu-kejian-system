@@ -8,11 +8,12 @@
 - `api-surface.openapi.yaml`：当前核心联调面；后端实现须生成更完整 OpenAPI，且不得违背此处语义。
 - `error-envelope.schema.json`：统一错误响应。
 - `sse-event.schema.json`：统一事件信封。
+- `creation-lifecycle-event.schema.json`：提示词版本、候选采用、项目写回和下游stale传播事件。
 - `workflow-node-status.schema.json`：节点状态枚举。
 - `intro-option-set.schema.json`：三类九套导入设计、最小课程锚点和选择交接。
 - `ppt-page-spec.schema.json`：PPT逐页四层结构、白底和可编辑内容合同。
 - `video-shot.schema.json`：细分镜、垫图引用和10/15秒生成合同。
-- `creation-package.schema.json`：项目导入通用创作中心的不可变包。
+- `creation-package.schema.json`：项目导入通用创作台的不可变包；兼容旧包，2.0包强制工作流来源、上下文快照和目标槽位。
 - `content-definition.schema.json`：动态内容字段树。
 - `material-evidence-package.schema.json`：教材PDF页级文本块、图片引用和来源追溯合同。
 - `content-package-manifest.schema.json`：可导入内容包的版本、条目、路径、Schema和哈希清单。
@@ -26,6 +27,7 @@
 - `markdown-template-draft.schema.json`：普通Markdown导入后的可审核模板草稿。
 - `mock-scenarios.json`：前端必须覆盖的关键 Mock 场景。
 - `fixtures/stage0/`：项目、上传、任务、工作流聚合、错误和SSE的确定性合同样例。
+- `fixtures/creation-lifecycle/`：project/standalone批次、提示词版本、采用、项目写回、CreationPackage 2.0和stale事件样例。
 - `fixtures/workflow-node-generation-bindings/`：覆盖教材、课时、教案、三类九套、PPT、图片、视频、音频和交付的完整脱敏节点目录样例。
 - `generated/`：由当前OpenAPI确定性生成的bundle和TypeScript类型，不是第二份手工合同。
 - `typescript/client.ts`：基于生成paths和openapi-fetch的共享客户端工厂。
@@ -47,6 +49,7 @@
 13. `save_prompt_version`、`generate`、`adopt`和`save_to_project`是四个独立合同；采用不等于写回项目，保存提示词版本不触发生成。
 14. 项目来源只能写回创作包固定项目与槽位；独立来源写回项目必须显式提交目标、重新鉴权并保存授权快照。
 15. 旧`manual/assisted/automatic`和旧创作端点必须通过显式兼容与弃用周期迁移；已发布策略快照不改写，客户端未迁移完成前不得删除旧值或静默改变含义。
+16. 新客户端通过`AutomationPolicyMode`、`source_kind`和四个独立创作动作接入；旧`AutomationMode`及候选直接写回入口只用于兼容，并在OpenAPI中标记`deprecated`。
 
 ## 本地命令
 
