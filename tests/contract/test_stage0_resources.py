@@ -84,7 +84,7 @@ async def test_project_upload_and_job_api_matches_stage0_contract(
 
             detail_response = await client.get(f"/api/v2/projects/{project_id}")
             assert detail_response.status_code == 200
-            assert detail_response.headers["ETag"] == 'W/"1"'
+            assert detail_response.headers["ETag"] == 'W/"1-1"'
             assert_contract_response(detail_response, operation_id="getProject", status="200")
 
             upload_response = await client.post(
