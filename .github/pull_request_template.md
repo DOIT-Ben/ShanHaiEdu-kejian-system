@@ -34,7 +34,7 @@ Closes #
 
 ## 子智能体审查
 
-- [ ] `subagent-review-pending`：Draft PR尚未完成独立审查。
+- [ ] `subagent-review-pending`：仅Draft PR可用；尚未完成独立审查。
 - [ ] `subagent-review-approved`：同一独立只读子智能体已完成初审、findings修复复核和最终base/head diff确认，P0/P1全部关闭，P2/P3已修复或显式接受；审查后HEAD未变化。
 
 审查子智能体：
@@ -57,10 +57,10 @@ Findings及处置：
 
 ## 变更规模
 
-以下两项必须且只能勾选一项。机器以全部变更的原始文件数和净新增行数触发保守门禁；生成物、Schema和迁移例外由评审导航解释。
+以下两项必须且只能勾选一项。机器以全部变更的原始文件数、净新增行数和二进制或未知统计项触发保守门禁；生成物、Schema和迁移例外由评审导航解释。
 
-- [ ] `pr-size-within-limit`：原始变更不超过20个文件，且净新增不超过800行。
-- [ ] `pr-size-review-map-required`：原始变更触发规模门禁；已提供评审导航和不可继续拆分的理由。
+- [ ] `pr-size-within-limit`：原始变更不超过20个文件、净新增不超过800行，且不含二进制或未知统计项。
+- [ ] `pr-size-review-map-required`：原始变更触发文件数、行数或二进制门禁；已提供评审导航和不可继续拆分的理由。
 
 原始规模：
 

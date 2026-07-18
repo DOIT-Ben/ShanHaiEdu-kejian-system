@@ -132,11 +132,11 @@ PR正文必须包含：
 - 删除的旧代码或旧文档。
 - 独立子智能体审查人、审查范围、findings处置、验证命令和残余风险。
 - `CURRENT_STATUS.md`新鲜度二选一声明及判断依据；触发状态页更新时，必须在同一PR同步状态页。
-- PR规模二选一声明；原始变更超过20个文件或净新增超过800行时选择`pr-size-review-map-required`，列出业务源码、生成物、Schema、迁移和测试的评审导航，并说明为何不能继续拆分。
+- PR规模二选一声明；原始变更超过20个文件、净新增超过800行或包含二进制/未知统计项时选择`pr-size-review-map-required`，列出业务源码、生成物、Schema、迁移和测试的评审导航，并说明为何不能继续拆分。
 
 超过20个业务源码文件或800行净新增非生成代码的PR，必须提供评审导航并说明为何不能拆分。初始化、生成代码、Schema和迁移可以例外，但应与手写业务代码分开列出。
 
-SHA必须由`git rev-parse`或`gh pr view --json baseRefOid,headRefOid`取得，不得手工扩写短SHA。PowerShell中更新多行PR正文或评论时使用UTF-8正文文件、标准输入或结构化API，不把含反引号、美元符号和换行的Markdown拼进插值命令。更新后必须重新读取远端正文，并运行PR声明校验。
+SHA必须由`git rev-parse`或`gh pr view --json baseRefOid,headRefOid`取得，不得手工扩写短SHA。PowerShell中更新多行PR正文或评论时使用UTF-8正文文件、标准输入或结构化API，不把含反引号、美元符号和换行的Markdown拼进插值命令。更新后必须重新读取远端正文，并运行PR声明校验。Draft可使用`subagent-review-pending`；PR正文编辑和转Ready都会重新触发校验，非Draft必须使用`subagent-review-approved`并绑定当前SHA。
 
 ## 8. 变更分级
 

@@ -29,7 +29,7 @@ MARKDOWN_H2_SECTION = re.compile(
     r"^##[ \t]+.*?(?=^##[ \t]+|\Z)",
     re.MULTILINE | re.DOTALL,
 )
-FIRST_REQUIRED_GOVERNANCE_PR = 93
+FIRST_REQUIRED_GOVERNANCE_PR = 93  # Remove under #94 after legacy PR #62 closes.
 
 
 def validate_status_declaration(body: str, changed_files: set[str]) -> list[str]:
