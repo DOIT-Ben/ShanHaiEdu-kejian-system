@@ -13,6 +13,7 @@ PENDING = "- [x] `subagent-review-pending`: review pending"
 APPROVED = "- [x] `subagent-review-approved`: review approved"
 PENDING_UNCHECKED = "- [ ] `subagent-review-pending`: review pending"
 APPROVED_UNCHECKED = "- [ ] `subagent-review-approved`: review approved"
+FULLWIDTH_COLON = "\uff1a"
 
 
 def test_status_update_declaration_requires_current_status_change() -> None:
@@ -56,7 +57,9 @@ def test_review_declaration_requires_exactly_one_choice_when_present() -> None:
 
 
 def test_pending_review_declaration_allows_empty_sha_fields() -> None:
-    body = f"{PENDING}\n{APPROVED_UNCHECKED}\n\nBase SHA：\n\nHead SHA："
+    body = (
+        f"{PENDING}\n{APPROVED_UNCHECKED}\n\nBase SHA{FULLWIDTH_COLON}\n\nHead SHA{FULLWIDTH_COLON}"
+    )
 
     assert validate_review_declaration(body, BASE_SHA, HEAD_SHA) == []
 
@@ -64,8 +67,8 @@ def test_pending_review_declaration_allows_empty_sha_fields() -> None:
 def test_approved_review_declaration_requires_full_sha_fields() -> None:
     body = (
         f"{PENDING_UNCHECKED}\n{APPROVED}\n\n"
-        "Base SHA：1234567\n\n"
-        "Head SHA："
+        f"Base SHA{FULLWIDTH_COLON}1234567\n\n"
+        f"Head SHA{FULLWIDTH_COLON}"
     )
 
     assert validate_review_declaration(body, BASE_SHA, HEAD_SHA) == [
@@ -77,8 +80,8 @@ def test_approved_review_declaration_requires_full_sha_fields() -> None:
 def test_approved_review_declaration_requires_matching_sha_fields() -> None:
     body = (
         f"{PENDING_UNCHECKED}\n{APPROVED}\n\n"
-        f"Base SHA：{'3' * 40}\n\n"
-        f"Head SHA：{'4' * 40}"
+        f"Base SHA{FULLWIDTH_COLON}{'3' * 40}\n\n"
+        f"Head SHA{FULLWIDTH_COLON}{'4' * 40}"
     )
 
     assert validate_review_declaration(body, BASE_SHA, HEAD_SHA) == [
@@ -90,8 +93,8 @@ def test_approved_review_declaration_requires_matching_sha_fields() -> None:
 def test_approved_review_declaration_accepts_exact_sha_fields() -> None:
     body = (
         f"{PENDING_UNCHECKED}\n{APPROVED}\n\n"
-        f"Base SHA：`{BASE_SHA}`\n\n"
-        f"Head SHA：`{HEAD_SHA}`"
+        f"Base SHA{FULLWIDTH_COLON}`{BASE_SHA}`\n\n"
+        f"Head SHA{FULLWIDTH_COLON}`{HEAD_SHA}`"
     )
 
     assert validate_review_declaration(body, BASE_SHA, HEAD_SHA) == []

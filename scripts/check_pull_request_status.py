@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate a pull request's CURRENT_STATUS freshness declaration."""
+"""Validate a pull request's status and review evidence declarations."""
 
 from __future__ import annotations
 
@@ -12,6 +12,13 @@ DECLARATION = re.compile(
     r"^-\s*\[[xX]\]\s*`(?P<choice>status-update-(?:required|not-required))`",
     re.MULTILINE,
 )
+REVIEW_MARKER = re.compile(r"`subagent-review-(?:pending|approved)`")
+REVIEW_DECLARATION = re.compile(
+    r"^-\s*\[(?P<checked>[ xX])\]\s*"
+    r"`(?P<choice>subagent-review-(?:pending|approved))`",
+    re.MULTILINE,
+)
+FULL_SHA = re.compile(r"[0-9a-fA-F]{40}")
 
 
 def validate_status_declaration(body: str, changed_files: set[str]) -> list[str]:
@@ -25,6 +32,45 @@ def validate_status_declaration(body: str, changed_files: set[str]) -> list[str]
     if choices[0] == "status-update-not-required" and changes_status:
         return ["PR changes CURRENT_STATUS.md but declares status-update-not-required"]
     return []
+
+
+def _review_field(body: str, label: str) -> str:
+    field = re.search(
+        rf"^\s*{re.escape(label)}\s*[\uFF1A:]\s*(?P<value>.*?)\s*$",
+        body,
+        re.MULTILINE,
+    )
+    if field is None:
+        return ""
+    return field.group("value").strip().strip("`").strip()
+
+
+def validate_review_declaration(body: str, base_sha: str, head_sha: str) -> list[str]:
+    if REVIEW_MARKER.search(body) is None:
+        return []
+
+    choices = [
+        match.group("choice")
+        for match in REVIEW_DECLARATION.finditer(body)
+        if match.group("checked").lower() == "x"
+    ]
+    if len(choices) != 1:
+        return ["PR must select exactly one subagent review declaration"]
+    if choices[0] == "subagent-review-pending":
+        return []
+
+    errors: list[str] = []
+    declared_base = _review_field(body, "Base SHA")
+    declared_head = _review_field(body, "Head SHA")
+    if FULL_SHA.fullmatch(declared_base) is None:
+        errors.append("subagent-review-approved requires a full 40-character Base SHA")
+    elif declared_base.lower() != base_sha.lower():
+        errors.append("subagent review Base SHA does not match the pull request base SHA")
+    if FULL_SHA.fullmatch(declared_head) is None:
+        errors.append("subagent-review-approved requires a full 40-character Head SHA")
+    elif declared_head.lower() != head_sha.lower():
+        errors.append("subagent review Head SHA does not match the pull request head SHA")
+    return errors
 
 
 def changed_files(base_sha: str, head_sha: str) -> set[str]:
@@ -48,12 +94,13 @@ def main() -> int:
         args.body,
         changed_files(args.base_sha, args.head_sha),
     )
+    errors.extend(validate_review_declaration(args.body, args.base_sha, args.head_sha))
     if errors:
         for error in errors:
             print(f"error: {error}", file=sys.stderr)
         return 1
 
-    print("CURRENT_STATUS freshness declaration is consistent with the PR diff")
+    print("PR status and review declarations are consistent with the pull request")
     return 0
 
 
