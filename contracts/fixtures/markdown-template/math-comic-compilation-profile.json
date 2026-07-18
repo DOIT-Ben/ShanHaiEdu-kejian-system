@@ -1,0 +1,28 @@
+{
+  "profile_version": "shanhai.markdown-template-compilation/v1",
+  "package_key": "shanhai.primary_math.math_comic_lesson",
+  "semantic_version": "1.0.0",
+  "runtime_constraint": ">=0.1.0 <1.0.0",
+  "change_summary": "从脱敏数学连环画草稿编译教案生成模板。",
+  "key_prefix": "math_comic_lesson",
+  "model_capability": "text.structured.zh_primary_math",
+  "domain": "primary_math",
+  "locale": "zh-CN",
+  "renderer_id": "shanhai.markdown.v1",
+  "prompt_role": "你是小学数学教案设计助手。",
+  "prompt_task": "依据教师输入和已批准教材证据生成结构化教案。",
+  "context_bindings": [
+    {
+      "binding_key": "material",
+      "source": "material.approved_parse",
+      "required": true,
+      "exposure": "summary",
+      "max_items": 1,
+      "max_bytes": 500000
+    }
+  ],
+  "user_edit_policy": {
+    "mode": "replace_editable_layer",
+    "max_chars": 30000
+  }
+}

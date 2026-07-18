@@ -27,6 +27,7 @@
 - `golden-courseware-case.schema.json`：黄金教材、教案、三类九套、PPT、视频、音频和交付期望的跨成果测试合同。
 - `workflow-node-generation-binding.schema.json`：业务节点执行类型、生成模板、三类参考策略、校验修复和审核策略的声明式绑定目录。
 - `markdown-template-draft.schema.json`：普通Markdown导入后的可审核模板草稿。
+- `markdown-template-compilation-profile.schema.json`：已审核模板草稿编译为内容包时的显式发布配置。
 - `mock-scenarios.json`：前端必须覆盖的关键 Mock 场景。
 - `fixtures/stage0/`：项目、上传、任务、工作流聚合、错误和SSE的确定性合同样例。
 - `fixtures/creation-lifecycle/`：project/standalone批次、提示词版本、采用、项目写回、CreationPackage 2.0和stale事件样例。
@@ -74,6 +75,15 @@ pnpm contracts:check-generated
 uv run python scripts/inspect_markdown_template.py contracts\fixtures\markdown-template\math-comic-lesson.md --format json
 uv run python scripts/inspect_markdown_template.py contracts\fixtures\markdown-template\math-comic-lesson.md --format markdown
 ```
+
+将管理员已确认且状态为`ready`的TemplateDraft编译为#38内容包：
+
+```powershell
+uv run python scripts/compile_markdown_template.py <ready-draft.json> --profile contracts\fixtures\markdown-template\math-comic-compilation-profile.json --output "$env:TEMP\shanhai-compiled-template"
+uv run python scripts/validate_content_package.py "$env:TEMP\shanhai-compiled-template"
+```
+
+编译命令拒绝覆盖已有输出目录。`ready-draft.json`来自后续管理端审核流程，不允许把解析器生成的`needs_review`草稿直接改状态后自动发布。
 
 首次更新依赖锁时运行 `pnpm install`。修改OpenAPI后必须重新生成并提交 `contracts/generated/`；CI会拒绝生成漂移和未声明的破坏性变更。
 

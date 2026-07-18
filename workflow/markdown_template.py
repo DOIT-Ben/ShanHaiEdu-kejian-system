@@ -4,31 +4,31 @@ from __future__ import annotations
 
 import hashlib
 import re
-from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any
-from urllib.parse import urlparse
 
-from markdown_it import MarkdownIt
 from markdown_it.token import Token
 
+from workflow.markdown_safety import (
+    MAX_MARKDOWN_BYTES as MAX_MARKDOWN_BYTES,
+)
+from workflow.markdown_safety import (
+    MarkdownTemplateError as MarkdownTemplateError,
+)
+from workflow.markdown_safety import (
+    decode_markdown_source,
+    parse_safe_markdown,
+)
+from workflow.markdown_safety import (
+    validate_markdown_fragment as validate_markdown_fragment,
+)
 from workflow.markdown_template_render import (
     render_markdown_template as render_markdown_template,
 )
 
-MAX_MARKDOWN_BYTES = 2_000_000
 MAX_HEADING_CHARS = 255
 ADAPTER_VERSION = "shanhai.markdown-template/v1"
-UNSAFE_LINK_SCHEMES = frozenset({"data", "file", "javascript", "vbscript"})
-
-
-class MarkdownTemplateError(ValueError):
-    """Raised when Markdown cannot safely become a template draft."""
-
-    def __init__(self, code: str, message: str) -> None:
-        super().__init__(message)
-        self.code = code
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,12 +42,24 @@ class _Heading:
 def parse_markdown_template(payload: bytes, *, source_name: str) -> dict[str, Any]:
     """Parse UTF-8 Markdown into a deterministic review draft."""
 
-    source = _decode_source(payload)
-    parser = MarkdownIt("commonmark", {"html": True}).enable("table")
-    parser.validateLink = _accept_link_for_validation
-    tokens = parser.parse(source)
-    _validate_tokens(tokens)
+    source = decode_markdown_source(payload)
+    tokens = parse_safe_markdown(source)
     headings = _collect_headings(tokens)
+    return _build_markdown_template_draft(
+        payload,
+        source_name=source_name,
+        source=source,
+        headings=headings,
+    )
+
+
+def _build_markdown_template_draft(
+    payload: bytes,
+    *,
+    source_name: str,
+    source: str,
+    headings: list[_Heading],
+) -> dict[str, Any]:
     sections = [heading for heading in headings if heading.level == 2]
     if not sections:
         raise MarkdownTemplateError(
@@ -76,64 +88,6 @@ def parse_markdown_template(payload: bytes, *, source_name: str) -> dict[str, An
         "sections": parsed_sections,
         "warnings": warnings,
     }
-
-
-def _decode_source(payload: bytes) -> str:
-    if len(payload) > MAX_MARKDOWN_BYTES:
-        raise MarkdownTemplateError(
-            "MARKDOWN_TOO_LARGE",
-            f"Markdown exceeds {MAX_MARKDOWN_BYTES} bytes",
-        )
-    try:
-        source = payload.decode("utf-8-sig")
-    except UnicodeDecodeError as exc:
-        raise MarkdownTemplateError(
-            "MARKDOWN_INVALID_UTF8",
-            "Markdown must use UTF-8 encoding",
-        ) from exc
-    if not source.strip():
-        raise MarkdownTemplateError("MARKDOWN_EMPTY", "Markdown cannot be empty")
-    if "\x00" in source:
-        raise MarkdownTemplateError(
-            "MARKDOWN_UNSAFE_CONTROL",
-            "Markdown contains an unsupported control character",
-        )
-    return source
-
-
-def _validate_tokens(tokens: list[Token]) -> None:
-    for token in _walk_tokens(tokens):
-        if token.type in {"html_block", "html_inline"}:
-            raise MarkdownTemplateError(
-                "MARKDOWN_UNSAFE_HTML",
-                "Raw HTML is not supported in Markdown templates",
-            )
-        if token.type == "image":
-            raise MarkdownTemplateError(
-                "MARKDOWN_UNSUPPORTED_IMAGE",
-                "Images are outside the Markdown adapter V1 scope",
-            )
-        if token.type == "link_open":
-            raw_href = token.attrGet("href")
-            href = raw_href if isinstance(raw_href, str) else ""
-            if urlparse(href).scheme.lower() in UNSAFE_LINK_SCHEMES:
-                raise MarkdownTemplateError(
-                    "MARKDOWN_UNSAFE_LINK",
-                    "Markdown contains an unsafe link scheme",
-                )
-
-
-def _accept_link_for_validation(url: str) -> bool:
-    return True
-
-
-def _walk_tokens(tokens: list[Token]) -> Iterator[Token]:
-    pending = list(reversed(tokens))
-    while pending:
-        token = pending.pop()
-        yield token
-        if token.children:
-            pending.extend(reversed(token.children))
 
 
 def _collect_headings(tokens: list[Token]) -> list[_Heading]:

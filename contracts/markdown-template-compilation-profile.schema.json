@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shanhaiedu.local/contracts/markdown-template-compilation-profile.schema.json",
+  "title": "MarkdownTemplateCompilationProfile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile_version",
+    "package_key",
+    "semantic_version",
+    "runtime_constraint",
+    "change_summary",
+    "key_prefix",
+    "model_capability",
+    "domain",
+    "locale",
+    "renderer_id",
+    "prompt_role",
+    "prompt_task",
+    "context_bindings",
+    "user_edit_policy"
+  ],
+  "properties": {
+    "profile_version": {"const": "shanhai.markdown-template-compilation/v1"},
+    "package_key": {"$ref": "#/$defs/key"},
+    "semantic_version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "runtime_constraint": {"type": "string", "minLength": 1, "maxLength": 120},
+    "change_summary": {"type": "string", "minLength": 1, "maxLength": 2000},
+    "key_prefix": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]+$",
+      "maxLength": 143
+    },
+    "model_capability": {"$ref": "#/$defs/key"},
+    "domain": {"$ref": "#/$defs/key"},
+    "locale": {"type": "string", "pattern": "^[a-z]{2}(?:-[A-Z]{2})?$"},
+    "renderer_id": {"$ref": "#/$defs/key"},
+    "prompt_role": {"type": "string", "minLength": 1, "maxLength": 10000},
+    "prompt_task": {"type": "string", "minLength": 1, "maxLength": 10000},
+    "context_bindings": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {"$ref": "#/$defs/contextBinding"}
+    },
+    "user_edit_policy": {"$ref": "#/$defs/userEditPolicy"}
+  },
+  "$defs": {
+    "key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{1,159}$"
+    },
+    "contextBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "binding_key",
+        "source",
+        "required",
+        "exposure",
+        "max_items",
+        "max_bytes"
+      ],
+      "properties": {
+        "binding_key": {"$ref": "#/$defs/key"},
+        "source": {"$ref": "#/$defs/key"},
+        "required": {"type": "boolean"},
+        "exposure": {"enum": ["full", "summary", "hidden"]},
+        "max_items": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "max_bytes": {"type": "integer", "minimum": 1, "maximum": 10000000}
+      }
+    },
+    "userEditPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "max_chars"],
+      "properties": {
+        "mode": {"enum": ["replace_editable_layer", "append"]},
+        "max_chars": {"type": "integer", "minimum": 1, "maximum": 100000}
+      }
+    }
+  }
+}
