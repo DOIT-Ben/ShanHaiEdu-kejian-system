@@ -6,6 +6,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from apps.api.creation.access import CreationBatchAccessService
 from apps.api.creation.models import CreationBatch
 from apps.api.creation.repository import CreationRepository
 from apps.api.creation.schemas import (
@@ -15,7 +16,6 @@ from apps.api.creation.schemas import (
 )
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, ProjectAction
-from apps.api.identity.permissions import ProjectAccessService
 from apps.api.ids import new_uuid7
 from apps.api.jobs.models import GenerationJob
 from apps.api.jobs.schemas import AcceptedJobData
@@ -219,13 +219,10 @@ class CreationGenerationService:
         return batch
 
     def _authorize_batch(self, batch: CreationBatch) -> None:
-        if batch.source_project_id is not None:
-            ProjectAccessService(self._session, self._actor).require(
-                batch.source_project_id,
-                ProjectAction.GENERATE,
-            )
-        elif self._actor.user_id is None or self._actor.is_system:
-            raise ApiError(status_code=403, code="PERMISSION_DENIED", message="Access denied.")
+        CreationBatchAccessService(self._session, self._actor).require(
+            batch,
+            ProjectAction.GENERATE,
+        )
 
     @staticmethod
     def _prompt_stale() -> ApiError:

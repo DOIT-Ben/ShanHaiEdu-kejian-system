@@ -111,7 +111,30 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
             )
             == 3
         )
-    assert ScriptDirectory.from_config(config).get_current_head() == "d2e5f8a1c604"
+    creation_batch_columns = {
+        column["name"] for column in database_inspector.get_columns("creation_batches")
+    }
+    creation_batch_indexes = {
+        index["name"] for index in database_inspector.get_indexes("creation_batches")
+    }
+    creation_batch_foreign_keys = {
+        foreign_key["name"]
+        for foreign_key in database_inspector.get_foreign_keys("creation_batches")
+    }
+    assert "owner_user_id" in creation_batch_columns
+    assert "ix_creation_batches_organization_owner_created" in creation_batch_indexes
+    assert "fk_creation_batches_owner_user_id_users" in creation_batch_foreign_keys
+    with engine.connect() as connection:
+        assert (
+            connection.scalar(
+                text(
+                    "SELECT count(*) FROM pg_trigger "
+                    "WHERE tgname = 'trg_creation_batch_owner_scope' AND NOT tgisinternal"
+                )
+            )
+            == 1
+        )
+    assert ScriptDirectory.from_config(config).get_current_head() == "e4f6a8c0b702"
     previous = os.environ.get("SHANHAI_DATABASE_URL")
     os.environ["SHANHAI_DATABASE_URL"] = postgres_database_url
     try:
@@ -190,6 +213,83 @@ def test_stage0_project_data_survives_identity_migration(postgres_database_url: 
             {"id": principal_id},
         ).one()
         assert principal == ("system", None)
+
+
+def test_creation_batch_owner_is_backfilled_from_its_creator(
+    postgres_database_url: str,
+) -> None:
+    run_migration(postgres_database_url, "d2e5f8a1c604")
+    engine = create_engine(sqlalchemy_url(postgres_database_url))
+    organization_id = UUID("01900000-0000-7000-8000-000000000001")
+    user_id = UUID("01930000-0000-7000-8000-000000000001")
+    member_id = UUID("01930000-0000-7000-8000-000000000002")
+    principal_id = UUID("01930000-0000-7000-8000-000000000003")
+    batch_id = UUID("01930000-0000-7000-8000-000000000004")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                INSERT INTO users (id, email, display_name, status, created_at)
+                VALUES (:id, 'migration-owner@example.test', 'Migration Owner', 'active', now())
+                """
+            ),
+            {"id": user_id},
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO organization_members (
+                    id, organization_id, user_id, role, status, created_at
+                ) VALUES (:id, :organization_id, :user_id, 'member', 'active', now())
+                """
+            ),
+            {"id": member_id, "organization_id": organization_id, "user_id": user_id},
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO principals (
+                    id, organization_id, user_id, principal_type, display_name,
+                    status, created_at
+                ) VALUES (
+                    :id, :organization_id, :user_id, 'user', 'Migration Owner',
+                    'active', now()
+                )
+                """
+            ),
+            {"id": principal_id, "organization_id": organization_id, "user_id": user_id},
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO creation_batches (
+                    id, organization_id, source_kind, creation_package_id,
+                    source_project_id, source_workflow_run_id, source_node_run_id,
+                    studio_type, title, status, created_at, updated_at, created_by,
+                    updated_by, lock_version, deleted_at
+                ) VALUES (
+                    :id, :organization_id, 'standalone', NULL, NULL, NULL, NULL,
+                    'image', 'Migration batch', 'draft', now(), now(), :principal_id,
+                    :principal_id, 1, NULL
+                )
+                """
+            ),
+            {
+                "id": batch_id,
+                "organization_id": organization_id,
+                "principal_id": principal_id,
+            },
+        )
+
+    run_migration(postgres_database_url, "head")
+    with engine.connect() as connection:
+        assert (
+            connection.scalar(
+                text("SELECT owner_user_id FROM creation_batches WHERE id = :id"),
+                {"id": batch_id},
+            )
+            == user_id
+        )
 
 
 def test_stage0_file_assets_survive_asset_extension_migration(

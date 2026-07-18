@@ -172,6 +172,7 @@ class CreationBatchService:
         batch = CreationBatch(
             id=new_uuid7(),
             organization_id=self._actor.organization_id,
+            owner_user_id=self._actor.user_id,
             created_by=self._actor.principal_id,
             updated_by=self._actor.principal_id,
             **values,

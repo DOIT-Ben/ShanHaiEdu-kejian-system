@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from apps.api.assets.project_contracts import ReplaceMode
 from apps.api.assets.project_repository import ProjectAssetRepository
 from apps.api.assets.project_service import ProjectAssetService
+from apps.api.creation.access import CreationBatchAccessService
 from apps.api.creation.models import CreationBatch, CreationItem, SaveToProjectOperation
 from apps.api.creation.repository import CreationRepository
 from apps.api.creation.schemas import (
@@ -52,6 +53,17 @@ class CreationSaveService:
         request_id: str,
     ) -> SaveToProjectOperationRead:
         request_payload = payload.model_dump(mode="json")
+        current = self._repository.get_adoption_context(adoption_id)
+        if current is None or current.item.active_adoption_id != adoption_id:
+            raise ApiError(
+                status_code=409,
+                code="CANDIDATE_NOT_ADOPTED",
+                message="The candidate is not the active adoption for this item.",
+            )
+        CreationBatchAccessService(self._session, self._actor).require(
+            current.batch,
+            ProjectAction.EDIT,
+        )
 
         def command() -> CommandResult:
             context = self._repository.get_adoption_context(adoption_id, for_update=True)
@@ -61,6 +73,10 @@ class CreationSaveService:
                     code="CANDIDATE_NOT_ADOPTED",
                     message="The candidate is not the active adoption for this item.",
                 )
+            CreationBatchAccessService(self._session, self._actor).require(
+                context.batch,
+                ProjectAction.EDIT,
+            )
             if context.result.file_asset_version_id is None:
                 raise ApiError(
                     status_code=409,
