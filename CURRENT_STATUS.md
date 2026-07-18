@@ -4,7 +4,7 @@
 
 验证基线：`main`，实现事实以本文件所在提交的代码、迁移和测试为准；任务状态以链接的GitHub Issue和Pull Request为准
 
-当前阶段：阶段0出口尚未关闭；阶段1通用口径校准门禁已经关闭，后端轨道等待受控恢复纵向出口
+当前阶段：阶段0出口尚未关闭；阶段1通用口径校准门禁已经关闭，后端轨道正在完成真实文本出口复验
 
 本文件只描述现在，不保存开发日志。任务细节、负责人、讨论和交接以GitHub Issue与Pull Request为准。
 
@@ -32,7 +32,7 @@
 
 - [Issue #44](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/44)与[PR #46](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/46)：Markdown TemplateDraft确定性编译的五项CI已通过，但当前与`main`存在合并冲突，需重新rebase后继续评审。
 - [Issue #48](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/48)：全流程生成节点与可配置模型I/O绑定的父任务；已标记`status:blocked`，结构化业务字段确认前不继续扩展实现。
-- [Issue #29](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/29)：阶段1后端纵向贯通与真实文本出口；已标记`status:blocked`，恢复前必须先确认只使用现有通用合同，或等待其所需结构化字段定稿。
+- [Issue #29](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/29)与[Draft PR #66](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/66)：已限定为现有通用合同并恢复实施；真实PostgreSQL、Redis、MinIO、Alembic、Worker纵向E2E及完整后端门禁已经通过，等待受控环境注入密钥后重跑阶段真实文本冒烟。
 - [Issue #51](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/51)：教师端只展示可编辑业务提示词并隐藏内部结构合同，尚未启动。
 - [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)：与生产前端完成真实合同联调，等待前端达到联调条件。
 
@@ -40,7 +40,8 @@
 
 - 教案、PPT、视频等具体业务结构化字段仍由产品负责人设计。#48后续任务不得提前固化这些字段；#56至#58只统一通用工作流、创作生命周期和保存边界，不猜测具体字段。
 - #44仍在评审；它负责通用Markdown模板编译，不代表具体业务字段已经批准。
-- 阶段1完整出口仍缺少后端纵向E2E与阶段真实文本冒烟，以及生产前端的真实API联调。
+- 阶段1后端轨道只剩受控真实文本冒烟复验；当前环境尚未注入`NEWAPI_TEXT_API_KEY`，不得用历史冒烟或Fake替代本阶段证据。
+- 阶段1整体产品出口仍缺少生产前端的真实API联调；后端轨道通过不代表完整阶段1产品完成。
 - 图片、视频和TTS真实Provider适配与凭据属于后续媒体阶段前置条件，不用Mock替代阶段验收。
 
 ## 下一个阶段出口
@@ -55,10 +56,10 @@
 
 阶段1后端轨道出口必须满足：
 
-- 先明确#29只使用现有阶段1通用合同，或等待并确认它实际需要的结构化字段；不得用猜测字段完成出口。
-- 启动#29，使用真实PostgreSQL、Redis和MinIO完成项目、上传、教材解析、资产/课时/工作流、SSE续传与REST对账的纵向E2E。
-- 普通CI使用确定性Fake，阶段出口另外完成受控真实文本模型冒烟并记录脱敏证据。
-- Alembic空库升级、合同兼容、仓库治理、失败重试、取消和幂等检查全部通过。
+- #29已经明确只使用现有阶段1通用合同，不消费或猜测#48尚未确认的结构化业务字段。
+- 真实PostgreSQL、Redis和MinIO上的项目、上传、教材解析、资产/课时/工作流、SSE续传与REST对账纵向E2E已经通过。
+- Alembic空库升级、合同兼容、仓库治理、Worker恢复、Redis停启、失败重试、取消、幂等和跨租户检查已经通过。
+- 普通CI继续使用确定性Fake；阶段出口仍须在受控环境完成本次真实文本模型冒烟并记录脱敏证据。
 
 阶段0整体出口仍必须满足：
 
@@ -77,4 +78,4 @@
 4. 被分配的Issue和PR
 5. 与任务直接相关的模块文档、合同、代码和测试
 
-结构化字段未确认前，不扩展#48后续实现，也不把#44的工程检查通过解释为具体业务字段已经批准。当前先按#56 → #57 → #58完成通用口径校准；恢复#29前再确认其E2E严格限定为已合并合同。
+结构化字段未确认前，不扩展#48后续实现，也不把#44的工程检查通过解释为具体业务字段已经批准。#29当前只等待受控真实文本冒烟；密钥注入后继续PR #66的出口复验、评审、合并和main复验。
