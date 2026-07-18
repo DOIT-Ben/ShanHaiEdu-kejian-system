@@ -1,6 +1,6 @@
 # 团队任务、分支与交接流程
 
-本文件定义一个开发任务从提出到关闭的完整生命周期。产品与工程事实不写在这里，分别维护在现行产品、工作流、合同和模块文档中。
+本文件定义一个开发任务从提出到关闭的完整生命周期。产品与工程事实不写在这里，分别维护在现行产品、工作流、合同和模块文档中。已证实的协作失败机制及防复发状态见[协作机制复盘与防复发](协作机制复盘与防复发.md)。
 
 ## 1. 协作模型
 
@@ -56,13 +56,11 @@ Issue进入`ready`前必须写清：
 
 ## 4. 开始任务
 
-负责人领取Issue后：
+负责人领取Issue后先更新远端引用。主工作区存在用户改动或属于其他任务时，不切换它；直接从最新`origin/main`创建仓库外短工作树：
 
 ```bash
 git fetch origin --prune
-git switch main
-git pull --ff-only
-git switch -c feat/123-project-assets
+git worktree add -b feat/123-project-assets ../shanhaiedu-worktrees/123-project-assets origin/main
 ```
 
 分支格式为：
@@ -91,6 +89,8 @@ git worktree add ../shanhaiedu-worktrees/123-project-assets feat/123-project-ass
 ```
 
 禁止在仓库内部创建第二份clone、源码副本、`backup/`、`copy/`或任务临时目录。
+
+创建前必须验证目标绝对路径位于约定的worktree根中；创建后核对分支、HEAD、upstream和工作区。不得在带有其他任务或用户改动的主工作区执行`git switch main`来为任务腾位置。
 
 开始修改前检查：
 
@@ -132,8 +132,11 @@ PR正文必须包含：
 - 删除的旧代码或旧文档。
 - 独立子智能体审查人、审查范围、findings处置、验证命令和残余风险。
 - `CURRENT_STATUS.md`新鲜度二选一声明及判断依据；触发状态页更新时，必须在同一PR同步状态页。
+- PR规模二选一声明；原始变更超过20个文件、净新增超过800行或包含二进制/未知统计项时选择`pr-size-review-map-required`，列出业务源码、生成物、Schema、迁移和测试的评审导航，并说明为何不能继续拆分。
 
 超过20个业务源码文件或800行净新增非生成代码的PR，必须提供评审导航并说明为何不能拆分。初始化、生成代码、Schema和迁移可以例外，但应与手写业务代码分开列出。
+
+SHA必须由`git rev-parse`或`gh pr view --json baseRefOid,headRefOid`取得，不得手工扩写短SHA。PowerShell中更新多行PR正文或评论时使用UTF-8正文文件、标准输入或结构化API，不把含反引号、美元符号和换行的Markdown拼进插值命令。更新后必须重新读取远端正文，并运行PR声明校验。Draft可使用`subagent-review-pending`；PR正文编辑和转Ready都会重新触发校验，非Draft必须使用`subagent-review-approved`并绑定当前SHA。
 
 ## 8. 变更分级
 
@@ -177,9 +180,11 @@ PR正文必须包含：
 - 线性历史。
 - 合并后自动删除分支。
 
-仓库的工程批准由独立只读子智能体完成，不要求另一个GitHub账号提交`APPROVED`。主智能体必须指定未参与实现的子智能体审查完整base-to-head diff，并把精确base SHA、head SHA、findings-first报告和最终处置写入PR。任何push、rebase或其他HEAD变化都会使原批准失效，必须对最终diff重新审查。P0/P1未关闭时不得转Ready或合并；P2/P3必须修复，或由主智能体在PR中说明接受理由和残余风险。子智能体与主智能体共享GitHub凭据时，不伪造平台Review；分支保护以必需状态检查、线性历史和对话解决作为机器门禁。
+仓库的工程批准由独立只读子智能体完成，不要求另一个GitHub账号提交`APPROVED`。主智能体必须指定一个未参与实现的子智能体，启动一次审查engagement并审查完整base-to-head diff。初审发现问题后由同一审查者复核修复和最终diff，不重复启动新的全量审查；只有原审查者不可用或范围发生实质变化时才更换，并在PR说明原因。任何push、rebase或其他HEAD变化都会使原批准失效，必须由同一审查者重新绑定最终base/head。P0/P1未关闭时不得转Ready或合并；P2/P3必须修复，或由主智能体在PR中说明接受理由和残余风险。子智能体与主智能体共享GitHub凭据时，不伪造平台Review；分支保护以必需状态检查、线性历史和对话解决作为机器门禁。
 
 默认使用Squash Merge，PR标题作为主分支提交信息。鉴权、核心数据表、破坏性合同、模型费用策略和发布基础设施仍须在子智能体审查中显式覆盖对应风险边界。
+
+从专用worktree合并时只执行`gh pr merge <PR> --squash`，不附加会切换或删除本地分支的`--delete-branch`。仓库设置负责合并后删除远端分支；本地分支和worktree在main复验后单独清理。合并命令返回后必须重新读取PR状态、merge commit、远端分支和当前worktree分支，不能假定CLI没有改变本地状态。
 
 合并前检查：
 
@@ -205,15 +210,22 @@ PR正文必须包含：
 8. 本地分支和worktree已清理。
 9. 任务导致进入新里程碑、可演示能力实质变化、新增或解除阶段阻塞，或下一阶段出口改变时，已在同一PR更新`CURRENT_STATUS.md`；不触发时已在PR明确声明。
 
-合并后的本地清理：
+合并后的main复验与本地清理：
 
 ```bash
+# 在任务worktree中
 git fetch origin --prune
-git switch main
-git pull --ff-only
-git branch -d feat/123-project-assets
+git switch --detach origin/main
+# 运行该任务要求的main复验
+git status --short --branch
+
+# 回到主仓或另一个已登记worktree中
+git -c core.longpaths=true worktree remove <verified-absolute-worktree-path>
 git worktree prune
+git branch -D feat/123-project-assets
 ```
+
+移除worktree前先删除其中可再生的`.venv`、`node_modules`和任务缓存，并再次确认工作区干净、绝对路径位于约定根目录。`branch -D`只允许在PR已`MERGED`、远端分支已删除、main复验通过且worktree已移除后用于精确任务分支；Squash Merge后不能用祖先关系代替这些证据。若Git已注销worktree但物理目录因Windows长路径或重解析点残留，先证明目录无`.git`、不含外部指向的重解析点且只含可再生内容，再使用支持长路径的单一路径清理方式；禁止对父目录递归删除或连续试用多种未核验删除命令。
 
 ## 12. 标准交接
 

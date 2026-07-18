@@ -34,7 +34,7 @@ Do not begin by reading all Git history, all documents or prior chat transcripts
 
 - Every change starts from a GitHub Issue with goal, scope, non-scope, acceptance criteria, risks, dependencies and tests.
 - One Issue has one current owner, one primary task branch and one primary Pull Request.
-- Before a substantive Pull Request is merged, the primary agent assigns a read-only subagent that did not implement the change to review the complete base-to-head diff. The subagent report is the repository's engineering approval evidence.
+- Before a substantive Pull Request is merged, the primary agent assigns one read-only subagent that did not implement the change to review the complete base-to-head diff. This starts one review engagement: if findings are raised, the same reviewer verifies the fixes and rebinds the final head instead of starting repeated whole-diff reviews. Use a replacement reviewer only when the original reviewer is unavailable or the scope materially changes, and record the reason in the Pull Request. The subagent report is the repository's engineering approval evidence.
 - Large outcomes use a parent Issue and independently acceptable child Issues.
 - Task states are `ready`, `in-progress`, `blocked`, `review` and `done`.
 - GitHub Issues and Pull Requests are the task and handoff truth. Do not add task journals to the repository.
@@ -108,7 +108,7 @@ Generated code, schemas, migrations and focused fixtures may exceed size trigger
 
 Use test-driven development for domain behavior and bug fixes. Report exact commands and failures.
 
-Independent review is mandatory before a Pull Request becomes Ready or merges. The reviewer subagent reports findings first with file and line references, verifies the relevant commands, and records residual risk. The review evidence binds the exact base SHA and head SHA. Any push, rebase or other head change invalidates the approval and requires a new review of the final diff. All P0 and P1 findings must be closed. P2 and P3 findings must be fixed or explicitly accepted with a reason in the Pull Request. The primary agent posts the final review disposition and remains accountable for the merge decision.
+Independent review is mandatory before a Pull Request becomes Ready or merges. The reviewer subagent reports findings first with file and line references, verifies the relevant commands, and records residual risk. The review evidence binds the exact base SHA and head SHA. Any push, rebase or other head change invalidates the approval; within the same review engagement, the same reviewer rechecks the changed delta and final base-to-head diff before rebinding the final head. All P0 and P1 findings must be closed. P2 and P3 findings must be fixed or explicitly accepted with a reason in the Pull Request. The primary agent posts the final review disposition and remains accountable for the merge decision.
 
 This evidence-based approval does not require a second GitHub account and must not be represented as a fabricated GitHub `APPROVED` review. GitHub branch protection enforces required checks, linear history and resolved conversations; the Pull Request records the subagent review evidence.
 
@@ -130,3 +130,4 @@ A task is done only after acceptance criteria pass, implementation and canonical
 - Preserve unrelated user changes. Do not use destructive Git or filesystem commands to solve a scoped task.
 
 Detailed placement rules are in `docs/governance/DOCUMENT_POLICY.md`; current delivery gates are in `docs/governance/DELIVERY_ROADMAP.md`.
+Recurring collaboration failure mechanisms and their current prevention controls are in `docs/governance/协作机制复盘与防复发.md`.

@@ -1,9 +1,42 @@
 from __future__ import annotations
 
-from scripts.check_pull_request_status import validate_status_declaration
+from scripts.check_pull_request_status import (
+    parse_numstat,
+    validate_review_declaration,
+    validate_size_declaration,
+    validate_status_declaration,
+)
 
 REQUIRED = "- [x] `status-update-required`: status changed"
 NOT_REQUIRED = "- [x] `status-update-not-required`: status did not change"
+BASE_SHA = "1" * 40
+HEAD_SHA = "2" * 40
+PENDING = "- [x] `subagent-review-pending`: review pending"
+APPROVED = "- [x] `subagent-review-approved`: review approved"
+PENDING_UNCHECKED = "- [ ] `subagent-review-pending`: review pending"
+APPROVED_UNCHECKED = "- [ ] `subagent-review-approved`: review approved"
+FULLWIDTH_COLON = "\uff1a"
+SIZE_WITHIN = "- [x] `pr-size-within-limit`: within limit"
+SIZE_MAP_REQUIRED = "- [x] `pr-size-review-map-required`: map required"
+SIZE_WITHIN_UNCHECKED = "- [ ] `pr-size-within-limit`: within limit"
+SIZE_MAP_UNCHECKED = "- [ ] `pr-size-review-map-required`: map required"
+
+
+def review_section(
+    declarations: str,
+    *,
+    base_sha: str = "",
+    head_sha: str = "",
+    extra_fields: str = "",
+) -> str:
+    return (
+        "## 子智能体审查\n\n"
+        f"{declarations}\n\n"
+        f"Base SHA{FULLWIDTH_COLON}{base_sha}\n\n"
+        f"Head SHA{FULLWIDTH_COLON}{head_sha}\n"
+        f"{extra_fields}\n\n"
+        "## CURRENT_STATUS新鲜度"
+    )
 
 
 def test_status_update_declaration_requires_current_status_change() -> None:
@@ -31,3 +64,181 @@ def test_status_declaration_requires_exactly_one_choice() -> None:
     assert validate_status_declaration(f"{REQUIRED}\n{NOT_REQUIRED}", set()) == [
         "PR must select exactly one CURRENT_STATUS freshness declaration"
     ]
+
+
+def test_review_declaration_keeps_legacy_pr_body_compatible() -> None:
+    assert validate_review_declaration("legacy PR body", BASE_SHA, HEAD_SHA) == []
+
+
+def test_review_declaration_requires_exactly_one_choice_when_present() -> None:
+    assert validate_review_declaration(
+        review_section(f"{PENDING_UNCHECKED}\n{APPROVED_UNCHECKED}"), BASE_SHA, HEAD_SHA
+    ) == ["PR must select exactly one subagent review declaration"]
+    assert validate_review_declaration(
+        review_section(f"{PENDING}\n{APPROVED}"), BASE_SHA, HEAD_SHA
+    ) == ["PR must select exactly one subagent review declaration"]
+
+
+def test_pending_review_declaration_allows_empty_sha_fields() -> None:
+    body = review_section(f"{PENDING}\n{APPROVED_UNCHECKED}")
+
+    assert validate_review_declaration(body, BASE_SHA, HEAD_SHA) == []
+
+
+def test_approved_review_declaration_requires_full_sha_fields() -> None:
+    body = review_section(
+        f"{PENDING_UNCHECKED}\n{APPROVED}",
+        base_sha="1234567",
+    )
+
+    assert validate_review_declaration(body, BASE_SHA, HEAD_SHA) == [
+        "subagent-review-approved requires a full 40-character Base SHA",
+        "subagent-review-approved requires a full 40-character Head SHA",
+    ]
+
+
+def test_approved_review_declaration_requires_matching_sha_fields() -> None:
+    body = review_section(
+        f"{PENDING_UNCHECKED}\n{APPROVED}",
+        base_sha="3" * 40,
+        head_sha="4" * 40,
+    )
+
+    assert validate_review_declaration(body, BASE_SHA, HEAD_SHA) == [
+        "subagent review Base SHA does not match the pull request base SHA",
+        "subagent review Head SHA does not match the pull request head SHA",
+    ]
+
+
+def test_approved_review_declaration_accepts_exact_sha_fields() -> None:
+    body = review_section(
+        f"{PENDING_UNCHECKED}\n{APPROVED}",
+        base_sha=f"`{BASE_SHA}`",
+        head_sha=f"`{HEAD_SHA}`",
+    )
+
+    assert validate_review_declaration(body, BASE_SHA, HEAD_SHA) == []
+
+
+def test_review_declaration_requires_block_for_current_prs() -> None:
+    assert validate_review_declaration(
+        "PR body without review block",
+        BASE_SHA,
+        HEAD_SHA,
+        required=True,
+    ) == ["PR must contain exactly one subagent review section"]
+
+
+def test_review_declaration_rejects_pending_for_ready_pr() -> None:
+    body = review_section(f"{PENDING}\n{APPROVED_UNCHECKED}")
+
+    assert validate_review_declaration(
+        body,
+        BASE_SHA,
+        HEAD_SHA,
+        required=True,
+        is_draft=False,
+    ) == ["non-draft PR must select subagent-review-approved"]
+
+
+def test_review_declaration_rejects_duplicate_sha_fields() -> None:
+    body = review_section(
+        f"{PENDING_UNCHECKED}\n{APPROVED}",
+        base_sha=BASE_SHA,
+        head_sha=HEAD_SHA,
+        extra_fields=f"\nBase SHA{FULLWIDTH_COLON}{'3' * 40}",
+    )
+
+    assert validate_review_declaration(
+        body,
+        BASE_SHA,
+        HEAD_SHA,
+        required=True,
+        is_draft=False,
+    ) == ["subagent review section must contain exactly one Base SHA field"]
+
+
+def test_review_declaration_rejects_duplicate_review_sections() -> None:
+    section = review_section(f"{PENDING}\n{APPROVED_UNCHECKED}")
+
+    assert validate_review_declaration(
+        f"{section}\n\n{section}",
+        BASE_SHA,
+        HEAD_SHA,
+        required=True,
+    ) == ["PR must contain exactly one subagent review section"]
+
+
+def test_size_declaration_keeps_legacy_pr_body_compatible() -> None:
+    assert validate_size_declaration("legacy PR body", 50, 2000, 0) == []
+
+
+def test_size_declaration_requires_block_for_current_prs() -> None:
+    assert validate_size_declaration("PR body without size block", 1, 1, 0, required=True) == [
+        "PR must select exactly one pull request size declaration"
+    ]
+
+
+def test_size_declaration_requires_exactly_one_choice_when_present() -> None:
+    assert validate_size_declaration(f"{SIZE_WITHIN_UNCHECKED}\n{SIZE_MAP_UNCHECKED}", 1, 1, 0) == [
+        "PR must select exactly one pull request size declaration"
+    ]
+    assert validate_size_declaration(f"{SIZE_WITHIN}\n{SIZE_MAP_REQUIRED}", 1, 1, 0) == [
+        "PR must select exactly one pull request size declaration"
+    ]
+
+
+def test_size_declaration_requires_review_map_above_file_limit() -> None:
+    assert validate_size_declaration(f"{SIZE_WITHIN}\n{SIZE_MAP_UNCHECKED}", 21, 100, 0) == [
+        "PR exceeds the raw size trigger but does not require a review map"
+    ]
+
+
+def test_size_declaration_requires_review_map_above_net_line_limit() -> None:
+    assert validate_size_declaration(f"{SIZE_WITHIN}\n{SIZE_MAP_UNCHECKED}", 10, 1001, 200) == [
+        "PR exceeds the raw size trigger but does not require a review map"
+    ]
+
+
+def test_size_declaration_accepts_review_map_above_raw_limit() -> None:
+    assert (
+        validate_size_declaration(f"{SIZE_WITHIN_UNCHECKED}\n{SIZE_MAP_REQUIRED}", 51, 1666, 471)
+        == []
+    )
+
+
+def test_size_declaration_rejects_unneeded_review_map_claim() -> None:
+    assert validate_size_declaration(
+        f"{SIZE_WITHIN_UNCHECKED}\n{SIZE_MAP_REQUIRED}", 20, 900, 100
+    ) == ["PR declares a required review map but does not exceed the raw size trigger"]
+
+
+def test_size_declaration_requires_review_map_for_binary_diff() -> None:
+    assert validate_size_declaration(
+        f"{SIZE_WITHIN}\n{SIZE_MAP_UNCHECKED}",
+        1,
+        0,
+        0,
+        binary_file_count=1,
+        required=True,
+    ) == ["PR exceeds the raw size trigger but does not require a review map"]
+
+
+def test_size_declaration_accepts_pure_rename_within_limit() -> None:
+    assert (
+        validate_size_declaration(
+            f"{SIZE_WITHIN}\n{SIZE_MAP_UNCHECKED}",
+            1,
+            0,
+            0,
+            binary_file_count=0,
+            required=True,
+        )
+        == []
+    )
+
+
+def test_parse_numstat_counts_binary_and_preserves_text_rename() -> None:
+    output = "4\t1\tmodule.py\n-\t-\tasset.zip\n0\t0\told.py => new.py\n"
+
+    assert parse_numstat(output) == (4, 1, 1)
