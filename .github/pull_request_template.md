@@ -32,6 +32,25 @@ Closes #
 
 真实界面或产物：
 
+## 子智能体审查
+
+- [ ] `subagent-review-pending`：Draft PR尚未完成独立审查。
+- [ ] `subagent-review-approved`：独立只读子智能体已审查下列精确base/head diff，P0/P1全部关闭，P2/P3已修复或显式接受；审查后HEAD未变化。
+
+审查子智能体：
+
+Base SHA：
+
+Head SHA：
+
+审查范围：
+
+Findings及处置：
+
+残余风险：
+
+审查证据链接：
+
 ## CURRENT_STATUS新鲜度
 
 以下两项必须且只能勾选一项：
