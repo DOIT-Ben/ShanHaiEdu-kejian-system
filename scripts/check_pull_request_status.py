@@ -19,6 +19,12 @@ REVIEW_DECLARATION = re.compile(
     re.MULTILINE,
 )
 FULL_SHA = re.compile(r"[0-9a-fA-F]{40}")
+SIZE_MARKER = re.compile(r"`pr-size-(?:within-limit|review-map-required)`")
+SIZE_DECLARATION = re.compile(
+    r"^-\s*\[(?P<checked>[ xX])\]\s*"
+    r"`(?P<choice>pr-size-(?:within-limit|review-map-required))`",
+    re.MULTILINE,
+)
 
 
 def validate_status_declaration(body: str, changed_files: set[str]) -> list[str]:
@@ -73,6 +79,31 @@ def validate_review_declaration(body: str, base_sha: str, head_sha: str) -> list
     return errors
 
 
+def validate_size_declaration(
+    body: str,
+    changed_file_count: int,
+    additions: int,
+    deletions: int,
+) -> list[str]:
+    if SIZE_MARKER.search(body) is None:
+        return []
+
+    choices = [
+        match.group("choice")
+        for match in SIZE_DECLARATION.finditer(body)
+        if match.group("checked").lower() == "x"
+    ]
+    if len(choices) != 1:
+        return ["PR must select exactly one pull request size declaration"]
+
+    exceeds_raw_trigger = changed_file_count > 20 or additions - deletions > 800
+    if exceeds_raw_trigger and choices[0] != "pr-size-review-map-required":
+        return ["PR exceeds the raw size trigger but does not require a review map"]
+    if not exceeds_raw_trigger and choices[0] != "pr-size-within-limit":
+        return ["PR declares a required review map but does not exceed the raw size trigger"]
+    return []
+
+
 def changed_files(base_sha: str, head_sha: str) -> set[str]:
     result = subprocess.run(
         ["git", "diff", "--name-only", f"{base_sha}...{head_sha}"],
@@ -83,6 +114,23 @@ def changed_files(base_sha: str, head_sha: str) -> set[str]:
     return {line for line in result.stdout.splitlines() if line}
 
 
+def changed_line_counts(base_sha: str, head_sha: str) -> tuple[int, int]:
+    result = subprocess.run(
+        ["git", "diff", "--numstat", f"{base_sha}...{head_sha}"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    additions = 0
+    deletions = 0
+    for line in result.stdout.splitlines():
+        added, deleted, _path = line.split("\t", 2)
+        if added.isdigit() and deleted.isdigit():
+            additions += int(added)
+            deletions += int(deleted)
+    return additions, deletions
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-sha", required=True)
@@ -90,11 +138,11 @@ def main() -> int:
     parser.add_argument("--body", required=True)
     args = parser.parse_args()
 
-    errors = validate_status_declaration(
-        args.body,
-        changed_files(args.base_sha, args.head_sha),
-    )
+    files = changed_files(args.base_sha, args.head_sha)
+    additions, deletions = changed_line_counts(args.base_sha, args.head_sha)
+    errors = validate_status_declaration(args.body, files)
     errors.extend(validate_review_declaration(args.body, args.base_sha, args.head_sha))
+    errors.extend(validate_size_declaration(args.body, len(files), additions, deletions))
     if errors:
         for error in errors:
             print(f"error: {error}", file=sys.stderr)
