@@ -11,6 +11,7 @@ from typing import Protocol, cast
 import httpx
 import psycopg
 from redis.asyncio import Redis
+from sqlalchemy.engine import make_url
 
 from apps.api.settings import Settings
 
@@ -67,6 +68,13 @@ class MissingConfigurationProbe:
         raise MissingConfigurationError("dependency is not configured")
 
 
+def psycopg_dsn(database_url: str) -> str:
+    url = make_url(database_url)
+    if not url.drivername.startswith("postgresql"):
+        raise ValueError("PostgreSQL readiness requires a PostgreSQL URL")
+    return url.set(drivername="postgresql").render_as_string(hide_password=False)
+
+
 class PostgreSQLProbe:
     name = "postgresql"
 
@@ -79,7 +87,7 @@ class PostgreSQLProbe:
 
     def _check_sync(self) -> None:
         with psycopg.connect(
-            self._dsn,
+            psycopg_dsn(self._dsn),
             connect_timeout=max(1, math.ceil(self._timeout_seconds)),
         ) as connection:
             connection.execute("SELECT 1")
