@@ -85,10 +85,16 @@ PROJECT_MEMORY_SECTIONS = (
     "## 记忆边界",
     "## 维护责任",
 )
+PROJECT_MEMORY_MARKDOWN_DECORATION = re.compile(r"[*_`]")
+PROJECT_MEMORY_LINE_PREFIX = re.compile(r"^\s*(?:>\s*)?(?:[-+*]\s+)?")
 PROJECT_MEMORY_FORBIDDEN_PATTERNS = (
     (
         "local absolute path",
-        re.compile(r"(?i)(?<![a-z0-9_])[a-z]:[\\/]"),
+        re.compile(
+            r"(?im)(?<![a-z0-9_])(?:[a-z]:[\\/]|"
+            r"\\\\[^\\\s]+\\[^\\\s]+|"
+            r"/(?:Users|home|root|opt|srv|mnt|var)/[^\s]+)"
+        ),
     ),
     (
         "full commit SHA",
@@ -98,28 +104,32 @@ PROJECT_MEMORY_FORBIDDEN_PATTERNS = (
         "concrete branch state",
         re.compile(
             r"(?im)^\s*(?:[-*]\s*)?(?:当前\s*)?(?:分支|branch)"
-            r"\s*[:\N{FULLWIDTH COLON}]"
+            r"\s*[:\N{FULLWIDTH COLON}]\s*(?:refs/heads/)?"
+            r"[a-z0-9._-]+(?:/[a-z0-9._-]+)*(?=\s|$)"
         ),
     ),
     (
         "concrete commit state",
         re.compile(
             r"(?im)^\s*(?:[-*]\s*)?(?:当前\s*)?(?:提交|commit)"
-            r"\s*[:\N{FULLWIDTH COLON}]"
+            r"\s*[:\N{FULLWIDTH COLON}]\s*[0-9a-f]{7,40}(?=\s|$)"
         ),
     ),
     (
         "concrete pull request state",
         re.compile(
-            r"(?im)^\s*(?:[-*]\s*)?(?:当前\s*)?(?:PR|Pull Request)"
-            r"\s*[:\N{FULLWIDTH COLON}]"
+            r"(?im)(?<![a-z0-9])(?:当前\s*)?(?:PR|Pull Request)"
+            r"\s*(?:[:\N{FULLWIDTH COLON}]\s*)?#?\d+\b|"
+            r"https://github\.com/[^\s)]+/pull/\d+"
         ),
     ),
     (
         "concrete port state",
         re.compile(
             r"(?im)^\s*(?:[-*]\s*)?(?:当前\s*)?(?:端口|port)"
-            r"\s*[:\N{FULLWIDTH COLON}]"
+            r"\s*[:\N{FULLWIDTH COLON}]\s*\d{2,5}\b|"
+            r"https?://(?:localhost|127(?:\.\d+){3}|\[::1\])(?::\d{2,5})?|"
+            r"(?<![a-z0-9.-])(?:localhost|127\.0\.0\.1|\[::1\]):\d{2,5}\b"
         ),
     ),
 )
@@ -242,8 +252,15 @@ def check_project_memory_index(index: Path, errors: list[str]) -> None:
         if section not in lines:
             errors.append(f"project memory index missing required section: {section}")
 
+    normalized_lines: list[str] = []
+    for line in text.splitlines():
+        normalized = PROJECT_MEMORY_LINE_PREFIX.sub("", line)
+        normalized = PROJECT_MEMORY_MARKDOWN_DECORATION.sub("", normalized)
+        normalized_lines.append(normalized.strip())
+    normalized_text = "\n".join(normalized_lines)
+
     for label, pattern in PROJECT_MEMORY_FORBIDDEN_PATTERNS:
-        if pattern.search(text) is not None:
+        if pattern.search(normalized_text) is not None:
             errors.append(f"project memory index contains {label}")
 
 
