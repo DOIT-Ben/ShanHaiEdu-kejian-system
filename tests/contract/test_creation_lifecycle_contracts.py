@@ -254,3 +254,12 @@ def test_creation_package_v2_requires_workflow_context_and_target_but_legacy_rem
         "created_at": "2026-07-17T00:00:00Z",
     }
     validate(legacy, schema)
+
+
+def test_creation_lifecycle_events_embed_the_canonical_sse_envelope() -> None:
+    canonical = load_json(CONTRACTS / "sse-event.schema.json")
+    lifecycle = load_json(CONTRACTS / "creation-lifecycle-event.schema.json")
+    embedded = lifecycle["$defs"]["base_event"]
+
+    for key in ("type", "additionalProperties", "required", "properties"):
+        assert embedded[key] == canonical[key]

@@ -3,7 +3,7 @@
   "$id": "https://shanhaiedu.local/contracts/creation-lifecycle-event.schema.json",
   "title": "CreationLifecycleEvent",
   "allOf": [
-    {"$ref": "sse-event.schema.json"},
+    {"$ref": "#/$defs/base_event"},
     {
       "oneOf": [
         {"$ref": "#/$defs/prompt_version_saved"},
@@ -14,6 +14,32 @@
     }
   ],
   "$defs": {
+    "base_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_id", "sequence_no", "event_type", "occurred_at", "resource", "payload"],
+      "properties": {
+        "event_id": {"type": "string", "format": "uuid"},
+        "sequence_no": {"type": "integer", "minimum": 1},
+        "event_type": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+        },
+        "occurred_at": {"type": "string", "format": "date-time"},
+        "project_id": {"type": ["string", "null"], "format": "uuid"},
+        "resource": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "id"],
+          "properties": {
+            "type": {"type": "string", "minLength": 1},
+            "id": {"type": "string", "format": "uuid"}
+          }
+        },
+        "payload": {"type": "object", "additionalProperties": true},
+        "request_id": {"type": ["string", "null"]}
+      }
+    },
     "prompt_version_saved": {
       "type": "object",
       "properties": {
