@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from scripts.check_pull_request_status import (
     validate_review_declaration,
+    validate_size_declaration,
     validate_status_declaration,
 )
 
@@ -14,6 +15,10 @@ APPROVED = "- [x] `subagent-review-approved`: review approved"
 PENDING_UNCHECKED = "- [ ] `subagent-review-pending`: review pending"
 APPROVED_UNCHECKED = "- [ ] `subagent-review-approved`: review approved"
 FULLWIDTH_COLON = "\uff1a"
+SIZE_WITHIN = "- [x] `pr-size-within-limit`: within limit"
+SIZE_MAP_REQUIRED = "- [x] `pr-size-review-map-required`: map required"
+SIZE_WITHIN_UNCHECKED = "- [ ] `pr-size-within-limit`: within limit"
+SIZE_MAP_UNCHECKED = "- [ ] `pr-size-review-map-required`: map required"
 
 
 def test_status_update_declaration_requires_current_status_change() -> None:
@@ -98,3 +103,41 @@ def test_approved_review_declaration_accepts_exact_sha_fields() -> None:
     )
 
     assert validate_review_declaration(body, BASE_SHA, HEAD_SHA) == []
+
+
+def test_size_declaration_keeps_legacy_pr_body_compatible() -> None:
+    assert validate_size_declaration("legacy PR body", 50, 2000, 0) == []
+
+
+def test_size_declaration_requires_exactly_one_choice_when_present() -> None:
+    assert validate_size_declaration(f"{SIZE_WITHIN_UNCHECKED}\n{SIZE_MAP_UNCHECKED}", 1, 1, 0) == [
+        "PR must select exactly one pull request size declaration"
+    ]
+    assert validate_size_declaration(f"{SIZE_WITHIN}\n{SIZE_MAP_REQUIRED}", 1, 1, 0) == [
+        "PR must select exactly one pull request size declaration"
+    ]
+
+
+def test_size_declaration_requires_review_map_above_file_limit() -> None:
+    assert validate_size_declaration(f"{SIZE_WITHIN}\n{SIZE_MAP_UNCHECKED}", 21, 100, 0) == [
+        "PR exceeds the raw size trigger but does not require a review map"
+    ]
+
+
+def test_size_declaration_requires_review_map_above_net_line_limit() -> None:
+    assert validate_size_declaration(f"{SIZE_WITHIN}\n{SIZE_MAP_UNCHECKED}", 10, 1001, 200) == [
+        "PR exceeds the raw size trigger but does not require a review map"
+    ]
+
+
+def test_size_declaration_accepts_review_map_above_raw_limit() -> None:
+    assert (
+        validate_size_declaration(f"{SIZE_WITHIN_UNCHECKED}\n{SIZE_MAP_REQUIRED}", 51, 1666, 471)
+        == []
+    )
+
+
+def test_size_declaration_rejects_unneeded_review_map_claim() -> None:
+    assert validate_size_declaration(
+        f"{SIZE_WITHIN_UNCHECKED}\n{SIZE_MAP_REQUIRED}", 20, 900, 100
+    ) == ["PR declares a required review map but does not exceed the raw size trigger"]
