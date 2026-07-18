@@ -153,12 +153,22 @@ def _validate_draft_semantics(draft: Mapping[str, Any]) -> None:
         ) from exc
 
     for section in sections:
-        if section["content_mode"] != "fixed" or not section["required"]:
+        if not section["required"]:
             continue
-        if any(not body.strip() for _, _, body in _section_leaves(section)):
+        missing_content = any(not body.strip() for _, _, body in _section_leaves(section))
+        if section["content_mode"] == "fixed" and missing_content:
             raise MarkdownTemplateCompilationError(
                 "MARKDOWN_COMPILE_FIXED_CONTENT_MISSING",
                 "Required fixed fields must contain approved content",
+            )
+        if (
+            section["content_mode"] in {"teacher_input", "mixed"}
+            and not section["visible"]
+            and missing_content
+        ):
+            raise MarkdownTemplateCompilationError(
+                "MARKDOWN_COMPILE_HIDDEN_REQUIRED_INPUT",
+                "Hidden required teacher inputs must contain an approved default value",
             )
 
 

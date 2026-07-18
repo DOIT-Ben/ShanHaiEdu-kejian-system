@@ -83,7 +83,7 @@ uv run python scripts/compile_markdown_template.py <ready-draft.json> --profile 
 uv run python scripts/validate_content_package.py "$env:TEMP\shanhai-compiled-template"
 ```
 
-编译命令拒绝覆盖已有输出目录。`ready-draft.json`来自后续管理端审核流程，不允许把解析器生成的`needs_review`草稿直接改状态后自动发布。
+编译命令使用操作系统原子 no-replace 发布语义，拒绝已有路径、断链符号链接和最终发布瞬间出现的竞争目标；协作锁只负责同类编译任务互斥，不作为防覆盖安全边界。`ready-draft.json`来自后续管理端审核流程，不允许把解析器生成的`needs_review`草稿直接改状态后自动发布。
 
 首次更新依赖锁时运行 `pnpm install`。修改OpenAPI后必须重新生成并提交 `contracts/generated/`；CI会拒绝生成漂移和未声明的破坏性变更。
 
