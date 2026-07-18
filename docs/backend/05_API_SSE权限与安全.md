@@ -74,17 +74,21 @@
 | --- | --- | --- |
 | `POST` | `/node-runs/{node_run_id}/creation-packages` | 从项目节点导出不可变创作包 |
 | `GET` | `/creation-packages/{package_id}` | 读取创作包和过期提示 |
-| `POST` | `/creation-batches` | 独立创建或从包实例化批次 |
+| `POST` | `/creation-batches` | 按判别合同独立创建，或从创作包实例化项目批次 |
 | `GET/PATCH` | `/creation-batches/{batch_id}` | 批次详情和设置 |
 | `POST` | `/creation-batches/{batch_id}/items` | 新增创作条目 |
-| `POST` | `/creation-items/{item_id}/revisions` | 保存提示词、资产和规格修订 |
+| `POST` | `/creation-items/{item_id}/prompt-versions` | 保存业务提示词、资产和规格版本，不触发生成 |
 | `POST` | `/creation-items/{item_id}/generate` | 生成单项候选 |
 | `POST` | `/creation-batches/{batch_id}/generate` | 并发生成选定条目 |
 | `POST` | `/generation-jobs/{job_id}/cancel` | 取消任务 |
-| `POST` | `/generation-results/{result_id}/select` | 选中候选 |
-| `POST` | `/generation-results/{result_id}/save-to-project` | 原子保存到项目槽位 |
+| `POST` | `/generation-results/{result_id}/adoptions` | 采用候选，不写回项目 |
+| `POST` | `/adoptions/{adoption_id}/save-to-project` | 把已采用候选原子保存到项目槽位 |
 
-`save-to-project` 必须明确 `project_id`、`slot_key`、`replace_mode` 和 `Idempotency-Key`。后台不得依据最近访问项目猜测目标。
+创建批次请求必须使用判别字段`source_kind`：`project`必须提供`creation_package_id`且不得覆盖来源与目标；`standalone`禁止提交项目、工作流或节点来源。
+
+`save_prompt_version`、`generate`、`adopt`和`save_to_project`分别鉴权、幂等和审计。项目来源的`save-to-project`只接收`replace_mode`与`Idempotency-Key`，目标由创作包固定；独立来源必须明确`project_id`、`slot_key`和`replace_mode`并重新鉴权。后台不得依据最近访问项目猜测目标，也不得让项目批次跨项目写回。
+
+合同迁移不得直接删除现有`manual/assisted`枚举或把旧的候选选择、提示词修订、写回端点静默改义。先增加新枚举和新动作合同，提供可观测的兼容映射与弃用标记，完成生成客户端和消费者迁移后再由独立清理任务移除旧入口。
 
 ### PPT、视频和交付
 
