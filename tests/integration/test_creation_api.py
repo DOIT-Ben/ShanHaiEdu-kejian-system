@@ -44,7 +44,10 @@ async def test_creation_http_flow_matches_the_shared_contract(
             )
             assert created.status_code == 201, created.text
             assert_contract_response(created, operation_id="createProject", status="201")
-            project_id = UUID(created.json()["data"]["id"])
+            created_project = created.json()["data"]
+            assert created_project["execution_mode"] == "automatic"
+            assert "automation_mode" not in created_project
+            project_id = UUID(created_project["id"])
 
             policy = await client.get(f"/api/v2/projects/{project_id}/automation-policy")
             assert policy.status_code == 200, policy.text
@@ -68,6 +71,15 @@ async def test_creation_http_flow_matches_the_shared_contract(
                 operation_id="updateProjectAutomationPolicy",
                 status="200",
             )
+            project_detail = await client.get(f"/api/v2/projects/{project_id}")
+            project_list = await client.get("/api/v2/projects")
+            workflow = await client.get(f"/api/v2/projects/{project_id}/workflow")
+            assert project_detail.status_code == 200, project_detail.text
+            assert project_detail.json()["data"]["execution_mode"] == "guided"
+            assert project_list.status_code == 200, project_list.text
+            assert project_list.json()["data"]["items"][0]["execution_mode"] == "guided"
+            assert workflow.status_code == 200, workflow.text
+            assert workflow.json()["data"]["project"]["execution_mode"] == "guided"
             stale_policy = await client.patch(
                 f"/api/v2/projects/{project_id}/automation-policy",
                 headers={
