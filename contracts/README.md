@@ -36,6 +36,8 @@
 - `generated/`：由当前OpenAPI确定性生成的bundle和TypeScript类型，不是第二份手工合同。
 - `typescript/client.ts`：基于生成paths和openapi-fetch的共享客户端工厂。
 
+上述首套业务内容包的人类可读确定性投影位于`docs/workflows/generation-guide/`。它供产品负责人、内容管理员和开发者审查，不是第二套机器合同，也不是教师公共界面。
+
 ## 使用规则
 
 1. 前端从 OpenAPI 生成 API 类型，不手写第二套 DTO。
@@ -94,6 +96,7 @@ uv run pytest tests\contract\test_workflow_node_generation_binding.py
 
 ```powershell
 uv run python scripts\build_builtin_generation_package.py workflow\builtin\primary_math_courseware\generation-source.json <空输出目录>
+uv run python scripts\render_builtin_generation_guide.py --check
 uv run python scripts\validate_content_package.py contracts\fixtures\primary-math-courseware-package
 uv run python scripts\validate_golden_courseware.py contracts\fixtures\golden-projects\numbers-1-to-5\golden-project.json
 uv run python scripts\validate_golden_courseware.py contracts\fixtures\golden-projects\numbers-1-to-5\golden-project.json --source-pdf <受控本地教材PDF>

@@ -34,12 +34,13 @@
 4. [三类九套导入设计](docs/workflows/INTRO_ANCHORS.md)
 5. [PPT生产流程与页级合同](docs/workflows/PPT_PRODUCTION.md)
 6. [视频生产流程](docs/workflows/VIDEO_PRODUCTION.md)
-7. [前端设计与外包规格](docs/frontend/README.md)
-8. [后端与数据设计](docs/backend/README.md)
-9. [前后端共享合同](contracts/README.md)
-10. [团队协作流程](docs/governance/TEAM_WORKFLOW.md)
-11. [文档生命周期](docs/governance/DOCUMENT_POLICY.md)
-12. [渐进式交付路线](docs/governance/DELIVERY_ROADMAP.md)
+7. [内置提示词、输入输出模板与黄金示例](docs/workflows/generation-guide/README.md)
+8. [前端设计与外包规格](docs/frontend/README.md)
+9. [后端与数据设计](docs/backend/README.md)
+10. [前后端共享合同](contracts/README.md)
+11. [团队协作流程](docs/governance/TEAM_WORKFLOW.md)
+12. [文档生命周期](docs/governance/DOCUMENT_POLICY.md)
+13. [渐进式交付路线](docs/governance/DELIVERY_ROADMAP.md)
 
 仓库当前树只保留一套有效设计，不设置V1/V2并行目录。历史由Git提供；日常任务和讨论由Issue/PR提供。
 
