@@ -302,6 +302,22 @@ def test_required_fixed_field_requires_approved_content() -> None:
     )
 
 
+@pytest.mark.parametrize("content_mode", ["teacher_input", "mixed"])
+def test_hidden_required_teacher_input_requires_a_default(content_mode: str) -> None:
+    draft = ready_draft()
+    section = draft["sections"][2]
+    section["content_mode"] = content_mode
+    section["visible"] = False
+    section["body_markdown"] = ""
+    section["subsections"] = []
+
+    assert_compilation_error(
+        draft,
+        compilation_profile(),
+        "MARKDOWN_COMPILE_HIDDEN_REQUIRED_INPUT",
+    )
+
+
 def test_duplicate_and_overlong_derived_keys_use_stable_errors() -> None:
     duplicate = ready_draft()
     duplicate["sections"][1]["section_key"] = duplicate["sections"][0]["section_key"]
@@ -476,6 +492,69 @@ def test_writer_refuses_a_target_created_during_validation(
     assert caught.value.code == "MARKDOWN_COMPILE_OUTPUT_EXISTS"
     assert output.is_dir()
     assert not list(output.iterdir())
+
+
+def test_writer_refuses_a_target_created_after_the_final_absence_check(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    compiled = compile_markdown_template(
+        ready_draft(),
+        compilation_profile(),
+        contracts_root=CONTRACTS,
+    )
+    output = tmp_path / "compiled-package"
+    original_require_absent = package_writer_module._require_output_absent
+    absence_checks = 0
+
+    def require_absent_then_race(path: Path) -> None:
+        nonlocal absence_checks
+        original_require_absent(path)
+        absence_checks += 1
+        if absence_checks == 2:
+            path.mkdir()
+
+    original_rename = Path.rename
+
+    def emulate_posix_overwriting_rename(source: Path, target: Path) -> Path:
+        if target.is_dir():
+            target.rmdir()
+        return original_rename(source, target)
+
+    monkeypatch.setattr(
+        package_writer_module,
+        "_require_output_absent",
+        require_absent_then_race,
+    )
+    monkeypatch.setattr(Path, "rename", emulate_posix_overwriting_rename)
+
+    with pytest.raises(MarkdownTemplateCompilationError) as caught:
+        write_compiled_content_package(compiled, output)
+    assert caught.value.code == "MARKDOWN_COMPILE_OUTPUT_EXISTS"
+    assert output.is_dir()
+    assert not list(output.iterdir())
+
+
+def test_writer_rejects_a_broken_output_symlink_without_following_it(tmp_path: Path) -> None:
+    compiled = compile_markdown_template(
+        ready_draft(),
+        compilation_profile(),
+        contracts_root=CONTRACTS,
+    )
+    redirected_parent = tmp_path / "redirected"
+    redirected_parent.mkdir()
+    redirected_output = redirected_parent / "package"
+    output = tmp_path / "compiled-package"
+    try:
+        output.symlink_to(redirected_output, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"symbolic links are unavailable: {exc}")
+
+    with pytest.raises(MarkdownTemplateCompilationError) as caught:
+        write_compiled_content_package(compiled, output)
+    assert caught.value.code == "MARKDOWN_COMPILE_OUTPUT_EXISTS"
+    assert output.is_symlink()
+    assert not redirected_output.exists()
 
 
 def test_cli_writes_a_package_that_the_existing_validator_accepts(tmp_path: Path) -> None:
