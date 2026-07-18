@@ -75,11 +75,12 @@ class ArtifactRelationService:
         self,
         previous_version_id: UUID | None,
         replacement_version_id: UUID | None,
-    ) -> list[UUID]:
+    ) -> tuple[list[UUID], list[UUID]]:
         if previous_version_id is None or previous_version_id == replacement_version_id:
-            return []
+            return [], []
         grouped = self._group_downstream_relations(previous_version_id)
         stale_ids: list[UUID] = []
+        stale_node_ids: list[UUID] = []
         for artifact_id in sorted(grouped, key=str):
             downstream = self._repository.get(artifact_id, for_update=True)
             if downstream is None:
@@ -100,9 +101,9 @@ class ArtifactRelationService:
                 previous_version_id, replacement_version_id, active
             )
             self._touch(downstream)
-            self._mark_nodes_stale(active, downstream.stale_reason_json)
+            stale_node_ids.extend(self._mark_nodes_stale(active, downstream.stale_reason_json))
             stale_ids.append(downstream.id)
-        return stale_ids
+        return stale_ids, stale_node_ids
 
     def _group_downstream_relations(
         self,
@@ -119,7 +120,7 @@ class ArtifactRelationService:
         self,
         relations: list[ArtifactRelation],
         stale_reason: dict[str, Any] | None,
-    ) -> None:
+    ) -> list[UUID]:
         target_ids = {relation.to_artifact_version_id for relation in relations}
         nodes = list(
             self._session.scalars(
@@ -136,6 +137,7 @@ class ArtifactRelationService:
             node.status = "stale"
             node.stale_reason_json = stale_reason
             self._touch(node)
+        return [node.id for node in nodes]
 
     @staticmethod
     def _stale_reason(

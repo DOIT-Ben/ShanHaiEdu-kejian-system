@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import pytest
+from sqlalchemy import select
 
 from apps.api.artifacts.repository import ArtifactRepository
 from apps.api.artifacts.service import ArtifactService
 from apps.api.content_runtime.registry import BUILTIN_CONTENT_DEFINITION_VERSION_ID
+from apps.api.creation.models import CreationPackage
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import ApiError
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
+from apps.api.reliability.models import EventStreamEntry
+from apps.api.workflows.models import NodeRun
 from tests.fakes.identity import seed_test_actor
+from tests.integration.test_creation_lifecycle import seed_project_package
 
 
 def create_approved(session, actor, project_id, key: str, content: dict[str, object]):
@@ -68,6 +73,16 @@ def test_stale_propagates_only_along_real_relations_and_accept_stale_clears_it(
                 binding_key="lesson_scope",
                 impact_scope={"fields": ["value"]},
             )
+            package, _ = seed_project_package(
+                session,
+                actor,
+                project,
+                "lesson.01.image.downstream",
+            )
+            package_node = session.get(NodeRun, package.source_node_run_id)
+            assert package_node is not None
+            package_node.active_artifact_version_id = downstream_v1.id
+            session.flush()
             draft = ArtifactRepository(session, actor).get_draft(upstream.id, "main")
             assert draft is not None
             saved = ArtifactService(session, actor).save_draft(
@@ -100,6 +115,20 @@ def test_stale_propagates_only_along_real_relations_and_accept_stale_clears_it(
             "bindings": [{"binding_key": "lesson_scope", "impact_scope": {"fields": ["value"]}}],
         }
         assert unrelated.status == "approved"
+        refreshed_package = session.get(CreationPackage, package.id)
+        assert refreshed_package is not None
+        assert refreshed_package.source_stale_at is not None
+        stale_event = session.scalar(
+            select(EventStreamEntry).where(
+                EventStreamEntry.event_type == "workflow.downstream_stale.propagated"
+            )
+        )
+        assert stale_event is not None
+        assert stale_event.summary_json["payload"] == {
+            "source_version_id": str(upstream_v2.id),
+            "affected_resource_ids": [str(downstream.id)],
+            "reason_code": "UPSTREAM_APPROVED_VERSION_CHANGED",
+        }
         session.rollback()
 
         with session.begin():

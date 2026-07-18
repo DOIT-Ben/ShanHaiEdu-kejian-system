@@ -16,7 +16,7 @@ from apps.api.jobs.models import GenerationJob
 from apps.api.jobs.repository import GenerationJobRepository
 from apps.api.jobs.schemas import GenerationJobRead
 from apps.api.jobs.state_machine import InvalidJobTransition, require_transition
-from apps.api.reliability.events import EventResource, EventWriter
+from apps.api.reliability.events import EventResource, EventWriter, append_outbox_only
 from apps.api.reliability.idempotency import CommandResult, IdempotencyService
 
 
@@ -196,19 +196,29 @@ class GenerationJobService:
         job.status = target
 
     def _append_job_event(self, job: GenerationJob, *, request_id: str) -> None:
-        if job.project_id is None:
-            raise ValueError("stage-zero generation jobs require a project")
-        self._events.append(
-            project_id=job.project_id,
-            event_type="generation.job.progress",
-            resource=EventResource(type="generation_job", id=job.id),
-            payload={
-                "status": job.status,
-                "progress_percent": job.progress_percent,
-                "attempt_count": job.attempt_count,
-            },
-            request_id=request_id,
-        )
+        payload = {
+            "status": job.status,
+            "progress_percent": job.progress_percent,
+            "attempt_count": job.attempt_count,
+        }
+        resource = EventResource(type="generation_job", id=job.id)
+        if job.project_id is not None:
+            self._events.append(
+                project_id=job.project_id,
+                event_type="generation.job.progress",
+                resource=resource,
+                payload=payload,
+                request_id=request_id,
+            )
+        else:
+            append_outbox_only(
+                self._session,
+                self._actor.organization_id,
+                event_type="generation.job.progress",
+                resource=resource,
+                payload=payload,
+                request_id=request_id,
+            )
 
     @staticmethod
     def _result(job: GenerationJob, status_code: int) -> CommandResult:

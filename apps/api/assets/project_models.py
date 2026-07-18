@@ -84,11 +84,27 @@ class AssetBinding(Base):
     file_asset_version_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("file_asset_versions.id", ondelete="RESTRICT"), nullable=False
     )
-    source_generation_result_id: Mapped[UUID | None] = mapped_column(Uuid)
+    source_generation_result_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey(
+            "generation_results.id",
+            name="fk_asset_bindings_generation_result",
+            ondelete="RESTRICT",
+            use_alter=True,
+        ),
+    )
     source_artifact_version_id: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("artifact_versions.id", ondelete="RESTRICT")
     )
-    save_operation_id: Mapped[UUID | None] = mapped_column(Uuid)
+    save_operation_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey(
+            "save_to_project_operations.id",
+            name="fk_asset_bindings_save_operation",
+            ondelete="RESTRICT",
+            use_alter=True,
+        ),
+    )
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     bound_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

@@ -12,6 +12,7 @@ from apps.api.artifacts.domain import ApprovalAction
 from apps.api.artifacts.models import Approval, Artifact, ArtifactVersion
 from apps.api.artifacts.relation_service import ArtifactRelationService
 from apps.api.artifacts.repository import ArtifactRepository
+from apps.api.creation.staleness_service import CreationPackageStalenessService
 from apps.api.database import utc_now
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, ProjectAction, ProjectRole
@@ -102,7 +103,10 @@ class ArtifactApprovalService:
         artifact.current_approved_version_id = version.id
         artifact.status = "approved"
         artifact.stale_reason_json = None
-        stale_ids = self._relations.propagate_stale(previous_version_id, version.id)
+        stale_ids, stale_node_ids = self._relations.propagate_stale(previous_version_id, version.id)
+        CreationPackageStalenessService(
+            self._session, self._actor.organization_id
+        ).mark_source_nodes_stale(stale_node_ids)
         self._touch(artifact)
         self._session.flush()
         self._append_event(
@@ -117,6 +121,7 @@ class ArtifactApprovalService:
             },
             request_id,
         )
+        self._append_stale_event(artifact, version.id, stale_ids, request_id)
         return approval
 
     def _accept_stale(
@@ -187,7 +192,10 @@ class ArtifactApprovalService:
             version, ApprovalAction.REVOKE, comment, quality_evidence, policy_snapshot
         )
         artifact.current_approved_version_id = None
-        stale_ids = self._relations.propagate_stale(version.id, None)
+        stale_ids, stale_node_ids = self._relations.propagate_stale(version.id, None)
+        CreationPackageStalenessService(
+            self._session, self._actor.organization_id
+        ).mark_source_nodes_stale(stale_node_ids)
         artifact.status = (
             "in_review" if artifact.current_submitted_version_id is not None else "draft"
         )
@@ -203,6 +211,7 @@ class ArtifactApprovalService:
             },
             request_id,
         )
+        self._append_stale_event(artifact, version.id, stale_ids, request_id)
         return approval
 
     def _record(
@@ -255,6 +264,27 @@ class ArtifactApprovalService:
             event_type=event_type,
             resource=EventResource(type="artifact", id=artifact.id),
             payload=payload,
+            request_id=request_id,
+        )
+
+    def _append_stale_event(
+        self,
+        artifact: Artifact,
+        source_version_id: UUID,
+        stale_ids: list[UUID],
+        request_id: str | None,
+    ) -> None:
+        if not stale_ids:
+            return
+        EventWriter(self._session, self._actor.organization_id).append(
+            project_id=artifact.project_id,
+            event_type="workflow.downstream_stale.propagated",
+            resource=EventResource(type="artifact", id=artifact.id),
+            payload={
+                "source_version_id": str(source_version_id),
+                "affected_resource_ids": [str(item) for item in stale_ids],
+                "reason_code": "UPSTREAM_APPROVED_VERSION_CHANGED",
+            },
             request_id=request_id,
         )
 

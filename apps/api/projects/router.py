@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Annotated, cast
 from uuid import UUID
 
@@ -14,6 +15,11 @@ from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.dependencies import get_actor_context
 from apps.api.identity.permissions import ProjectAccessService
+from apps.api.projects.policy_schemas import (
+    AutomationPolicyEnvelope,
+    UpdateAutomationPolicyRequest,
+)
+from apps.api.projects.policy_service import AutomationPolicyService
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import (
     CreateProjectRequest,
@@ -29,6 +35,7 @@ from apps.api.reliability.sse import EventReplayRepository, parse_last_event_id,
 from apps.api.settings import Settings
 
 router = APIRouter(prefix="/api/v2/projects", tags=["projects"])
+ETAG_PATTERN = re.compile(r'^(?:W/)?"(?P<version>[1-9][0-9]*)"$')
 
 
 @router.post(
@@ -121,6 +128,60 @@ def get_project(
         data=ProjectRead.model_validate(project),
         request_id=request.state.request_id,
     )
+
+
+@router.get(
+    "/{project_id}/automation-policy",
+    response_model=AutomationPolicyEnvelope,
+    operation_id="getProjectAutomationPolicy",
+)
+def get_project_automation_policy(
+    project_id: UUID,
+    request: Request,
+    response: Response,
+    actor: Annotated[ActorContext, Depends(get_actor_context)],
+    session: Annotated[Session, Depends(get_session)],
+) -> AutomationPolicyEnvelope:
+    policy = AutomationPolicyService(session, actor).get(project_id)
+    response.headers["ETag"] = f'W/"{policy.policy_version}"'
+    return AutomationPolicyEnvelope(data=policy, request_id=request.state.request_id)
+
+
+@router.patch(
+    "/{project_id}/automation-policy",
+    response_model=AutomationPolicyEnvelope,
+    operation_id="updateProjectAutomationPolicy",
+)
+def update_project_automation_policy(
+    project_id: UUID,
+    payload: UpdateAutomationPolicyRequest,
+    request: Request,
+    response: Response,
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8)],
+    if_match: Annotated[str, Header(alias="If-Match")],
+    actor: Annotated[ActorContext, Depends(get_actor_context)],
+    session: Annotated[Session, Depends(get_session)],
+) -> AutomationPolicyEnvelope:
+    match = ETAG_PATTERN.fullmatch(if_match.strip())
+    if match is None:
+        raise ApiError(
+            status_code=422,
+            code="VALIDATION_FAILED",
+            message="If-Match must contain a valid automation policy ETag.",
+            details={"field": "If-Match"},
+        )
+    settings = cast(Settings, request.app.state.settings)
+    with session.begin():
+        policy = AutomationPolicyService(session, actor).update(
+            project_id,
+            payload,
+            idempotency_key=idempotency_key,
+            request_id=request.state.request_id,
+            ttl_seconds=settings.idempotency_ttl_seconds,
+            expected_version=int(match.group("version")),
+        )
+    response.headers["ETag"] = f'W/"{policy.policy_version}"'
+    return AutomationPolicyEnvelope(data=policy, request_id=request.state.request_id)
 
 
 @router.get(

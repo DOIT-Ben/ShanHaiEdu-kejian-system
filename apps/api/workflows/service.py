@@ -10,6 +10,7 @@ from apps.api.database import utc_now
 from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.permissions import ProjectAccessService
 from apps.api.ids import new_uuid7
+from apps.api.projects.policy_service import AutomationPolicyService
 from apps.api.workflows.models import (
     NodeInputSnapshot,
     NodeRun,
@@ -42,13 +43,18 @@ class WorkflowRuntimeService:
         if self._repository.active_for_project(project_id, for_update=True) is not None:
             raise WorkflowRuntimeError("project already has an active workflow run")
         self._load_registered_workflow(project.workflow_definition_version_id)
+        policy_snapshot = AutomationPolicyService(self._session, self._actor).snapshot(project.id)
+        if policy_snapshot["workflow_definition_version_id"] != str(
+            project.workflow_definition_version_id
+        ):
+            raise WorkflowRuntimeError("automation policy uses a different workflow definition")
         run = WorkflowRun(
             id=new_uuid7(),
             organization_id=self._actor.organization_id,
             project_id=project.id,
             workflow_definition_version_id=project.workflow_definition_version_id,
             content_release_id=project.content_release_id,
-            automation_policy_snapshot_json={"mode": project.automation_mode},
+            automation_policy_snapshot_json=policy_snapshot,
             run_no=self._repository.next_run_no(project.id),
             status="active",
             current_event_seq=0,

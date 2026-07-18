@@ -100,6 +100,8 @@ class ProjectAssetService:
         *,
         file_asset_version_id: UUID,
         source_artifact_version_id: UUID | None,
+        source_generation_result_id: UUID | None = None,
+        save_operation_id: UUID | None = None,
         replace_mode: ReplaceMode,
         position: int | None,
         request_id: str | None,
@@ -125,9 +127,9 @@ class ProjectAssetService:
             organization_id=self._actor.organization_id,
             project_asset_slot_id=slot.id,
             file_asset_version_id=file_version.id,
-            source_generation_result_id=None,
+            source_generation_result_id=source_generation_result_id,
             source_artifact_version_id=source_artifact_version_id,
-            save_operation_id=None,
+            save_operation_id=save_operation_id,
             position=resolved_position,
             is_active=True,
             bound_at=now,
@@ -154,6 +156,14 @@ class ProjectAssetService:
                     str(source_artifact_version_id)
                     if source_artifact_version_id is not None
                     else None
+                ),
+                "source_generation_result_id": (
+                    str(source_generation_result_id)
+                    if source_generation_result_id is not None
+                    else None
+                ),
+                "save_operation_id": (
+                    str(save_operation_id) if save_operation_id is not None else None
                 ),
                 "position": binding.position,
                 "replaced_binding_id": str(replaced.id) if replaced is not None else None,
