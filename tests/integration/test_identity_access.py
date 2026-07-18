@@ -7,7 +7,10 @@ from uuid import UUID
 import httpx
 from sqlalchemy.orm import Session
 
-from apps.api.content_runtime.registry import BUILTIN_RUNTIME_DEFAULTS
+from apps.api.content_runtime.registry import (
+    BUILTIN_CONTENT_DEFINITION_VERSION_ID,
+    BUILTIN_RUNTIME_DEFAULTS,
+)
 from apps.api.database import build_session_factory
 from apps.api.identity.context import AuthenticatedIdentity, system_actor
 from apps.api.identity.dependencies import get_authenticated_identity
@@ -268,6 +271,59 @@ async def test_project_roles_control_read_and_upload_generation(
             )
         assert reviewer_replay.status_code == 403
         assert reviewer_replay.json()["error"]["code"] == "PERMISSION_DENIED"
+    finally:
+        app.state.database_engine.dispose()
+
+
+async def test_idempotent_replay_rechecks_current_project_membership(
+    postgres_database_url: str,
+) -> None:
+    run_migration(postgres_database_url, "head")
+    app = create_app(
+        settings=Settings(_env_file=None, environment="test", database_url=postgres_database_url)
+    )
+    factory = build_session_factory(app.state.database_engine)
+    payload = {
+        "artifact_key": "lesson-plan:lesson-01",
+        "artifact_type": "lesson_plan",
+        "branch_key": "lesson_plan",
+        "content_definition_version_id": str(BUILTIN_CONTENT_DEFINITION_VERSION_ID),
+        "draft_branch": "main",
+        "content": {"title": "Private draft"},
+    }
+    try:
+        with factory() as session, session.begin():
+            add_organization(session, ORG_A, "replay-membership-org")
+            add_user_actor(
+                session,
+                organization_id=ORG_A,
+                user_id=OWNER_USER,
+                principal_id=OWNER_PRINCIPAL,
+                name="replay-owner",
+            )
+
+        use_identity(app, user_id=OWNER_USER, organization_id=ORG_A)
+        async for client in client_for(app):
+            project_id = await create_project(client, "replay-membership-project")
+            first = await client.post(
+                f"/api/v2/projects/{project_id}/artifacts",
+                headers={"Idempotency-Key": "replay-membership-artifact"},
+                json=payload,
+            )
+        assert first.status_code == 201, first.text
+
+        with factory() as session, session.begin():
+            membership = session.query(ProjectMember).filter_by(project_id=project_id).one()
+            session.delete(membership)
+
+        async for client in client_for(app):
+            replay = await client.post(
+                f"/api/v2/projects/{project_id}/artifacts",
+                headers={"Idempotency-Key": "replay-membership-artifact"},
+                json=payload,
+            )
+        assert replay.status_code == 404
+        assert replay.json()["error"]["code"] == "PROJECT_NOT_FOUND"
     finally:
         app.state.database_engine.dispose()
 
