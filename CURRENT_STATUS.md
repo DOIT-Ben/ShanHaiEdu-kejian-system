@@ -4,7 +4,7 @@
 
 验证基线：`main`，实现事实以本文件所在提交的代码、迁移和测试为准；任务状态以链接的GitHub Issue和Pull Request为准
 
-当前阶段：阶段0出口尚未关闭；阶段1通用口径校准门禁和后端轨道已经关闭，下一门禁是业务结构化内容合同确认
+当前阶段：阶段0出口尚未关闭；阶段1通用口径校准门禁和后端轨道已经关闭，#68产品口径已批准并等待机器合同完成工程合并
 
 本文件只描述现在，不保存开发日志。任务细节、负责人、讨论和交接以GitHub Issue与Pull Request为准。
 
@@ -13,6 +13,7 @@
 - 后端已经具备可运行的FastAPI模块化单体、PostgreSQL、Redis、MinIO、Alembic、Worker、Outbox、SSE和幂等基座。
 - API和测试已经覆盖租户与用户边界、项目、课时与分支、上传、文件资产与不可变版本、内容发布、工作流运行、产物审核与依赖、Prompt与Context快照、教材PDF解析以及项目资产原子绑定。
 - OpenAPI、JSON Schema、生成TypeScript客户端、确定性Mock/Fake和后端CI已经进入自动门禁；文本模型网关已经完成受控真实冒烟。
+- 首套小学数学业务内容包已经为23个模型节点固定输入、Prompt、输出、投影和逻辑能力；“1～5的认识”黄金Fixture可以分别启动教案、PPT和视频合同测试，但不代表真实模型或媒体生产完成。
 - 当前可以通过自动化测试和API/CLI验证后端链路，但尚未完成浏览器到真实API的阶段1纵向演示，不得描述为阶段1产品完成。
 - 生产前端仍在[Issue #4](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)与[Draft PR #33](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/33)中独立推进，尚未合并到`main`。
 
@@ -32,19 +33,21 @@
 ## 当前工作
 
 - [Issue #44](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/44)与[PR #46](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/46)：Markdown TemplateDraft确定性编译的五项CI已通过，但当前与`main`存在合并冲突，需重新rebase后继续评审。
-- [Issue #68](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/68)与[Draft PR #71](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/71)：首套黄金课程内容包已经进入评审；十二部分教案、三类九套、10页PPT和50秒视频目前是待产品负责人确认的候选合同，确认前不得作为#48后续实现依据。
-- [Issue #48](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/48)：全流程生成节点与可配置模型I/O绑定的父任务；继续保持`status:blocked`，直到#68候选合同完成产品确认、工程审查和合并。
+- [Decision #73](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/73)已经批准：PPT通常推荐10至20页，视频按故事和服务端价格事实推荐60至180秒，教师可以覆盖；TTS延后独立实施。
+- [Issue #68](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/68)与[Draft PR #71](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/71)：正在把批准口径收敛为首套内置内容包和黄金Fixture；黄金案例固定10页PPT与90秒视频，但不把案例参数提升为平台常量。
+- [Issue #48](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/48)：全流程生成节点与可配置模型I/O绑定的父任务；继续保持`status:blocked`，直到#68完成工程审查和合并。
 - [Issue #61](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/61)与[Draft PR #62](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/62)：原阻塞依赖#58已经满足；恢复实现前需从最新`main`重新rebase并复核统一模型网关上线后的Provider边界。
 - [Issue #51](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/51)：教师端只展示可编辑业务提示词并隐藏内部结构合同，尚未启动。
 - [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)：与生产前端完成真实合同联调，等待前端达到联调条件。
 
 ## 当前阻塞
 
-- #68包含教案、三类九套、PPT和视频的候选结构化字段，但尚未完成产品负责人确认；#48后续任务不得提前固化这些字段。
-- #44仍在评审；它负责通用Markdown模板编译，不代表#68候选业务字段已经批准。
-- #61的历史阻塞事实已经变化，但必须通过其独立Issue/PR完成rebase、范围复核和状态变更，不在本状态收尾任务中静默恢复实现。
+- #68产品语义已经批准，但机器合同、黄金Fixture和最终Head工程审查尚未合并；#48后续任务不得在合并前复制或固化另一套字段。
+- #44仍在评审；它负责通用Markdown模板编译，不代表#68机器合同已经进入主线。
+- #61的历史阻塞事实已经变化，但必须通过其独立Issue/PR完成rebase、范围复核和状态变更，不在#68中静默恢复实现。
 - 阶段1整体产品出口仍缺少生产前端的真实API联调；后端轨道通过不代表完整阶段1产品完成。
-- 统一模型网关已经提供文本、图片和视频能力；ShanHaiEdu的图片/视频Adapter、异步恢复和真实冒烟仍属于#61及后续适配任务，TTS能力尚未提供。
+- 统一模型网关已经提供文本、图片和视频能力；ShanHaiEdu的图片/视频Adapter、异步恢复和真实冒烟仍属于#61及后续适配任务。TTS当前不实现、不冒烟，也不阻塞#68。
+- #68只发布首套业务合同和黄金Fixture，不实现模型运行时、实时价格计算、PPTX装配、媒体生成或最终交付；这些仍需独立Issue和真实阶段验收。
 
 ## 下一个阶段出口
 
@@ -68,7 +71,7 @@
 - 生产前端工程达到Issue #4的阶段0范围并通过前端门禁，源码通过PR进入`main`。
 - 前端通过#11消费当前OpenAPI、JSON Schema和SSE合同，完成真实API联调；Mock不能作为出口。
 
-进入阶段2“教材到教案纵向链路”前，先完成#68候选业务内容合同的产品确认、工程审查和合并，再解除#48阻塞并拆分课时/教案子任务。#44、#61和#51继续使用各自独立短分支；#11等待生产前端达到联调条件，不阻塞这些后端任务。
+进入阶段2“教材到教案纵向链路”前，先完成#68机器合同与黄金Fixture的工程审查和合并，再解除#48阻塞。#68合并后，教案、PPT/图片、视频和运行时可以基于统一黄金输入领取独立短分支并行推进；TTS继续延后，且这些任务不得自动扩大#29或阶段出口范围。#44、#61和#51继续使用各自独立短分支；#11等待生产前端达到联调条件。
 
 ## 接手提示
 
@@ -80,4 +83,4 @@
 4. 被分配的Issue和PR
 5. 与任务直接相关的模块文档、合同、代码和测试
 
-新对话先确认#68候选业务内容合同是否已经得到产品负责人明确批准。未批准时只做审查和差异分析，不扩展#48；不得把#44编译器、#61 Provider基础层或#68 Fixture的工程检查通过解释为产品语义已经批准。
+新对话先确认#68工程审查与合并状态；产品口径以Decision #73为准，未合并前不得让#48复制或固化另一套字段。#68合并后以内容包和黄金Fixture为机器基线，不得从外部旧Skill恢复七部分教案、视频读取教案/PPT或第二套DTO；教案、PPT和视频运行时分别领取#48下的独立子Issue。

@@ -40,6 +40,18 @@ flowchart TD
 
 当前脱敏节点目录合同覆盖教材、课时、教案、三类九套、PPT、图片、视频、TTS、装配和交付。它固定业务阶段与权限边界，不固定供应商模型名或私有参数。
 
+### 首套内置生成基线
+
+`shanhai.primary_math.courseware@1.0.0`是首套可执行业务内容基线。其声明源位于`workflow/builtin/primary_math_courseware/generation-source.json`，确定性构建后为现行目录中的23个`model_generation`节点各提供：
+
+- 教师输入、系统补全和Context注入字段；
+- 可编辑业务Prompt与只读方法、质量门；
+- 结构化输出字段、必填/可编辑/可删/重复语义；
+- 教师可读投影和GenerationTemplate引用；
+- 逻辑模型能力和风格预设，不含Provider名称、密钥或私有参数。
+
+“1～5的认识”黄金项目只提交教材哈希、物理页3～5与印刷页14～16映射、脱敏证据和结构期望。它验证教案、PPT和视频可从各自固定输入独立启动，并明确禁止视频读取教案、教材和PPT。普通CI据此使用确定性Fixture；真实文本、图片、视频和TTS调用仍必须在适配器任务及阶段出口单独冒烟，不能用内容包通过替代。
+
 ### 执行方式边界
 
 完整课件只有一个`WorkflowDefinition`。用户侧提供两种执行方式：
