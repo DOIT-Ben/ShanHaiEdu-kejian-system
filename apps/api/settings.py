@@ -16,6 +16,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         env_prefix="SHANHAI_",
+        env_ignore_empty=True,
         extra="ignore",
     )
 
@@ -51,7 +52,7 @@ class Settings(BaseSettings):
     text_provider_base_url: HttpUrl | None = None
     text_provider_model: str | None = None
     text_provider_secret_env: str = Field(
-        default="OPENROUTER_API_KEY",
+        default="NEWAPI_TEXT_API_KEY",
         pattern=r"^[A-Z][A-Z0-9_]{2,127}$",
     )
     text_provider_timeout_seconds: float = Field(default=30, gt=0, le=120)

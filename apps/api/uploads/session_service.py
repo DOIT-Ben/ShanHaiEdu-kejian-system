@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 from pathlib import PurePosixPath, PureWindowsPath
 from uuid import UUID
 
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from apps.api.database import utc_now
@@ -20,6 +22,15 @@ from apps.api.uploads.schemas import CreateUploadSessionRequest, UploadSessionRe
 from apps.api.uploads.storage import ObjectStorage, ObjectStorageError
 
 ALLOWED_MEDIA_TYPES = frozenset({"application/pdf"})
+
+
+class PersistedUploadSessionResult(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    upload_session_id: UUID
+    material_id: UUID
+    required_headers: dict[str, str]
+    expires_at: datetime
 
 
 def safe_filename(filename: str) -> str:
@@ -82,14 +93,14 @@ class UploadSessionService:
             ttl_seconds=self._ttl_seconds,
         )
         with self._session.begin():
+            self._require_project(project_id)
             replay = idempotency.lookup(
                 scope="material_uploads.create",
                 key=idempotency_key,
                 payload=idempotency_payload,
             )
-            self._require_project(project_id)
         if replay is not None:
-            return UploadSessionRead.model_validate(replay.body)
+            return self._present_result(project_id, replay)
 
         upload_id = new_uuid7()
         material_id = new_uuid7()
@@ -98,11 +109,9 @@ class UploadSessionService:
             f"{material_id}/uploads/{upload_id}/{filename}"
         )
         expires_at = utc_now() + timedelta(seconds=self._ttl_seconds)
-        upload_url = self._presigned_url(key)
-        created = UploadSessionRead(
+        persisted = PersistedUploadSessionResult(
             upload_session_id=upload_id,
             material_id=material_id,
-            upload_url=upload_url,
             required_headers={"Content-Type": media_type},
             expires_at=expires_at,
         )
@@ -128,7 +137,7 @@ class UploadSessionService:
             )
             return CommandResult(
                 status_code=201,
-                body=created.model_dump(mode="json"),
+                body=persisted.model_dump(mode="json"),
                 resource_type="upload_session",
                 resource_id=upload_id,
             )
@@ -140,7 +149,7 @@ class UploadSessionService:
                 payload=idempotency_payload,
                 command=command,
             )
-        return UploadSessionRead.model_validate(result.body)
+        return self._present_result(project_id, result)
 
     def _require_project(self, project_id: UUID, *, for_update: bool = False) -> None:
         project = ProjectAccessService(self._session, self._actor).require(
@@ -155,12 +164,50 @@ class UploadSessionService:
                 message="The project cannot accept uploads.",
             )
 
-    def _presigned_url(self, key: str) -> str:
+    def _present_result(self, project_id: UUID, result: CommandResult) -> UploadSessionRead:
+        persisted = PersistedUploadSessionResult.model_validate(result.body)
+        with self._session.begin():
+            self._require_project(project_id)
+            upload = self._session.scalar(
+                select(UploadSession).where(
+                    UploadSession.id == persisted.upload_session_id,
+                    UploadSession.organization_id == self._actor.organization_id,
+                    UploadSession.project_id == project_id,
+                    UploadSession.material_id == persisted.material_id,
+                    UploadSession.status == "created",
+                    UploadSession.deleted_at.is_(None),
+                )
+            )
+            if upload is None:
+                raise ApiError(
+                    status_code=409,
+                    code="PRECONDITION_NOT_MET",
+                    message="The upload session is no longer available.",
+                )
+            bucket = upload.storage_bucket
+            key = upload.storage_key
+            expires_at = upload.expires_at
+        remaining = expires_at - utc_now()
+        if remaining <= timedelta(0):
+            raise ApiError(
+                status_code=409,
+                code="PRECONDITION_NOT_MET",
+                message="The upload session has expired.",
+            )
+        return UploadSessionRead(
+            upload_session_id=persisted.upload_session_id,
+            material_id=persisted.material_id,
+            upload_url=self._presigned_url(bucket=bucket, key=key, expires=remaining),
+            required_headers=persisted.required_headers,
+            expires_at=expires_at,
+        )
+
+    def _presigned_url(self, *, bucket: str, key: str, expires: timedelta) -> str:
         try:
             return self._storage.create_presigned_put(
-                bucket=self._bucket,
+                bucket=bucket,
                 key=key,
-                expires=timedelta(seconds=self._ttl_seconds),
+                expires=expires,
             )
         except ObjectStorageError as exc:
             raise ApiError(

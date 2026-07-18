@@ -78,10 +78,10 @@ docker compose -f infra\compose.yaml down
 真实文本模型只通过显式冒烟命令调用。先在受控环境中注入密钥变量，不把密钥写入`.env`、命令历史或参数；再配置非敏感路由并运行：
 
 ```powershell
-$env:SHANHAI_TEXT_PROVIDER_NAME="openrouter"
-$env:SHANHAI_TEXT_PROVIDER_BASE_URL="https://openrouter.ai/api/v1"
-$env:SHANHAI_TEXT_PROVIDER_MODEL="<approved-model>"
-$env:SHANHAI_TEXT_PROVIDER_SECRET_ENV="OPENROUTER_API_KEY"
+$env:SHANHAI_TEXT_PROVIDER_NAME="newapi"
+$env:SHANHAI_TEXT_PROVIDER_BASE_URL="https://newapi.doitbenai.cloud/v1"
+$env:SHANHAI_TEXT_PROVIDER_MODEL="deepseek"
+$env:SHANHAI_TEXT_PROVIDER_SECRET_ENV="NEWAPI_TEXT_API_KEY"
 uv run python -m apps.api.cli model-smoke --capability text.smoke --real
 ```
 
