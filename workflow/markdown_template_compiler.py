@@ -23,6 +23,10 @@ from workflow.markdown_template_content_package import (
     build_compiled_items,
     build_compiled_manifest,
 )
+from workflow.node_generation_binding import (
+    NodeGenerationBindingError,
+    validate_model_capability,
+)
 
 PROFILE_SCHEMA_FILE = "markdown-template-compilation-profile.schema.json"
 DRAFT_SCHEMA_FILE = "markdown-template-draft.schema.json"
@@ -68,6 +72,7 @@ def compile_markdown_template(
         "MARKDOWN_COMPILE_PROFILE_INVALID",
     )
     _validate_context_bindings(profile)
+    _validate_model_capability(profile)
     _validate_draft_keys(draft)
 
     prefix = cast(str, profile["key_prefix"])
@@ -96,9 +101,10 @@ def write_compiled_content_package(
             "MARKDOWN_COMPILE_OUTPUT_EXISTS",
             f"Output path already exists: {output.name}",
         )
-    output.parent.mkdir(parents=True, exist_ok=True)
-    temporary = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent))
+    temporary: Path | None = None
     try:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent))
         for entry in cast(list[dict[str, Any]], compiled.manifest["items"]):
             item_path = resolve_content_package_item_path(
                 temporary,
@@ -127,7 +133,7 @@ def write_compiled_content_package(
             "Cannot write compiled content package",
         ) from exc
     finally:
-        if temporary.exists():
+        if temporary is not None and temporary.exists():
             shutil.rmtree(temporary, ignore_errors=True)
 
 
@@ -164,6 +170,16 @@ def _validate_context_bindings(profile: Mapping[str, Any]) -> None:
                 "CompilationProfile contains duplicate or forbidden context bindings",
             )
         keys.add(binding_key)
+
+
+def _validate_model_capability(profile: Mapping[str, Any]) -> None:
+    try:
+        validate_model_capability(cast(str, profile["model_capability"]))
+    except NodeGenerationBindingError as exc:
+        raise MarkdownTemplateCompilationError(
+            "MARKDOWN_COMPILE_PROFILE_INVALID",
+            "CompilationProfile model capability must be Provider-neutral",
+        ) from exc
 
 
 def _validate_draft_keys(draft: Mapping[str, Any]) -> None:

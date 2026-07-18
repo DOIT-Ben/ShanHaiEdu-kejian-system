@@ -148,7 +148,7 @@ def _validate_node(node: dict[str, Any]) -> None:
     _validate_context_policy(cast(dict[str, Any], node["context_policy"]))
     _validate_reference_asset_policy(cast(dict[str, Any], node["reference_asset_policy"]))
     if node["execution_kind"] == "model_generation":
-        _validate_capability(cast(str, node["model_capability"]))
+        validate_model_capability(cast(str, node["model_capability"]))
         if not node["validator_refs"]:
             raise NodeGenerationBindingError(
                 "NODE_BINDING_VALIDATOR_REQUIRED",
@@ -256,7 +256,9 @@ def _validate_reference_role(role: dict[str, Any]) -> None:
             )
 
 
-def _validate_capability(capability: str) -> None:
+def validate_model_capability(capability: str) -> None:
+    """Reject Provider-specific names at the shared workflow contract boundary."""
+
     tokens = set(TOKEN_SPLIT.split(capability.lower()))
     if (
         not capability.startswith(ALLOWED_CAPABILITY_PREFIXES)

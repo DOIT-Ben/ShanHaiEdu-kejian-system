@@ -163,7 +163,7 @@ def _prompt_sections(profile: Mapping[str, Any]) -> list[dict[str, Any]]:
             "layer": "method",
             "content": "严格按照已确认的结构化字段生成。不得新增、删除或重命名字段。",
             "editable": False,
-            "visible_to_teacher": True,
+            "visible_to_teacher": False,
         },
     ]
 

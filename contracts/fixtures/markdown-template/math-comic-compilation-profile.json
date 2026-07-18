@@ -5,7 +5,7 @@
   "runtime_constraint": ">=0.1.0 <1.0.0",
   "change_summary": "从脱敏数学连环画草稿编译教案生成模板。",
   "key_prefix": "math_comic_lesson",
-  "model_capability": "text.structured.lesson_plan",
+  "model_capability": "text.structured.zh_primary_math",
   "domain": "primary_math",
   "locale": "zh-CN",
   "renderer_id": "shanhai.markdown.v1",

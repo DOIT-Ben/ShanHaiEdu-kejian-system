@@ -88,6 +88,10 @@ def test_ready_draft_compiles_to_a_valid_generation_content_package(tmp_path: Pa
         "math_comic_lesson.generate",
     ]
     assert set(validated.items) == set(compiled.items)
+    assert (
+        item_spec(compiled, "math_comic_lesson.generate")["model_capability"]
+        == "text.structured.zh_primary_math"
+    )
 
 
 def test_content_modes_map_to_explicit_input_and_output_semantics() -> None:
@@ -179,7 +183,11 @@ def test_imported_body_never_becomes_a_role_or_hidden_prompt_layer() -> None:
         "method",
     ]
     assert imported_body not in "\n".join(section["content"] for section in prompt["sections"])
-    assert all(section["visible_to_teacher"] for section in prompt["sections"])
+    assert [section["visible_to_teacher"] for section in prompt["sections"]] == [
+        True,
+        True,
+        False,
+    ]
 
 
 def test_compilation_and_written_json_are_byte_deterministic(tmp_path: Path) -> None:
@@ -261,6 +269,17 @@ def test_forbidden_context_source_is_rejected_before_package_writing() -> None:
     )
 
 
+def test_provider_specific_model_capability_is_rejected() -> None:
+    profile = compilation_profile()
+    profile["model_capability"] = "text.gpt-4o"
+
+    assert_compilation_error(
+        ready_draft(),
+        profile,
+        "MARKDOWN_COMPILE_PROFILE_INVALID",
+    )
+
+
 def test_ten_section_revision_gets_a_new_version_and_content_hash() -> None:
     original = compile_markdown_template(
         ready_draft(),
@@ -331,6 +350,20 @@ def test_writer_refuses_to_overwrite_an_existing_path(tmp_path: Path) -> None:
     with pytest.raises(MarkdownTemplateCompilationError) as caught:
         write_compiled_content_package(compiled, output)
     assert caught.value.code == "MARKDOWN_COMPILE_OUTPUT_EXISTS"
+
+
+def test_writer_maps_an_unusable_parent_to_a_stable_write_error(tmp_path: Path) -> None:
+    compiled = compile_markdown_template(
+        ready_draft(),
+        compilation_profile(),
+        contracts_root=CONTRACTS,
+    )
+    parent = tmp_path / "not-a-directory"
+    parent.write_text("occupied", encoding="utf-8")
+
+    with pytest.raises(MarkdownTemplateCompilationError) as caught:
+        write_compiled_content_package(compiled, parent / "compiled-package")
+    assert caught.value.code == "MARKDOWN_COMPILE_WRITE_FAILED"
 
 
 def test_cli_writes_a_package_that_the_existing_validator_accepts(tmp_path: Path) -> None:
