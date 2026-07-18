@@ -259,10 +259,9 @@ def _validate_reference_role(role: dict[str, Any]) -> None:
 def validate_model_capability(capability: str) -> None:
     """Reject Provider-specific names at the shared workflow contract boundary."""
 
-    tokens = set(TOKEN_SPLIT.split(capability.lower()))
-    if (
-        not capability.startswith(ALLOWED_CAPABILITY_PREFIXES)
-        or tokens & FORBIDDEN_CAPABILITY_TOKENS
+    normalized = capability.lower()
+    if not capability.startswith(ALLOWED_CAPABILITY_PREFIXES) or any(
+        token in normalized for token in FORBIDDEN_CAPABILITY_TOKENS
     ):
         raise NodeGenerationBindingError(
             "NODE_BINDING_CAPABILITY_FORBIDDEN",

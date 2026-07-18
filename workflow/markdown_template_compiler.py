@@ -3,25 +3,27 @@
 from __future__ import annotations
 
 import json
-import shutil
-import tempfile
 from collections.abc import Mapping
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
 from jsonschema import Draft202012Validator, SchemaError
 
-from workflow.content_package import (
-    DEFAULT_CONTEXT_SOURCES,
-    ContentPackageValidationError,
-    resolve_content_package_item_path,
-    validate_content_package,
-)
+from workflow.content_package import DEFAULT_CONTEXT_SOURCES
+from workflow.markdown_safety import MarkdownTemplateError, validate_markdown_fragment
 from workflow.markdown_template_content_package import (
     ITEM_SUFFIXES,
     build_compiled_items,
     build_compiled_manifest,
+)
+from workflow.markdown_template_package_writer import (
+    CompiledMarkdownTemplatePackage as CompiledMarkdownTemplatePackage,
+)
+from workflow.markdown_template_package_writer import (
+    MarkdownTemplateCompilationError as MarkdownTemplateCompilationError,
+)
+from workflow.markdown_template_package_writer import (
+    write_compiled_content_package as write_compiled_content_package,
 )
 from workflow.node_generation_binding import (
     NodeGenerationBindingError,
@@ -32,23 +34,6 @@ PROFILE_SCHEMA_FILE = "markdown-template-compilation-profile.schema.json"
 DRAFT_SCHEMA_FILE = "markdown-template-draft.schema.json"
 REQUEST_FIELD_KEY = "request.instructions"
 MAX_COMPILED_KEY_CHARS = 160
-
-
-class MarkdownTemplateCompilationError(ValueError):
-    """Raised when a reviewed draft cannot become a safe content package."""
-
-    def __init__(self, code: str, message: str) -> None:
-        super().__init__(message)
-        self.code = code
-
-
-@dataclass(frozen=True, slots=True)
-class CompiledMarkdownTemplatePackage:
-    """An in-memory package ready for deterministic validated writing."""
-
-    manifest: dict[str, Any]
-    items: Mapping[str, dict[str, Any]]
-    contracts_root: Path = field(repr=False, compare=False)
 
 
 def compile_markdown_template(
@@ -66,6 +51,7 @@ def compile_markdown_template(
             "MARKDOWN_COMPILE_DRAFT_NOT_READY",
             "TemplateDraft must be approved before compilation",
         )
+    _validate_draft_semantics(draft)
     _validate_instance(
         profile,
         root / PROFILE_SCHEMA_FILE,
@@ -87,54 +73,6 @@ def compile_markdown_template(
         items=items,
         contracts_root=root,
     )
-
-
-def write_compiled_content_package(
-    compiled: CompiledMarkdownTemplatePackage,
-    output_root: Path,
-) -> None:
-    """Atomically write and validate a compiled package without overwriting paths."""
-
-    output = output_root.resolve()
-    if output.exists():
-        raise MarkdownTemplateCompilationError(
-            "MARKDOWN_COMPILE_OUTPUT_EXISTS",
-            f"Output path already exists: {output.name}",
-        )
-    temporary: Path | None = None
-    try:
-        output.parent.mkdir(parents=True, exist_ok=True)
-        temporary = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent))
-        for entry in cast(list[dict[str, Any]], compiled.manifest["items"]):
-            item_path = resolve_content_package_item_path(
-                temporary,
-                cast(str, entry["path"]),
-            )
-            item_path.parent.mkdir(parents=True, exist_ok=True)
-            _write_json(item_path, compiled.items[cast(str, entry["item_key"])])
-        _write_json(temporary / "manifest.json", compiled.manifest)
-        try:
-            validate_content_package(temporary, contracts_root=compiled.contracts_root)
-        except ContentPackageValidationError as exc:
-            raise MarkdownTemplateCompilationError(
-                "MARKDOWN_COMPILE_PACKAGE_INVALID",
-                f"Compiled content package failed validation: {exc.code}",
-            ) from exc
-        temporary.rename(output)
-    except MarkdownTemplateCompilationError:
-        raise
-    except OSError as exc:
-        if output.exists():
-            code = "MARKDOWN_COMPILE_OUTPUT_EXISTS"
-        else:
-            code = "MARKDOWN_COMPILE_WRITE_FAILED"
-        raise MarkdownTemplateCompilationError(
-            code,
-            "Cannot write compiled content package",
-        ) from exc
-    finally:
-        if temporary is not None and temporary.exists():
-            shutil.rmtree(temporary, ignore_errors=True)
 
 
 def _validate_instance(value: Mapping[str, Any], schema_path: Path, code: str) -> None:
@@ -180,6 +118,48 @@ def _validate_model_capability(profile: Mapping[str, Any]) -> None:
             "MARKDOWN_COMPILE_PROFILE_INVALID",
             "CompilationProfile model capability must be Provider-neutral",
         ) from exc
+
+
+def _validate_draft_semantics(draft: Mapping[str, Any]) -> None:
+    if cast(str, draft["preamble_markdown"]).strip():
+        raise MarkdownTemplateCompilationError(
+            "MARKDOWN_COMPILE_PREAMBLE_UNSUPPORTED",
+            "V1 compilation requires preamble content to be moved into a reviewed section",
+        )
+
+    titles = [cast(str, draft["title"])]
+    fragments = list(titles)
+    sections = cast(list[dict[str, Any]], draft["sections"])
+    for section in sections:
+        section_title = cast(str, section["title"])
+        titles.append(section_title)
+        fragments.extend((section_title, cast(str, section["body_markdown"])))
+        for subsection in cast(list[dict[str, Any]], section["subsections"]):
+            subsection_title = cast(str, subsection["title"])
+            titles.append(subsection_title)
+            fragments.extend((subsection_title, cast(str, subsection["body_markdown"])))
+    if any("{{" in title or "}}" in title for title in titles):
+        raise MarkdownTemplateCompilationError(
+            "MARKDOWN_COMPILE_TEMPLATE_SYNTAX_FORBIDDEN",
+            "Template titles cannot contain projection expression syntax",
+        )
+    try:
+        for fragment in fragments:
+            validate_markdown_fragment(fragment)
+    except MarkdownTemplateError as exc:
+        raise MarkdownTemplateCompilationError(
+            "MARKDOWN_COMPILE_DRAFT_UNSAFE",
+            "TemplateDraft contains unsafe Markdown after review editing",
+        ) from exc
+
+    for section in sections:
+        if section["content_mode"] != "fixed" or not section["required"]:
+            continue
+        if any(not body.strip() for _, _, body in _section_leaves(section)):
+            raise MarkdownTemplateCompilationError(
+                "MARKDOWN_COMPILE_FIXED_CONTENT_MISSING",
+                "Required fixed fields must contain approved content",
+            )
 
 
 def _validate_draft_keys(draft: Mapping[str, Any]) -> None:
@@ -326,14 +306,3 @@ def _common_output_field(key: object, label: object, section: dict[str, Any]) ->
         "deletable": not cast(bool, section["required"]),
         "visibility": "primary" if section["visible"] else "hidden",
     }
-
-
-def _write_json(path: Path, value: Mapping[str, Any]) -> None:
-    payload = json.dumps(
-        value,
-        ensure_ascii=False,
-        indent=2,
-        sort_keys=True,
-        allow_nan=False,
-    )
-    path.write_text(payload + "\n", encoding="utf-8", newline="\n")

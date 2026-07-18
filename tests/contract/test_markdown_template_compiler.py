@@ -9,6 +9,7 @@ from typing import Any, cast
 
 import pytest
 
+import workflow.markdown_template_package_writer as package_writer_module
 from workflow.content_package import validate_content_package
 from workflow.markdown_template import parse_markdown_template
 from workflow.markdown_template_compiler import (
@@ -239,6 +240,62 @@ def test_compilation_profile_is_validated_at_the_boundary() -> None:
     )
 
 
+@pytest.mark.parametrize("title_owner", ["document", "section"])
+def test_projection_titles_reject_template_expression_syntax(title_owner: str) -> None:
+    draft = ready_draft()
+    if title_owner == "document":
+        draft["title"] = "{{overview}}"
+    else:
+        draft["sections"][0]["title"] = "{{overview}}"
+
+    assert_compilation_error(
+        draft,
+        compilation_profile(),
+        "MARKDOWN_COMPILE_TEMPLATE_SYNTAX_FORBIDDEN",
+    )
+
+
+@pytest.mark.parametrize(
+    "unsafe_body",
+    [
+        "<script>alert(1)</script>",
+        "![教材图](asset.png)",
+        "[危险链接](javascript:alert(1))",
+    ],
+)
+def test_ready_draft_revalidates_edited_markdown_safety(unsafe_body: str) -> None:
+    draft = ready_draft()
+    draft["sections"][1]["body_markdown"] = unsafe_body
+
+    assert_compilation_error(
+        draft,
+        compilation_profile(),
+        "MARKDOWN_COMPILE_DRAFT_UNSAFE",
+    )
+
+
+def test_nonempty_preamble_is_rejected_instead_of_silently_dropped() -> None:
+    draft = ready_draft()
+    draft["preamble_markdown"] = "这段前言已经由管理员批准, 不能静默丢弃。"
+
+    assert_compilation_error(
+        draft,
+        compilation_profile(),
+        "MARKDOWN_COMPILE_PREAMBLE_UNSUPPORTED",
+    )
+
+
+def test_required_fixed_field_requires_approved_content() -> None:
+    draft = ready_draft()
+    draft["sections"][0]["body_markdown"] = "   "
+
+    assert_compilation_error(
+        draft,
+        compilation_profile(),
+        "MARKDOWN_COMPILE_FIXED_CONTENT_MISSING",
+    )
+
+
 def test_duplicate_and_overlong_derived_keys_use_stable_errors() -> None:
     duplicate = ready_draft()
     duplicate["sections"][1]["section_key"] = duplicate["sections"][0]["section_key"]
@@ -269,9 +326,10 @@ def test_forbidden_context_source_is_rejected_before_package_writing() -> None:
     )
 
 
-def test_provider_specific_model_capability_is_rejected() -> None:
+@pytest.mark.parametrize("capability", ["text.gpt-4o", "text.gpt4o"])
+def test_provider_specific_model_capability_is_rejected(capability: str) -> None:
     profile = compilation_profile()
-    profile["model_capability"] = "text.gpt-4o"
+    profile["model_capability"] = capability
 
     assert_compilation_error(
         ready_draft(),
@@ -364,6 +422,51 @@ def test_writer_maps_an_unusable_parent_to_a_stable_write_error(tmp_path: Path) 
     with pytest.raises(MarkdownTemplateCompilationError) as caught:
         write_compiled_content_package(compiled, parent / "compiled-package")
     assert caught.value.code == "MARKDOWN_COMPILE_WRITE_FAILED"
+
+
+def test_writer_rejects_an_active_output_reservation(tmp_path: Path) -> None:
+    compiled = compile_markdown_template(
+        ready_draft(),
+        compilation_profile(),
+        contracts_root=CONTRACTS,
+    )
+    output = tmp_path / "compiled-package"
+    (tmp_path / ".compiled-package.compile.lock").write_text("occupied", encoding="utf-8")
+
+    with pytest.raises(MarkdownTemplateCompilationError) as caught:
+        write_compiled_content_package(compiled, output)
+    assert caught.value.code == "MARKDOWN_COMPILE_OUTPUT_BUSY"
+    assert not output.exists()
+
+
+def test_writer_refuses_a_target_created_during_validation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    compiled = compile_markdown_template(
+        ready_draft(),
+        compilation_profile(),
+        contracts_root=CONTRACTS,
+    )
+    output = tmp_path / "compiled-package"
+    original_validate = package_writer_module.validate_content_package
+
+    def validate_then_create_target(package_root: Path, *, contracts_root: Path) -> object:
+        validated = original_validate(package_root, contracts_root=contracts_root)
+        output.mkdir()
+        return validated
+
+    monkeypatch.setattr(
+        package_writer_module,
+        "validate_content_package",
+        validate_then_create_target,
+    )
+
+    with pytest.raises(MarkdownTemplateCompilationError) as caught:
+        write_compiled_content_package(compiled, output)
+    assert caught.value.code == "MARKDOWN_COMPILE_OUTPUT_EXISTS"
+    assert output.is_dir()
+    assert not list(output.iterdir())
 
 
 def test_cli_writes_a_package_that_the_existing_validator_accepts(tmp_path: Path) -> None:
