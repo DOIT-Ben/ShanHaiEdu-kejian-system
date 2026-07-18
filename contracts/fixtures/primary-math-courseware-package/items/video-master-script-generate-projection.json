@@ -1,0 +1,29 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "video.master_script.generate.projection",
+    "name": "视频母版剧本生成教师投影",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "video.master_script.generate.projection",
+    "title": "视频母版剧本生成教师投影",
+    "source_definition_ref": {
+      "item_key": "video.master_script.generate.output",
+      "kind": "content_definition"
+    },
+    "output_format": "video_script",
+    "renderer_id": "shanhai.video_master_script.v1",
+    "template": "# {{master_title}}\n\n## 叙事目的\n{{narrative_purpose}}\n\n## 完整故事\n{{complete_story}}\n\n## 场次\n{{master_scenes}}\n\n## 课堂交接\n{{master_handoff}}",
+    "allowed_variables": [
+      "master_title",
+      "narrative_purpose",
+      "complete_story",
+      "master_scenes",
+      "master_handoff"
+    ],
+    "teacher_visible": true
+  }
+}

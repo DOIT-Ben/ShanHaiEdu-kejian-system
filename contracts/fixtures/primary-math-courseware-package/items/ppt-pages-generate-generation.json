@@ -1,0 +1,50 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "generation_template",
+  "metadata": {
+    "key": "ppt.pages.generate",
+    "name": "PPT逐页四层设计",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "ppt.pages.generate",
+    "title": "PPT逐页四层设计",
+    "description": "为批准大纲生成画布、图片主视觉、可编辑教学信息和排版互动四层页级事实。",
+    "model_capability": "text.structured.ppt_page_design",
+    "input_definition_ref": {
+      "item_key": "ppt.pages.generate.input",
+      "kind": "input_definition"
+    },
+    "prompt_template_ref": {
+      "item_key": "ppt.pages.generate.prompt",
+      "kind": "prompt_template"
+    },
+    "output_definition_ref": {
+      "item_key": "ppt.pages.generate.output",
+      "kind": "content_definition"
+    },
+    "style_preset_refs": [
+      {
+        "item_key": "style.primary_math.paper_clay",
+        "kind": "style_preset"
+      }
+    ],
+    "projection_refs": [
+      {
+        "role": "teacher_view",
+        "template_ref": {
+          "item_key": "ppt.pages.generate.projection",
+          "kind": "projection_template"
+        }
+      },
+      {
+        "role": "export",
+        "template_ref": {
+          "item_key": "ppt.pages.generate.projection",
+          "kind": "projection_template"
+        }
+      }
+    ]
+  }
+}

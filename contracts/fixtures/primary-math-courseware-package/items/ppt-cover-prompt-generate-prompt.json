@@ -1,0 +1,84 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "ppt.cover.prompt.generate.prompt",
+    "name": "PPT封面图片提示词业务Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "ppt.cover.prompt.generate.prompt",
+    "title": "PPT封面图片提示词业务Prompt",
+    "description": "基于批准大纲和页规格生成封面主视觉的完整图片请求，不把准确课题文字交给图片模型。",
+    "model_capability": "text.structured.image_prompt",
+    "input_definition_ref": {
+      "item_key": "ppt.cover.prompt.generate.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "ppt.cover.prompt.generate.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是小学数学PPT封面主视觉提示词设计师。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "根据批准PPT大纲、封面页规格和风格偏好，生成封面主视觉的结构化完整图片请求。封面表达课题核心和课堂吸引力，但准确课题文字由PPT可编辑层添加。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "写清主体、可见动作或关系、纸艺或黏土材质、承托面、接触阴影、光源、透视、16:9构图、标题安全区、配色和候选数量。封面可以是完整主视觉，不沿用正文白底组件布局；同时为标题和副标题保留稳定可读区域。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "不得要求图片模型绘制课题文字、数字、公式、答案、Logo或水印；主视觉必须与教学主题有关但不提前讲解答案；候选数2至4；构图、材质、光线、留白、负面约束和固定目标槽位齐全。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [
+      {
+        "binding_key": "approved_outline",
+        "source": "ppt_outline.approved_version",
+        "required": true,
+        "exposure": "summary",
+        "max_items": 1,
+        "max_bytes": 200000
+      },
+      {
+        "binding_key": "cover_page_spec",
+        "source": "ppt_page_spec.current_version",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 150000
+      },
+      {
+        "binding_key": "teacher_preferences",
+        "source": "project.teacher_preferences",
+        "required": false,
+        "exposure": "summary",
+        "max_items": 1,
+        "max_bytes": 30000
+      }
+    ],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 20000
+    }
+  }
+}

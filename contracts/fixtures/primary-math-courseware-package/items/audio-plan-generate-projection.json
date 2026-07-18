@@ -1,0 +1,27 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "audio.plan.generate.projection",
+    "name": "配音音效音乐计划教师投影",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "audio.plan.generate.projection",
+    "title": "配音音效音乐计划教师投影",
+    "source_definition_ref": {
+      "item_key": "audio.plan.generate.output",
+      "kind": "content_definition"
+    },
+    "output_format": "markdown",
+    "renderer_id": "shanhai.audio_plan.markdown.v1",
+    "template": "# 视频配音、音效、音乐与字幕计划\n\n{{audio_tracks}}\n\n## 混音与字幕时间线\n{{audio_mix_plan}}\n\n## 质量检查\n{{audio_plan_quality}}",
+    "allowed_variables": [
+      "audio_tracks",
+      "audio_mix_plan",
+      "audio_plan_quality"
+    ],
+    "teacher_visible": true
+  }
+}

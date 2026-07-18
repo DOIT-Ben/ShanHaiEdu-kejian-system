@@ -1,0 +1,84 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "ppt.outline.generate.prompt",
+    "name": "PPT大纲生成业务Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "ppt.outline.generate.prompt",
+    "title": "PPT大纲生成业务Prompt",
+    "description": "把PPT内容分析变成具有稳定页面键和单页唯一教学任务的大纲。",
+    "model_capability": "text.structured.ppt_content",
+    "input_definition_ref": {
+      "item_key": "ppt.outline.generate.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "ppt.outline.generate.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是小学数学课堂PPT页序设计师，擅长把教学过程组织为单页单任务的大纲。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "依据PPT内容分析和批准教案生成页面大纲。每页使用稳定page_key，写清顺序、页面类型、唯一教学任务、来源引用、学生关注点和互动意图。不要写详细版式、图片提示词或PPTX。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "先保留教案中的知识顺序和课堂节奏，再按学生需要看见或操作的一个主要任务划页。封面只承担课题识别；正文在真实需要时覆盖导入、概念建构、方法形成、探究或例题、练习、辨析和总结，不为凑页机械加入页面。相邻页必须形成清楚推进，练习和总结承担评价功能。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "page_key稳定且位置连续；每页只有一个主要教学任务；所有来源引用存在；覆盖目标但不复制完整教案；不超出批准边界；页数调整不能造成目标遗漏、难点过载或无意义拆分。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [
+      {
+        "binding_key": "approved_lesson_plan",
+        "source": "lesson_plan.approved_version",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 600000
+      },
+      {
+        "binding_key": "approved_material",
+        "source": "material.approved_parse",
+        "required": true,
+        "exposure": "summary",
+        "max_items": 50,
+        "max_bytes": 300000
+      },
+      {
+        "binding_key": "teacher_preferences",
+        "source": "project.teacher_preferences",
+        "required": false,
+        "exposure": "summary",
+        "max_items": 1,
+        "max_bytes": 30000
+      }
+    ],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 30000
+    }
+  }
+}

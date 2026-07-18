@@ -1,0 +1,26 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "audio.tts.generate.projection",
+    "name": "TTS配音生成教师投影",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "audio.tts.generate.projection",
+    "title": "TTS配音生成教师投影",
+    "source_definition_ref": {
+      "item_key": "audio.tts.generate.output",
+      "kind": "content_definition"
+    },
+    "output_format": "markdown",
+    "renderer_id": "shanhai.audio_candidates.markdown.v1",
+    "template": "# TTS配音候选\n\n目标槽位：{{tts_target_slot}}\n\n{{tts_candidates}}",
+    "allowed_variables": [
+      "tts_target_slot",
+      "tts_candidates"
+    ],
+    "teacher_visible": true
+  }
+}

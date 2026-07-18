@@ -1,0 +1,196 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "ppt.pages.generate.output",
+    "name": "PPT逐页四层设计输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "ppt.pages.generate.output",
+    "title": "PPT逐页四层设计输出",
+    "description": "符合PptPageSpec语义的逐页四层设计集合。",
+    "definition_role": "artifact",
+    "fields": [
+      {
+        "field_key": "page_spec_set_key",
+        "label": "页规格集键",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "visibility": "hidden"
+      },
+      {
+        "field_key": "page_spec_outline_key",
+        "label": "来源大纲键",
+        "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "page_specs",
+        "label": "逐页规格",
+        "type": "repeatable",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "repeatable": true,
+        "min_items": 5,
+        "children": [
+          {
+            "field_key": "page_key",
+            "label": "页面键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "page_position",
+            "label": "顺序",
+            "type": "number",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "page_type",
+            "label": "页面类型",
+            "type": "enum",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "teaching_task",
+            "label": "教学任务",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "page_source_refs",
+            "label": "来源引用",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "student_focus",
+            "label": "学生关注点",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "canvas",
+            "label": "画布层",
+            "type": "object",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "generation_instruction": "封面使用cover_art；所有正文使用solid_white和#FFFFFF。"
+          },
+          {
+            "field_key": "visual_decision",
+            "label": "视觉决策",
+            "type": "enum",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "image_strategy",
+            "label": "图片策略",
+            "type": "enum",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "main_visual_description",
+            "label": "主视觉说明",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "page_asset_requirements",
+            "label": "图片资产要求",
+            "type": "repeatable",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 1
+          },
+          {
+            "field_key": "editable_text_blocks",
+            "label": "可编辑文字",
+            "type": "repeatable",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "repeatable": true
+          },
+          {
+            "field_key": "editable_math_shapes",
+            "label": "可编辑数学图形",
+            "type": "repeatable",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "repeatable": true
+          },
+          {
+            "field_key": "layout_spec",
+            "label": "排版规格",
+            "type": "object",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "interaction_spec",
+            "label": "互动规格",
+            "type": "object",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "speaker_notes",
+            "label": "教师备注",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "page_validation_rules",
+            "label": "页面校验规则",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "page_set_quality",
+        "label": "整套页级质量",
+        "type": "rubric",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      }
+    ]
+  }
+}

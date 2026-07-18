@@ -1,0 +1,38 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "generation_template",
+  "metadata": {
+    "key": "audio.tts.generate",
+    "name": "TTS配音生成",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "audio.tts.generate",
+    "title": "TTS配音生成",
+    "description": "逐条执行旁白或对白计划并产生可审计音轨候选，声音参考仅按节点角色传入。",
+    "model_capability": "audio.tts.child_friendly_zh",
+    "input_definition_ref": {
+      "item_key": "audio.tts.generate.input",
+      "kind": "input_definition"
+    },
+    "prompt_template_ref": {
+      "item_key": "audio.tts.generate.prompt",
+      "kind": "prompt_template"
+    },
+    "output_definition_ref": {
+      "item_key": "audio.tts.generate.output",
+      "kind": "content_definition"
+    },
+    "style_preset_refs": [],
+    "projection_refs": [
+      {
+        "role": "teacher_view",
+        "template_ref": {
+          "item_key": "audio.tts.generate.projection",
+          "kind": "projection_template"
+        }
+      }
+    ]
+  }
+}

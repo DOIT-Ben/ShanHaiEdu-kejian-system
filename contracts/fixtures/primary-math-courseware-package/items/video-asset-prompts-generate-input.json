@@ -1,0 +1,76 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "video.asset_prompts.generate.input",
+    "name": "视频资产图片提示词输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "video.asset_prompts.generate.input",
+    "title": "视频资产图片提示词输入",
+    "description": "输入目标资产范围，读取资产清单、母版剧本和批准视频风格。",
+    "fields": [
+      {
+        "field_key": "video_asset_prompt_scope",
+        "label": "生成范围",
+        "value_type": "enum",
+        "required": true,
+        "source": "teacher",
+        "visibility": "primary",
+        "widget": "select",
+        "default_value": "all_missing",
+        "options": [
+          {
+            "value": "all_missing",
+            "label": "全部缺失资产"
+          },
+          {
+            "value": "selected_assets",
+            "label": "选定资产"
+          }
+        ]
+      },
+      {
+        "field_key": "selected_video_asset_keys",
+        "label": "选定资产",
+        "value_type": "list",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "multiselect"
+      },
+      {
+        "field_key": "video_asset_prompt_requirements",
+        "label": "资产图片补充要求",
+        "value_type": "rich_text",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "textarea",
+        "validation": {
+          "max_length": 5000
+        }
+      },
+      {
+        "field_key": "current_video_asset_inventory",
+        "label": "资产清单",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "approved_video_style",
+        "label": "视频风格合同",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      }
+    ]
+  }
+}

@@ -1,0 +1,1897 @@
+{
+  "source_version": "shanhai.builtin-generation-source/v1",
+  "package": {
+    "package_key": "shanhai.primary_math.courseware",
+    "name": "小学数学标准课件生产内容包",
+    "semantic_version": "1.0.0",
+    "runtime_constraint": ">=0.1.0 <1.0.0",
+    "change_summary": "冻结首套课时、教案、导入、PPT、图片、视频和音频业务生成合同。"
+  },
+  "styles": [
+    {
+      "preset_key": "style.primary_math.paper_clay",
+      "title": "纸艺黏土数学世界",
+      "description": "用于小学数学课件的清晰纸艺与轻黏土视觉语言，正文保持纯白画布。",
+      "modalities": ["image", "video", "presentation"],
+      "visual_language": "真实纸张层次与轻黏土物件结合，造型清楚、尺度稳定、接触关系可信，儿童友好但不过度卡通化。",
+      "palette": ["清澈蓝绿", "明亮柠檬黄", "珊瑚红强调", "纯白正文画布"],
+      "mood": ["明快", "有秩序", "可信", "适合课堂投影"],
+      "texture": ["细腻哑光纸感", "轻黏土柔和体积", "克制接触阴影"],
+      "negative_constraints": [
+        "禁止水印、Logo和乱码",
+        "禁止把准确文字、数字、公式或答案烘焙进图片",
+        "禁止廉价贴纸堆叠和无关装饰",
+        "禁止恐怖、成人化和危险模仿内容"
+      ],
+      "extensions": {
+        "image": {
+          "medium": "paper craft and soft clay digital illustration",
+          "composition_preferences": ["单一视觉焦点", "明确前中后层次", "保留可编辑教学信息区域"],
+          "lighting": ["明亮柔和主光", "低戏剧性阴影", "主体接触面清楚"]
+        },
+        "video": {
+          "motion_language": "单镜头一个主要可见节拍，动作连续且首尾状态清楚",
+          "camera_language": "稳定机位配合一次主要运镜，避免无目的摇晃和突变",
+          "pacing": "适合低年级观看，变化可辨识但不拖慢",
+          "transition_style": "以动作衔接和状态连续为主，少用炫技转场"
+        },
+        "presentation": {
+          "background_policy": "white",
+          "typography": "清晰无衬线中文字体；文字、数字和数学符号保持PPT原生可编辑",
+          "layout_density": "sparse",
+          "illustration_style": "封面允许完整主视觉，正文只使用与封面同视觉语言的独立场景或物件资产"
+        }
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "template_key": "lesson.division.generate",
+      "title": "课时划分生成",
+      "description": "从教师批准的教材范围中划分可独立实施的40分钟课时，只决定课时边界，不同时生成详细教案。",
+      "model_capability": "text.structured.zh_primary_math",
+      "input": {
+        "description": "教师可调整课时长度、课时数策略和特殊约束；教材内容只从批准的解析快照注入。",
+        "fields": [
+          {
+            "field_key": "duration_minutes",
+            "label": "每课时分钟数",
+            "description": "默认按小学数学40分钟课堂设计。",
+            "value_type": "number",
+            "required": true,
+            "source": "teacher",
+            "visibility": "primary",
+            "widget": "number",
+            "default_value": 40,
+            "validation": {"minimum": 30, "maximum": 60}
+          },
+          {
+            "field_key": "lesson_count_mode",
+            "label": "课时数量",
+            "value_type": "enum",
+            "required": true,
+            "source": "teacher",
+            "visibility": "primary",
+            "widget": "select",
+            "default_value": "auto",
+            "options": [
+              {"value": "auto", "label": "自动划分"},
+              {"value": "specified", "label": "指定数量"}
+            ]
+          },
+          {
+            "field_key": "requested_lesson_count",
+            "label": "指定课时数",
+            "description": "仅在指定数量时使用；模型仍须报告容量或知识边界冲突。",
+            "value_type": "number",
+            "required": false,
+            "source": "teacher",
+            "visibility": "secondary",
+            "widget": "number",
+            "validation": {"minimum": 1, "maximum": 20}
+          },
+          {
+            "field_key": "lesson_type_preferences",
+            "label": "课型偏好",
+            "value_type": "list",
+            "required": false,
+            "source": "teacher",
+            "visibility": "advanced",
+            "widget": "multiselect",
+            "options": [
+              {"value": "new_learning", "label": "新授课"},
+              {"value": "practice", "label": "练习课"},
+              {"value": "review", "label": "整理复习课"},
+              {"value": "activity", "label": "活动课"}
+            ]
+          },
+          {
+            "field_key": "special_requirements",
+            "label": "特殊要求",
+            "value_type": "rich_text",
+            "required": false,
+            "source": "teacher",
+            "visibility": "secondary",
+            "widget": "textarea",
+            "validation": {"max_length": 4000}
+          },
+          {
+            "field_key": "approved_material_scope",
+            "label": "已批准教材范围",
+            "value_type": "reference",
+            "required": true,
+            "source": "context",
+            "visibility": "hidden",
+            "widget": "textarea"
+          }
+        ]
+      },
+      "output": {
+        "description": "覆盖批准教材范围且不重叠的课时划分、知识边界和划分依据。",
+        "definition_role": "artifact",
+        "fields": [
+          {
+            "field_key": "division_key",
+            "label": "课时划分键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "visibility": "hidden",
+            "generation_instruction": "使用项目内稳定键，不使用数据库UUID。"
+          },
+          {
+            "field_key": "scope_summary",
+            "label": "教材范围摘要",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "visibility": "primary",
+            "generation_instruction": "概括批准页段的知识内容和边界，不复制大段教材原文。"
+          },
+          {
+            "field_key": "lesson_count",
+            "label": "课时数",
+            "type": "number",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "visibility": "primary",
+            "validation_rules": [{"minimum": 1}, {"equals_repeatable_count": "lesson_units"}]
+          },
+          {
+            "field_key": "lesson_units",
+            "label": "课时列表",
+            "type": "repeatable",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 1,
+            "visibility": "primary",
+            "children": [
+              {"field_key": "lesson_unit_key", "label": "课时键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "position", "label": "顺序", "type": "number", "required": true, "editable": true, "deletable": false},
+              {"field_key": "title", "label": "课题名称", "type": "text", "required": true, "editable": true, "deletable": false},
+              {
+                "field_key": "lesson_type",
+                "label": "课型",
+                "type": "enum",
+                "required": true,
+                "editable": true,
+                "deletable": false,
+                "options": [
+                  {"value": "new_learning", "label": "新授课"},
+                  {"value": "practice", "label": "练习课"},
+                  {"value": "review", "label": "整理复习课"},
+                  {"value": "activity", "label": "活动课"}
+                ]
+              },
+              {"field_key": "duration_minutes", "label": "课时分钟数", "type": "number", "required": true, "editable": true, "deletable": false},
+              {"field_key": "core_learning_outcome", "label": "核心学习结果", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "material_scope", "label": "对应教材范围", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "evidence_refs", "label": "教材证据引用", "type": "list", "required": true, "editable": false, "deletable": false, "min_items": 1},
+              {"field_key": "prior_learning", "label": "前置基础", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "content_boundary", "label": "本课讲授边界", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "must_not_preteach", "label": "不得提前讲授", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "teaching_focus", "label": "教学重点", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "learning_difficulty", "label": "学习难点", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "division_reason", "label": "划分理由", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "following_connection", "label": "后续衔接", "type": "rich_text", "required": true, "editable": true, "deletable": false}
+            ]
+          },
+          {
+            "field_key": "coverage_check",
+            "label": "覆盖检查",
+            "type": "group",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "visibility": "secondary",
+            "children": [
+              {"field_key": "all_evidence_covered", "label": "批准证据已覆盖", "type": "boolean", "required": true, "editable": false, "deletable": false},
+              {"field_key": "overlap_free", "label": "课时边界无重叠", "type": "boolean", "required": true, "editable": false, "deletable": false},
+              {"field_key": "progression_rationale", "label": "认知进阶说明", "type": "rich_text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "unresolved_questions", "label": "待确认问题", "type": "list", "required": true, "editable": false, "deletable": false}
+            ]
+          }
+        ]
+      },
+      "prompt": {
+        "role": "你是一名熟悉小学数学课程标准、教材编排逻辑、儿童认知发展和单元整体教学的资深教学设计专家。",
+        "task": "读取教师已经批准的教材范围，生成且只生成课时划分。确定分几课时、每课时讲什么、对应哪些教材证据以及为什么这样划分；不要同时生成详细教案、PPT、导入方案或视频。",
+        "method": "先分析批准范围中的知识结构、前后联系、例题或活动层次和学生可能的认知转折，再划分课时。默认按40分钟容量，由直观经验到抽象表示、由概念形成到应用练习；新授课每课时聚焦一个核心知识或方法，不把多个难点强塞在一起。若同页包含多个认知层次，按认知难度而非机械页码拆分；若材料只包含一个容量适当的小知识点，保留单课时，不为凑结构增加练习课或复习课。每课时写明稳定键、顺序、课型、核心学习结果、教材范围与证据、前置基础、讲授边界、不得提前讲授、重点、难点、划分理由和后续衔接。指定课时数与容量或知识边界冲突时，在待确认问题中如实报告，不牺牲理解过程硬塞。",
+        "quality_gate": "所有批准教材证据必须被恰好覆盖，不重叠、不遗漏、不越出批准范围；每课时容量匹配设定分钟数且只有一个核心学习结果；重点与难点不能空泛；划分理由必须解释认知逻辑；不得虚构班级事实，不得把比大小、序数、分与合、加减法、0等未在本次范围批准的内容提前写入当前课时。输出必须严格符合结构化合同。",
+        "context_bindings": [
+          {
+            "binding_key": "approved_material",
+            "source": "material.approved_parse",
+            "required": true,
+            "exposure": "full",
+            "max_items": 50,
+            "max_bytes": 500000
+          }
+        ],
+        "max_chars": 30000
+      },
+      "projection": {
+        "output_format": "markdown",
+        "renderer_id": "shanhai.lesson_division.markdown.v1",
+        "template": "# 课时划分\n\n## 教材范围\n{{scope_summary}}\n\n## 课时总表\n{{lesson_units}}\n\n## 覆盖与合理性检查\n{{coverage_check}}",
+        "allowed_variables": ["scope_summary", "lesson_units", "coverage_check"],
+        "roles": ["teacher_view", "export"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "lesson_plan.generate",
+      "title": "分课时教案生成",
+      "description": "为一个已批准课时生成默认十二部分教案；三类九套由兄弟节点独立生成，不嵌入教案字段树。",
+      "model_capability": "text.structured.zh_primary_math",
+      "input": {
+        "description": "输入固定课时、教材证据、教师偏好和教案详略要求。",
+        "fields": [
+          {"field_key": "lesson_unit_ref", "label": "已批准课时", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "material_evidence_ref", "label": "教材证据", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "lesson_detail_level", "label": "教案详略", "value_type": "enum", "required": true, "source": "teacher", "visibility": "primary", "widget": "select", "default_value": "detailed", "options": [{"value": "standard", "label": "标准教案"}, {"value": "detailed", "label": "详细教案"}, {"value": "open_class", "label": "公开课详案"}]},
+          {"field_key": "class_duration_minutes", "label": "课堂时长", "value_type": "number", "required": true, "source": "system", "visibility": "secondary", "widget": "number", "default_value": 40, "validation": {"minimum": 30, "maximum": 60}},
+          {"field_key": "teacher_requirements", "label": "教师补充要求", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 6000}},
+          {"field_key": "teacher_preferences", "label": "教师偏好", "value_type": "reference", "required": false, "source": "context", "visibility": "hidden", "widget": "textarea"}
+        ]
+      },
+      "output": {
+        "description": "由内容定义版本固定的十二部分教案事实；删除任何导入附录后仍可独立试讲。",
+        "definition_role": "artifact",
+        "fields": [
+          {
+            "field_key": "teaching_content",
+            "label": "一、教学内容",
+            "type": "group",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "visibility": "primary",
+            "children": [
+              {"field_key": "lesson_plan_key", "label": "教案键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "source_lesson_unit_key", "label": "来源课时键", "type": "reference", "required": true, "editable": false, "deletable": false},
+              {"field_key": "lesson_topic", "label": "课题", "type": "text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "subject", "label": "学科", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "grade", "label": "年级", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "lesson_type", "label": "课型", "type": "enum", "required": true, "editable": true, "deletable": false},
+              {"field_key": "duration_minutes", "label": "课时分钟数", "type": "number", "required": true, "editable": true, "deletable": false},
+              {"field_key": "teaching_scope", "label": "教学范围", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "teaching_evidence_refs", "label": "教材证据", "type": "list", "required": true, "editable": false, "deletable": false, "min_items": 1},
+              {"field_key": "content_boundary", "label": "内容边界", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "must_not_preteach", "label": "不得提前讲授", "type": "list", "required": true, "editable": true, "deletable": false}
+            ]
+          },
+          {
+            "field_key": "material_analysis",
+            "label": "二、教材分析",
+            "type": "group",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "children": [
+              {"field_key": "prior_learning", "label": "前置基础", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "current_focus", "label": "本课核心", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "next_learning", "label": "后续衔接", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "teaching_value", "label": "教学价值", "type": "rich_text", "required": true, "editable": true, "deletable": false}
+            ]
+          },
+          {
+            "field_key": "learner_analysis",
+            "label": "三、学情分析",
+            "type": "group",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "children": [
+              {"field_key": "confirmed_learner_facts", "label": "已确认班级事实", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "general_learning_characteristics", "label": "一般学习特点", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "likely_learning_difficulties", "label": "可能困难", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "likely_misconceptions", "label": "典型错误", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "differentiation_needs", "label": "分层支持", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "learner_unknowns", "label": "待确认学情", "type": "list", "required": true, "editable": true, "deletable": false}
+            ]
+          },
+          {
+            "field_key": "design_intent",
+            "label": "四、设计意图",
+            "type": "group",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "children": [
+              {"field_key": "teaching_main_line", "label": "教学主线", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "learning_sequence", "label": "学习路径", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "evaluation_alignment", "label": "教学习评一致性", "type": "rich_text", "required": true, "editable": true, "deletable": false}
+            ]
+          },
+          {
+            "field_key": "teaching_objectives",
+            "label": "五、教学目标",
+            "type": "repeatable",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 1,
+            "children": [
+              {"field_key": "objective_key", "label": "目标键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "competency_focus", "label": "核心素养指向", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "observable_outcome", "label": "可观察学习结果", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "completion_condition", "label": "完成条件", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "success_criteria", "label": "成功标准", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "objective_evidence_refs", "label": "目标证据", "type": "list", "required": true, "editable": false, "deletable": false},
+              {"field_key": "assessment_evidence_keys", "label": "评价证据键", "type": "list", "required": true, "editable": false, "deletable": false}
+            ]
+          },
+          {
+            "field_key": "key_difficulties_and_strategies",
+            "label": "六、教学重难点及突破策略",
+            "type": "group",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "children": [
+              {"field_key": "key_learning_focus", "label": "教学重点", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "central_learning_difficulty", "label": "教学难点", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "breakthrough_strategies", "label": "突破策略", "type": "list", "required": true, "editable": true, "deletable": false}
+            ]
+          },
+          {
+            "field_key": "preparation",
+            "label": "七、教学准备",
+            "type": "group",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "children": [
+              {"field_key": "teacher_resources", "label": "教师准备", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "student_resources", "label": "学生准备", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "digital_resources", "label": "数字资源", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "safety_requirements", "label": "安全要求", "type": "list", "required": true, "editable": true, "deletable": false}
+            ]
+          },
+          {
+            "field_key": "teaching_process",
+            "label": "八、教学过程",
+            "type": "repeatable",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 4,
+            "children": [
+              {"field_key": "process_section_key", "label": "环节键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "process_type", "label": "环节类型", "type": "enum", "required": true, "editable": true, "deletable": false},
+              {"field_key": "process_title", "label": "环节名称", "type": "text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "process_minutes", "label": "时间", "type": "number", "required": true, "editable": true, "deletable": false},
+              {"field_key": "process_objective_keys", "label": "关联目标", "type": "list", "required": true, "editable": false, "deletable": false},
+              {"field_key": "teacher_actions", "label": "教师活动", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "student_actions", "label": "学生活动", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "key_questions", "label": "关键提问", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "expected_responses", "label": "预设回答", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "process_possible_errors", "label": "可能错误", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "scaffolds_and_followups", "label": "追问与支架", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "process_assessment_evidence", "label": "评价证据", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "board_updates", "label": "板书增量", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "process_transition", "label": "过渡", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "process_design_rationale", "label": "设计意图", "type": "rich_text", "required": true, "editable": true, "deletable": false}
+            ]
+          },
+          {
+            "field_key": "board_design",
+            "label": "九、板书设计",
+            "type": "group",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "children": [
+              {"field_key": "board_layout", "label": "空间布局", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "board_final_content", "label": "最终保留内容", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "board_build_order", "label": "生成顺序", "type": "list", "required": true, "editable": true, "deletable": false}
+            ]
+          },
+          {
+            "field_key": "lesson_summary",
+            "label": "十、课堂总结",
+            "type": "group",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "children": [
+              {"field_key": "summary_questions", "label": "总结问题", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "student_summary_evidence", "label": "学生总结证据", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "teacher_closure", "label": "教师收束", "type": "rich_text", "required": true, "editable": true, "deletable": false}
+            ]
+          },
+          {
+            "field_key": "differentiated_homework",
+            "label": "十一、分层作业",
+            "type": "repeatable",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "repeatable": true,
+            "children": [
+              {"field_key": "homework_key", "label": "作业键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "homework_level", "label": "层级", "type": "enum", "required": true, "editable": true, "deletable": false},
+              {"field_key": "homework_task", "label": "任务", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "homework_objective_keys", "label": "关联目标", "type": "list", "required": true, "editable": false, "deletable": false},
+              {"field_key": "homework_expected_minutes", "label": "预计用时", "type": "number", "required": true, "editable": true, "deletable": false},
+              {"field_key": "homework_criteria", "label": "评价标准", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "homework_answer_guidance", "label": "答案与指导", "type": "rich_text", "required": true, "editable": true, "deletable": false}
+            ]
+          },
+          {
+            "field_key": "teaching_reflection",
+            "label": "十二、教学反思",
+            "type": "group",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "children": [
+              {"field_key": "reflection_state", "label": "反思状态", "type": "enum", "required": true, "editable": false, "deletable": false, "default_value": "not_taught"},
+              {"field_key": "reflection_prompts", "label": "课后反思提示", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "teacher_reflection_record", "label": "教师实际记录", "type": "rich_text", "required": false, "editable": true, "deletable": false}
+            ]
+          }
+        ]
+      },
+      "prompt": {
+        "role": "你是一名熟悉小学数学课程标准、教材证据、儿童认知规律和教学习评一致性的资深教学设计专家。",
+        "task": "围绕一个已批准课时生成十二部分结构化教案。严格继承课时边界和教材证据，不扩展到其他课时；正文必须自带可直接执行的课堂启动，不依赖三类九套附录。不要生成PPT、视频、图片或三类九套。",
+        "method": "先确定本课前置基础、核心学习结果、后续衔接和不得提前讲授内容；再写可观察、可评价且有成功标准的目标，并让每个目标同时绑定教学环节和评价证据。按设定课时长度设计学习启动、核心探究、应用或评价、课堂收束，全部环节时间之和必须等于课时长度。每个环节写清教师活动、学生活动、关键问题、预设回答、可能错误、追问支架、评价证据、板书增量、过渡和设计意图。学情区分已确认事实、审慎的一般性判断和未知项；分层作业符合年级并提供标准。教学反思只提供课后问题和空白记录，不能伪造授课结果。",
+        "quality_gate": "输出顶层字段必须且只能按当前内容定义包含教学内容、教材分析、学情分析、设计意图、教学目标、教学重难点及突破策略、教学准备、教学过程、板书设计、课堂总结、分层作业和教学反思十二部分。不得使用不可评价的空泛目标，不得虚构班级掌握率或设备，不得超出批准教材，不得把准确答案提前放入导入。正文删除任何导入附录后仍须完整可试讲；结构、目标引用、证据引用和时间总量必须通过校验。",
+        "context_bindings": [
+          {"binding_key": "approved_lesson_unit", "source": "lesson_division.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 200000},
+          {"binding_key": "approved_material", "source": "material.approved_parse", "required": true, "exposure": "full", "max_items": 50, "max_bytes": 500000},
+          {"binding_key": "teacher_preferences", "source": "project.teacher_preferences", "required": false, "exposure": "summary", "max_items": 1, "max_bytes": 30000}
+        ],
+        "max_chars": 60000
+      },
+      "projection": {
+        "output_format": "markdown",
+        "renderer_id": "shanhai.lesson_plan.markdown.v1",
+        "template": "# 分课时教案\n\n## 一、教学内容\n{{teaching_content}}\n\n## 二、教材分析\n{{material_analysis}}\n\n## 三、学情分析\n{{learner_analysis}}\n\n## 四、设计意图\n{{design_intent}}\n\n## 五、教学目标\n{{teaching_objectives}}\n\n## 六、教学重难点及突破策略\n{{key_difficulties_and_strategies}}\n\n## 七、教学准备\n{{preparation}}\n\n## 八、教学过程\n{{teaching_process}}\n\n## 九、板书设计\n{{board_design}}\n\n## 十、课堂总结\n{{lesson_summary}}\n\n## 十一、分层作业\n{{differentiated_homework}}\n\n## 十二、教学反思\n{{teaching_reflection}}",
+        "allowed_variables": ["teaching_content", "material_analysis", "learner_analysis", "design_intent", "teaching_objectives", "key_difficulties_and_strategies", "preparation", "teaching_process", "board_design", "lesson_summary", "differentiated_homework", "teaching_reflection"],
+        "roles": ["teacher_view", "export"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "intro.ideate",
+      "title": "三类九套独立创意",
+      "description": "在严格隔离课程上下文的条件下生成科普、应用、故事各三套独立创意。",
+      "model_capability": "text.structured.creative_education",
+      "input": {
+        "description": "只接收创意类别规则、年龄安全边界和通用媒介偏好。",
+        "fields": [
+          {"field_key": "ideas_per_category", "label": "每类方案数", "value_type": "number", "required": true, "source": "system", "visibility": "hidden", "widget": "number", "default_value": 3, "validation": {"minimum": 3, "maximum": 3}},
+          {"field_key": "audience_age_band", "label": "受众年龄段", "value_type": "text", "required": true, "source": "system", "visibility": "hidden", "widget": "text", "default_value": "6-12岁"},
+          {"field_key": "medium_preferences", "label": "媒介偏好", "value_type": "list", "required": false, "source": "teacher", "visibility": "secondary", "widget": "multiselect"},
+          {"field_key": "creative_preferences", "label": "创意偏好", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 4000}},
+          {"field_key": "general_teacher_preferences", "label": "教师通用偏好", "value_type": "reference", "required": false, "source": "context", "visibility": "hidden", "widget": "textarea"}
+        ]
+      },
+      "output": {
+        "description": "不含教材、知识点或课程锚点的九套独立创意。",
+        "definition_role": "intermediate",
+        "fields": [
+          {"field_key": "idea_set_key", "label": "创意集键", "type": "text", "required": true, "editable": false, "deletable": false, "visibility": "hidden"},
+          {
+            "field_key": "independent_ideas",
+            "label": "独立创意",
+            "type": "repeatable",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 9,
+            "max_items": 9,
+            "children": [
+              {"field_key": "idea_key", "label": "创意键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "idea_category", "label": "类别", "type": "enum", "required": true, "editable": false, "deletable": false, "options": [{"value": "science", "label": "科普"}, {"value": "application", "label": "应用"}, {"value": "story", "label": "故事"}]},
+              {"field_key": "idea_title", "label": "标题", "type": "text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "independent_concept", "label": "独立创意概念", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "creative_hook", "label": "开场钩子", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "viewer_value", "label": "独立观看价值", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "suggested_medium", "label": "建议媒介", "type": "enum", "required": true, "editable": true, "deletable": false},
+              {"field_key": "safety_notes", "label": "儿童安全说明", "type": "list", "required": true, "editable": true, "deletable": false}
+            ]
+          },
+          {
+            "field_key": "diversity_check",
+            "label": "多样性检查",
+            "type": "group",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "children": [
+              {"field_key": "category_counts", "label": "分类计数", "type": "object", "required": true, "editable": false, "deletable": false},
+              {"field_key": "distinct_hooks", "label": "钩子实质不同", "type": "boolean", "required": true, "editable": false, "deletable": false},
+              {"field_key": "independent_without_course", "label": "脱离课程仍成立", "type": "boolean", "required": true, "editable": false, "deletable": false},
+              {"field_key": "diversity_notes", "label": "差异说明", "type": "rich_text", "required": true, "editable": false, "deletable": false}
+            ]
+          }
+        ]
+      },
+      "prompt": {
+        "role": "你是面向儿童的独立创意策划师，擅长科普观察、真实任务和完整小故事。",
+        "task": "在不知道教材、学科、课题、教案和PPT的前提下，生成科普、应用、故事三类各三套、共九套实质不同的独立创意。此阶段不要补课程锚点、课堂问题、知识点或推荐分。",
+        "method": "科普类围绕值得观察或解释的现象与未知；应用类围绕真实任务、限制、选择或完成目标的需要；故事类围绕人物或主体的目标、变化、阻碍、误会或悬念。每套写清独立概念、开场钩子、去掉任何课程回接后仍然存在的观看价值、适合媒介和安全注意。创意可自然出现儿童、成人、动物、机器、自然或抽象主体，但不能因小学受众而默认使用教师、教室和课堂活动。",
+        "quality_gate": "每类恰好三套，总数九套；九套不能只替换标题、角色名或场景；不知道课程的人仍能理解事件，去掉未来锚点后仍值得观看或参与；不得泄漏教材、知识点、教案、PPT、课程标题、分镜、旁白、字幕、资产、Provider或费用；内容适龄、安全、不鼓励危险模仿。",
+        "context_bindings": [
+          {"binding_key": "teacher_preferences", "source": "project.teacher_preferences", "required": false, "exposure": "summary", "max_items": 1, "max_bytes": 20000}
+        ],
+        "max_chars": 30000
+      },
+      "projection": {
+        "output_format": "markdown",
+        "renderer_id": "shanhai.intro_independent_ideas.markdown.v1",
+        "template": "# 三类九套独立创意\n\n{{independent_ideas}}\n\n## 多样性检查\n{{diversity_check}}",
+        "allowed_variables": ["independent_ideas", "diversity_check"],
+        "roles": ["teacher_view"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "intro.anchor",
+      "title": "最小课程锚定",
+      "description": "只为九套独立创意补充唯一最小课程锚点、首问、交接和推荐度，不改写独立创意。",
+      "model_capability": "text.structured.zh_primary_math",
+      "input": {
+        "description": "输入九套独立创意，并注入已批准课时和教材证据。",
+        "fields": [
+          {"field_key": "independent_idea_set", "label": "独立创意集", "value_type": "reference", "required": true, "source": "system", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "target_lesson_unit", "label": "目标课时", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "target_material_evidence", "label": "教材证据", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "duration_preference_seconds", "label": "建议导入时长", "value_type": "number", "required": true, "source": "teacher", "visibility": "secondary", "widget": "number", "default_value": 45, "validation": {"minimum": 15, "maximum": 120}},
+          {"field_key": "anchor_requirements", "label": "锚点补充要求", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 4000}}
+        ]
+      },
+      "output": {
+        "description": "三类九套完整导入方案、唯一最高推荐分和可冻结选择快照。",
+        "definition_role": "artifact",
+        "fields": [
+          {"field_key": "option_set_key", "label": "方案集键", "type": "text", "required": true, "editable": false, "deletable": false, "visibility": "hidden"},
+          {"field_key": "source_lesson_unit_key", "label": "来源课时键", "type": "reference", "required": true, "editable": false, "deletable": false, "visibility": "hidden"},
+          {
+            "field_key": "options",
+            "label": "导入方案",
+            "type": "repeatable",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 9,
+            "max_items": 9,
+            "children": [
+              {"field_key": "option_key", "label": "方案键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "source_idea_key", "label": "独立创意键", "type": "reference", "required": true, "editable": false, "deletable": false},
+              {"field_key": "option_category", "label": "类别", "type": "enum", "required": true, "editable": false, "deletable": false},
+              {"field_key": "option_title", "label": "标题", "type": "text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "anchored_independent_concept", "label": "独立创意", "type": "rich_text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "anchored_hook", "label": "钩子", "type": "rich_text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "anchored_viewer_value", "label": "独立价值", "type": "rich_text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "anchored_medium", "label": "建议媒介", "type": "enum", "required": true, "editable": true, "deletable": false},
+              {"field_key": "suggested_duration_seconds", "label": "建议时长", "type": "number", "required": true, "editable": true, "deletable": false},
+              {"field_key": "course_anchor", "label": "唯一课程锚点", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "classroom_first_question", "label": "课堂第一问", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "handoff_moment", "label": "交接时刻", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "option_must_not_preteach", "label": "不得提前讲授", "type": "list", "required": true, "editable": false, "deletable": false},
+              {"field_key": "fit_reason", "label": "适配理由", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "recommendation_score", "label": "推荐分", "type": "number", "required": true, "editable": false, "deletable": false},
+              {"field_key": "option_risks", "label": "风险", "type": "list", "required": true, "editable": true, "deletable": false}
+            ]
+          },
+          {
+            "field_key": "recommendation_summary",
+            "label": "推荐结论",
+            "type": "group",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "children": [
+              {"field_key": "recommended_option_key", "label": "最高推荐方案", "type": "reference", "required": true, "editable": false, "deletable": false},
+              {"field_key": "recommendation_reason", "label": "推荐理由", "type": "rich_text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "single_highest_score", "label": "最高分唯一", "type": "boolean", "required": true, "editable": false, "deletable": false}
+            ]
+          }
+        ]
+      },
+      "prompt": {
+        "role": "你是小学数学课堂导入锚定设计师，负责把已经成立的独立创意最小化地接回一个已批准课时。",
+        "task": "逐套保留独立创意的标题、独立概念、钩子和观看价值，只补一个课程锚点、课堂第一问、交接时刻、不得提前讲授、适配理由、风险和推荐分。不得重写独立创意，不得生成分镜、旁白、字幕、资产或模型参数。",
+        "method": "先从批准课时与教材证据提取当前核心学习边界和不得提前讲授内容。对每套创意找到一个具体的触发事件、可见现象、真实选择或未完成行动作为唯一回接；锚点只负责把注意力带回课堂，不解释整节课。交接时刻必须可定位，课堂第一问必须可直接由教师提出。推荐度综合独立性、课时适配、可制作性、时长和风险，九套分数必须产生唯一最高值。",
+        "quality_gate": "科普、应用、故事各恰好三套；独立创意字段与上游逐字一致；每套只有一个课程锚点，且去掉锚点仍成立；不得提前讲出需要学生发现的定义、写法、方法或结论；最高推荐分必须唯一；不得因为小学受众默认教师、教室或儿童角色；输出不含教案正文、PPT、分镜、旁白、字幕、资产、Provider和费用。",
+        "context_bindings": [
+          {"binding_key": "approved_lesson_unit", "source": "lesson_division.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 200000},
+          {"binding_key": "approved_material", "source": "material.approved_parse", "required": true, "exposure": "summary", "max_items": 50, "max_bytes": 300000}
+        ],
+        "max_chars": 40000
+      },
+      "projection": {
+        "output_format": "markdown",
+        "renderer_id": "shanhai.intro_option_set.markdown.v1",
+        "template": "# 三类九套课堂导入设计\n\n{{options}}\n\n## 推荐结论\n{{recommendation_summary}}",
+        "allowed_variables": ["options", "recommendation_summary"],
+        "roles": ["teacher_view", "export"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "ppt.content_analyze",
+      "title": "PPT内容分析",
+      "description": "从批准教案和教材证据中提取PPT需要承接的教学顺序、图片化机会和可编辑信息。",
+      "model_capability": "text.structured.ppt_content",
+      "style_preset_refs": ["style.primary_math.paper_clay"],
+      "input": {
+        "description": "输入课件用途、画幅和教师页数偏好；教学事实从批准上下文读取。",
+        "fields": [
+          {"field_key": "presentation_purpose", "label": "课件用途", "value_type": "enum", "required": true, "source": "teacher", "visibility": "primary", "widget": "select", "default_value": "daily_class", "options": [{"value": "daily_class", "label": "日常课堂"}, {"value": "open_class", "label": "公开课"}, {"value": "review", "label": "复习课"}]},
+          {"field_key": "aspect_ratio", "label": "画幅", "value_type": "enum", "required": true, "source": "system", "visibility": "secondary", "widget": "select", "default_value": "16:9", "options": [{"value": "16:9", "label": "宽屏16:9"}]},
+          {"field_key": "preferred_page_count", "label": "期望页数", "value_type": "number", "required": false, "source": "teacher", "visibility": "secondary", "widget": "number", "validation": {"minimum": 5, "maximum": 60}},
+          {"field_key": "ppt_requirements", "label": "PPT补充要求", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 5000}},
+          {"field_key": "approved_lesson_plan", "label": "已批准教案", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "approved_material_evidence", "label": "教材证据", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"}
+        ]
+      },
+      "output": {
+        "description": "PPT教学内容、视觉机会、可编辑责任和建议页数分析。",
+        "definition_role": "intermediate",
+        "fields": [
+          {"field_key": "analysis_key", "label": "分析键", "type": "text", "required": true, "editable": false, "deletable": false, "visibility": "hidden"},
+          {"field_key": "source_lesson_plan_key", "label": "来源教案键", "type": "reference", "required": true, "editable": false, "deletable": false},
+          {"field_key": "audience_and_use", "label": "受众与用途", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+          {"field_key": "ppt_content_boundary", "label": "内容边界", "type": "rich_text", "required": true, "editable": false, "deletable": false},
+          {"field_key": "ppt_must_not_preteach", "label": "不得提前讲授", "type": "list", "required": true, "editable": false, "deletable": false},
+          {"field_key": "objective_sequence", "label": "目标与课堂顺序", "type": "list", "required": true, "editable": true, "deletable": false},
+          {"field_key": "interaction_points", "label": "互动节点", "type": "list", "required": true, "editable": true, "deletable": false},
+          {"field_key": "visualization_opportunities", "label": "适合图片化的内容", "type": "list", "required": true, "editable": true, "deletable": false},
+          {"field_key": "editable_information_requirements", "label": "必须可编辑的信息", "type": "list", "required": true, "editable": false, "deletable": false},
+          {"field_key": "recommended_page_count", "label": "建议页数", "type": "number", "required": true, "editable": true, "deletable": false},
+          {"field_key": "analysis_quality_notes", "label": "分析质量说明", "type": "rubric", "required": true, "editable": false, "deletable": false}
+        ]
+      },
+      "prompt": {
+        "role": "你是小学数学课堂PPT内容架构师，负责把批准教案转成适合投影与互动的页面任务，不重写教案。",
+        "task": "分析批准教案、教材证据、课件用途和教师偏好，输出PPT的受众、内容边界、目标顺序、互动点、图片化机会、必须保持可编辑的信息和建议页数。此阶段不要写逐页设计或生成图片。",
+        "method": "按教案真实教学过程识别课堂启动、概念建构、方法形成、探究或例题、应用练习、辨析和总结中需要视觉支持的部分。区分图片主视觉与准确教学信息责任：现实场景、物件和认知情境适合图片化；标题、正文、数字、算式、答案、标注和精确数学关系必须保持PPT原生可编辑。页数服从教学节奏，不机械按教案段落一段一页。",
+        "quality_gate": "不得改变教案目标、知识边界、顺序和例题逻辑；不得复制完整教案；不得把准确文字、数字或数学关系交给图片模型；建议页数必须能覆盖关键教学环节且不过度拆页；输出必须标明所有必须可编辑的信息。",
+        "context_bindings": [
+          {"binding_key": "approved_lesson_plan", "source": "lesson_plan.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 600000},
+          {"binding_key": "approved_material", "source": "material.approved_parse", "required": true, "exposure": "summary", "max_items": 50, "max_bytes": 300000},
+          {"binding_key": "teacher_preferences", "source": "project.teacher_preferences", "required": false, "exposure": "summary", "max_items": 1, "max_bytes": 30000}
+        ],
+        "max_chars": 30000
+      },
+      "projection": {
+        "output_format": "markdown",
+        "renderer_id": "shanhai.ppt_analysis.markdown.v1",
+        "template": "# PPT内容分析\n\n## 受众与边界\n{{audience_and_use}}\n\n{{ppt_content_boundary}}\n\n## 课堂顺序\n{{objective_sequence}}\n\n## 互动与图片化机会\n{{interaction_points}}\n\n{{visualization_opportunities}}\n\n## 可编辑要求与页数\n{{editable_information_requirements}}\n\n建议页数：{{recommended_page_count}}",
+        "allowed_variables": ["audience_and_use", "ppt_content_boundary", "objective_sequence", "interaction_points", "visualization_opportunities", "editable_information_requirements", "recommended_page_count"],
+        "roles": ["teacher_view"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "ppt.outline.generate",
+      "title": "PPT大纲生成",
+      "description": "把PPT内容分析变成具有稳定页面键和单页唯一教学任务的大纲。",
+      "model_capability": "text.structured.ppt_content",
+      "style_preset_refs": ["style.primary_math.paper_clay"],
+      "input": {
+        "description": "输入内容分析和可选页数调整，教学事实继续以批准教案和教材为准。",
+        "fields": [
+          {"field_key": "ppt_analysis_ref", "label": "PPT内容分析", "value_type": "reference", "required": true, "source": "system", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "page_count_adjustment", "label": "页数调整", "value_type": "number", "required": false, "source": "teacher", "visibility": "secondary", "widget": "number", "validation": {"minimum": 5, "maximum": 60}},
+          {"field_key": "outline_requirements", "label": "大纲补充要求", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 4000}},
+          {"field_key": "outline_lesson_plan", "label": "已批准教案", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"}
+        ]
+      },
+      "output": {
+        "description": "覆盖批准教案的页面任务、来源引用和顺序。",
+        "definition_role": "artifact",
+        "fields": [
+          {"field_key": "outline_key", "label": "大纲键", "type": "text", "required": true, "editable": false, "deletable": false, "visibility": "hidden"},
+          {"field_key": "outline_source_lesson_plan_key", "label": "来源教案键", "type": "reference", "required": true, "editable": false, "deletable": false},
+          {
+            "field_key": "outline_pages",
+            "label": "页面大纲",
+            "type": "repeatable",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 5,
+            "children": [
+              {"field_key": "outline_page_key", "label": "页面键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "outline_position", "label": "顺序", "type": "number", "required": true, "editable": true, "deletable": false},
+              {"field_key": "outline_page_type", "label": "页面类型", "type": "enum", "required": true, "editable": true, "deletable": false},
+              {"field_key": "outline_teaching_task", "label": "唯一教学任务", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "outline_source_refs", "label": "来源引用", "type": "list", "required": true, "editable": false, "deletable": false, "min_items": 1},
+              {"field_key": "outline_student_focus", "label": "学生关注点", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "outline_interaction_intent", "label": "互动意图", "type": "rich_text", "required": true, "editable": true, "deletable": false}
+            ]
+          },
+          {
+            "field_key": "outline_coverage_check",
+            "label": "大纲覆盖检查",
+            "type": "group",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "children": [
+              {"field_key": "outline_all_objectives_covered", "label": "目标已覆盖", "type": "boolean", "required": true, "editable": false, "deletable": false},
+              {"field_key": "outline_sequence_preserved", "label": "教学顺序已保持", "type": "boolean", "required": true, "editable": false, "deletable": false},
+              {"field_key": "outline_one_task_per_page", "label": "每页单任务", "type": "boolean", "required": true, "editable": false, "deletable": false},
+              {"field_key": "outline_coverage_notes", "label": "覆盖说明", "type": "rich_text", "required": true, "editable": false, "deletable": false}
+            ]
+          }
+        ]
+      },
+      "prompt": {
+        "role": "你是小学数学课堂PPT页序设计师，擅长把教学过程组织为单页单任务的大纲。",
+        "task": "依据PPT内容分析和批准教案生成页面大纲。每页使用稳定page_key，写清顺序、页面类型、唯一教学任务、来源引用、学生关注点和互动意图。不要写详细版式、图片提示词或PPTX。",
+        "method": "先保留教案中的知识顺序和课堂节奏，再按学生需要看见或操作的一个主要任务划页。封面只承担课题识别；正文在真实需要时覆盖导入、概念建构、方法形成、探究或例题、练习、辨析和总结，不为凑页机械加入页面。相邻页必须形成清楚推进，练习和总结承担评价功能。",
+        "quality_gate": "page_key稳定且位置连续；每页只有一个主要教学任务；所有来源引用存在；覆盖目标但不复制完整教案；不超出批准边界；页数调整不能造成目标遗漏、难点过载或无意义拆分。",
+        "context_bindings": [
+          {"binding_key": "approved_lesson_plan", "source": "lesson_plan.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 600000},
+          {"binding_key": "approved_material", "source": "material.approved_parse", "required": true, "exposure": "summary", "max_items": 50, "max_bytes": 300000},
+          {"binding_key": "teacher_preferences", "source": "project.teacher_preferences", "required": false, "exposure": "summary", "max_items": 1, "max_bytes": 30000}
+        ],
+        "max_chars": 30000
+      },
+      "projection": {
+        "output_format": "markdown",
+        "renderer_id": "shanhai.ppt_outline.markdown.v1",
+        "template": "# PPT大纲\n\n{{outline_pages}}\n\n## 覆盖检查\n{{outline_coverage_check}}",
+        "allowed_variables": ["outline_pages", "outline_coverage_check"],
+        "roles": ["teacher_view", "export"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "ppt.pages.generate",
+      "title": "PPT逐页四层设计",
+      "description": "为批准大纲生成画布、图片主视觉、可编辑教学信息和排版互动四层页级事实。",
+      "model_capability": "text.structured.ppt_page_design",
+      "style_preset_refs": ["style.primary_math.paper_clay"],
+      "input": {
+        "description": "输入批准大纲和页面设计约束，读取批准教案及教材证据。",
+        "fields": [
+          {"field_key": "approved_outline_ref", "label": "已批准PPT大纲", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "page_style_preset", "label": "视觉风格", "value_type": "reference", "required": true, "source": "teacher", "visibility": "primary", "widget": "style_picker", "allowed_item_kinds": ["style_preset"]},
+          {"field_key": "page_design_requirements", "label": "逐页设计要求", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 5000}},
+          {"field_key": "pages_lesson_plan", "label": "已批准教案", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "pages_material_evidence", "label": "教材证据", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"}
+        ]
+      },
+      "output": {
+        "description": "符合PptPageSpec语义的逐页四层设计集合。",
+        "definition_role": "artifact",
+        "fields": [
+          {"field_key": "page_spec_set_key", "label": "页规格集键", "type": "text", "required": true, "editable": false, "deletable": false, "visibility": "hidden"},
+          {"field_key": "page_spec_outline_key", "label": "来源大纲键", "type": "reference", "required": true, "editable": false, "deletable": false},
+          {
+            "field_key": "page_specs",
+            "label": "逐页规格",
+            "type": "repeatable",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 5,
+            "children": [
+              {"field_key": "page_key", "label": "页面键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "page_position", "label": "顺序", "type": "number", "required": true, "editable": true, "deletable": false},
+              {"field_key": "page_type", "label": "页面类型", "type": "enum", "required": true, "editable": true, "deletable": false},
+              {"field_key": "teaching_task", "label": "教学任务", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "page_source_refs", "label": "来源引用", "type": "list", "required": true, "editable": false, "deletable": false},
+              {"field_key": "student_focus", "label": "学生关注点", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "canvas", "label": "画布层", "type": "object", "required": true, "editable": true, "deletable": false, "generation_instruction": "封面使用cover_art；所有正文使用solid_white和#FFFFFF。"},
+              {"field_key": "visual_decision", "label": "视觉决策", "type": "enum", "required": true, "editable": true, "deletable": false},
+              {"field_key": "image_strategy", "label": "图片策略", "type": "enum", "required": true, "editable": true, "deletable": false},
+              {"field_key": "main_visual_description", "label": "主视觉说明", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "page_asset_requirements", "label": "图片资产要求", "type": "repeatable", "required": true, "editable": true, "deletable": false, "repeatable": true, "min_items": 1},
+              {"field_key": "editable_text_blocks", "label": "可编辑文字", "type": "repeatable", "required": true, "editable": true, "deletable": false, "repeatable": true},
+              {"field_key": "editable_math_shapes", "label": "可编辑数学图形", "type": "repeatable", "required": true, "editable": true, "deletable": false, "repeatable": true},
+              {"field_key": "layout_spec", "label": "排版规格", "type": "object", "required": true, "editable": true, "deletable": false},
+              {"field_key": "interaction_spec", "label": "互动规格", "type": "object", "required": true, "editable": true, "deletable": false},
+              {"field_key": "speaker_notes", "label": "教师备注", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "page_validation_rules", "label": "页面校验规则", "type": "list", "required": true, "editable": false, "deletable": false}
+            ]
+          },
+          {"field_key": "page_set_quality", "label": "整套页级质量", "type": "rubric", "required": true, "editable": false, "deletable": false}
+        ]
+      },
+      "prompt": {
+        "role": "你是小学数学课堂PPT逐页设计师，使用画布、图片主视觉、可编辑教学信息、排版互动四层合同。",
+        "task": "逐页把批准大纲展开为结构化页面规格。每页保留稳定page_key、唯一教学任务、来源和学生关注点，并定义canvas、visual、editable content、layout与interaction。不要生成PPTX或图片候选。",
+        "method": "封面可使用主题统领型cover_art；所有正文页面固定纯白#FFFFFF。每页先判断学生需要看见的数量关系、整体部分、比较、转化、变化、操作或生活应用，再选择教材情境重构、原创资产或混合策略，并至少登记一个主视觉资产要求。标题、正文、问题、数字、算式、公式、答案、标注和精确数学关系全部放入可编辑文字或数学图形层，禁止烘焙进图片。布局写清安全区、层级、对齐、留白、出现顺序和教师使用方式。",
+        "quality_gate": "页面键和大纲一一对应且顺序连续；每页一个教学任务；封面background_mode=cover_art，所有正文background_mode=solid_white且background_color=#FFFFFF；每页至少一个主视觉资产；图片提示词不依赖准确文字数字；数学和文字可编辑；来源、互动、备注与校验规则齐全。",
+        "context_bindings": [
+          {"binding_key": "approved_lesson_plan", "source": "lesson_plan.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 600000},
+          {"binding_key": "approved_material", "source": "material.approved_parse", "required": true, "exposure": "summary", "max_items": 50, "max_bytes": 300000},
+          {"binding_key": "approved_outline", "source": "ppt_outline.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 300000}
+        ],
+        "max_chars": 60000
+      },
+      "projection": {
+        "output_format": "markdown",
+        "renderer_id": "shanhai.ppt_page_specs.markdown.v1",
+        "template": "# PPT逐页设计与制作方案\n\n{{page_specs}}\n\n## 整套质量检查\n{{page_set_quality}}",
+        "allowed_variables": ["page_specs", "page_set_quality"],
+        "roles": ["teacher_view", "export"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "ppt.cover.prompt.generate",
+      "title": "PPT封面图片提示词",
+      "description": "基于批准大纲和页规格生成封面主视觉的完整图片请求，不把准确课题文字交给图片模型。",
+      "model_capability": "text.structured.image_prompt",
+      "style_preset_refs": ["style.primary_math.paper_clay"],
+      "input": {
+        "description": "输入候选数和风格，读取大纲、封面页规格与教师偏好。",
+        "fields": [
+          {"field_key": "cover_candidate_count", "label": "封面候选数", "value_type": "number", "required": true, "source": "teacher", "visibility": "primary", "widget": "number", "default_value": 3, "validation": {"minimum": 2, "maximum": 4}},
+          {"field_key": "cover_style_preset", "label": "封面风格", "value_type": "reference", "required": true, "source": "teacher", "visibility": "primary", "widget": "style_picker", "allowed_item_kinds": ["style_preset"]},
+          {"field_key": "cover_prompt_requirements", "label": "封面补充要求", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 4000}},
+          {"field_key": "cover_outline_context", "label": "批准大纲", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "cover_page_context", "label": "封面页规格", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"}
+        ]
+      },
+      "output": {
+        "description": "可直接导入图片创作台的封面图片业务请求。",
+        "definition_role": "prompt_components",
+        "fields": [
+          {"field_key": "cover_request_key", "label": "请求键", "type": "text", "required": true, "editable": false, "deletable": false},
+          {"field_key": "cover_subject", "label": "主体与教学情境", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+          {"field_key": "cover_composition", "label": "构图与留白", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+          {"field_key": "cover_material_and_form", "label": "材质与造型", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+          {"field_key": "cover_palette_and_lighting", "label": "配色与光线", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+          {"field_key": "cover_aspect_ratio", "label": "画幅", "type": "text", "required": true, "editable": false, "deletable": false, "default_value": "16:9"},
+          {"field_key": "cover_text_safe_area", "label": "标题安全区", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+          {"field_key": "cover_negative_constraints", "label": "负面约束", "type": "list", "required": true, "editable": false, "deletable": false},
+          {"field_key": "cover_candidate_count_output", "label": "候选数", "type": "number", "required": true, "editable": true, "deletable": false},
+          {"field_key": "cover_target_slot", "label": "目标槽位", "type": "text", "required": true, "editable": false, "deletable": false}
+        ]
+      },
+      "prompt": {
+        "role": "你是小学数学PPT封面主视觉提示词设计师。",
+        "task": "根据批准PPT大纲、封面页规格和风格偏好，生成封面主视觉的结构化完整图片请求。封面表达课题核心和课堂吸引力，但准确课题文字由PPT可编辑层添加。",
+        "method": "写清主体、可见动作或关系、纸艺或黏土材质、承托面、接触阴影、光源、透视、16:9构图、标题安全区、配色和候选数量。封面可以是完整主视觉，不沿用正文白底组件布局；同时为标题和副标题保留稳定可读区域。",
+        "quality_gate": "不得要求图片模型绘制课题文字、数字、公式、答案、Logo或水印；主视觉必须与教学主题有关但不提前讲解答案；候选数2至4；构图、材质、光线、留白、负面约束和固定目标槽位齐全。",
+        "context_bindings": [
+          {"binding_key": "approved_outline", "source": "ppt_outline.approved_version", "required": true, "exposure": "summary", "max_items": 1, "max_bytes": 200000},
+          {"binding_key": "cover_page_spec", "source": "ppt_page_spec.current_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 150000},
+          {"binding_key": "teacher_preferences", "source": "project.teacher_preferences", "required": false, "exposure": "summary", "max_items": 1, "max_bytes": 30000}
+        ],
+        "max_chars": 20000
+      },
+      "projection": {
+        "output_format": "prompt_text",
+        "renderer_id": "shanhai.image_prompt.v1",
+        "template": "封面主体：{{cover_subject}}。构图与留白：{{cover_composition}}。材质造型：{{cover_material_and_form}}。配色与光线：{{cover_palette_and_lighting}}。画幅：{{cover_aspect_ratio}}。标题安全区：{{cover_text_safe_area}}。禁止：{{cover_negative_constraints}}。",
+        "allowed_variables": ["cover_subject", "cover_composition", "cover_material_and_form", "cover_palette_and_lighting", "cover_aspect_ratio", "cover_text_safe_area", "cover_negative_constraints"],
+        "roles": ["teacher_view", "provider_request"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "ppt.cover.image.generate",
+      "title": "PPT封面候选生成",
+      "description": "通过服务端图片网关执行封面业务请求并返回可审计候选，不在合同中固定Provider私有参数。",
+      "model_capability": "image.generate.education_16x9",
+      "style_preset_refs": ["style.primary_math.paper_clay"],
+      "input": {
+        "description": "输入批准的完整图片提示词、候选数、目标槽位和可选风格参考资产。",
+        "fields": [
+          {"field_key": "cover_prompt_text", "label": "完整封面生成指令", "value_type": "rich_text", "required": true, "source": "teacher", "visibility": "primary", "widget": "textarea", "validation": {"min_length": 20, "max_length": 20000}},
+          {"field_key": "cover_generation_count", "label": "候选数量", "value_type": "number", "required": true, "source": "teacher", "visibility": "primary", "widget": "number", "default_value": 3, "validation": {"minimum": 2, "maximum": 4}},
+          {"field_key": "cover_generation_target_slot", "label": "目标槽位", "value_type": "text", "required": true, "source": "system", "visibility": "hidden", "widget": "text"},
+          {"field_key": "cover_reference_assets", "label": "风格参考", "value_type": "asset", "required": false, "source": "system", "visibility": "advanced", "widget": "asset_picker"}
+        ]
+      },
+      "output": {
+        "description": "封面图片候选的文件事实与质量标记，不包含临时下载URL。",
+        "definition_role": "artifact",
+        "fields": [
+          {"field_key": "cover_generation_request_key", "label": "生成请求键", "type": "text", "required": true, "editable": false, "deletable": false},
+          {"field_key": "cover_generation_target", "label": "目标槽位", "type": "text", "required": true, "editable": false, "deletable": false},
+          {
+            "field_key": "cover_candidates",
+            "label": "封面候选",
+            "type": "repeatable",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 2,
+            "max_items": 4,
+            "children": [
+              {"field_key": "cover_result_key", "label": "候选键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "cover_artifact_kind", "label": "产物类型", "type": "enum", "required": true, "editable": false, "deletable": false},
+              {"field_key": "cover_width", "label": "宽度", "type": "number", "required": true, "editable": false, "deletable": false},
+              {"field_key": "cover_height", "label": "高度", "type": "number", "required": true, "editable": false, "deletable": false},
+              {"field_key": "cover_mime_type", "label": "媒体类型", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "cover_sha256", "label": "文件摘要", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "cover_quality_flags", "label": "质量标记", "type": "list", "required": true, "editable": false, "deletable": false}
+            ]
+          }
+        ]
+      },
+      "prompt": {
+        "role": "你是服务端教育图片生成执行器，只执行已冻结的业务提示词和参考资产合同。",
+        "task": "为PPT封面生成指定数量的16:9图片候选，保持业务提示词、目标槽位和参考资产顺序；返回文件事实和质量标记。",
+        "method": "通过模型网关选择满足image.generate.education_16x9能力的路由。参考资产仅按节点声明的style_reference角色传入；不把Provider名称、密钥、私有参数或临时URL写入业务产物。对每个结果记录稳定候选键、尺寸、媒体类型和SHA-256。",
+        "quality_gate": "候选必须可解码、画幅符合16:9、无文字水印Logo、儿童安全且不依赖准确数学文字；失败结果不得冒充候选；候选只进入创作批次，采用不等于写回项目。",
+        "context_bindings": [],
+        "max_chars": 20000
+      },
+      "projection": {
+        "output_format": "markdown",
+        "renderer_id": "shanhai.image_candidates.markdown.v1",
+        "template": "# PPT封面候选\n\n目标槽位：{{cover_generation_target}}\n\n{{cover_candidates}}",
+        "allowed_variables": ["cover_generation_target", "cover_candidates"],
+        "roles": ["teacher_view"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "ppt.body_asset_prompts.generate",
+      "title": "PPT正文图片任务包",
+      "description": "把逐页资产要求编译为可批量导入图片创作台的不可变任务项。",
+      "model_capability": "text.structured.image_prompt",
+      "style_preset_refs": ["style.primary_math.paper_clay"],
+      "input": {
+        "description": "读取页规格、批准视觉合同、教案和教材，为每个正文资产生成完整提示词。",
+        "fields": [
+          {"field_key": "body_asset_scope", "label": "生成范围", "value_type": "enum", "required": true, "source": "teacher", "visibility": "primary", "widget": "select", "default_value": "all_missing", "options": [{"value": "all_missing", "label": "全部缺失资产"}, {"value": "selected_pages", "label": "选定页面"}]},
+          {"field_key": "selected_page_keys", "label": "选定页面", "value_type": "list", "required": false, "source": "teacher", "visibility": "secondary", "widget": "multiselect"},
+          {"field_key": "body_prompt_requirements", "label": "正文图片补充要求", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 5000}},
+          {"field_key": "body_page_specs", "label": "逐页规格", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "body_style_contract", "label": "PPT视觉合同", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"}
+        ]
+      },
+      "output": {
+        "description": "每个正文图片资产一个独立生成项，包含来源页面、提示词、负面约束和固定槽位。",
+        "definition_role": "artifact",
+        "fields": [
+          {"field_key": "body_package_key", "label": "图片任务包键", "type": "text", "required": true, "editable": false, "deletable": false},
+          {"field_key": "body_style_contract_ref", "label": "视觉合同版本", "type": "reference", "required": true, "editable": false, "deletable": false},
+          {
+            "field_key": "body_asset_items",
+            "label": "正文图片任务",
+            "type": "repeatable",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 1,
+            "children": [
+              {"field_key": "body_item_key", "label": "任务键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "body_page_key", "label": "页面键", "type": "reference", "required": true, "editable": false, "deletable": false},
+              {"field_key": "body_requirement_key", "label": "资产要求键", "type": "reference", "required": true, "editable": false, "deletable": false},
+              {"field_key": "body_asset_role", "label": "资产角色", "type": "enum", "required": true, "editable": false, "deletable": false},
+              {"field_key": "body_target_slot", "label": "目标槽位", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "body_prompt_text", "label": "完整图片提示词", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "body_negative_constraints", "label": "负面约束", "type": "list", "required": true, "editable": false, "deletable": false},
+              {"field_key": "body_aspect_ratio", "label": "画幅", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "body_consistency_key", "label": "一致性键", "type": "text", "required": true, "editable": false, "deletable": false}
+            ]
+          },
+          {"field_key": "body_asset_coverage", "label": "资产覆盖检查", "type": "rubric", "required": true, "editable": false, "deletable": false}
+        ]
+      },
+      "prompt": {
+        "role": "你是小学数学PPT正文图片资产提示词工程师，负责从已批准页规格编译独立可生成的图片任务。",
+        "task": "为目标页面的每个asset_requirement生成一个独立任务项，继承PPT视觉合同，写出完整提示词、负面约束、画幅、一致性键和固定目标槽位。不要合并不同资产，不生成PPT文字或数学答案。",
+        "method": "每个提示词说明主体、动作或用途、材质厚度、承托面、接触阴影、光源、透视、构图、色彩、画幅、留白和禁止项。参与精确数量、点数、排序、增删或逐步揭示的具象物件优先生成单体资产，由PPT复制和控制数量；准确文字、数字、算式、表格、关系线和答案留给可编辑层。正文继承封面视觉语言但保持白底，不复制封面背景。",
+        "quality_gate": "任务项与页规格资产要求一一对应；每项只有一个目标槽位和一致性键；禁止文字数字公式水印Logo、额外主体和畸形结构；不得照搬教材插图或大段原文；每个资产独立可生成且能回溯页面与要求键。",
+        "context_bindings": [
+          {"binding_key": "approved_lesson_plan", "source": "lesson_plan.approved_version", "required": true, "exposure": "summary", "max_items": 1, "max_bytes": 300000},
+          {"binding_key": "approved_material", "source": "material.approved_parse", "required": true, "exposure": "summary", "max_items": 50, "max_bytes": 300000},
+          {"binding_key": "page_specs", "source": "ppt_page_spec.current_version", "required": true, "exposure": "full", "max_items": 100, "max_bytes": 800000},
+          {"binding_key": "ppt_style", "source": "ppt_style.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 100000}
+        ],
+        "max_chars": 60000
+      },
+      "projection": {
+        "output_format": "markdown",
+        "renderer_id": "shanhai.creation_image_package.markdown.v1",
+        "template": "# PPT正文图片任务包\n\n视觉合同：{{body_style_contract_ref}}\n\n{{body_asset_items}}\n\n## 覆盖检查\n{{body_asset_coverage}}",
+        "allowed_variables": ["body_style_contract_ref", "body_asset_items", "body_asset_coverage"],
+        "roles": ["teacher_view", "export"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "ppt.body_assets.generate",
+      "title": "PPT正文图片生成",
+      "description": "按正文图片任务包批量生成独立候选并保持页面槽位、风格和文件血缘。",
+      "model_capability": "image.generate.education_16x9",
+      "style_preset_refs": ["style.primary_math.paper_clay"],
+      "input": {
+        "description": "输入不可变图片任务项、PPT视觉合同和节点声明的参考资产。",
+        "fields": [
+          {"field_key": "body_creation_package_ref", "label": "正文图片任务包", "value_type": "reference", "required": true, "source": "system", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "body_generation_quality", "label": "逻辑质量档位", "value_type": "enum", "required": true, "source": "teacher", "visibility": "secondary", "widget": "select", "default_value": "balanced", "options": [{"value": "fast", "label": "快速"}, {"value": "balanced", "label": "均衡"}, {"value": "quality", "label": "高质量"}]},
+          {"field_key": "body_candidates_per_item", "label": "每项候选数", "value_type": "number", "required": true, "source": "teacher", "visibility": "primary", "widget": "number", "default_value": 2, "validation": {"minimum": 1, "maximum": 4}},
+          {"field_key": "body_reference_assets", "label": "视觉参考资产", "value_type": "asset", "required": true, "source": "system", "visibility": "hidden", "widget": "asset_picker"}
+        ]
+      },
+      "output": {
+        "description": "按任务项分组的正文图片候选和文件事实。",
+        "definition_role": "artifact",
+        "fields": [
+          {"field_key": "body_generation_batch_key", "label": "生成批次键", "type": "text", "required": true, "editable": false, "deletable": false},
+          {
+            "field_key": "body_generated_items",
+            "label": "生成结果",
+            "type": "repeatable",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 1,
+            "children": [
+              {"field_key": "generated_body_item_key", "label": "任务键", "type": "reference", "required": true, "editable": false, "deletable": false},
+              {"field_key": "generated_body_page_key", "label": "页面键", "type": "reference", "required": true, "editable": false, "deletable": false},
+              {"field_key": "generated_body_target_slot", "label": "目标槽位", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "generated_body_candidates", "label": "候选文件", "type": "repeatable", "required": true, "editable": false, "deletable": false, "repeatable": true, "min_items": 1},
+              {"field_key": "generated_body_quality_flags", "label": "质量标记", "type": "list", "required": true, "editable": false, "deletable": false}
+            ]
+          },
+          {"field_key": "body_generation_coverage", "label": "批次覆盖检查", "type": "rubric", "required": true, "editable": false, "deletable": false}
+        ]
+      },
+      "prompt": {
+        "role": "你是服务端PPT正文图片批量生成执行器。",
+        "task": "逐项执行冻结的正文图片任务，使用PPT视觉母图和页面构图参考保持一致性，返回分组候选及文件事实。不得合并任务项或猜测目标槽位。",
+        "method": "每个任务项单独调用满足image.generate.education_16x9能力的网关路由；按节点参考资产策略传入ppt_style_master和page_composition_reference。记录任务键、页面键、固定槽位、候选文件摘要和质量标记。准确数量的可复用单体保持同一来源，数量由后续PPT装配控制。",
+        "quality_gate": "所有任务项均有结果或显式失败；候选可解码、风格一致、无文字数字公式水印Logo；文件和槽位血缘完整；失败项只重试自身，不重跑已通过页面；采用候选和写回项目保持独立。",
+        "context_bindings": [],
+        "max_chars": 30000
+      },
+      "projection": {
+        "output_format": "markdown",
+        "renderer_id": "shanhai.image_collection.markdown.v1",
+        "template": "# PPT正文图片生成结果\n\n{{body_generated_items}}\n\n## 覆盖检查\n{{body_generation_coverage}}",
+        "allowed_variables": ["body_generated_items", "body_generation_coverage"],
+        "roles": ["teacher_view"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "video.master_script.generate",
+      "title": "视频母版剧本生成",
+      "description": "只从已选导入方案不可变快照扩写完整独立短片剧本，并准确停在课堂交接时刻。",
+      "model_capability": "text.structured.creative_video",
+      "style_preset_refs": ["style.primary_math.paper_clay"],
+      "input": {
+        "description": "输入目标时长、画幅、语言和创作要求；唯一业务上下文为已选导入方案快照。",
+        "fields": [
+          {"field_key": "selected_intro_snapshot_ref", "label": "已选导入方案", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "video_target_duration_seconds", "label": "目标总时长", "value_type": "number", "required": true, "source": "teacher", "visibility": "primary", "widget": "number", "default_value": 50, "validation": {"minimum": 30, "maximum": 90}},
+          {"field_key": "video_aspect_ratio", "label": "视频画幅", "value_type": "enum", "required": true, "source": "teacher", "visibility": "secondary", "widget": "select", "default_value": "16:9", "options": [{"value": "16:9", "label": "横屏16:9"}, {"value": "9:16", "label": "竖屏9:16"}]},
+          {"field_key": "video_language", "label": "语言", "value_type": "enum", "required": true, "source": "teacher", "visibility": "secondary", "widget": "select", "default_value": "zh-CN", "options": [{"value": "zh-CN", "label": "普通话"}]},
+          {"field_key": "master_script_requirements", "label": "剧本补充要求", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 5000}}
+        ]
+      },
+      "output": {
+        "description": "包含完整故事、场次、旁白对白、声音意图和唯一课程交接的母版剧本。",
+        "definition_role": "artifact",
+        "fields": [
+          {"field_key": "master_script_key", "label": "母版剧本键", "type": "text", "required": true, "editable": false, "deletable": false, "visibility": "hidden"},
+          {"field_key": "master_selected_intro_option_key", "label": "已选方案键", "type": "reference", "required": true, "editable": false, "deletable": false},
+          {"field_key": "master_title", "label": "短片标题", "type": "text", "required": true, "editable": true, "deletable": false},
+          {"field_key": "narrative_purpose", "label": "叙事目的", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+          {"field_key": "complete_story", "label": "完整故事", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+          {
+            "field_key": "master_scenes",
+            "label": "场次",
+            "type": "repeatable",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 1,
+            "children": [
+              {"field_key": "master_scene_key", "label": "场次键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "master_scene_position", "label": "顺序", "type": "number", "required": true, "editable": true, "deletable": false},
+              {"field_key": "master_scene_purpose", "label": "场次目的", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "master_scene_location", "label": "地点", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "master_scene_subjects", "label": "人物或主体", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "master_visible_change", "label": "可见变化", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "master_actions", "label": "动作", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "master_narration", "label": "旁白", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "master_dialogue", "label": "对白", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "master_sound_intent", "label": "声音意图", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "master_start_state", "label": "开始状态", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "master_end_state", "label": "结束状态", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "master_scene_duration_seconds", "label": "预计时长", "type": "number", "required": true, "editable": true, "deletable": false}
+            ]
+          },
+          {
+            "field_key": "master_handoff",
+            "label": "课堂交接",
+            "type": "group",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "children": [
+              {"field_key": "master_course_anchor", "label": "唯一课程锚点", "type": "rich_text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "master_classroom_first_question", "label": "课堂第一问", "type": "rich_text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "master_handoff_moment", "label": "交接时刻", "type": "rich_text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "master_must_not_preteach", "label": "不得提前讲授", "type": "list", "required": true, "editable": false, "deletable": false}
+            ]
+          },
+          {"field_key": "master_target_duration_seconds", "label": "目标总时长", "type": "number", "required": true, "editable": true, "deletable": false},
+          {"field_key": "master_script_quality", "label": "剧本质量检查", "type": "rubric", "required": true, "editable": false, "deletable": false}
+        ]
+      },
+      "prompt": {
+        "role": "你是独立创意课堂导入短片的母版编剧，负责把已选方案扩写为完整可生产故事。",
+        "task": "严格继承已选方案的标题、独立概念、钩子、课程锚点、课堂第一问、交接时刻和不得提前讲授内容，生成完整故事与场次。不得重新选择创意，不得读取或推测教案、教材、PPT。此阶段不要写shot级提示词。",
+        "method": "先让脱离课程仍成立的故事具有清楚的开始状态、目标或未知、可见变化和结局推进，再只在最后按上游唯一锚点回接。每个场次写明目的、地点、人物或主体、动作、旁白、对白、声音意图、开始和结束状态及预计时长。第一阶段画面优先无准确对白，旁白和对白保留为后期音频文本。总时长控制在30至90秒并符合目标。",
+        "quality_gate": "上游独立创意与锚点字段不得改写；完整故事不是梗概或shot列表；结尾准确停在handoff_moment；不得解释must_not_preteach；场次时长总和等于目标时长；不包含Provider、模型、参考图位置、费用、自动批准或下一工具。",
+        "context_bindings": [
+          {"binding_key": "selected_intro", "source": "intro_selection.snapshot", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 100000}
+        ],
+        "max_chars": 40000
+      },
+      "projection": {
+        "output_format": "video_script",
+        "renderer_id": "shanhai.video_master_script.v1",
+        "template": "# {{master_title}}\n\n## 叙事目的\n{{narrative_purpose}}\n\n## 完整故事\n{{complete_story}}\n\n## 场次\n{{master_scenes}}\n\n## 课堂交接\n{{master_handoff}}",
+        "allowed_variables": ["master_title", "narrative_purpose", "complete_story", "master_scenes", "master_handoff"],
+        "roles": ["teacher_view", "export"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "video.rough_storyboard.generate",
+      "title": "视频粗分镜生成",
+      "description": "把批准母版剧本拆成场次节拍、预计时长和资产需求，不产生逐镜Provider提示词。",
+      "model_capability": "text.structured.creative_video",
+      "style_preset_refs": ["style.primary_math.paper_clay"],
+      "input": {
+        "description": "读取已选方案和批准母版剧本，可接受节奏与镜头密度偏好。",
+        "fields": [
+          {"field_key": "rough_master_script_ref", "label": "批准母版剧本", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "rough_pacing_preference", "label": "节奏偏好", "value_type": "enum", "required": true, "source": "teacher", "visibility": "secondary", "widget": "select", "default_value": "balanced", "options": [{"value": "calm", "label": "舒缓"}, {"value": "balanced", "label": "均衡"}, {"value": "lively", "label": "活泼"}]},
+          {"field_key": "rough_storyboard_requirements", "label": "粗分镜补充要求", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 4000}},
+          {"field_key": "rough_selected_intro_ref", "label": "已选导入方案", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"}
+        ]
+      },
+      "output": {
+        "description": "按故事节拍拆解的粗分镜、资产需求和总时长检查。",
+        "definition_role": "artifact",
+        "fields": [
+          {"field_key": "rough_storyboard_key", "label": "粗分镜键", "type": "text", "required": true, "editable": false, "deletable": false},
+          {"field_key": "rough_master_script_key", "label": "来源母版剧本键", "type": "reference", "required": true, "editable": false, "deletable": false},
+          {
+            "field_key": "rough_beats",
+            "label": "故事节拍",
+            "type": "repeatable",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 2,
+            "children": [
+              {"field_key": "rough_beat_key", "label": "节拍键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "rough_scene_key", "label": "来源场次键", "type": "reference", "required": true, "editable": false, "deletable": false},
+              {"field_key": "rough_position", "label": "顺序", "type": "number", "required": true, "editable": true, "deletable": false},
+              {"field_key": "rough_primary_event", "label": "唯一主要事件", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "rough_start_state", "label": "开始状态", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "rough_end_state", "label": "结束状态", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "rough_duration_seconds", "label": "预计时长", "type": "number", "required": true, "editable": true, "deletable": false},
+              {"field_key": "rough_asset_needs", "label": "资产需求", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "rough_transition", "label": "衔接", "type": "rich_text", "required": true, "editable": true, "deletable": false}
+            ]
+          },
+          {"field_key": "rough_total_duration_seconds", "label": "总时长", "type": "number", "required": true, "editable": false, "deletable": false},
+          {"field_key": "rough_storyboard_quality", "label": "粗分镜质量", "type": "rubric", "required": true, "editable": false, "deletable": false}
+        ]
+      },
+      "prompt": {
+        "role": "你是创意短片粗分镜设计师，负责验证故事节奏、时长和可制作性。",
+        "task": "把批准母版剧本按场次和故事节拍拆成粗分镜。每个beat只说明发生什么、学生看到什么变化、预计多长、需要哪些资产和怎样衔接；不要写逐秒运镜、参考图序号或视频模型提示词。",
+        "method": "保持母版剧本场次、开始结束状态和唯一课堂交接不变。按可见变化拆分2个以上节拍，每个节拍只有一个主要事件，稳定引用来源scene_key。预计时长总和等于母版目标时长，并为后续人物、场景、道具、生物资产清单提供明确需求。",
+        "quality_gate": "不改写已选方案或母版剧本；节拍顺序连续、来源有效、单节拍单事件；总时长一致；最后节拍才到达handoff_moment；不包含Provider提示词、参考图位置、10/15秒shot硬切、资产文件或模型参数。",
+        "context_bindings": [
+          {"binding_key": "selected_intro", "source": "intro_selection.snapshot", "required": true, "exposure": "summary", "max_items": 1, "max_bytes": 100000},
+          {"binding_key": "approved_master_script", "source": "video.master_script.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 400000}
+        ],
+        "max_chars": 30000
+      },
+      "projection": {
+        "output_format": "markdown",
+        "renderer_id": "shanhai.video_rough_storyboard.markdown.v1",
+        "template": "# 视频粗分镜\n\n{{rough_beats}}\n\n总时长：{{rough_total_duration_seconds}}秒\n\n## 质量检查\n{{rough_storyboard_quality}}",
+        "allowed_variables": ["rough_beats", "rough_total_duration_seconds", "rough_storyboard_quality"],
+        "roles": ["teacher_view", "export"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "video.style_master.prompt.generate",
+      "title": "视频视觉母图提示词",
+      "description": "从已选方案、母版剧本和粗分镜中编译视频视觉母图请求，用于锁定视觉语言而非替代全部资产。",
+      "model_capability": "text.structured.image_prompt",
+      "style_preset_refs": ["style.primary_math.paper_clay"],
+      "input": {
+        "description": "输入视觉方向、候选数和画幅，读取视频三个批准上下文。",
+        "fields": [
+          {"field_key": "video_style_candidate_count", "label": "视觉母图候选数", "value_type": "number", "required": true, "source": "teacher", "visibility": "primary", "widget": "number", "default_value": 3, "validation": {"minimum": 2, "maximum": 4}},
+          {"field_key": "video_style_preset", "label": "视频视觉方向", "value_type": "reference", "required": true, "source": "teacher", "visibility": "primary", "widget": "style_picker", "allowed_item_kinds": ["style_preset"]},
+          {"field_key": "video_style_requirements", "label": "视觉补充要求", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 5000}},
+          {"field_key": "style_master_script_ref", "label": "母版剧本", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "style_rough_storyboard_ref", "label": "粗分镜", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"}
+        ]
+      },
+      "output": {
+        "description": "可生成视觉母图的完整提示词组件和风格合同目标。",
+        "definition_role": "prompt_components",
+        "fields": [
+          {"field_key": "style_master_request_key", "label": "请求键", "type": "text", "required": true, "editable": false, "deletable": false},
+          {"field_key": "style_master_subjects", "label": "代表主体与场景", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+          {"field_key": "style_master_medium", "label": "媒介与写实程度", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+          {"field_key": "style_master_design_rules", "label": "造型材质与线条", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+          {"field_key": "style_master_palette_lighting", "label": "配色光线质感", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+          {"field_key": "style_master_camera_motion", "label": "摄影机与运动语言", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+          {"field_key": "style_master_aspect_ratio", "label": "画幅", "type": "text", "required": true, "editable": false, "deletable": false},
+          {"field_key": "style_master_negative_constraints", "label": "禁止项", "type": "list", "required": true, "editable": false, "deletable": false},
+          {"field_key": "style_master_candidate_count", "label": "候选数", "type": "number", "required": true, "editable": true, "deletable": false},
+          {"field_key": "style_master_target_slot", "label": "目标槽位", "type": "text", "required": true, "editable": false, "deletable": false}
+        ]
+      },
+      "prompt": {
+        "role": "你是创意短片视觉开发师，负责用一张视觉母图锁定整片视觉语言。",
+        "task": "依据已选方案、批准母版剧本和粗分镜，生成视觉母图的完整图片请求，覆盖代表主体、场景、媒介、造型比例、材质、配色、光线、背景密度、摄影机和运动语言。母图只锁风格，不替代人物设定、场景空镜、道具单体或镜头关键帧。",
+        "method": "选择能同时展示主要主体、代表环境和关键材质关系的非剧情高潮构图；说明16:9或项目画幅、纸艺黏土媒介、主体尺度、接触阴影、背景密度、机位、镜头运动倾向和候选数。风格约束必须能被后续图片和视频提示词逐字复用。",
+        "quality_gate": "不得改写故事或课程交接；不得把准确文字、字幕、公式、水印或Logo画入母图；禁止恐怖、成人化和风格漂移；母图不作为全部镜头唯一垫图；候选数、目标槽位、画幅和负面约束完整。",
+        "context_bindings": [
+          {"binding_key": "selected_intro", "source": "intro_selection.snapshot", "required": true, "exposure": "summary", "max_items": 1, "max_bytes": 100000},
+          {"binding_key": "approved_master_script", "source": "video.master_script.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 400000},
+          {"binding_key": "approved_rough_storyboard", "source": "video.rough_storyboard.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 300000}
+        ],
+        "max_chars": 25000
+      },
+      "projection": {
+        "output_format": "prompt_text",
+        "renderer_id": "shanhai.image_prompt.v1",
+        "template": "代表主体与场景：{{style_master_subjects}}。媒介：{{style_master_medium}}。造型材质：{{style_master_design_rules}}。配色光线：{{style_master_palette_lighting}}。摄影机与运动语言：{{style_master_camera_motion}}。画幅：{{style_master_aspect_ratio}}。禁止：{{style_master_negative_constraints}}。",
+        "allowed_variables": ["style_master_subjects", "style_master_medium", "style_master_design_rules", "style_master_palette_lighting", "style_master_camera_motion", "style_master_aspect_ratio", "style_master_negative_constraints"],
+        "roles": ["teacher_view", "provider_request"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "video.style_master.image.generate",
+      "title": "视频视觉母图生成",
+      "description": "执行视觉母图图片请求，产生用于批准风格合同的可审计候选。",
+      "model_capability": "image.generate.education_16x9",
+      "style_preset_refs": ["style.primary_math.paper_clay"],
+      "input": {
+        "description": "输入视觉母图完整指令、候选数、目标槽位和可选风格参考。",
+        "fields": [
+          {"field_key": "style_master_prompt_text", "label": "视觉母图完整指令", "value_type": "rich_text", "required": true, "source": "teacher", "visibility": "primary", "widget": "textarea", "validation": {"min_length": 20, "max_length": 25000}},
+          {"field_key": "style_master_generation_count", "label": "候选数", "value_type": "number", "required": true, "source": "teacher", "visibility": "primary", "widget": "number", "default_value": 3, "validation": {"minimum": 2, "maximum": 4}},
+          {"field_key": "style_master_generation_slot", "label": "目标槽位", "value_type": "text", "required": true, "source": "system", "visibility": "hidden", "widget": "text"},
+          {"field_key": "style_master_reference_assets", "label": "风格参考", "value_type": "asset", "required": false, "source": "system", "visibility": "advanced", "widget": "asset_picker"}
+        ]
+      },
+      "output": {
+        "description": "视觉母图候选文件事实和质量标记。",
+        "definition_role": "artifact",
+        "fields": [
+          {"field_key": "style_master_generation_key", "label": "生成请求键", "type": "text", "required": true, "editable": false, "deletable": false},
+          {"field_key": "style_master_generation_target", "label": "目标槽位", "type": "text", "required": true, "editable": false, "deletable": false},
+          {
+            "field_key": "style_master_candidates",
+            "label": "视觉母图候选",
+            "type": "repeatable",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 2,
+            "max_items": 4,
+            "children": [
+              {"field_key": "style_master_result_key", "label": "候选键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "style_master_width", "label": "宽度", "type": "number", "required": true, "editable": false, "deletable": false},
+              {"field_key": "style_master_height", "label": "高度", "type": "number", "required": true, "editable": false, "deletable": false},
+              {"field_key": "style_master_mime_type", "label": "媒体类型", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "style_master_sha256", "label": "文件摘要", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "style_master_quality_flags", "label": "质量标记", "type": "list", "required": true, "editable": false, "deletable": false}
+            ]
+          }
+        ]
+      },
+      "prompt": {
+        "role": "你是服务端视频视觉母图生成执行器。",
+        "task": "通过图片模型网关执行已冻结视觉母图指令，生成指定数量候选并返回文件事实。",
+        "method": "按style_reference角色传入可选参考资产；对每个候选记录稳定键、尺寸、媒体类型和SHA-256。Provider路由与私有参数停留在适配层，不进入业务结果。",
+        "quality_gate": "候选可解码、画幅正确、视觉语言清楚、儿童安全且无文字水印Logo；失败结果不冒充候选；候选采用和项目写回保持独立。",
+        "context_bindings": [],
+        "max_chars": 20000
+      },
+      "projection": {
+        "output_format": "markdown",
+        "renderer_id": "shanhai.image_candidates.markdown.v1",
+        "template": "# 视频视觉母图候选\n\n目标槽位：{{style_master_generation_target}}\n\n{{style_master_candidates}}",
+        "allowed_variables": ["style_master_generation_target", "style_master_candidates"],
+        "roles": ["teacher_view"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "video.asset_inventory.generate",
+      "title": "视频四类资产清单",
+      "description": "从批准母版剧本和粗分镜扫描、分类并去重人物、场景、道具和生物资产。",
+      "model_capability": "text.structured.creative_video",
+      "style_preset_refs": ["style.primary_math.paper_clay"],
+      "input": {
+        "description": "输入资产复用和变体策略，读取母版剧本及粗分镜。",
+        "fields": [
+          {"field_key": "asset_reuse_policy", "label": "资产复用策略", "value_type": "enum", "required": true, "source": "system", "visibility": "secondary", "widget": "select", "default_value": "deduplicate_base_identity", "options": [{"value": "deduplicate_base_identity", "label": "同一基础身份复用"}]},
+          {"field_key": "asset_inventory_requirements", "label": "资产清单补充要求", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 4000}},
+          {"field_key": "inventory_master_script_ref", "label": "批准母版剧本", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "inventory_rough_storyboard_ref", "label": "批准粗分镜", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"}
+        ]
+      },
+      "output": {
+        "description": "四类资产及其来源、用途、去重身份和固定槽位。",
+        "definition_role": "artifact",
+        "fields": [
+          {"field_key": "asset_inventory_key", "label": "资产清单键", "type": "text", "required": true, "editable": false, "deletable": false},
+          {
+            "field_key": "video_assets",
+            "label": "视频图片资产",
+            "type": "repeatable",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 1,
+            "children": [
+              {"field_key": "video_asset_key", "label": "资产键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "video_asset_type", "label": "资产类型", "type": "enum", "required": true, "editable": false, "deletable": false, "options": [{"value": "character", "label": "人物"}, {"value": "scene", "label": "场景"}, {"value": "prop", "label": "道具"}, {"value": "creature", "label": "生物"}]},
+              {"field_key": "video_asset_name", "label": "语义名称", "type": "text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "video_asset_identity_key", "label": "基础身份键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "video_asset_source_scene_keys", "label": "来源场次", "type": "list", "required": true, "editable": false, "deletable": false},
+              {"field_key": "video_asset_source_beat_keys", "label": "来源节拍", "type": "list", "required": true, "editable": false, "deletable": false},
+              {"field_key": "video_asset_usage", "label": "用途", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "video_asset_description", "label": "外观与状态", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "video_asset_framing_rule", "label": "默认构图", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "video_asset_target_slot", "label": "目标槽位", "type": "text", "required": true, "editable": false, "deletable": false}
+            ]
+          },
+          {
+            "field_key": "asset_category_summary",
+            "label": "四类汇总",
+            "type": "group",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "children": [
+              {"field_key": "character_asset_keys", "label": "人物", "type": "list", "required": true, "editable": false, "deletable": false},
+              {"field_key": "scene_asset_keys", "label": "场景", "type": "list", "required": true, "editable": false, "deletable": false},
+              {"field_key": "prop_asset_keys", "label": "道具", "type": "list", "required": true, "editable": false, "deletable": false},
+              {"field_key": "creature_asset_keys", "label": "生物", "type": "list", "required": true, "editable": false, "deletable": false}
+            ]
+          },
+          {"field_key": "asset_deduplication_notes", "label": "去重与变体说明", "type": "rich_text", "required": true, "editable": false, "deletable": false}
+        ]
+      },
+      "prompt": {
+        "role": "你是创意短片资产制片，负责从已批准故事事实中建立可复用的四类图片资产清单。",
+        "task": "联合扫描母版剧本和粗分镜，登记实际需要的人物character、场景scene、道具prop和生物creature。没有某类时保留空分类，不强行创造；同一基础身份去重，明确造型或状态变体另建版本。",
+        "method": "每项建立稳定asset_key和identity_key，记录来源scene/beat、用途、外观与状态、默认构图和项目目标槽位。场景默认无人空镜，道具默认单体无手持；不同资产不得塞进一张全家福。人物、动物、机器或抽象主体都只按故事真实需要登记，不因小学受众强制儿童或教室。",
+        "quality_gate": "所有粗分镜资产需求均被覆盖且引用有效；同一基础身份不重复；场景与道具遵守默认独立构图；四类汇总与资产记录一致；不生成图片提示词、文件、Provider参数或未在故事出现的装饰资产。",
+        "context_bindings": [
+          {"binding_key": "approved_master_script", "source": "video.master_script.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 400000},
+          {"binding_key": "approved_rough_storyboard", "source": "video.rough_storyboard.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 300000}
+        ],
+        "max_chars": 30000
+      },
+      "projection": {
+        "output_format": "markdown",
+        "renderer_id": "shanhai.video_asset_inventory.markdown.v1",
+        "template": "# 视频四类资产清单\n\n{{video_assets}}\n\n## 四类汇总\n{{asset_category_summary}}\n\n## 去重说明\n{{asset_deduplication_notes}}",
+        "allowed_variables": ["video_assets", "asset_category_summary", "asset_deduplication_notes"],
+        "roles": ["teacher_view", "export"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "video.asset_prompts.generate",
+      "title": "视频资产图片提示词",
+      "description": "为四类资产清单逐项编译图片创作任务，继承批准视频风格合同。",
+      "model_capability": "text.structured.image_prompt",
+      "style_preset_refs": ["style.primary_math.paper_clay"],
+      "input": {
+        "description": "输入目标资产范围，读取资产清单、母版剧本和批准视频风格。",
+        "fields": [
+          {"field_key": "video_asset_prompt_scope", "label": "生成范围", "value_type": "enum", "required": true, "source": "teacher", "visibility": "primary", "widget": "select", "default_value": "all_missing", "options": [{"value": "all_missing", "label": "全部缺失资产"}, {"value": "selected_assets", "label": "选定资产"}]},
+          {"field_key": "selected_video_asset_keys", "label": "选定资产", "value_type": "list", "required": false, "source": "teacher", "visibility": "secondary", "widget": "multiselect"},
+          {"field_key": "video_asset_prompt_requirements", "label": "资产图片补充要求", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 5000}},
+          {"field_key": "current_video_asset_inventory", "label": "资产清单", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "approved_video_style", "label": "视频风格合同", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"}
+        ]
+      },
+      "output": {
+        "description": "每个视频资产一个独立图片任务项，包含完整提示词、负面约束、一致性和固定槽位。",
+        "definition_role": "artifact",
+        "fields": [
+          {"field_key": "video_asset_package_key", "label": "图片任务包键", "type": "text", "required": true, "editable": false, "deletable": false},
+          {"field_key": "video_style_contract_ref", "label": "视频风格版本", "type": "reference", "required": true, "editable": false, "deletable": false},
+          {
+            "field_key": "video_asset_prompt_items",
+            "label": "视频资产图片任务",
+            "type": "repeatable",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 1,
+            "children": [
+              {"field_key": "video_asset_item_key", "label": "任务键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "video_asset_source_key", "label": "资产键", "type": "reference", "required": true, "editable": false, "deletable": false},
+              {"field_key": "video_asset_prompt_type", "label": "资产类型", "type": "enum", "required": true, "editable": false, "deletable": false},
+              {"field_key": "video_asset_prompt_target_slot", "label": "目标槽位", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "video_asset_prompt_text", "label": "完整图片提示词", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "video_asset_negative_constraints", "label": "负面约束", "type": "list", "required": true, "editable": false, "deletable": false},
+              {"field_key": "video_asset_prompt_aspect_ratio", "label": "画幅", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "video_asset_prompt_consistency_key", "label": "一致性键", "type": "text", "required": true, "editable": false, "deletable": false}
+            ]
+          },
+          {"field_key": "video_asset_prompt_coverage", "label": "任务覆盖检查", "type": "rubric", "required": true, "editable": false, "deletable": false}
+        ]
+      },
+      "prompt": {
+        "role": "你是创意短片四类资产图片提示词设计师。",
+        "task": "为资产清单中的每个目标资产生成一个独立图片任务，逐字继承批准视频风格合同并固定目标槽位。人物、场景、道具、生物不得混成一张全家福。",
+        "method": "提示词写清语义主体、外观状态、材质厚度、承托面、接触阴影、光源、透视、构图、色彩、画幅和用途。character生成清楚身份设定；scene默认无人空镜；prop默认单体无手持；creature保持物种或幻想生物结构稳定。所有任务继承同一视觉语言和一致性键。",
+        "quality_gate": "任务与资产清单一一对应，来源、类型、目标槽位和一致性键完整；禁止文字、字幕、公式、水印、Logo、额外主体、畸形结构和风格漂移；不得生成剧情镜头或把视觉母图当成资产替代品。",
+        "context_bindings": [
+          {"binding_key": "asset_inventory", "source": "video.asset_inventory.current_version", "required": true, "exposure": "full", "max_items": 200, "max_bytes": 500000},
+          {"binding_key": "approved_master_script", "source": "video.master_script.approved_version", "required": true, "exposure": "summary", "max_items": 1, "max_bytes": 200000},
+          {"binding_key": "approved_video_style", "source": "video.style.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 150000}
+        ],
+        "max_chars": 50000
+      },
+      "projection": {
+        "output_format": "markdown",
+        "renderer_id": "shanhai.creation_image_package.markdown.v1",
+        "template": "# 视频资产图片任务包\n\n风格合同：{{video_style_contract_ref}}\n\n{{video_asset_prompt_items}}\n\n## 覆盖检查\n{{video_asset_prompt_coverage}}",
+        "allowed_variables": ["video_style_contract_ref", "video_asset_prompt_items", "video_asset_prompt_coverage"],
+        "roles": ["teacher_view", "export"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "video.assets.generate",
+      "title": "视频四类图片资产生成",
+      "description": "按视频资产图片任务逐项生成候选，继承视觉母图并保持四类资产身份、槽位和文件血缘。",
+      "model_capability": "image.generate.education_16x9",
+      "style_preset_refs": ["style.primary_math.paper_clay"],
+      "input": {
+        "description": "输入不可变图片任务包、视频风格合同、候选数和必需视觉母图参考。",
+        "fields": [
+          {"field_key": "video_asset_creation_package_ref", "label": "视频资产图片任务包", "value_type": "reference", "required": true, "source": "system", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "video_asset_candidates_per_item", "label": "每项候选数", "value_type": "number", "required": true, "source": "teacher", "visibility": "primary", "widget": "number", "default_value": 2, "validation": {"minimum": 1, "maximum": 4}},
+          {"field_key": "video_asset_generation_quality", "label": "逻辑质量档位", "value_type": "enum", "required": true, "source": "teacher", "visibility": "secondary", "widget": "select", "default_value": "balanced", "options": [{"value": "fast", "label": "快速"}, {"value": "balanced", "label": "均衡"}, {"value": "quality", "label": "高质量"}]},
+          {"field_key": "video_style_master_asset", "label": "视觉母图参考", "value_type": "asset", "required": true, "source": "system", "visibility": "hidden", "widget": "asset_picker"}
+        ]
+      },
+      "output": {
+        "description": "按资产任务分组的图片候选、文件事实和风格一致性标记。",
+        "definition_role": "artifact",
+        "fields": [
+          {"field_key": "video_asset_generation_batch_key", "label": "生成批次键", "type": "text", "required": true, "editable": false, "deletable": false},
+          {
+            "field_key": "generated_video_assets",
+            "label": "视频图片资产候选",
+            "type": "repeatable",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 1,
+            "children": [
+              {"field_key": "generated_video_asset_item_key", "label": "任务键", "type": "reference", "required": true, "editable": false, "deletable": false},
+              {"field_key": "generated_video_asset_source_key", "label": "资产键", "type": "reference", "required": true, "editable": false, "deletable": false},
+              {"field_key": "generated_video_asset_type", "label": "资产类型", "type": "enum", "required": true, "editable": false, "deletable": false},
+              {"field_key": "generated_video_asset_target_slot", "label": "目标槽位", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "generated_video_asset_candidates", "label": "候选文件", "type": "repeatable", "required": true, "editable": false, "deletable": false, "repeatable": true, "min_items": 1},
+              {"field_key": "generated_video_asset_quality_flags", "label": "质量标记", "type": "list", "required": true, "editable": false, "deletable": false}
+            ]
+          },
+          {"field_key": "video_asset_generation_coverage", "label": "资产批次覆盖", "type": "rubric", "required": true, "editable": false, "deletable": false}
+        ]
+      },
+      "prompt": {
+        "role": "你是服务端视频四类图片资产批量生成执行器。",
+        "task": "逐项执行冻结的character、scene、prop和creature图片任务，使用批准视觉母图维持风格一致，返回候选和文件事实。不得合并任务或改变固定槽位。",
+        "method": "每项独立调用满足image.generate.education_16x9能力的网关路由；按video_style_master角色传入视觉母图。记录任务键、资产键、类型、槽位、候选摘要和质量标记。场景保持无人空镜、道具保持单体，除非任务合同明确要求变体。",
+        "quality_gate": "候选可解码、风格一致、角色或物件身份稳定、无文字字幕公式水印Logo；每项有结果或显式失败；失败项只重试自身；候选采用不等于创建已批准资产版本或写回项目。",
+        "context_bindings": [],
+        "max_chars": 30000
+      },
+      "projection": {
+        "output_format": "markdown",
+        "renderer_id": "shanhai.video_image_assets.markdown.v1",
+        "template": "# 视频四类图片资产生成结果\n\n{{generated_video_assets}}\n\n## 覆盖检查\n{{video_asset_generation_coverage}}",
+        "allowed_variables": ["generated_video_assets", "video_asset_generation_coverage"],
+        "roles": ["teacher_view"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "video.fine_storyboard.generate",
+      "title": "视频细分镜与生成指令",
+      "description": "在母版、粗分镜、风格和已批准图片资产齐备后生成10/15秒逐shot合同。",
+      "model_capability": "text.structured.creative_video",
+      "style_preset_refs": ["style.primary_math.paper_clay"],
+      "input": {
+        "description": "读取已选方案、批准母版、粗分镜、风格和图片资产，可接受镜头数量偏好。",
+        "fields": [
+          {"field_key": "fine_preferred_shot_count", "label": "期望镜头数", "value_type": "number", "required": false, "source": "teacher", "visibility": "secondary", "widget": "number", "validation": {"minimum": 2, "maximum": 12}},
+          {"field_key": "fine_storyboard_requirements", "label": "细分镜补充要求", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 5000}},
+          {"field_key": "fine_master_script_ref", "label": "批准母版剧本", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "fine_rough_storyboard_ref", "label": "批准粗分镜", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "fine_video_style_ref", "label": "批准视频风格", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "fine_approved_assets_ref", "label": "已批准图片资产", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"}
+        ]
+      },
+      "output": {
+        "description": "可直接提交视频模型的逐shot生成合同、垫图顺序、音频占位和连续性。",
+        "definition_role": "artifact",
+        "fields": [
+          {"field_key": "fine_storyboard_key", "label": "细分镜键", "type": "text", "required": true, "editable": false, "deletable": false},
+          {"field_key": "fine_source_master_script_key", "label": "来源母版剧本键", "type": "reference", "required": true, "editable": false, "deletable": false},
+          {"field_key": "fine_target_duration_seconds", "label": "目标总时长", "type": "number", "required": true, "editable": false, "deletable": false},
+          {
+            "field_key": "fine_shots",
+            "label": "逐镜头合同",
+            "type": "repeatable",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 2,
+            "children": [
+              {"field_key": "shot_key", "label": "镜头键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "shot_scene_key", "label": "来源场次键", "type": "reference", "required": true, "editable": false, "deletable": false},
+              {"field_key": "shot_beat_key", "label": "来源节拍键", "type": "reference", "required": true, "editable": false, "deletable": false},
+              {"field_key": "shot_position", "label": "顺序", "type": "number", "required": true, "editable": true, "deletable": false},
+              {"field_key": "shot_duration_seconds", "label": "时长", "type": "enum", "required": true, "editable": true, "deletable": false, "options": [{"value": "10", "label": "10秒"}, {"value": "15", "label": "15秒"}]},
+              {"field_key": "shot_visible_beat", "label": "唯一可见节拍", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "shot_start_state", "label": "开始状态", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "shot_end_state", "label": "结束状态", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "shot_camera", "label": "景别角度与唯一运镜", "type": "object", "required": true, "editable": true, "deletable": false},
+              {"field_key": "shot_action_timeline", "label": "动作时间顺序", "type": "timeline", "required": true, "editable": true, "deletable": false},
+              {"field_key": "shot_asset_usages", "label": "垫图使用", "type": "repeatable", "required": true, "editable": false, "deletable": false, "repeatable": true, "min_items": 1},
+              {"field_key": "shot_prompt_text", "label": "完整视频提示词", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "shot_negative_constraints", "label": "负面约束", "type": "list", "required": true, "editable": false, "deletable": false},
+              {"field_key": "shot_narration_placeholder", "label": "旁白占位", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "shot_dialogue_placeholder", "label": "对白占位", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "shot_sound_intent", "label": "声音意图", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "shot_continuity_locks", "label": "连续性锁定", "type": "list", "required": true, "editable": true, "deletable": false}
+            ]
+          },
+          {"field_key": "fine_storyboard_quality", "label": "细分镜质量", "type": "rubric", "required": true, "editable": false, "deletable": false}
+        ]
+      },
+      "prompt": {
+        "role": "你是创意短片细分镜导演，负责把已批准节拍和图片资产变成10秒或15秒逐shot生产合同。",
+        "task": "在母版剧本、粗分镜、视频风格和已批准图片资产全部齐备后，生成逐shot细分镜。每个shot只有一个主要可见节拍、一个明确终点和一次主要运镜，并输出可直接提交视频模型的完整提示词。",
+        "method": "按故事节拍选择10秒或15秒规格，使全部shot总和等于母版目标时长。每个shot稳定引用scene和beat，写明开始/结束状态、景别、角度、起止构图、一次主要运镜、主体动作时间顺序、旁白/对白/声音占位和连续性锁定。每张已批准垫图按连续image_index登记语义名、版本和用途，提示词中的垫图标记与结构一一对应。最后一个shot才到达课堂交接。",
+        "quality_gate": "shot顺序连续，时长只能10或15秒且总和精确；每个shot单节拍单运镜；所有资产版本已批准且引用存在；人物、道具、光线、天气和动作状态无解释跳变；不把旁白字幕交给视频画面生成；结尾不越过handoff_moment、不解释must_not_preteach。",
+        "context_bindings": [
+          {"binding_key": "selected_intro", "source": "intro_selection.snapshot", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 100000},
+          {"binding_key": "approved_master_script", "source": "video.master_script.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 400000},
+          {"binding_key": "approved_rough_storyboard", "source": "video.rough_storyboard.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 300000},
+          {"binding_key": "approved_video_style", "source": "video.style.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 150000},
+          {"binding_key": "approved_video_assets", "source": "video.assets.approved_versions", "required": true, "exposure": "full", "max_items": 200, "max_bytes": 1000000}
+        ],
+        "max_chars": 70000
+      },
+      "projection": {
+        "output_format": "video_script",
+        "renderer_id": "shanhai.video_fine_storyboard.v1",
+        "template": "# 视频细分镜与生成指令\n\n目标时长：{{fine_target_duration_seconds}}秒\n\n{{fine_shots}}\n\n## 质量检查\n{{fine_storyboard_quality}}",
+        "allowed_variables": ["fine_target_duration_seconds", "fine_shots", "fine_storyboard_quality"],
+        "roles": ["teacher_view", "export"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "video.shots.generate",
+      "title": "逐镜头候选视频生成",
+      "description": "按细分镜逐shot生成候选视频，候选通过校验、采用并保存后才形成正式clip。",
+      "model_capability": "video.image_to_video.10s_15s",
+      "style_preset_refs": ["style.primary_math.paper_clay"],
+      "input": {
+        "description": "输入一个shot合同、视频风格、候选数及必需关键帧与连续性参考。",
+        "fields": [
+          {"field_key": "shot_spec_ref", "label": "细分镜shot", "value_type": "reference", "required": true, "source": "system", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "shot_candidate_count", "label": "候选数量", "value_type": "number", "required": true, "source": "teacher", "visibility": "primary", "widget": "number", "default_value": 2, "validation": {"minimum": 1, "maximum": 4}},
+          {"field_key": "shot_generation_quality", "label": "逻辑质量档位", "value_type": "enum", "required": true, "source": "teacher", "visibility": "secondary", "widget": "select", "default_value": "balanced", "options": [{"value": "fast", "label": "快速"}, {"value": "balanced", "label": "均衡"}, {"value": "quality", "label": "高质量"}]},
+          {"field_key": "shot_reference_assets", "label": "关键帧与连续性参考", "value_type": "asset", "required": true, "source": "system", "visibility": "hidden", "widget": "asset_picker"},
+          {"field_key": "shot_style_contract_ref", "label": "视频风格合同", "value_type": "reference", "required": true, "source": "system", "visibility": "hidden", "widget": "textarea"}
+        ]
+      },
+      "output": {
+        "description": "一个shot的候选结果、技术文件事实和业务质量标记。",
+        "definition_role": "artifact",
+        "fields": [
+          {"field_key": "shot_generation_key", "label": "生成请求键", "type": "text", "required": true, "editable": false, "deletable": false},
+          {"field_key": "generated_shot_key", "label": "镜头键", "type": "reference", "required": true, "editable": false, "deletable": false},
+          {"field_key": "generated_shot_target_slot", "label": "镜头目标槽位", "type": "text", "required": true, "editable": false, "deletable": false},
+          {
+            "field_key": "shot_candidates",
+            "label": "镜头候选",
+            "type": "repeatable",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 1,
+            "children": [
+              {"field_key": "shot_result_key", "label": "候选键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "shot_result_duration_seconds", "label": "实际时长", "type": "number", "required": true, "editable": false, "deletable": false},
+              {"field_key": "shot_result_width", "label": "宽度", "type": "number", "required": true, "editable": false, "deletable": false},
+              {"field_key": "shot_result_height", "label": "高度", "type": "number", "required": true, "editable": false, "deletable": false},
+              {"field_key": "shot_result_fps", "label": "帧率", "type": "number", "required": true, "editable": false, "deletable": false},
+              {"field_key": "shot_result_mime_type", "label": "媒体类型", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "shot_result_sha256", "label": "文件摘要", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "shot_result_quality_flags", "label": "质量标记", "type": "list", "required": true, "editable": false, "deletable": false}
+            ]
+          }
+        ]
+      },
+      "prompt": {
+        "role": "你是服务端逐shot视频生成执行器。",
+        "task": "严格按一个已冻结shot合同生成指定数量候选，按image_index顺序传入shot_keyframe和continuity_reference，不改写故事、时长、动作或固定槽位。",
+        "method": "通过模型网关选择满足video.image_to_video.10s_15s能力的路由；只传节点允许的参考资产与业务提示词。记录候选键、实际时长、分辨率、帧率、媒体类型、SHA-256和质量标记。候选阶段不创建clip_id；只有校验通过、被采用并原子保存到shot槽位后才形成正式clip。",
+        "quality_gate": "输出可播放且时长匹配10或15秒；首尾状态、主体身份、资产、动作、光线和镜头连续；无文字字幕水印Logo和儿童安全问题；失败只影响当前shot；Provider私有参数和临时URL不进入业务产物。",
+        "context_bindings": [],
+        "max_chars": 35000
+      },
+      "projection": {
+        "output_format": "markdown",
+        "renderer_id": "shanhai.video_clip_candidates.markdown.v1",
+        "template": "# {{generated_shot_key}} 候选视频\n\n目标槽位：{{generated_shot_target_slot}}\n\n{{shot_candidates}}",
+        "allowed_variables": ["generated_shot_key", "generated_shot_target_slot", "shot_candidates"],
+        "roles": ["teacher_view"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "audio.plan.generate",
+      "title": "配音音效音乐计划",
+      "description": "在正式clips选定后规划旁白、对白、音效、音乐和字幕，绑定shot或明确时间线区间。",
+      "model_capability": "text.structured.audio_plan",
+      "input": {
+        "description": "读取已选方案、批准母版剧本和正式clips，接受声音风格、语速和音乐偏好。",
+        "fields": [
+          {"field_key": "audio_voice_style", "label": "旁白风格", "value_type": "text", "required": true, "source": "teacher", "visibility": "primary", "widget": "text", "default_value": "亲切、清晰、自然，不幼稚化"},
+          {"field_key": "audio_speech_rate", "label": "语速", "value_type": "number", "required": true, "source": "teacher", "visibility": "secondary", "widget": "number", "default_value": 0.95, "validation": {"minimum": 0.7, "maximum": 1.2}},
+          {"field_key": "audio_music_preference", "label": "音乐偏好", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 2000}},
+          {"field_key": "audio_plan_requirements", "label": "音频补充要求", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 4000}},
+          {"field_key": "audio_master_script_ref", "label": "批准母版剧本", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "approved_video_clips_ref", "label": "正式视频片段", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"}
+        ]
+      },
+      "output": {
+        "description": "逐条音频、字幕和混音计划，时间与已选clips严格对齐。",
+        "definition_role": "artifact",
+        "fields": [
+          {"field_key": "audio_plan_key", "label": "音频计划键", "type": "text", "required": true, "editable": false, "deletable": false},
+          {"field_key": "audio_source_master_script_key", "label": "来源母版剧本键", "type": "reference", "required": true, "editable": false, "deletable": false},
+          {
+            "field_key": "audio_tracks",
+            "label": "音频轨道项",
+            "type": "repeatable",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 1,
+            "children": [
+              {"field_key": "audio_track_key", "label": "音频键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "audio_track_kind", "label": "类型", "type": "enum", "required": true, "editable": true, "deletable": false, "options": [{"value": "narration", "label": "旁白"}, {"value": "dialogue", "label": "对白"}, {"value": "sound_effect", "label": "音效"}, {"value": "music", "label": "音乐"}]},
+              {"field_key": "audio_track_shot_key", "label": "关联shot", "type": "reference", "required": false, "editable": false, "deletable": false},
+              {"field_key": "audio_timeline_range", "label": "时间线区间", "type": "timeline", "required": true, "editable": true, "deletable": false},
+              {"field_key": "audio_script_text", "label": "文本或声音说明", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "audio_voice_profile", "label": "声音档案", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "audio_rate", "label": "语速", "type": "number", "required": true, "editable": true, "deletable": false},
+              {"field_key": "audio_expected_duration_seconds", "label": "预计时长", "type": "number", "required": true, "editable": true, "deletable": false},
+              {"field_key": "audio_volume_intent", "label": "音量意图", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "audio_ducking_rules", "label": "避让规则", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "audio_subtitle_text", "label": "字幕文本", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "audio_target_slot", "label": "目标槽位", "type": "text", "required": true, "editable": false, "deletable": false}
+            ]
+          },
+          {"field_key": "audio_mix_plan", "label": "混音与字幕计划", "type": "timeline", "required": true, "editable": true, "deletable": false},
+          {"field_key": "audio_plan_quality", "label": "音频计划质量", "type": "rubric", "required": true, "editable": false, "deletable": false}
+        ]
+      },
+      "prompt": {
+        "role": "你是儿童友好课堂短片的音频与字幕导演。",
+        "task": "在正式clips已经选定后，依据已选方案和批准母版剧本规划旁白、对白、音效、音乐和字幕。每项绑定shot或明确时间线区间，并为后续TTS和FFmpeg合成提供固定目标槽位。",
+        "method": "以母版剧本旁白对白为事实源，不临时改写故事或课程交接。检查每段文本按设定语速能在clip时长内读完；数学读法和单位准确；字幕停留时间可读。音乐和音效服务动作，不遮盖旁白；使用ducking规则控制音量。图片/视频模型产生的原始声音不承担准确对白。",
+        "quality_gate": "所有正式clip均在时间线中覆盖；旁白、字幕、音效与动作对齐；文本不越过handoff_moment、不解释must_not_preteach；语速、时长、音量和字幕可读性合法；不包含TTS Provider、密钥、私有参数或实际文件路径。",
+        "context_bindings": [
+          {"binding_key": "selected_intro", "source": "intro_selection.snapshot", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 100000},
+          {"binding_key": "approved_master_script", "source": "video.master_script.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 400000},
+          {"binding_key": "approved_clips", "source": "video.clips.approved_versions", "required": true, "exposure": "full", "max_items": 20, "max_bytes": 500000}
+        ],
+        "max_chars": 40000
+      },
+      "projection": {
+        "output_format": "markdown",
+        "renderer_id": "shanhai.audio_plan.markdown.v1",
+        "template": "# 视频配音、音效、音乐与字幕计划\n\n{{audio_tracks}}\n\n## 混音与字幕时间线\n{{audio_mix_plan}}\n\n## 质量检查\n{{audio_plan_quality}}",
+        "allowed_variables": ["audio_tracks", "audio_mix_plan", "audio_plan_quality"],
+        "roles": ["teacher_view", "export"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "audio.tts.generate",
+      "title": "TTS配音生成",
+      "description": "逐条执行旁白或对白计划并产生可审计音轨候选，声音参考仅按节点角色传入。",
+      "model_capability": "audio.tts.child_friendly_zh",
+      "input": {
+        "description": "输入一个TTS音频计划项、候选数和可选声音参考。",
+        "fields": [
+          {"field_key": "tts_audio_plan_item_ref", "label": "TTS计划项", "value_type": "reference", "required": true, "source": "system", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "tts_candidate_count", "label": "候选数量", "value_type": "number", "required": true, "source": "teacher", "visibility": "primary", "widget": "number", "default_value": 1, "validation": {"minimum": 1, "maximum": 3}},
+          {"field_key": "tts_voice_reference", "label": "声音参考", "value_type": "asset", "required": false, "source": "system", "visibility": "advanced", "widget": "asset_picker"},
+          {"field_key": "tts_generation_quality", "label": "逻辑质量档位", "value_type": "enum", "required": true, "source": "teacher", "visibility": "secondary", "widget": "select", "default_value": "balanced", "options": [{"value": "fast", "label": "快速"}, {"value": "balanced", "label": "均衡"}, {"value": "quality", "label": "高质量"}]}
+        ]
+      },
+      "output": {
+        "description": "单个音频计划项的候选文件事实、时长和安全质量标记。",
+        "definition_role": "artifact",
+        "fields": [
+          {"field_key": "tts_generation_key", "label": "TTS请求键", "type": "text", "required": true, "editable": false, "deletable": false},
+          {"field_key": "tts_audio_track_key", "label": "音频计划键", "type": "reference", "required": true, "editable": false, "deletable": false},
+          {"field_key": "tts_target_slot", "label": "目标槽位", "type": "text", "required": true, "editable": false, "deletable": false},
+          {
+            "field_key": "tts_candidates",
+            "label": "配音候选",
+            "type": "repeatable",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 1,
+            "children": [
+              {"field_key": "tts_result_key", "label": "候选键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "tts_duration_seconds", "label": "实际时长", "type": "number", "required": true, "editable": false, "deletable": false},
+              {"field_key": "tts_sample_rate", "label": "采样率", "type": "number", "required": true, "editable": false, "deletable": false},
+              {"field_key": "tts_channels", "label": "声道数", "type": "number", "required": true, "editable": false, "deletable": false},
+              {"field_key": "tts_mime_type", "label": "媒体类型", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "tts_sha256", "label": "文件摘要", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "tts_quality_flags", "label": "质量标记", "type": "list", "required": true, "editable": false, "deletable": false}
+            ]
+          }
+        ]
+      },
+      "prompt": {
+        "role": "你是服务端儿童友好中文TTS执行器。",
+        "task": "严格执行一个已冻结的旁白或对白计划项，保持文本、声音档案、语速、时长意图和目标槽位，返回音频候选文件事实。",
+        "method": "通过模型网关选择满足audio.tts.child_friendly_zh能力的路由；可选voice_reference只按节点声明传入。记录候选键、实际时长、采样率、声道、媒体类型和SHA-256。Provider名称、密钥和私有参数不写入业务结果。",
+        "quality_gate": "语音清晰自然、发音和数学读法准确、时长适配计划、无爆音截断或危险内容；失败不冒充候选；候选采用和保存到项目音轨槽位保持独立。",
+        "context_bindings": [],
+        "max_chars": 20000
+      },
+      "projection": {
+        "output_format": "markdown",
+        "renderer_id": "shanhai.audio_candidates.markdown.v1",
+        "template": "# TTS配音候选\n\n目标槽位：{{tts_target_slot}}\n\n{{tts_candidates}}",
+        "allowed_variables": ["tts_target_slot", "tts_candidates"],
+        "roles": ["teacher_view"],
+        "teacher_visible": true
+      }
+    },
+    {
+      "template_key": "video.classroom_quality.evaluate",
+      "title": "视频课堂质量评估",
+      "description": "以最终视频和已选导入快照评估独立创意、交接、不得提前讲授、连续性和课堂可用性。",
+      "model_capability": "vision.evaluate.classroom_video",
+      "input": {
+        "description": "输入最终视频参考、已选导入方案和评估阈值。",
+        "fields": [
+          {"field_key": "final_video_asset", "label": "最终视频", "value_type": "asset", "required": true, "source": "system", "visibility": "hidden", "widget": "asset_picker"},
+          {"field_key": "classroom_quality_threshold", "label": "通过阈值", "value_type": "number", "required": true, "source": "system", "visibility": "hidden", "widget": "number", "default_value": 80, "validation": {"minimum": 1, "maximum": 100}},
+          {"field_key": "quality_evaluation_requirements", "label": "评估补充要求", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 3000}},
+          {"field_key": "quality_selected_intro_ref", "label": "已选导入方案", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"}
+        ]
+      },
+      "output": {
+        "description": "最终视频课堂质量评分、时间定位发现和是否通过结论。",
+        "definition_role": "artifact",
+        "fields": [
+          {"field_key": "classroom_quality_report_key", "label": "质量报告键", "type": "text", "required": true, "editable": false, "deletable": false},
+          {"field_key": "quality_source_video_ref", "label": "来源视频版本", "type": "reference", "required": true, "editable": false, "deletable": false},
+          {"field_key": "quality_intro_option_key", "label": "已选方案键", "type": "reference", "required": true, "editable": false, "deletable": false},
+          {"field_key": "independent_creative_score", "label": "独立创意完整度", "type": "number", "required": true, "editable": false, "deletable": false},
+          {"field_key": "handoff_accuracy_score", "label": "课堂交接准确度", "type": "number", "required": true, "editable": false, "deletable": false},
+          {"field_key": "no_preteach_score", "label": "未提前讲授", "type": "number", "required": true, "editable": false, "deletable": false},
+          {"field_key": "continuity_score", "label": "视觉与动作连续性", "type": "number", "required": true, "editable": false, "deletable": false},
+          {"field_key": "classroom_usability_score", "label": "课堂可用性", "type": "number", "required": true, "editable": false, "deletable": false},
+          {
+            "field_key": "classroom_quality_findings",
+            "label": "评估发现",
+            "type": "repeatable",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "repeatable": true,
+            "children": [
+              {"field_key": "quality_finding_key", "label": "发现键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "quality_severity", "label": "严重度", "type": "enum", "required": true, "editable": false, "deletable": false},
+              {"field_key": "quality_time_range", "label": "时间区间", "type": "timeline", "required": true, "editable": false, "deletable": false},
+              {"field_key": "quality_observation", "label": "观察", "type": "rich_text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "quality_expected_behavior", "label": "预期", "type": "rich_text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "quality_affected_shot_keys", "label": "受影响镜头", "type": "list", "required": true, "editable": false, "deletable": false}
+            ]
+          },
+          {"field_key": "classroom_quality_passed", "label": "是否通过", "type": "boolean", "required": true, "editable": false, "deletable": false},
+          {"field_key": "classroom_quality_summary", "label": "评估总结", "type": "rich_text", "required": true, "editable": false, "deletable": false}
+        ]
+      },
+      "prompt": {
+        "role": "你是课堂导入视频的独立质量评估员，按已选导入方案快照检查最终视频。",
+        "task": "观看最终视频并评估独立创意是否成立、是否准确继承钩子、是否在唯一handoff_moment交接、是否没有提前讲授、视觉动作是否连续、是否适合真实课堂。所有问题给出时间区间和受影响shot。",
+        "method": "以已选方案快照为唯一课程语义基准，不读取教案、教材或PPT。逐段比较independent_concept、hook、course_anchor、classroom_first_question、handoff_moment和must_not_preteach；同时检查画面可读性、节奏、儿童安全、连续性、字幕音频同步和课堂暂停点。分项评分并按阈值给出通过结论。",
+        "quality_gate": "不得因个人审美改写上游创意；所有失败有可定位证据；任何提前讲授、越过交接、严重安全问题或不可播放都必须阻塞通过；发现只指向受影响shot，不要求无关镜头重做；报告不包含Provider、密钥或原始敏感模型响应。",
+        "context_bindings": [
+          {"binding_key": "selected_intro", "source": "intro_selection.snapshot", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 100000}
+        ],
+        "max_chars": 30000
+      },
+      "projection": {
+        "output_format": "markdown",
+        "renderer_id": "shanhai.video_classroom_quality.markdown.v1",
+        "template": "# 视频课堂质量报告\n\n独立创意：{{independent_creative_score}}\n\n课堂交接：{{handoff_accuracy_score}}\n\n未提前讲授：{{no_preteach_score}}\n\n连续性：{{continuity_score}}\n\n课堂可用性：{{classroom_usability_score}}\n\n## 发现\n{{classroom_quality_findings}}\n\n通过：{{classroom_quality_passed}}\n\n{{classroom_quality_summary}}",
+        "allowed_variables": ["independent_creative_score", "handoff_accuracy_score", "no_preteach_score", "continuity_score", "classroom_usability_score", "classroom_quality_findings", "classroom_quality_passed", "classroom_quality_summary"],
+        "roles": ["teacher_view", "export"],
+        "teacher_visible": true
+      }
+    }
+  ]
+}

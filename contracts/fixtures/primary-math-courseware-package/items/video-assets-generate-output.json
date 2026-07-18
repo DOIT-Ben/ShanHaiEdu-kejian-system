@@ -1,0 +1,96 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "video.assets.generate.output",
+    "name": "视频四类图片资产生成输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "video.assets.generate.output",
+    "title": "视频四类图片资产生成输出",
+    "description": "按资产任务分组的图片候选、文件事实和风格一致性标记。",
+    "definition_role": "artifact",
+    "fields": [
+      {
+        "field_key": "video_asset_generation_batch_key",
+        "label": "生成批次键",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "generated_video_assets",
+        "label": "视频图片资产候选",
+        "type": "repeatable",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "repeatable": true,
+        "min_items": 1,
+        "children": [
+          {
+            "field_key": "generated_video_asset_item_key",
+            "label": "任务键",
+            "type": "reference",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "generated_video_asset_source_key",
+            "label": "资产键",
+            "type": "reference",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "generated_video_asset_type",
+            "label": "资产类型",
+            "type": "enum",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "generated_video_asset_target_slot",
+            "label": "目标槽位",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "generated_video_asset_candidates",
+            "label": "候选文件",
+            "type": "repeatable",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 1
+          },
+          {
+            "field_key": "generated_video_asset_quality_flags",
+            "label": "质量标记",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "video_asset_generation_coverage",
+        "label": "资产批次覆盖",
+        "type": "rubric",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      }
+    ]
+  }
+}

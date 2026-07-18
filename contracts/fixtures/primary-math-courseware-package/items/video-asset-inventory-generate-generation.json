@@ -1,0 +1,50 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "generation_template",
+  "metadata": {
+    "key": "video.asset_inventory.generate",
+    "name": "视频四类资产清单",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "video.asset_inventory.generate",
+    "title": "视频四类资产清单",
+    "description": "从批准母版剧本和粗分镜扫描、分类并去重人物、场景、道具和生物资产。",
+    "model_capability": "text.structured.creative_video",
+    "input_definition_ref": {
+      "item_key": "video.asset_inventory.generate.input",
+      "kind": "input_definition"
+    },
+    "prompt_template_ref": {
+      "item_key": "video.asset_inventory.generate.prompt",
+      "kind": "prompt_template"
+    },
+    "output_definition_ref": {
+      "item_key": "video.asset_inventory.generate.output",
+      "kind": "content_definition"
+    },
+    "style_preset_refs": [
+      {
+        "item_key": "style.primary_math.paper_clay",
+        "kind": "style_preset"
+      }
+    ],
+    "projection_refs": [
+      {
+        "role": "teacher_view",
+        "template_ref": {
+          "item_key": "video.asset_inventory.generate.projection",
+          "kind": "projection_template"
+        }
+      },
+      {
+        "role": "export",
+        "template_ref": {
+          "item_key": "video.asset_inventory.generate.projection",
+          "kind": "projection_template"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "ppt.cover.image.generate.prompt",
+    "name": "PPT封面候选生成业务Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "ppt.cover.image.generate.prompt",
+    "title": "PPT封面候选生成业务Prompt",
+    "description": "通过服务端图片网关执行封面业务请求并返回可审计候选，不在合同中固定Provider私有参数。",
+    "model_capability": "image.generate.education_16x9",
+    "input_definition_ref": {
+      "item_key": "ppt.cover.image.generate.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "ppt.cover.image.generate.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是服务端教育图片生成执行器，只执行已冻结的业务提示词和参考资产合同。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "为PPT封面生成指定数量的16:9图片候选，保持业务提示词、目标槽位和参考资产顺序；返回文件事实和质量标记。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "通过模型网关选择满足image.generate.education_16x9能力的路由。参考资产仅按节点声明的style_reference角色传入；不把Provider名称、密钥、私有参数或临时URL写入业务产物。对每个结果记录稳定候选键、尺寸、媒体类型和SHA-256。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "候选必须可解码、画幅符合16:9、无文字水印Logo、儿童安全且不依赖准确数学文字；失败结果不得冒充候选；候选只进入创作批次，采用不等于写回项目。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 20000
+    }
+  }
+}

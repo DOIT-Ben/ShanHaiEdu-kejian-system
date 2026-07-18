@@ -1,0 +1,78 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "video.fine_storyboard.generate.input",
+    "name": "视频细分镜与生成指令输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "video.fine_storyboard.generate.input",
+    "title": "视频细分镜与生成指令输入",
+    "description": "读取已选方案、批准母版、粗分镜、风格和图片资产，可接受镜头数量偏好。",
+    "fields": [
+      {
+        "field_key": "fine_preferred_shot_count",
+        "label": "期望镜头数",
+        "value_type": "number",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "number",
+        "validation": {
+          "minimum": 2,
+          "maximum": 12
+        }
+      },
+      {
+        "field_key": "fine_storyboard_requirements",
+        "label": "细分镜补充要求",
+        "value_type": "rich_text",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "textarea",
+        "validation": {
+          "max_length": 5000
+        }
+      },
+      {
+        "field_key": "fine_master_script_ref",
+        "label": "批准母版剧本",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "fine_rough_storyboard_ref",
+        "label": "批准粗分镜",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "fine_video_style_ref",
+        "label": "批准视频风格",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "fine_approved_assets_ref",
+        "label": "已批准图片资产",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      }
+    ]
+  }
+}

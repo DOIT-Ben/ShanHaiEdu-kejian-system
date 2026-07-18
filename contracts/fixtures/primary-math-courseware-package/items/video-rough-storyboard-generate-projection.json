@@ -1,0 +1,27 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "video.rough_storyboard.generate.projection",
+    "name": "视频粗分镜生成教师投影",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "video.rough_storyboard.generate.projection",
+    "title": "视频粗分镜生成教师投影",
+    "source_definition_ref": {
+      "item_key": "video.rough_storyboard.generate.output",
+      "kind": "content_definition"
+    },
+    "output_format": "markdown",
+    "renderer_id": "shanhai.video_rough_storyboard.markdown.v1",
+    "template": "# 视频粗分镜\n\n{{rough_beats}}\n\n总时长：{{rough_total_duration_seconds}}秒\n\n## 质量检查\n{{rough_storyboard_quality}}",
+    "allowed_variables": [
+      "rough_beats",
+      "rough_total_duration_seconds",
+      "rough_storyboard_quality"
+    ],
+    "teacher_visible": true
+  }
+}

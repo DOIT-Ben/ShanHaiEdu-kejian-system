@@ -1,0 +1,61 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "video.classroom_quality.evaluate.input",
+    "name": "视频课堂质量评估输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "video.classroom_quality.evaluate.input",
+    "title": "视频课堂质量评估输入",
+    "description": "输入最终视频参考、已选导入方案和评估阈值。",
+    "fields": [
+      {
+        "field_key": "final_video_asset",
+        "label": "最终视频",
+        "value_type": "asset",
+        "required": true,
+        "source": "system",
+        "visibility": "hidden",
+        "widget": "asset_picker"
+      },
+      {
+        "field_key": "classroom_quality_threshold",
+        "label": "通过阈值",
+        "value_type": "number",
+        "required": true,
+        "source": "system",
+        "visibility": "hidden",
+        "widget": "number",
+        "default_value": 80,
+        "validation": {
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      {
+        "field_key": "quality_evaluation_requirements",
+        "label": "评估补充要求",
+        "value_type": "rich_text",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "textarea",
+        "validation": {
+          "max_length": 3000
+        }
+      },
+      {
+        "field_key": "quality_selected_intro_ref",
+        "label": "已选导入方案",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      }
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "video.asset_prompts.generate.projection",
+    "name": "视频资产图片提示词教师投影",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "video.asset_prompts.generate.projection",
+    "title": "视频资产图片提示词教师投影",
+    "source_definition_ref": {
+      "item_key": "video.asset_prompts.generate.output",
+      "kind": "content_definition"
+    },
+    "output_format": "markdown",
+    "renderer_id": "shanhai.creation_image_package.markdown.v1",
+    "template": "# 视频资产图片任务包\n\n风格合同：{{video_style_contract_ref}}\n\n{{video_asset_prompt_items}}\n\n## 覆盖检查\n{{video_asset_prompt_coverage}}",
+    "allowed_variables": [
+      "video_style_contract_ref",
+      "video_asset_prompt_items",
+      "video_asset_prompt_coverage"
+    ],
+    "teacher_visible": true
+  }
+}

@@ -1,0 +1,118 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "video.shots.generate.output",
+    "name": "逐镜头候选视频生成输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "video.shots.generate.output",
+    "title": "逐镜头候选视频生成输出",
+    "description": "一个shot的候选结果、技术文件事实和业务质量标记。",
+    "definition_role": "artifact",
+    "fields": [
+      {
+        "field_key": "shot_generation_key",
+        "label": "生成请求键",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "generated_shot_key",
+        "label": "镜头键",
+        "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "generated_shot_target_slot",
+        "label": "镜头目标槽位",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "shot_candidates",
+        "label": "镜头候选",
+        "type": "repeatable",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "repeatable": true,
+        "min_items": 1,
+        "children": [
+          {
+            "field_key": "shot_result_key",
+            "label": "候选键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_result_duration_seconds",
+            "label": "实际时长",
+            "type": "number",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_result_width",
+            "label": "宽度",
+            "type": "number",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_result_height",
+            "label": "高度",
+            "type": "number",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_result_fps",
+            "label": "帧率",
+            "type": "number",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_result_mime_type",
+            "label": "媒体类型",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_result_sha256",
+            "label": "文件摘要",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_result_quality_flags",
+            "label": "质量标记",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "ppt.outline.generate.input",
+    "name": "PPT大纲生成输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "ppt.outline.generate.input",
+    "title": "PPT大纲生成输入",
+    "description": "输入内容分析和可选页数调整，教学事实继续以批准教案和教材为准。",
+    "fields": [
+      {
+        "field_key": "ppt_analysis_ref",
+        "label": "PPT内容分析",
+        "value_type": "reference",
+        "required": true,
+        "source": "system",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "page_count_adjustment",
+        "label": "页数调整",
+        "value_type": "number",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "number",
+        "validation": {
+          "minimum": 5,
+          "maximum": 60
+        }
+      },
+      {
+        "field_key": "outline_requirements",
+        "label": "大纲补充要求",
+        "value_type": "rich_text",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "textarea",
+        "validation": {
+          "max_length": 4000
+        }
+      },
+      {
+        "field_key": "outline_lesson_plan",
+        "label": "已批准教案",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      }
+    ]
+  }
+}

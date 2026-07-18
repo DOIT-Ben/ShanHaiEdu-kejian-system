@@ -1,0 +1,71 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "style_preset",
+  "metadata": {
+    "key": "style.primary_math.paper_clay",
+    "name": "纸艺黏土数学世界",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "preset_key": "style.primary_math.paper_clay",
+    "title": "纸艺黏土数学世界",
+    "description": "用于小学数学课件的清晰纸艺与轻黏土视觉语言，正文保持纯白画布。",
+    "modalities": [
+      "image",
+      "video",
+      "presentation"
+    ],
+    "visual_language": "真实纸张层次与轻黏土物件结合，造型清楚、尺度稳定、接触关系可信，儿童友好但不过度卡通化。",
+    "palette": [
+      "清澈蓝绿",
+      "明亮柠檬黄",
+      "珊瑚红强调",
+      "纯白正文画布"
+    ],
+    "mood": [
+      "明快",
+      "有秩序",
+      "可信",
+      "适合课堂投影"
+    ],
+    "texture": [
+      "细腻哑光纸感",
+      "轻黏土柔和体积",
+      "克制接触阴影"
+    ],
+    "negative_constraints": [
+      "禁止水印、Logo和乱码",
+      "禁止把准确文字、数字、公式或答案烘焙进图片",
+      "禁止廉价贴纸堆叠和无关装饰",
+      "禁止恐怖、成人化和危险模仿内容"
+    ],
+    "extensions": {
+      "image": {
+        "medium": "paper craft and soft clay digital illustration",
+        "composition_preferences": [
+          "单一视觉焦点",
+          "明确前中后层次",
+          "保留可编辑教学信息区域"
+        ],
+        "lighting": [
+          "明亮柔和主光",
+          "低戏剧性阴影",
+          "主体接触面清楚"
+        ]
+      },
+      "video": {
+        "motion_language": "单镜头一个主要可见节拍，动作连续且首尾状态清楚",
+        "camera_language": "稳定机位配合一次主要运镜，避免无目的摇晃和突变",
+        "pacing": "适合低年级观看，变化可辨识但不拖慢",
+        "transition_style": "以动作衔接和状态连续为主，少用炫技转场"
+      },
+      "presentation": {
+        "background_policy": "white",
+        "typography": "清晰无衬线中文字体；文字、数字和数学符号保持PPT原生可编辑",
+        "layout_density": "sparse",
+        "illustration_style": "封面允许完整主视觉，正文只使用与封面同视觉语言的独立场景或物件资产"
+      }
+    }
+  }
+}

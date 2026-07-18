@@ -1,0 +1,73 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "ppt.cover.prompt.generate.input",
+    "name": "PPT封面图片提示词输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "ppt.cover.prompt.generate.input",
+    "title": "PPT封面图片提示词输入",
+    "description": "输入候选数和风格，读取大纲、封面页规格与教师偏好。",
+    "fields": [
+      {
+        "field_key": "cover_candidate_count",
+        "label": "封面候选数",
+        "value_type": "number",
+        "required": true,
+        "source": "teacher",
+        "visibility": "primary",
+        "widget": "number",
+        "default_value": 3,
+        "validation": {
+          "minimum": 2,
+          "maximum": 4
+        }
+      },
+      {
+        "field_key": "cover_style_preset",
+        "label": "封面风格",
+        "value_type": "reference",
+        "required": true,
+        "source": "teacher",
+        "visibility": "primary",
+        "widget": "style_picker",
+        "allowed_item_kinds": [
+          "style_preset"
+        ]
+      },
+      {
+        "field_key": "cover_prompt_requirements",
+        "label": "封面补充要求",
+        "value_type": "rich_text",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "textarea",
+        "validation": {
+          "max_length": 4000
+        }
+      },
+      {
+        "field_key": "cover_outline_context",
+        "label": "批准大纲",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "cover_page_context",
+        "label": "封面页规格",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      }
+    ]
+  }
+}

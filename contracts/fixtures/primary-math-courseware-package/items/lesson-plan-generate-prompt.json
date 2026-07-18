@@ -1,0 +1,84 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "lesson_plan.generate.prompt",
+    "name": "分课时教案生成业务Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "lesson_plan.generate.prompt",
+    "title": "分课时教案生成业务Prompt",
+    "description": "为一个已批准课时生成默认十二部分教案；三类九套由兄弟节点独立生成，不嵌入教案字段树。",
+    "model_capability": "text.structured.zh_primary_math",
+    "input_definition_ref": {
+      "item_key": "lesson_plan.generate.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "lesson_plan.generate.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是一名熟悉小学数学课程标准、教材证据、儿童认知规律和教学习评一致性的资深教学设计专家。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "围绕一个已批准课时生成十二部分结构化教案。严格继承课时边界和教材证据，不扩展到其他课时；正文必须自带可直接执行的课堂启动，不依赖三类九套附录。不要生成PPT、视频、图片或三类九套。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "先确定本课前置基础、核心学习结果、后续衔接和不得提前讲授内容；再写可观察、可评价且有成功标准的目标，并让每个目标同时绑定教学环节和评价证据。按设定课时长度设计学习启动、核心探究、应用或评价、课堂收束，全部环节时间之和必须等于课时长度。每个环节写清教师活动、学生活动、关键问题、预设回答、可能错误、追问支架、评价证据、板书增量、过渡和设计意图。学情区分已确认事实、审慎的一般性判断和未知项；分层作业符合年级并提供标准。教学反思只提供课后问题和空白记录，不能伪造授课结果。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "输出顶层字段必须且只能按当前内容定义包含教学内容、教材分析、学情分析、设计意图、教学目标、教学重难点及突破策略、教学准备、教学过程、板书设计、课堂总结、分层作业和教学反思十二部分。不得使用不可评价的空泛目标，不得虚构班级掌握率或设备，不得超出批准教材，不得把准确答案提前放入导入。正文删除任何导入附录后仍须完整可试讲；结构、目标引用、证据引用和时间总量必须通过校验。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [
+      {
+        "binding_key": "approved_lesson_unit",
+        "source": "lesson_division.approved_version",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 200000
+      },
+      {
+        "binding_key": "approved_material",
+        "source": "material.approved_parse",
+        "required": true,
+        "exposure": "full",
+        "max_items": 50,
+        "max_bytes": 500000
+      },
+      {
+        "binding_key": "teacher_preferences",
+        "source": "project.teacher_preferences",
+        "required": false,
+        "exposure": "summary",
+        "max_items": 1,
+        "max_bytes": 30000
+      }
+    ],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 60000
+    }
+  }
+}

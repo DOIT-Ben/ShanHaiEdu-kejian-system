@@ -1,0 +1,45 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "generation_template",
+  "metadata": {
+    "key": "intro.anchor",
+    "name": "最小课程锚定",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "intro.anchor",
+    "title": "最小课程锚定",
+    "description": "只为九套独立创意补充唯一最小课程锚点、首问、交接和推荐度，不改写独立创意。",
+    "model_capability": "text.structured.zh_primary_math",
+    "input_definition_ref": {
+      "item_key": "intro.anchor.input",
+      "kind": "input_definition"
+    },
+    "prompt_template_ref": {
+      "item_key": "intro.anchor.prompt",
+      "kind": "prompt_template"
+    },
+    "output_definition_ref": {
+      "item_key": "intro.anchor.output",
+      "kind": "content_definition"
+    },
+    "style_preset_refs": [],
+    "projection_refs": [
+      {
+        "role": "teacher_view",
+        "template_ref": {
+          "item_key": "intro.anchor.projection",
+          "kind": "projection_template"
+        }
+      },
+      {
+        "role": "export",
+        "template_ref": {
+          "item_key": "intro.anchor.projection",
+          "kind": "projection_template"
+        }
+      }
+    ]
+  }
+}

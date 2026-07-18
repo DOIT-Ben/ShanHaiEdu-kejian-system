@@ -1,0 +1,26 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "video.assets.generate.projection",
+    "name": "视频四类图片资产生成教师投影",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "video.assets.generate.projection",
+    "title": "视频四类图片资产生成教师投影",
+    "source_definition_ref": {
+      "item_key": "video.assets.generate.output",
+      "kind": "content_definition"
+    },
+    "output_format": "markdown",
+    "renderer_id": "shanhai.video_image_assets.markdown.v1",
+    "template": "# 视频四类图片资产生成结果\n\n{{generated_video_assets}}\n\n## 覆盖检查\n{{video_asset_generation_coverage}}",
+    "allowed_variables": [
+      "generated_video_assets",
+      "video_asset_generation_coverage"
+    ],
+    "teacher_visible": true
+  }
+}

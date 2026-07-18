@@ -1,0 +1,84 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "ppt.pages.generate.prompt",
+    "name": "PPT逐页四层设计业务Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "ppt.pages.generate.prompt",
+    "title": "PPT逐页四层设计业务Prompt",
+    "description": "为批准大纲生成画布、图片主视觉、可编辑教学信息和排版互动四层页级事实。",
+    "model_capability": "text.structured.ppt_page_design",
+    "input_definition_ref": {
+      "item_key": "ppt.pages.generate.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "ppt.pages.generate.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是小学数学课堂PPT逐页设计师，使用画布、图片主视觉、可编辑教学信息、排版互动四层合同。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "逐页把批准大纲展开为结构化页面规格。每页保留稳定page_key、唯一教学任务、来源和学生关注点，并定义canvas、visual、editable content、layout与interaction。不要生成PPTX或图片候选。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "封面可使用主题统领型cover_art；所有正文页面固定纯白#FFFFFF。每页先判断学生需要看见的数量关系、整体部分、比较、转化、变化、操作或生活应用，再选择教材情境重构、原创资产或混合策略，并至少登记一个主视觉资产要求。标题、正文、问题、数字、算式、公式、答案、标注和精确数学关系全部放入可编辑文字或数学图形层，禁止烘焙进图片。布局写清安全区、层级、对齐、留白、出现顺序和教师使用方式。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "页面键和大纲一一对应且顺序连续；每页一个教学任务；封面background_mode=cover_art，所有正文background_mode=solid_white且background_color=#FFFFFF；每页至少一个主视觉资产；图片提示词不依赖准确文字数字；数学和文字可编辑；来源、互动、备注与校验规则齐全。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [
+      {
+        "binding_key": "approved_lesson_plan",
+        "source": "lesson_plan.approved_version",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 600000
+      },
+      {
+        "binding_key": "approved_material",
+        "source": "material.approved_parse",
+        "required": true,
+        "exposure": "summary",
+        "max_items": 50,
+        "max_bytes": 300000
+      },
+      {
+        "binding_key": "approved_outline",
+        "source": "ppt_outline.approved_version",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 300000
+      }
+    ],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 60000
+    }
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "lesson_plan.generate.input",
+    "name": "分课时教案生成输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "lesson_plan.generate.input",
+    "title": "分课时教案生成输入",
+    "description": "输入固定课时、教材证据、教师偏好和教案详略要求。",
+    "fields": [
+      {
+        "field_key": "lesson_unit_ref",
+        "label": "已批准课时",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "material_evidence_ref",
+        "label": "教材证据",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "lesson_detail_level",
+        "label": "教案详略",
+        "value_type": "enum",
+        "required": true,
+        "source": "teacher",
+        "visibility": "primary",
+        "widget": "select",
+        "default_value": "detailed",
+        "options": [
+          {
+            "value": "standard",
+            "label": "标准教案"
+          },
+          {
+            "value": "detailed",
+            "label": "详细教案"
+          },
+          {
+            "value": "open_class",
+            "label": "公开课详案"
+          }
+        ]
+      },
+      {
+        "field_key": "class_duration_minutes",
+        "label": "课堂时长",
+        "value_type": "number",
+        "required": true,
+        "source": "system",
+        "visibility": "secondary",
+        "widget": "number",
+        "default_value": 40,
+        "validation": {
+          "minimum": 30,
+          "maximum": 60
+        }
+      },
+      {
+        "field_key": "teacher_requirements",
+        "label": "教师补充要求",
+        "value_type": "rich_text",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "textarea",
+        "validation": {
+          "max_length": 6000
+        }
+      },
+      {
+        "field_key": "teacher_preferences",
+        "label": "教师偏好",
+        "value_type": "reference",
+        "required": false,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      }
+    ]
+  }
+}

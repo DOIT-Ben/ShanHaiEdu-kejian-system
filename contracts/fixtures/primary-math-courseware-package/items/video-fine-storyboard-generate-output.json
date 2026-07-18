@@ -1,0 +1,210 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "video.fine_storyboard.generate.output",
+    "name": "视频细分镜与生成指令输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "video.fine_storyboard.generate.output",
+    "title": "视频细分镜与生成指令输出",
+    "description": "可直接提交视频模型的逐shot生成合同、垫图顺序、音频占位和连续性。",
+    "definition_role": "artifact",
+    "fields": [
+      {
+        "field_key": "fine_storyboard_key",
+        "label": "细分镜键",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "fine_source_master_script_key",
+        "label": "来源母版剧本键",
+        "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "fine_target_duration_seconds",
+        "label": "目标总时长",
+        "type": "number",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "fine_shots",
+        "label": "逐镜头合同",
+        "type": "repeatable",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "repeatable": true,
+        "min_items": 2,
+        "children": [
+          {
+            "field_key": "shot_key",
+            "label": "镜头键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_scene_key",
+            "label": "来源场次键",
+            "type": "reference",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_beat_key",
+            "label": "来源节拍键",
+            "type": "reference",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_position",
+            "label": "顺序",
+            "type": "number",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_duration_seconds",
+            "label": "时长",
+            "type": "enum",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "options": [
+              {
+                "value": "10",
+                "label": "10秒"
+              },
+              {
+                "value": "15",
+                "label": "15秒"
+              }
+            ]
+          },
+          {
+            "field_key": "shot_visible_beat",
+            "label": "唯一可见节拍",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_start_state",
+            "label": "开始状态",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_end_state",
+            "label": "结束状态",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_camera",
+            "label": "景别角度与唯一运镜",
+            "type": "object",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_action_timeline",
+            "label": "动作时间顺序",
+            "type": "timeline",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_asset_usages",
+            "label": "垫图使用",
+            "type": "repeatable",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 1
+          },
+          {
+            "field_key": "shot_prompt_text",
+            "label": "完整视频提示词",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_negative_constraints",
+            "label": "负面约束",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_narration_placeholder",
+            "label": "旁白占位",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_dialogue_placeholder",
+            "label": "对白占位",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_sound_intent",
+            "label": "声音意图",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "shot_continuity_locks",
+            "label": "连续性锁定",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "fine_storyboard_quality",
+        "label": "细分镜质量",
+        "type": "rubric",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      }
+    ]
+  }
+}

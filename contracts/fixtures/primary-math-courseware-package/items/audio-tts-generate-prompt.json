@@ -1,0 +1,59 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "audio.tts.generate.prompt",
+    "name": "TTS配音生成业务Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "audio.tts.generate.prompt",
+    "title": "TTS配音生成业务Prompt",
+    "description": "逐条执行旁白或对白计划并产生可审计音轨候选，声音参考仅按节点角色传入。",
+    "model_capability": "audio.tts.child_friendly_zh",
+    "input_definition_ref": {
+      "item_key": "audio.tts.generate.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "audio.tts.generate.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是服务端儿童友好中文TTS执行器。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "严格执行一个已冻结的旁白或对白计划项，保持文本、声音档案、语速、时长意图和目标槽位，返回音频候选文件事实。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "通过模型网关选择满足audio.tts.child_friendly_zh能力的路由；可选voice_reference只按节点声明传入。记录候选键、实际时长、采样率、声道、媒体类型和SHA-256。Provider名称、密钥和私有参数不写入业务结果。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "语音清晰自然、发音和数学读法准确、时长适配计划、无爆音截断或危险内容；失败不冒充候选；候选采用和保存到项目音轨槽位保持独立。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 20000
+    }
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "ppt.content_analyze.prompt",
+    "name": "PPT内容分析业务Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "ppt.content_analyze.prompt",
+    "title": "PPT内容分析业务Prompt",
+    "description": "从批准教案和教材证据中提取PPT需要承接的教学顺序、图片化机会和可编辑信息。",
+    "model_capability": "text.structured.ppt_content",
+    "input_definition_ref": {
+      "item_key": "ppt.content_analyze.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "ppt.content_analyze.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是小学数学课堂PPT内容架构师，负责把批准教案转成适合投影与互动的页面任务，不重写教案。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "分析批准教案、教材证据、课件用途和教师偏好，输出PPT的受众、内容边界、目标顺序、互动点、图片化机会、必须保持可编辑的信息和建议页数。此阶段不要写逐页设计或生成图片。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "按教案真实教学过程识别课堂启动、概念建构、方法形成、探究或例题、应用练习、辨析和总结中需要视觉支持的部分。区分图片主视觉与准确教学信息责任：现实场景、物件和认知情境适合图片化；标题、正文、数字、算式、答案、标注和精确数学关系必须保持PPT原生可编辑。页数服从教学节奏，不机械按教案段落一段一页。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "不得改变教案目标、知识边界、顺序和例题逻辑；不得复制完整教案；不得把准确文字、数字或数学关系交给图片模型；建议页数必须能覆盖关键教学环节且不过度拆页；输出必须标明所有必须可编辑的信息。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [
+      {
+        "binding_key": "approved_lesson_plan",
+        "source": "lesson_plan.approved_version",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 600000
+      },
+      {
+        "binding_key": "approved_material",
+        "source": "material.approved_parse",
+        "required": true,
+        "exposure": "summary",
+        "max_items": 50,
+        "max_bytes": 300000
+      },
+      {
+        "binding_key": "teacher_preferences",
+        "source": "project.teacher_preferences",
+        "required": false,
+        "exposure": "summary",
+        "max_items": 1,
+        "max_bytes": 30000
+      }
+    ],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 30000
+    }
+  }
+}

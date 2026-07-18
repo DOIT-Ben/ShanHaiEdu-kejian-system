@@ -1,0 +1,27 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "video.fine_storyboard.generate.projection",
+    "name": "视频细分镜与生成指令教师投影",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "video.fine_storyboard.generate.projection",
+    "title": "视频细分镜与生成指令教师投影",
+    "source_definition_ref": {
+      "item_key": "video.fine_storyboard.generate.output",
+      "kind": "content_definition"
+    },
+    "output_format": "video_script",
+    "renderer_id": "shanhai.video_fine_storyboard.v1",
+    "template": "# 视频细分镜与生成指令\n\n目标时长：{{fine_target_duration_seconds}}秒\n\n{{fine_shots}}\n\n## 质量检查\n{{fine_storyboard_quality}}",
+    "allowed_variables": [
+      "fine_target_duration_seconds",
+      "fine_shots",
+      "fine_storyboard_quality"
+    ],
+    "teacher_visible": true
+  }
+}

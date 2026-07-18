@@ -1,0 +1,63 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "video.asset_inventory.generate.input",
+    "name": "视频四类资产清单输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "video.asset_inventory.generate.input",
+    "title": "视频四类资产清单输入",
+    "description": "输入资产复用和变体策略，读取母版剧本及粗分镜。",
+    "fields": [
+      {
+        "field_key": "asset_reuse_policy",
+        "label": "资产复用策略",
+        "value_type": "enum",
+        "required": true,
+        "source": "system",
+        "visibility": "secondary",
+        "widget": "select",
+        "default_value": "deduplicate_base_identity",
+        "options": [
+          {
+            "value": "deduplicate_base_identity",
+            "label": "同一基础身份复用"
+          }
+        ]
+      },
+      {
+        "field_key": "asset_inventory_requirements",
+        "label": "资产清单补充要求",
+        "value_type": "rich_text",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "textarea",
+        "validation": {
+          "max_length": 4000
+        }
+      },
+      {
+        "field_key": "inventory_master_script_ref",
+        "label": "批准母版剧本",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "inventory_rough_storyboard_ref",
+        "label": "批准粗分镜",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      }
+    ]
+  }
+}

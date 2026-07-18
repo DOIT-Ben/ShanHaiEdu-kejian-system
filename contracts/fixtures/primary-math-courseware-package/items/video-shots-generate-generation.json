@@ -1,0 +1,43 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "generation_template",
+  "metadata": {
+    "key": "video.shots.generate",
+    "name": "逐镜头候选视频生成",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "video.shots.generate",
+    "title": "逐镜头候选视频生成",
+    "description": "按细分镜逐shot生成候选视频，候选通过校验、采用并保存后才形成正式clip。",
+    "model_capability": "video.image_to_video.10s_15s",
+    "input_definition_ref": {
+      "item_key": "video.shots.generate.input",
+      "kind": "input_definition"
+    },
+    "prompt_template_ref": {
+      "item_key": "video.shots.generate.prompt",
+      "kind": "prompt_template"
+    },
+    "output_definition_ref": {
+      "item_key": "video.shots.generate.output",
+      "kind": "content_definition"
+    },
+    "style_preset_refs": [
+      {
+        "item_key": "style.primary_math.paper_clay",
+        "kind": "style_preset"
+      }
+    ],
+    "projection_refs": [
+      {
+        "role": "teacher_view",
+        "template_ref": {
+          "item_key": "video.shots.generate.projection",
+          "kind": "projection_template"
+        }
+      }
+    ]
+  }
+}

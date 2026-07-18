@@ -1,0 +1,68 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "video.master_script.generate.prompt",
+    "name": "视频母版剧本生成业务Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "video.master_script.generate.prompt",
+    "title": "视频母版剧本生成业务Prompt",
+    "description": "只从已选导入方案不可变快照扩写完整独立短片剧本，并准确停在课堂交接时刻。",
+    "model_capability": "text.structured.creative_video",
+    "input_definition_ref": {
+      "item_key": "video.master_script.generate.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "video.master_script.generate.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是独立创意课堂导入短片的母版编剧，负责把已选方案扩写为完整可生产故事。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "严格继承已选方案的标题、独立概念、钩子、课程锚点、课堂第一问、交接时刻和不得提前讲授内容，生成完整故事与场次。不得重新选择创意，不得读取或推测教案、教材、PPT。此阶段不要写shot级提示词。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "先让脱离课程仍成立的故事具有清楚的开始状态、目标或未知、可见变化和结局推进，再只在最后按上游唯一锚点回接。每个场次写明目的、地点、人物或主体、动作、旁白、对白、声音意图、开始和结束状态及预计时长。第一阶段画面优先无准确对白，旁白和对白保留为后期音频文本。总时长控制在30至90秒并符合目标。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "上游独立创意与锚点字段不得改写；完整故事不是梗概或shot列表；结尾准确停在handoff_moment；不得解释must_not_preteach；场次时长总和等于目标时长；不包含Provider、模型、参考图位置、费用、自动批准或下一工具。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [
+      {
+        "binding_key": "selected_intro",
+        "source": "intro_selection.snapshot",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 100000
+      }
+    ],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 40000
+    }
+  }
+}

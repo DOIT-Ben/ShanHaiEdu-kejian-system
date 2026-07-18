@@ -1,0 +1,50 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "generation_template",
+  "metadata": {
+    "key": "video.fine_storyboard.generate",
+    "name": "视频细分镜与生成指令",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "video.fine_storyboard.generate",
+    "title": "视频细分镜与生成指令",
+    "description": "在母版、粗分镜、风格和已批准图片资产齐备后生成10/15秒逐shot合同。",
+    "model_capability": "text.structured.creative_video",
+    "input_definition_ref": {
+      "item_key": "video.fine_storyboard.generate.input",
+      "kind": "input_definition"
+    },
+    "prompt_template_ref": {
+      "item_key": "video.fine_storyboard.generate.prompt",
+      "kind": "prompt_template"
+    },
+    "output_definition_ref": {
+      "item_key": "video.fine_storyboard.generate.output",
+      "kind": "content_definition"
+    },
+    "style_preset_refs": [
+      {
+        "item_key": "style.primary_math.paper_clay",
+        "kind": "style_preset"
+      }
+    ],
+    "projection_refs": [
+      {
+        "role": "teacher_view",
+        "template_ref": {
+          "item_key": "video.fine_storyboard.generate.projection",
+          "kind": "projection_template"
+        }
+      },
+      {
+        "role": "export",
+        "template_ref": {
+          "item_key": "video.fine_storyboard.generate.projection",
+          "kind": "projection_template"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "ppt.content_analyze.output",
+    "name": "PPT内容分析输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "ppt.content_analyze.output",
+    "title": "PPT内容分析输出",
+    "description": "PPT教学内容、视觉机会、可编辑责任和建议页数分析。",
+    "definition_role": "intermediate",
+    "fields": [
+      {
+        "field_key": "analysis_key",
+        "label": "分析键",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "visibility": "hidden"
+      },
+      {
+        "field_key": "source_lesson_plan_key",
+        "label": "来源教案键",
+        "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "audience_and_use",
+        "label": "受众与用途",
+        "type": "rich_text",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "ppt_content_boundary",
+        "label": "内容边界",
+        "type": "rich_text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "ppt_must_not_preteach",
+        "label": "不得提前讲授",
+        "type": "list",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "objective_sequence",
+        "label": "目标与课堂顺序",
+        "type": "list",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "interaction_points",
+        "label": "互动节点",
+        "type": "list",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "visualization_opportunities",
+        "label": "适合图片化的内容",
+        "type": "list",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "editable_information_requirements",
+        "label": "必须可编辑的信息",
+        "type": "list",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "recommended_page_count",
+        "label": "建议页数",
+        "type": "number",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "analysis_quality_notes",
+        "label": "分析质量说明",
+        "type": "rubric",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      }
+    ]
+  }
+}

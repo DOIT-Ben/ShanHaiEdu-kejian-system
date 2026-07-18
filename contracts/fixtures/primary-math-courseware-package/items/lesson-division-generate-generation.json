@@ -1,0 +1,45 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "generation_template",
+  "metadata": {
+    "key": "lesson.division.generate",
+    "name": "课时划分生成",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "lesson.division.generate",
+    "title": "课时划分生成",
+    "description": "从教师批准的教材范围中划分可独立实施的40分钟课时，只决定课时边界，不同时生成详细教案。",
+    "model_capability": "text.structured.zh_primary_math",
+    "input_definition_ref": {
+      "item_key": "lesson.division.generate.input",
+      "kind": "input_definition"
+    },
+    "prompt_template_ref": {
+      "item_key": "lesson.division.generate.prompt",
+      "kind": "prompt_template"
+    },
+    "output_definition_ref": {
+      "item_key": "lesson.division.generate.output",
+      "kind": "content_definition"
+    },
+    "style_preset_refs": [],
+    "projection_refs": [
+      {
+        "role": "teacher_view",
+        "template_ref": {
+          "item_key": "lesson.division.generate.projection",
+          "kind": "projection_template"
+        }
+      },
+      {
+        "role": "export",
+        "template_ref": {
+          "item_key": "lesson.division.generate.projection",
+          "kind": "projection_template"
+        }
+      }
+    ]
+  }
+}

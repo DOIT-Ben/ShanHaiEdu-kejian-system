@@ -1,0 +1,99 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "ppt.cover.prompt.generate.output",
+    "name": "PPT封面图片提示词输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "ppt.cover.prompt.generate.output",
+    "title": "PPT封面图片提示词输出",
+    "description": "可直接导入图片创作台的封面图片业务请求。",
+    "definition_role": "prompt_components",
+    "fields": [
+      {
+        "field_key": "cover_request_key",
+        "label": "请求键",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "cover_subject",
+        "label": "主体与教学情境",
+        "type": "rich_text",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "cover_composition",
+        "label": "构图与留白",
+        "type": "rich_text",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "cover_material_and_form",
+        "label": "材质与造型",
+        "type": "rich_text",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "cover_palette_and_lighting",
+        "label": "配色与光线",
+        "type": "rich_text",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "cover_aspect_ratio",
+        "label": "画幅",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "default_value": "16:9"
+      },
+      {
+        "field_key": "cover_text_safe_area",
+        "label": "标题安全区",
+        "type": "rich_text",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "cover_negative_constraints",
+        "label": "负面约束",
+        "type": "list",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "cover_candidate_count_output",
+        "label": "候选数",
+        "type": "number",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "cover_target_slot",
+        "label": "目标槽位",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      }
+    ]
+  }
+}

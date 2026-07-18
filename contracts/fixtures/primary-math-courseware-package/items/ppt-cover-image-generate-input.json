@@ -1,0 +1,62 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "ppt.cover.image.generate.input",
+    "name": "PPT封面候选生成输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "ppt.cover.image.generate.input",
+    "title": "PPT封面候选生成输入",
+    "description": "输入批准的完整图片提示词、候选数、目标槽位和可选风格参考资产。",
+    "fields": [
+      {
+        "field_key": "cover_prompt_text",
+        "label": "完整封面生成指令",
+        "value_type": "rich_text",
+        "required": true,
+        "source": "teacher",
+        "visibility": "primary",
+        "widget": "textarea",
+        "validation": {
+          "min_length": 20,
+          "max_length": 20000
+        }
+      },
+      {
+        "field_key": "cover_generation_count",
+        "label": "候选数量",
+        "value_type": "number",
+        "required": true,
+        "source": "teacher",
+        "visibility": "primary",
+        "widget": "number",
+        "default_value": 3,
+        "validation": {
+          "minimum": 2,
+          "maximum": 4
+        }
+      },
+      {
+        "field_key": "cover_generation_target_slot",
+        "label": "目标槽位",
+        "value_type": "text",
+        "required": true,
+        "source": "system",
+        "visibility": "hidden",
+        "widget": "text"
+      },
+      {
+        "field_key": "cover_reference_assets",
+        "label": "风格参考",
+        "value_type": "asset",
+        "required": false,
+        "source": "system",
+        "visibility": "advanced",
+        "widget": "asset_picker"
+      }
+    ]
+  }
+}

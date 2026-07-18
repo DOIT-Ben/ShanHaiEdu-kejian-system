@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shanhaiedu.local/contracts/builtin-generation-source.schema.json",
+  "title": "BuiltinGenerationSource",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source_version", "package", "styles", "nodes"],
+  "properties": {
+    "source_version": {"const": "shanhai.builtin-generation-source/v1"},
+    "package": {"$ref": "#/$defs/package"},
+    "styles": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/style"}
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/node"}
+    }
+  },
+  "$defs": {
+    "key": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{1,159}$"},
+    "itemRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item_key", "kind"],
+      "properties": {
+        "item_key": {"$ref": "#/$defs/key"},
+        "kind": {"type": "string"}
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package_key", "name", "semantic_version", "runtime_constraint", "change_summary"],
+      "properties": {
+        "package_key": {"$ref": "#/$defs/key"},
+        "name": {"type": "string", "minLength": 1},
+        "semantic_version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$"
+        },
+        "runtime_constraint": {"type": "string", "minLength": 1},
+        "change_summary": {"type": "string", "minLength": 1}
+      }
+    },
+    "style": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preset_key", "title", "modalities", "visual_language"],
+      "properties": {
+        "preset_key": {"$ref": "#/$defs/key"},
+        "title": {"type": "string", "minLength": 1},
+        "description": {"type": "string"},
+        "modalities": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["image", "video", "presentation"]}
+        },
+        "visual_language": {"type": "string", "minLength": 1},
+        "palette": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "mood": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "texture": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "negative_constraints": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "extensions": {"type": "object"}
+      }
+    },
+    "inputField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field_key", "label", "value_type", "required", "source", "visibility", "widget"],
+      "properties": {
+        "field_key": {"$ref": "#/$defs/key"},
+        "label": {"type": "string", "minLength": 1},
+        "description": {"type": "string"},
+        "value_type": {
+          "enum": ["text", "rich_text", "number", "boolean", "enum", "list", "reference", "asset"]
+        },
+        "required": {"type": "boolean"},
+        "source": {"enum": ["teacher", "system", "context"]},
+        "visibility": {"enum": ["primary", "secondary", "advanced", "hidden"]},
+        "widget": {
+          "enum": ["text", "textarea", "number", "toggle", "select", "multiselect", "style_picker", "asset_picker"]
+        },
+        "default_value": {},
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value", "label"],
+            "properties": {
+              "value": {"type": "string", "minLength": 1},
+              "label": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        "allowed_item_kinds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"enum": ["style_preset", "content_definition"]}
+        },
+        "validation": {"type": "object"}
+      }
+    },
+    "contentField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field_key", "label", "type", "required", "editable", "deletable"],
+      "properties": {
+        "field_key": {"$ref": "#/$defs/key"},
+        "label": {"type": "string", "minLength": 1},
+        "description": {"type": "string"},
+        "type": {
+          "enum": ["text", "rich_text", "number", "boolean", "enum", "color", "object", "list", "table", "group", "repeatable", "reference", "asset", "math", "rubric", "timeline"]
+        },
+        "required": {"type": "boolean"},
+        "editable": {"type": "boolean"},
+        "deletable": {"type": "boolean"},
+        "repeatable": {"type": "boolean"},
+        "min_items": {"type": "integer", "minimum": 0},
+        "max_items": {"type": "integer", "minimum": 1},
+        "ui_widget": {"type": "string"},
+        "visibility": {"enum": ["primary", "secondary", "advanced", "hidden"]},
+        "placeholder": {"type": "string"},
+        "default_value": {},
+        "options": {"type": "array"},
+        "generation_instruction": {"type": "string"},
+        "validation_rules": {"type": "array", "items": {"type": "object"}},
+        "visibility_condition": {"type": ["object", "null"]},
+        "export_mapping": {"type": ["object", "null"]},
+        "children": {"type": "array", "items": {"$ref": "#/$defs/contentField"}}
+      }
+    },
+    "contextBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["binding_key", "source", "required", "exposure", "max_items", "max_bytes"],
+      "properties": {
+        "binding_key": {"$ref": "#/$defs/key"},
+        "source": {"$ref": "#/$defs/key"},
+        "required": {"type": "boolean"},
+        "exposure": {"enum": ["full", "summary", "hidden"]},
+        "max_items": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "max_bytes": {"type": "integer", "minimum": 1, "maximum": 10000000}
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "fields"],
+      "properties": {
+        "description": {"type": "string"},
+        "fields": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/inputField"}}
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "definition_role", "fields"],
+      "properties": {
+        "description": {"type": "string"},
+        "definition_role": {"enum": ["artifact", "prompt_components", "intermediate"]},
+        "fields": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/contentField"}}
+      }
+    },
+    "prompt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "task", "method", "quality_gate", "context_bindings", "max_chars"],
+      "properties": {
+        "role": {"type": "string", "minLength": 1},
+        "task": {"type": "string", "minLength": 1},
+        "method": {"type": "string", "minLength": 1},
+        "quality_gate": {"type": "string", "minLength": 1},
+        "context_bindings": {"type": "array", "items": {"$ref": "#/$defs/contextBinding"}},
+        "max_chars": {"type": "integer", "minimum": 1, "maximum": 100000}
+      }
+    },
+    "projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["output_format", "renderer_id", "template", "allowed_variables", "roles"],
+      "properties": {
+        "output_format": {"enum": ["prompt_text", "markdown", "docx", "pptx", "pdf", "video_script"]},
+        "renderer_id": {"$ref": "#/$defs/key"},
+        "template": {"type": "string", "minLength": 1},
+        "allowed_variables": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/key"}
+        },
+        "roles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["teacher_view", "provider_request", "export"]}
+        },
+        "teacher_visible": {"type": "boolean"}
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["template_key", "title", "description", "model_capability", "input", "output", "prompt", "projection"],
+      "properties": {
+        "template_key": {"$ref": "#/$defs/key"},
+        "title": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "model_capability": {"$ref": "#/$defs/key"},
+        "style_preset_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/key"}
+        },
+        "input": {"$ref": "#/$defs/input"},
+        "output": {"$ref": "#/$defs/output"},
+        "prompt": {"$ref": "#/$defs/prompt"},
+        "projection": {"$ref": "#/$defs/projection"}
+      }
+    }
+  }
+}

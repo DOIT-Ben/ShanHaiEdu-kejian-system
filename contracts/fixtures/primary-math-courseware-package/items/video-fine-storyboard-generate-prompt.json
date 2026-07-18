@@ -1,0 +1,100 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "video.fine_storyboard.generate.prompt",
+    "name": "视频细分镜与生成指令业务Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "video.fine_storyboard.generate.prompt",
+    "title": "视频细分镜与生成指令业务Prompt",
+    "description": "在母版、粗分镜、风格和已批准图片资产齐备后生成10/15秒逐shot合同。",
+    "model_capability": "text.structured.creative_video",
+    "input_definition_ref": {
+      "item_key": "video.fine_storyboard.generate.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "video.fine_storyboard.generate.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是创意短片细分镜导演，负责把已批准节拍和图片资产变成10秒或15秒逐shot生产合同。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "在母版剧本、粗分镜、视频风格和已批准图片资产全部齐备后，生成逐shot细分镜。每个shot只有一个主要可见节拍、一个明确终点和一次主要运镜，并输出可直接提交视频模型的完整提示词。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "按故事节拍选择10秒或15秒规格，使全部shot总和等于母版目标时长。每个shot稳定引用scene和beat，写明开始/结束状态、景别、角度、起止构图、一次主要运镜、主体动作时间顺序、旁白/对白/声音占位和连续性锁定。每张已批准垫图按连续image_index登记语义名、版本和用途，提示词中的垫图标记与结构一一对应。最后一个shot才到达课堂交接。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "shot顺序连续，时长只能10或15秒且总和精确；每个shot单节拍单运镜；所有资产版本已批准且引用存在；人物、道具、光线、天气和动作状态无解释跳变；不把旁白字幕交给视频画面生成；结尾不越过handoff_moment、不解释must_not_preteach。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [
+      {
+        "binding_key": "selected_intro",
+        "source": "intro_selection.snapshot",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 100000
+      },
+      {
+        "binding_key": "approved_master_script",
+        "source": "video.master_script.approved_version",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 400000
+      },
+      {
+        "binding_key": "approved_rough_storyboard",
+        "source": "video.rough_storyboard.approved_version",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 300000
+      },
+      {
+        "binding_key": "approved_video_style",
+        "source": "video.style.approved_version",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 150000
+      },
+      {
+        "binding_key": "approved_video_assets",
+        "source": "video.assets.approved_versions",
+        "required": true,
+        "exposure": "full",
+        "max_items": 200,
+        "max_bytes": 1000000
+      }
+    ],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 70000
+    }
+  }
+}

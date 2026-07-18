@@ -1,0 +1,157 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "video.classroom_quality.evaluate.output",
+    "name": "视频课堂质量评估输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "video.classroom_quality.evaluate.output",
+    "title": "视频课堂质量评估输出",
+    "description": "最终视频课堂质量评分、时间定位发现和是否通过结论。",
+    "definition_role": "artifact",
+    "fields": [
+      {
+        "field_key": "classroom_quality_report_key",
+        "label": "质量报告键",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "quality_source_video_ref",
+        "label": "来源视频版本",
+        "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "quality_intro_option_key",
+        "label": "已选方案键",
+        "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "independent_creative_score",
+        "label": "独立创意完整度",
+        "type": "number",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "handoff_accuracy_score",
+        "label": "课堂交接准确度",
+        "type": "number",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "no_preteach_score",
+        "label": "未提前讲授",
+        "type": "number",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "continuity_score",
+        "label": "视觉与动作连续性",
+        "type": "number",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "classroom_usability_score",
+        "label": "课堂可用性",
+        "type": "number",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "classroom_quality_findings",
+        "label": "评估发现",
+        "type": "repeatable",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "repeatable": true,
+        "children": [
+          {
+            "field_key": "quality_finding_key",
+            "label": "发现键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "quality_severity",
+            "label": "严重度",
+            "type": "enum",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "quality_time_range",
+            "label": "时间区间",
+            "type": "timeline",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "quality_observation",
+            "label": "观察",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "quality_expected_behavior",
+            "label": "预期",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "quality_affected_shot_keys",
+            "label": "受影响镜头",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "classroom_quality_passed",
+        "label": "是否通过",
+        "type": "boolean",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "classroom_quality_summary",
+        "label": "评估总结",
+        "type": "rich_text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      }
+    ]
+  }
+}

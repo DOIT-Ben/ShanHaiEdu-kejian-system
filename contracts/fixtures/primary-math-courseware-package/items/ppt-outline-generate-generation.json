@@ -1,0 +1,50 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "generation_template",
+  "metadata": {
+    "key": "ppt.outline.generate",
+    "name": "PPT大纲生成",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "ppt.outline.generate",
+    "title": "PPT大纲生成",
+    "description": "把PPT内容分析变成具有稳定页面键和单页唯一教学任务的大纲。",
+    "model_capability": "text.structured.ppt_content",
+    "input_definition_ref": {
+      "item_key": "ppt.outline.generate.input",
+      "kind": "input_definition"
+    },
+    "prompt_template_ref": {
+      "item_key": "ppt.outline.generate.prompt",
+      "kind": "prompt_template"
+    },
+    "output_definition_ref": {
+      "item_key": "ppt.outline.generate.output",
+      "kind": "content_definition"
+    },
+    "style_preset_refs": [
+      {
+        "item_key": "style.primary_math.paper_clay",
+        "kind": "style_preset"
+      }
+    ],
+    "projection_refs": [
+      {
+        "role": "teacher_view",
+        "template_ref": {
+          "item_key": "ppt.outline.generate.projection",
+          "kind": "projection_template"
+        }
+      },
+      {
+        "role": "export",
+        "template_ref": {
+          "item_key": "ppt.outline.generate.projection",
+          "kind": "projection_template"
+        }
+      }
+    ]
+  }
+}

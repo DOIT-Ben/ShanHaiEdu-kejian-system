@@ -1,0 +1,43 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "generation_template",
+  "metadata": {
+    "key": "video.style_master.image.generate",
+    "name": "视频视觉母图生成",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "video.style_master.image.generate",
+    "title": "视频视觉母图生成",
+    "description": "执行视觉母图图片请求，产生用于批准风格合同的可审计候选。",
+    "model_capability": "image.generate.education_16x9",
+    "input_definition_ref": {
+      "item_key": "video.style_master.image.generate.input",
+      "kind": "input_definition"
+    },
+    "prompt_template_ref": {
+      "item_key": "video.style_master.image.generate.prompt",
+      "kind": "prompt_template"
+    },
+    "output_definition_ref": {
+      "item_key": "video.style_master.image.generate.output",
+      "kind": "content_definition"
+    },
+    "style_preset_refs": [
+      {
+        "item_key": "style.primary_math.paper_clay",
+        "kind": "style_preset"
+      }
+    ],
+    "projection_refs": [
+      {
+        "role": "teacher_view",
+        "template_ref": {
+          "item_key": "video.style_master.image.generate.projection",
+          "kind": "projection_template"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "generation_template",
+  "metadata": {
+    "key": "video.rough_storyboard.generate",
+    "name": "视频粗分镜生成",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "video.rough_storyboard.generate",
+    "title": "视频粗分镜生成",
+    "description": "把批准母版剧本拆成场次节拍、预计时长和资产需求，不产生逐镜Provider提示词。",
+    "model_capability": "text.structured.creative_video",
+    "input_definition_ref": {
+      "item_key": "video.rough_storyboard.generate.input",
+      "kind": "input_definition"
+    },
+    "prompt_template_ref": {
+      "item_key": "video.rough_storyboard.generate.prompt",
+      "kind": "prompt_template"
+    },
+    "output_definition_ref": {
+      "item_key": "video.rough_storyboard.generate.output",
+      "kind": "content_definition"
+    },
+    "style_preset_refs": [
+      {
+        "item_key": "style.primary_math.paper_clay",
+        "kind": "style_preset"
+      }
+    ],
+    "projection_refs": [
+      {
+        "role": "teacher_view",
+        "template_ref": {
+          "item_key": "video.rough_storyboard.generate.projection",
+          "kind": "projection_template"
+        }
+      },
+      {
+        "role": "export",
+        "template_ref": {
+          "item_key": "video.rough_storyboard.generate.projection",
+          "kind": "projection_template"
+        }
+      }
+    ]
+  }
+}

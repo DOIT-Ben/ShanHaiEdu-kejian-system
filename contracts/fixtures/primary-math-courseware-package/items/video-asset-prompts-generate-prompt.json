@@ -1,0 +1,84 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "video.asset_prompts.generate.prompt",
+    "name": "视频资产图片提示词业务Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "video.asset_prompts.generate.prompt",
+    "title": "视频资产图片提示词业务Prompt",
+    "description": "为四类资产清单逐项编译图片创作任务，继承批准视频风格合同。",
+    "model_capability": "text.structured.image_prompt",
+    "input_definition_ref": {
+      "item_key": "video.asset_prompts.generate.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "video.asset_prompts.generate.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是创意短片四类资产图片提示词设计师。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "为资产清单中的每个目标资产生成一个独立图片任务，逐字继承批准视频风格合同并固定目标槽位。人物、场景、道具、生物不得混成一张全家福。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "提示词写清语义主体、外观状态、材质厚度、承托面、接触阴影、光源、透视、构图、色彩、画幅和用途。character生成清楚身份设定；scene默认无人空镜；prop默认单体无手持；creature保持物种或幻想生物结构稳定。所有任务继承同一视觉语言和一致性键。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "任务与资产清单一一对应，来源、类型、目标槽位和一致性键完整；禁止文字、字幕、公式、水印、Logo、额外主体、畸形结构和风格漂移；不得生成剧情镜头或把视觉母图当成资产替代品。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [
+      {
+        "binding_key": "asset_inventory",
+        "source": "video.asset_inventory.current_version",
+        "required": true,
+        "exposure": "full",
+        "max_items": 200,
+        "max_bytes": 500000
+      },
+      {
+        "binding_key": "approved_master_script",
+        "source": "video.master_script.approved_version",
+        "required": true,
+        "exposure": "summary",
+        "max_items": 1,
+        "max_bytes": 200000
+      },
+      {
+        "binding_key": "approved_video_style",
+        "source": "video.style.approved_version",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 150000
+      }
+    ],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 50000
+    }
+  }
+}

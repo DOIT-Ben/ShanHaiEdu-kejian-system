@@ -1,0 +1,27 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "ppt.body_asset_prompts.generate.projection",
+    "name": "PPT正文图片任务包教师投影",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "ppt.body_asset_prompts.generate.projection",
+    "title": "PPT正文图片任务包教师投影",
+    "source_definition_ref": {
+      "item_key": "ppt.body_asset_prompts.generate.output",
+      "kind": "content_definition"
+    },
+    "output_format": "markdown",
+    "renderer_id": "shanhai.creation_image_package.markdown.v1",
+    "template": "# PPT正文图片任务包\n\n视觉合同：{{body_style_contract_ref}}\n\n{{body_asset_items}}\n\n## 覆盖检查\n{{body_asset_coverage}}",
+    "allowed_variables": [
+      "body_style_contract_ref",
+      "body_asset_items",
+      "body_asset_coverage"
+    ],
+    "teacher_visible": true
+  }
+}

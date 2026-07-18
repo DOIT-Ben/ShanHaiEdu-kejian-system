@@ -1,0 +1,71 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "intro.ideate.input",
+    "name": "三类九套独立创意输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "intro.ideate.input",
+    "title": "三类九套独立创意输入",
+    "description": "只接收创意类别规则、年龄安全边界和通用媒介偏好。",
+    "fields": [
+      {
+        "field_key": "ideas_per_category",
+        "label": "每类方案数",
+        "value_type": "number",
+        "required": true,
+        "source": "system",
+        "visibility": "hidden",
+        "widget": "number",
+        "default_value": 3,
+        "validation": {
+          "minimum": 3,
+          "maximum": 3
+        }
+      },
+      {
+        "field_key": "audience_age_band",
+        "label": "受众年龄段",
+        "value_type": "text",
+        "required": true,
+        "source": "system",
+        "visibility": "hidden",
+        "widget": "text",
+        "default_value": "6-12岁"
+      },
+      {
+        "field_key": "medium_preferences",
+        "label": "媒介偏好",
+        "value_type": "list",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "multiselect"
+      },
+      {
+        "field_key": "creative_preferences",
+        "label": "创意偏好",
+        "value_type": "rich_text",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "textarea",
+        "validation": {
+          "max_length": 4000
+        }
+      },
+      {
+        "field_key": "general_teacher_preferences",
+        "label": "教师通用偏好",
+        "value_type": "reference",
+        "required": false,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      }
+    ]
+  }
+}

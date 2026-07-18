@@ -1,0 +1,31 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "ppt.content_analyze.projection",
+    "name": "PPT内容分析教师投影",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "ppt.content_analyze.projection",
+    "title": "PPT内容分析教师投影",
+    "source_definition_ref": {
+      "item_key": "ppt.content_analyze.output",
+      "kind": "content_definition"
+    },
+    "output_format": "markdown",
+    "renderer_id": "shanhai.ppt_analysis.markdown.v1",
+    "template": "# PPT内容分析\n\n## 受众与边界\n{{audience_and_use}}\n\n{{ppt_content_boundary}}\n\n## 课堂顺序\n{{objective_sequence}}\n\n## 互动与图片化机会\n{{interaction_points}}\n\n{{visualization_opportunities}}\n\n## 可编辑要求与页数\n{{editable_information_requirements}}\n\n建议页数：{{recommended_page_count}}",
+    "allowed_variables": [
+      "audience_and_use",
+      "ppt_content_boundary",
+      "objective_sequence",
+      "interaction_points",
+      "visualization_opportunities",
+      "editable_information_requirements",
+      "recommended_page_count"
+    ],
+    "teacher_visible": true
+  }
+}

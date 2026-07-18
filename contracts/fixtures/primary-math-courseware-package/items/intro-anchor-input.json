@@ -1,0 +1,70 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "intro.anchor.input",
+    "name": "最小课程锚定输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "intro.anchor.input",
+    "title": "最小课程锚定输入",
+    "description": "输入九套独立创意，并注入已批准课时和教材证据。",
+    "fields": [
+      {
+        "field_key": "independent_idea_set",
+        "label": "独立创意集",
+        "value_type": "reference",
+        "required": true,
+        "source": "system",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "target_lesson_unit",
+        "label": "目标课时",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "target_material_evidence",
+        "label": "教材证据",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "duration_preference_seconds",
+        "label": "建议导入时长",
+        "value_type": "number",
+        "required": true,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "number",
+        "default_value": 45,
+        "validation": {
+          "minimum": 15,
+          "maximum": 120
+        }
+      },
+      {
+        "field_key": "anchor_requirements",
+        "label": "锚点补充要求",
+        "value_type": "rich_text",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "textarea",
+        "validation": {
+          "max_length": 4000
+        }
+      }
+    ]
+  }
+}

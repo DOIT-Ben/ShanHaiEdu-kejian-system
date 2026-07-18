@@ -1,0 +1,84 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "video.style_master.prompt.generate.prompt",
+    "name": "视频视觉母图提示词业务Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "video.style_master.prompt.generate.prompt",
+    "title": "视频视觉母图提示词业务Prompt",
+    "description": "从已选方案、母版剧本和粗分镜中编译视频视觉母图请求，用于锁定视觉语言而非替代全部资产。",
+    "model_capability": "text.structured.image_prompt",
+    "input_definition_ref": {
+      "item_key": "video.style_master.prompt.generate.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "video.style_master.prompt.generate.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是创意短片视觉开发师，负责用一张视觉母图锁定整片视觉语言。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "依据已选方案、批准母版剧本和粗分镜，生成视觉母图的完整图片请求，覆盖代表主体、场景、媒介、造型比例、材质、配色、光线、背景密度、摄影机和运动语言。母图只锁风格，不替代人物设定、场景空镜、道具单体或镜头关键帧。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "选择能同时展示主要主体、代表环境和关键材质关系的非剧情高潮构图；说明16:9或项目画幅、纸艺黏土媒介、主体尺度、接触阴影、背景密度、机位、镜头运动倾向和候选数。风格约束必须能被后续图片和视频提示词逐字复用。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "不得改写故事或课程交接；不得把准确文字、字幕、公式、水印或Logo画入母图；禁止恐怖、成人化和风格漂移；母图不作为全部镜头唯一垫图；候选数、目标槽位、画幅和负面约束完整。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [
+      {
+        "binding_key": "selected_intro",
+        "source": "intro_selection.snapshot",
+        "required": true,
+        "exposure": "summary",
+        "max_items": 1,
+        "max_bytes": 100000
+      },
+      {
+        "binding_key": "approved_master_script",
+        "source": "video.master_script.approved_version",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 400000
+      },
+      {
+        "binding_key": "approved_rough_storyboard",
+        "source": "video.rough_storyboard.approved_version",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 300000
+      }
+    ],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 25000
+    }
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "ppt.body_asset_prompts.generate.prompt",
+    "name": "PPT正文图片任务包业务Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "ppt.body_asset_prompts.generate.prompt",
+    "title": "PPT正文图片任务包业务Prompt",
+    "description": "把逐页资产要求编译为可批量导入图片创作台的不可变任务项。",
+    "model_capability": "text.structured.image_prompt",
+    "input_definition_ref": {
+      "item_key": "ppt.body_asset_prompts.generate.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "ppt.body_asset_prompts.generate.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是小学数学PPT正文图片资产提示词工程师，负责从已批准页规格编译独立可生成的图片任务。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "为目标页面的每个asset_requirement生成一个独立任务项，继承PPT视觉合同，写出完整提示词、负面约束、画幅、一致性键和固定目标槽位。不要合并不同资产，不生成PPT文字或数学答案。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "每个提示词说明主体、动作或用途、材质厚度、承托面、接触阴影、光源、透视、构图、色彩、画幅、留白和禁止项。参与精确数量、点数、排序、增删或逐步揭示的具象物件优先生成单体资产，由PPT复制和控制数量；准确文字、数字、算式、表格、关系线和答案留给可编辑层。正文继承封面视觉语言但保持白底，不复制封面背景。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "任务项与页规格资产要求一一对应；每项只有一个目标槽位和一致性键；禁止文字数字公式水印Logo、额外主体和畸形结构；不得照搬教材插图或大段原文；每个资产独立可生成且能回溯页面与要求键。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [
+      {
+        "binding_key": "approved_lesson_plan",
+        "source": "lesson_plan.approved_version",
+        "required": true,
+        "exposure": "summary",
+        "max_items": 1,
+        "max_bytes": 300000
+      },
+      {
+        "binding_key": "approved_material",
+        "source": "material.approved_parse",
+        "required": true,
+        "exposure": "summary",
+        "max_items": 50,
+        "max_bytes": 300000
+      },
+      {
+        "binding_key": "page_specs",
+        "source": "ppt_page_spec.current_version",
+        "required": true,
+        "exposure": "full",
+        "max_items": 100,
+        "max_bytes": 800000
+      },
+      {
+        "binding_key": "ppt_style",
+        "source": "ppt_style.approved_version",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 100000
+      }
+    ],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 60000
+    }
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "video.rough_storyboard.generate.prompt",
+    "name": "视频粗分镜生成业务Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "video.rough_storyboard.generate.prompt",
+    "title": "视频粗分镜生成业务Prompt",
+    "description": "把批准母版剧本拆成场次节拍、预计时长和资产需求，不产生逐镜Provider提示词。",
+    "model_capability": "text.structured.creative_video",
+    "input_definition_ref": {
+      "item_key": "video.rough_storyboard.generate.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "video.rough_storyboard.generate.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是创意短片粗分镜设计师，负责验证故事节奏、时长和可制作性。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "把批准母版剧本按场次和故事节拍拆成粗分镜。每个beat只说明发生什么、学生看到什么变化、预计多长、需要哪些资产和怎样衔接；不要写逐秒运镜、参考图序号或视频模型提示词。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "保持母版剧本场次、开始结束状态和唯一课堂交接不变。按可见变化拆分2个以上节拍，每个节拍只有一个主要事件，稳定引用来源scene_key。预计时长总和等于母版目标时长，并为后续人物、场景、道具、生物资产清单提供明确需求。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "不改写已选方案或母版剧本；节拍顺序连续、来源有效、单节拍单事件；总时长一致；最后节拍才到达handoff_moment；不包含Provider提示词、参考图位置、10/15秒shot硬切、资产文件或模型参数。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [
+      {
+        "binding_key": "selected_intro",
+        "source": "intro_selection.snapshot",
+        "required": true,
+        "exposure": "summary",
+        "max_items": 1,
+        "max_bytes": 100000
+      },
+      {
+        "binding_key": "approved_master_script",
+        "source": "video.master_script.approved_version",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 400000
+      }
+    ],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 30000
+    }
+  }
+}

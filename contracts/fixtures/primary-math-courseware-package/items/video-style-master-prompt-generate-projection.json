@@ -1,0 +1,31 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "video.style_master.prompt.generate.projection",
+    "name": "视频视觉母图提示词教师投影",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "video.style_master.prompt.generate.projection",
+    "title": "视频视觉母图提示词教师投影",
+    "source_definition_ref": {
+      "item_key": "video.style_master.prompt.generate.output",
+      "kind": "content_definition"
+    },
+    "output_format": "prompt_text",
+    "renderer_id": "shanhai.image_prompt.v1",
+    "template": "代表主体与场景：{{style_master_subjects}}。媒介：{{style_master_medium}}。造型材质：{{style_master_design_rules}}。配色光线：{{style_master_palette_lighting}}。摄影机与运动语言：{{style_master_camera_motion}}。画幅：{{style_master_aspect_ratio}}。禁止：{{style_master_negative_constraints}}。",
+    "allowed_variables": [
+      "style_master_subjects",
+      "style_master_medium",
+      "style_master_design_rules",
+      "style_master_palette_lighting",
+      "style_master_camera_motion",
+      "style_master_aspect_ratio",
+      "style_master_negative_constraints"
+    ],
+    "teacher_visible": true
+  }
+}
