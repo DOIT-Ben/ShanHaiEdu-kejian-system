@@ -48,9 +48,11 @@ def test_approval_pointer_event_and_outbox_commit_or_rollback_together(
                 request_id="req-submit",
             )
 
-        baseline_approvals = session.scalar(select(func.count()).select_from(Approval))
-        baseline_events = session.scalar(select(func.count()).select_from(EventStreamEntry))
-        baseline_outbox = session.scalar(select(func.count()).select_from(OutboxEvent))
+        baseline_approvals = int(session.scalar(select(func.count()).select_from(Approval)) or 0)
+        baseline_events = int(
+            session.scalar(select(func.count()).select_from(EventStreamEntry)) or 0
+        )
+        baseline_outbox = int(session.scalar(select(func.count()).select_from(OutboxEvent)) or 0)
         session.rollback()
 
         try:
@@ -199,14 +201,16 @@ def test_approved_version_is_no_longer_a_returnable_submission(
         assert artifact.current_submitted_version_id is None
         assert artifact.current_approved_version_id == version.id
         assert artifact.status == "approved"
+        session.rollback()
 
-        with pytest.raises(ApiError) as conflict, session.begin():
-            ArtifactService(session, actor).review(
-                version.id,
-                action="request_changes",
-                comment="Too late",
-                request_id="req-terminal-return",
-            )
+        with pytest.raises(ApiError) as conflict:
+            with session.begin():
+                ArtifactService(session, actor).review(
+                    version.id,
+                    action="request_changes",
+                    comment="Too late",
+                    request_id="req-terminal-return",
+                )
         assert conflict.value.code == "ARTIFACT_STATE_CONFLICT"
 
         session.refresh(artifact)

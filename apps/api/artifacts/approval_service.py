@@ -100,6 +100,7 @@ class ArtifactApprovalService:
         approval = self._record(
             version, ApprovalAction.APPROVE, comment, quality_evidence, policy_snapshot
         )
+        artifact.current_submitted_version_id = None
         artifact.current_approved_version_id = version.id
         artifact.status = "approved"
         artifact.stale_reason_json = None
@@ -158,7 +159,7 @@ class ArtifactApprovalService:
         quality_evidence: dict[str, Any] | None,
         policy_snapshot: dict[str, Any] | None,
     ) -> Approval:
-        if artifact.current_submitted_version_id != version.id:
+        if artifact.status != "in_review" or artifact.current_submitted_version_id != version.id:
             raise self._state_conflict("Only the current submitted version can be returned.")
         approval = self._record(
             version,

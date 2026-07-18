@@ -365,11 +365,11 @@ async def test_unexpected_provider_failure_is_normalized_and_audited(
                 GenerationAttempt.request_id == "req-unexpected-provider-failure"
             )
         )
+        assert attempt is not None
         usage = session.scalar(
             select(UsageRecord).where(UsageRecord.generation_attempt_id == attempt.id)
         )
 
-    assert attempt is not None
     assert attempt.status == "failed"
     assert attempt.finished_at is not None
     assert attempt.error_code == "MODEL_PROVIDER_UNAVAILABLE"

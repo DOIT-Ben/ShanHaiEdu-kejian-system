@@ -69,6 +69,15 @@ class ModelGateway:
             self._fail_audit(attempt_id, audit_context, error, latency_ms=latency_ms)
             self._audit_error(request, provider, error.code, latency_ms)
             raise
+        except Exception as cause:
+            latency_ms = round((time.perf_counter() - started) * 1_000)
+            error = ModelGatewayError(
+                GatewayErrorCode.PROVIDER_UNAVAILABLE,
+                retryable=True,
+            )
+            self._fail_audit(attempt_id, audit_context, error, latency_ms=latency_ms)
+            self._audit_error(request, provider, error.code, latency_ms)
+            raise error from cause
 
         latency_ms = round((time.perf_counter() - started) * 1_000)
         route = RouteDecision(
