@@ -37,8 +37,7 @@
     "teacher_preferences": {"type": "object", "additionalProperties": true},
     "generation_templates": {
       "type": "array",
-      "minItems": 23,
-      "maxItems": 23,
+      "minItems": 1,
       "uniqueItems": true,
       "items": {"$ref": "#/$defs/key"}
     },
@@ -48,12 +47,13 @@
     "intro_selection": {"$ref": "#/$defs/introSelection"},
     "ppt": {"$ref": "#/$defs/ppt"},
     "video": {"$ref": "#/$defs/video"},
-    "delivery_expectations": {"type": "object", "additionalProperties": true}
+    "delivery_expectations": {"$ref": "#/$defs/deliveryExpectations"}
   },
   "$defs": {
     "key": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{1,159}$"},
     "nonEmptyStrings": {
       "type": "array",
+      "minItems": 1,
       "items": {"type": "string", "minLength": 1},
       "uniqueItems": true
     },
@@ -88,9 +88,9 @@
           "additionalProperties": false,
           "required": ["hash_verified", "page_count_verified", "page_range_visually_verified", "raw_source_committed"],
           "properties": {
-            "hash_verified": {"type": "boolean"},
-            "page_count_verified": {"type": "boolean"},
-            "page_range_visually_verified": {"type": "boolean"},
+            "hash_verified": {"const": true},
+            "page_count_verified": {"const": true},
+            "page_range_visually_verified": {"const": true},
             "raw_source_committed": {"const": false}
           }
         }
@@ -187,7 +187,7 @@
             "teaching_objectives": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": true}},
             "key_difficulties_and_strategies": {"type": "object", "additionalProperties": true},
             "preparation": {"type": "object", "additionalProperties": true},
-            "teaching_process": {"type": "array", "minItems": 4, "items": {"type": "object", "additionalProperties": true, "required": ["section_key", "minutes", "objective_keys", "teacher_actions", "student_actions", "key_questions", "assessment_evidence"]}},
+            "teaching_process": {"type": "array", "minItems": 4, "items": {"type": "object", "additionalProperties": true, "required": ["section_key", "minutes", "objective_keys", "teacher_actions", "student_actions", "key_questions", "board_updates", "transition", "design_rationale", "assessment_evidence"]}},
             "board_design": {"type": "object", "additionalProperties": true},
             "lesson_summary": {"type": "object", "additionalProperties": true},
             "differentiated_homework": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
@@ -224,20 +224,29 @@
     "introOptionSet": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["option_set_key", "lesson_unit_key", "options", "quality_expectations"],
+      "required": ["option_set_key", "generation_mode", "lesson_unit_key", "options", "quality_expectations"],
       "properties": {
         "option_set_key": {"$ref": "#/$defs/key"},
+        "generation_mode": {"enum": ["default_nine", "refine_existing"]},
         "lesson_unit_key": {"$ref": "#/$defs/key"},
-        "options": {"type": "array", "minItems": 9, "maxItems": 9, "items": {"$ref": "#/$defs/introOption"}},
+        "options": {"type": "array", "minItems": 1, "maxItems": 9, "items": {"$ref": "#/$defs/introOption"}},
         "quality_expectations": {"type": "object", "additionalProperties": true}
-      }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"generation_mode": {"const": "default_nine"}}},
+          "then": {"properties": {"options": {"minItems": 9, "maxItems": 9}}},
+          "else": {"properties": {"options": {"minItems": 1, "maxItems": 1}}}
+        }
+      ]
     },
     "introSelection": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["selection_key", "option_key", "snapshot"],
+      "required": ["selection_key", "selection_method", "option_key", "snapshot"],
       "properties": {
         "selection_key": {"$ref": "#/$defs/key"},
+        "selection_method": {"enum": ["teacher_selected", "policy_default"]},
         "option_key": {"type": "string", "pattern": "^INTRO-(SCI|APP|STO)-[0-9]{2}$"},
         "snapshot": {"$ref": "#/$defs/introOption"}
       }
@@ -264,11 +273,15 @@
     "ppt": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["source_lesson_plan_key", "analysis", "outline", "cover", "style_contract", "page_specs", "assembly_expectations", "quality_expectations"],
+      "required": ["source_lesson_plan_key", "outline_key", "page_spec_set_key", "body_package_key", "analysis", "outline", "outline_coverage_check", "cover", "style_contract", "page_specs", "assembly_expectations", "quality_expectations"],
       "properties": {
         "source_lesson_plan_key": {"$ref": "#/$defs/key"},
+        "outline_key": {"$ref": "#/$defs/key"},
+        "page_spec_set_key": {"$ref": "#/$defs/key"},
+        "body_package_key": {"$ref": "#/$defs/key"},
         "analysis": {"type": "object", "additionalProperties": true},
         "outline": {"type": "array", "minItems": 5, "items": {"type": "object", "additionalProperties": true}},
+        "outline_coverage_check": {"type": "object", "additionalProperties": true},
         "cover": {"type": "object", "additionalProperties": true},
         "style_contract": {"type": "object", "additionalProperties": true},
         "page_specs": {"type": "array", "minItems": 5, "items": {"$ref": "#/$defs/pptPage"}},
@@ -276,21 +289,98 @@
         "quality_expectations": {"type": "object", "additionalProperties": true}
       }
     },
+    "audioTrack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["track_key", "kind", "shot_key", "timeline", "script_text", "voice_profile", "speech_rate", "volume_intent", "ducking_rules", "target_slot", "subtitle_text"],
+      "properties": {
+        "track_key": {"$ref": "#/$defs/key"},
+        "kind": {"enum": ["narration", "dialogue", "sound_effect", "music"]},
+        "shot_key": {"oneOf": [{"$ref": "#/$defs/key"}, {"type": "null"}]},
+        "timeline": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["start_seconds", "end_seconds"],
+          "properties": {
+            "start_seconds": {"type": "number", "minimum": 0},
+            "end_seconds": {"type": "number", "exclusiveMinimum": 0}
+          }
+        },
+        "script_text": {"type": "string", "minLength": 1},
+        "voice_profile": {"type": "string", "minLength": 1},
+        "speech_rate": {"type": "number", "exclusiveMinimum": 0, "maximum": 3},
+        "volume_intent": {"type": "string", "minLength": 1},
+        "ducking_rules": {"$ref": "#/$defs/nonEmptyStrings"},
+        "target_slot": {"type": "string", "minLength": 1},
+        "subtitle_text": {"type": "string"}
+      }
+    },
+    "audioPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["audio_plan_key", "tracks", "mix_rules"],
+      "properties": {
+        "audio_plan_key": {"$ref": "#/$defs/key"},
+        "tracks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/audioTrack"}
+        },
+        "mix_rules": {"$ref": "#/$defs/nonEmptyStrings"}
+      }
+    },
+    "deliveryExpectations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled_branches", "required_artifact_families", "golden_fixture_claim", "ordinary_ci_provider_policy", "milestone_exit_provider_policy"],
+      "properties": {
+        "enabled_branches": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["lesson_plan", "intro_options", "ppt", "video"]}
+        },
+        "required_artifact_families": {"$ref": "#/$defs/nonEmptyStrings"},
+        "golden_fixture_claim": {"type": "string", "minLength": 1},
+        "ordinary_ci_provider_policy": {"const": "deterministic_fake_only"},
+        "milestone_exit_provider_policy": {"const": "real_text_image_video_smoke_tts_deferred"}
+      }
+    },
     "video": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["selected_intro_option_key", "source_policy", "master_script", "rough_storyboard", "style_contract", "asset_inventory", "asset_image_prompts", "fine_storyboard", "clip_expectations", "audio_plan", "timeline_expectations", "quality_expectations"],
+      "required": ["selected_intro_option_key", "source_policy", "master_script", "rough_storyboard", "style_contract", "asset_inventory", "asset_image_prompt_package_key", "asset_image_prompts", "fine_storyboard", "clip_expectations", "audio_plan", "timeline_expectations", "quality_expectations"],
       "properties": {
         "selected_intro_option_key": {"type": "string", "pattern": "^INTRO-(SCI|APP|STO)-[0-9]{2}$"},
         "source_policy": {"type": "object", "additionalProperties": false, "required": ["allowed_sources", "forbidden_sources"], "properties": {"allowed_sources": {"$ref": "#/$defs/nonEmptyStrings"}, "forbidden_sources": {"$ref": "#/$defs/nonEmptyStrings"}}},
-        "master_script": {"type": "object", "additionalProperties": true, "required": ["master_script_key", "selected_intro_option_key", "title", "complete_story", "scenes", "handoff", "target_duration_seconds"]},
+        "master_script": {"type": "object", "additionalProperties": true, "required": ["master_script_key", "selected_intro_option_key", "title", "complete_story", "scenes", "handoff", "duration_recommendation", "target_duration_seconds"]},
         "rough_storyboard": {"type": "object", "additionalProperties": true, "required": ["rough_storyboard_key", "beats", "total_duration_seconds"]},
         "style_contract": {"type": "object", "additionalProperties": true},
         "asset_inventory": {"type": "object", "additionalProperties": true, "required": ["asset_inventory_key", "categories", "assets"]},
+        "asset_image_prompt_package_key": {"$ref": "#/$defs/key"},
         "asset_image_prompts": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": true, "required": ["asset_key", "target_slot", "prompt_text", "negative_constraints"]}},
-        "fine_storyboard": {"type": "object", "additionalProperties": true, "required": ["fine_storyboard_key", "target_duration_seconds", "shots"]},
+        "fine_storyboard": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["fine_storyboard_key", "target_duration_seconds", "shots"],
+          "properties": {
+            "target_duration_seconds": {"type": "integer", "minimum": 60, "maximum": 180},
+            "shots": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "type": "object",
+                "additionalProperties": true,
+                "required": ["shot_key", "duration_seconds"],
+                "properties": {
+                  "duration_seconds": {"type": "integer", "minimum": 6, "maximum": 30}
+                }
+              }
+            }
+          }
+        },
         "clip_expectations": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": true, "required": ["shot_key", "candidate_count", "formal_clip_after_adopt_and_save"]}},
-        "audio_plan": {"type": "object", "additionalProperties": true, "required": ["audio_plan_key", "tracks"]},
+        "audio_plan": {"$ref": "#/$defs/audioPlan"},
         "timeline_expectations": {"type": "object", "additionalProperties": true},
         "quality_expectations": {"type": "object", "additionalProperties": true}
       }

@@ -16,7 +16,7 @@
     },
     "output_format": "markdown",
     "renderer_id": "shanhai.intro_option_set.markdown.v1",
-    "template": "# 三类九套课堂导入设计\n\n{{options}}\n\n## 推荐结论\n{{recommendation_summary}}",
+    "template": "# 课堂导入设计\n\n{{options}}\n\n## 推荐结论\n{{recommendation_summary}}",
     "allowed_variables": [
       "options",
       "recommendation_summary"

@@ -213,6 +213,56 @@
         ]
       },
       {
+        "field_key": "master_duration_recommendation",
+        "label": "时长建议",
+        "type": "group",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "children": [
+          {
+            "field_key": "master_duration_mode",
+            "label": "时长方式",
+            "type": "enum",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "master_recommended_duration_seconds",
+            "label": "系统建议时长",
+            "type": "number",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "master_duration_reason",
+            "label": "建议理由",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "master_estimated_shot_count",
+            "label": "预计镜头数",
+            "type": "number",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "master_pricing_quote_required",
+            "label": "进入分镜前需要服务端报价",
+            "type": "boolean",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      },
+      {
         "field_key": "master_target_duration_seconds",
         "label": "目标总时长",
         "type": "number",

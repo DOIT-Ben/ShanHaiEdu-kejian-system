@@ -54,7 +54,7 @@
       },
       {
         "field_key": "preferred_page_count",
-        "label": "期望页数",
+        "label": "期望页数（可选）",
         "value_type": "number",
         "required": false,
         "source": "teacher",

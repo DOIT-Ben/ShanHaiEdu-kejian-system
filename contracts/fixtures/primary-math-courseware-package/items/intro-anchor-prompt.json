@@ -10,7 +10,7 @@
   "spec": {
     "template_key": "intro.anchor.prompt",
     "title": "最小课程锚定业务Prompt",
-    "description": "只为九套独立创意补充唯一最小课程锚点、首问、交接和推荐度，不改写独立创意。",
+    "description": "只为一套或九套独立创意补充唯一最小课程锚点、首问、交接和推荐度，不改写独立创意。",
     "model_capability": "text.structured.zh_primary_math",
     "input_definition_ref": {
       "item_key": "intro.anchor.input",
@@ -38,14 +38,14 @@
       {
         "section_key": "method",
         "layer": "method",
-        "content": "先从批准课时与教材证据提取当前核心学习边界和不得提前讲授内容。对每套创意找到一个具体的触发事件、可见现象、真实选择或未完成行动作为唯一回接；锚点只负责把注意力带回课堂，不解释整节课。交接时刻必须可定位，课堂第一问必须可直接由教师提出。推荐度综合独立性、课时适配、可制作性、时长和风险，九套分数必须产生唯一最高值。",
+        "content": "先从批准课时与教材证据提取当前核心学习边界和不得提前讲授内容。对每套创意找到一个具体的触发事件、可见现象、真实选择或未完成行动作为唯一回接；锚点只负责把注意力带回课堂，不解释整节课。交接时刻必须可定位，课堂第一问必须可直接由教师提出。推荐度综合独立性、课时适配、可制作性、时长和风险；default_nine必须产生唯一最高值，refine_existing只有一套并保留教师选择。",
         "editable": false,
         "visible_to_teacher": false
       },
       {
         "section_key": "quality_gate",
         "layer": "quality_gate",
-        "content": "科普、应用、故事各恰好三套；独立创意字段与上游逐字一致；每套只有一个课程锚点，且去掉锚点仍成立；不得提前讲出需要学生发现的定义、写法、方法或结论；最高推荐分必须唯一；不得因为小学受众默认教师、教室或儿童角色；输出不含教案正文、PPT、分镜、旁白、字幕、资产、Provider和费用。",
+        "content": "default_nine科普、应用、故事各恰好三套，refine_existing恰好一套；独立创意字段与上游逐字一致；每套只有一个课程锚点，且去掉锚点仍成立；不得提前讲出需要学生发现的定义、写法、方法或结论；default_nine最高推荐分必须唯一；不得因为小学受众默认教师、教室或儿童角色；输出不含教案正文、PPT、分镜、旁白、字幕、资产、Provider和费用。",
         "editable": false,
         "visible_to_teacher": false
       }

@@ -12,7 +12,7 @@
 - `workflow-node-status.schema.json`：节点状态枚举。
 - `intro-option-set.schema.json`：三类九套导入设计、最小课程锚点和选择交接。
 - `ppt-page-spec.schema.json`：PPT逐页四层结构、白底和可编辑内容合同。
-- `video-shot.schema.json`：细分镜、垫图引用和10/15秒生成合同。
+- `video-shot.schema.json`：细分镜、垫图引用和6至30秒逻辑生成合同。
 - `creation-package.schema.json`：项目导入通用创作台的不可变包；兼容旧包，2.0包强制工作流来源、上下文快照和目标槽位。
 - `content-definition.schema.json`：动态内容字段树。
 - `material-evidence-package.schema.json`：教材PDF页级文本块、图片引用和来源追溯合同。
@@ -32,7 +32,7 @@
 - `fixtures/creation-lifecycle/`：project/standalone批次、提示词版本、采用、项目写回、CreationPackage 2.0和stale事件样例。
 - `fixtures/workflow-node-generation-bindings/`：覆盖教材、课时、教案、三类九套、PPT、图片、视频、音频和交付的完整脱敏节点目录样例。
 - `fixtures/primary-math-courseware-package/`：由内置生成源确定性展开的首套小学数学业务内容包；23个模型节点均有输入、Prompt、输出、投影和生成模板。
-- `fixtures/golden-projects/`：不包含原教材和媒体文件的脱敏黄金项目；固定可复现实例、上下文隔离和跨成果质量不变量。
+- `fixtures/golden-projects/`：不包含原教材和媒体文件的脱敏黄金项目；固定可复现实例、上下文隔离、跨成果质量不变量和分支可消费的精确规划输出。
 - `generated/`：由当前OpenAPI确定性生成的bundle和TypeScript类型，不是第二份手工合同。
 - `typescript/client.ts`：基于生成paths和openapi-fetch的共享客户端工厂。
 
@@ -103,4 +103,6 @@ uv run python scripts\validate_golden_courseware.py contracts\fixtures\golden-pr
 uv run pytest tests\contract\test_golden_courseware_package.py
 ```
 
-普通CI只运行脱敏Fixture和确定性构建，不要求教材原件或真实Provider。传入受控本地PDF的命令额外核验SHA-256、总页数和黄金页段；真实文本、图片、视频和TTS仍属于对应适配器任务与里程碑出口。
+`scripts/golden_courseware_branch_inputs.py` 将跨成果聚合数据确定性投影为教案、PPT和视频分支入口，以及16个符合各自 `ContentDefinition` 的规划型节点输出；`scripts/golden_courseware_stage_inputs.py` 继续连接不依赖真实媒体的内部阶段。其余7个节点依赖真实图片、视频、TTS文件或最终媒体质检，只保留合同和Provider门禁，不在黄金Fixture中伪造候选文件、SHA或质量报告。
+
+普通CI只运行脱敏Fixture和确定性构建，不要求教材原件或真实Provider。传入受控本地PDF的命令额外核验SHA-256、总页数和黄金页段；真实文本、图片和视频仍属于对应适配器任务与里程碑出口。TTS当前只保留计划数据，待音频Provider可用后独立验收。

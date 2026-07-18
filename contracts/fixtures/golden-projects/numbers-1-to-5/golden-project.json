@@ -99,8 +99,11 @@
     "presentation_purpose": "daily_class",
     "ppt_aspect_ratio": "16:9",
     "ppt_preferred_page_count": 10,
-    "video_target_duration_seconds": 50,
+    "video_duration_mode": "system_recommended",
+    "video_target_duration_seconds": 90,
+    "video_cost_preference": "balanced",
     "video_aspect_ratio": "16:9",
+    "video_language": "zh-CN",
     "visual_style_key": "style.primary_math.paper_clay",
     "audio_voice_style": "亲切、清晰、自然，不幼稚化",
     "audio_speech_rate": 0.95
@@ -242,6 +245,9 @@
           "expected_responses": ["数一个点一个", "把数过的物体移到一边", "顺序改变但总数不变"],
           "possible_errors": ["重复数同一物体", "漏掉边缘物体"],
           "scaffolds": ["让学生移动物体或做已数标记", "请学生复演错误并找出重复位置"],
+          "board_updates": ["板书“数一个，点一个”，记录不重复、不遗漏的计数方法"],
+          "transition": "确认逐个计数的方法后，进入物体与点子的一一对应。",
+          "design_rationale": "先暴露学生真实计数策略，为从具体物体过渡到点子表征建立共同经验。",
           "assessment_evidence": [{"evidence_key": "AE-01", "criterion": "逐个对应且说出总数"}]
         },
         {
@@ -256,6 +262,9 @@
           "expected_responses": ["每个物体都要有一个点子", "点子表示数量，不表示物体长什么样"],
           "possible_errors": ["按物体大小配点子", "多放或少放点子"],
           "scaffolds": ["用连线或移动方式显化一一对应", "让学生逐个核对而不是只看整体"],
+          "board_updates": ["补充“一个物体对应一个点子”的配对示意"],
+          "transition": "稳定一一对应后，把点子数量与数字符号连接起来。",
+          "design_rationale": "借助点子中介淡化物体外观差异，突出数量不随表征对象变化。",
           "assessment_evidence": [{"evidence_key": "AE-02", "criterion": "物体与点子一一对应且匹配正确"}]
         },
         {
@@ -270,6 +279,9 @@
           "expected_responses": ["它们都有4个", "可以摆3个物体或画3个点"],
           "possible_errors": ["按卡片位置而不是数量匹配", "只会顺序认读，打乱后混淆"],
           "scaffolds": ["退回点子中介重新数", "用相邻数字卡帮助定位但不讲比较大小"],
+          "board_updates": ["形成物体—点子—数字1～5的对应链"],
+          "transition": "完成数量与数字的双向匹配后，进入数字规范书写。",
+          "design_rationale": "通过打乱顺序后的双向匹配，检验学生是否真正建立数量与符号联系。",
           "assessment_evidence": [{"evidence_key": "AE-02", "criterion": "物体、点子和数字双向匹配"}]
         },
         {
@@ -284,6 +296,9 @@
           "expected_responses": ["按示范方向写", "注意上下和左右位置"],
           "possible_errors": ["反向书写", "数字过小或超出格子", "把4或5写成封闭图形"],
           "scaffolds": ["放大笔顺轨迹并让学生空书", "只返修错误数字，不要求整行重写"],
+          "board_updates": ["按1～5顺序补充起笔方向和田字格占位提示"],
+          "transition": "规范书写完成后，用多种表示任务综合回看本课学习。",
+          "design_rationale": "采用观察、空书、描写和独立书写的递进练习，降低低年级书写负荷。",
           "assessment_evidence": [{"evidence_key": "AE-03", "criterion": "五个数字至少四个方向和占格基本正确"}]
         },
         {
@@ -298,6 +313,9 @@
           "expected_responses": ["数量没有变", "可以用物体、点子或数字表示"],
           "possible_errors": ["两种表示的数量不一致"],
           "scaffolds": ["让学生逐个对应检查两种表示"],
+          "board_updates": ["完成“物体—点子—数字”总结链并圈出数量不变"],
+          "transition": "以出口卡结束课堂，不进入比较大小、序数或运算内容。",
+          "design_rationale": "用两种表示和出口卡同时回收数量感知、符号对应与书写证据。",
           "assessment_evidence": [{"evidence_key": "AE-04", "criterion": "两种表示数量一致且数字书写可辨认"}]
         }
       ],
@@ -343,7 +361,7 @@
       "teaching_reflection": {
         "state": "not_taught",
         "prompts": ["哪些学生仍不能稳定一一对应？", "物体—点子—数字的哪个转换最容易出错？", "数字书写的主要问题是方向、占格还是握笔？", "下次应保留或调整哪个支架？"],
-        "teacher_record": null
+        "teacher_record": ""
       }
     },
     "quality_expectations": {
@@ -357,6 +375,7 @@
   },
   "intro_option_set": {
     "option_set_key": "INTRO-SET-001",
+    "generation_mode": "default_nine",
     "lesson_unit_key": "LESSON-001",
     "options": [
       {
@@ -443,7 +462,7 @@
         "hook": "巡检结束时，记录板上有一处空白，却没人记得对应哪组保护罩。",
         "viewer_value": "观众可以独立推理怎样留下可靠记录，并体验真实巡检任务。",
         "suggested_medium": "mixed",
-        "duration_seconds": 50,
+        "duration_seconds": 90,
         "replacement_field_key": "teaching_process.PROC-01",
         "course_anchor": "巡检员面对一组四个保护罩，准备选择一种不易丢失的数量记录方式。",
         "classroom_first_question": "这组有几个保护罩？除了画物体，还能怎样记录数量？",
@@ -481,7 +500,7 @@
         "hook": "雾中传来四声回响，最后一束灯光却来自错误方向。",
         "viewer_value": "观众会关心无人机能否分辨真实信号、避开迷雾并按时送达包裹。",
         "suggested_medium": "video",
-        "duration_seconds": 50,
+        "duration_seconds": 90,
         "replacement_field_key": "teaching_process.PROC-01",
         "course_anchor": "中转站在雾中显出四个清晰光点，无人机需要先确认信号数量再决定是否降落。",
         "classroom_first_question": "你看见了几个清晰光点？可以用哪些方式把这个数量表示出来？",
@@ -490,7 +509,7 @@
         "fit_reason": "故事先独立成立，最后的四个光点提供清楚、唯一且不泄题的数量入口。",
         "risks": ["雾效不能遮住光点", "不得在仪表盘显示数字4", "最后必须停在问题而非给出结论"],
         "recommendation_score": 92,
-        "recommendation_reason": "独立故事完整、钩子明确、视觉资产数量可控，课程锚点最小且适合50秒多镜头制作。"
+        "recommendation_reason": "独立故事完整、钩子明确、视觉资产数量可控，课程锚点最小且适合约90秒多镜头制作。"
       },
       {
         "option_key": "INTRO-STO-02",
@@ -541,6 +560,7 @@
   },
   "intro_selection": {
     "selection_key": "INTRO-SELECTION-001",
+    "selection_method": "teacher_selected",
     "option_key": "INTRO-STO-01",
     "snapshot": {
       "option_key": "INTRO-STO-01",
@@ -550,7 +570,7 @@
       "hook": "雾中传来四声回响，最后一束灯光却来自错误方向。",
       "viewer_value": "观众会关心无人机能否分辨真实信号、避开迷雾并按时送达包裹。",
       "suggested_medium": "video",
-      "duration_seconds": 50,
+      "duration_seconds": 90,
       "replacement_field_key": "teaching_process.PROC-01",
       "course_anchor": "中转站在雾中显出四个清晰光点，无人机需要先确认信号数量再决定是否降落。",
       "classroom_first_question": "你看见了几个清晰光点？可以用哪些方式把这个数量表示出来？",
@@ -559,33 +579,49 @@
       "fit_reason": "故事先独立成立，最后的四个光点提供清楚、唯一且不泄题的数量入口。",
       "risks": ["雾效不能遮住光点", "不得在仪表盘显示数字4", "最后必须停在问题而非给出结论"],
       "recommendation_score": 92,
-      "recommendation_reason": "独立故事完整、钩子明确、视觉资产数量可控，课程锚点最小且适合50秒多镜头制作。"
+      "recommendation_reason": "独立故事完整、钩子明确、视觉资产数量可控，课程锚点最小且适合约90秒多镜头制作。"
     }
   },
   "ppt": {
     "source_lesson_plan_key": "LESSON-PLAN-001",
+    "outline_key": "PPT-OUTLINE-001",
+    "page_spec_set_key": "PPT-PAGE-SPECS-001",
+    "body_package_key": "PPT-BODY-PROMPTS-001",
     "analysis": {
-      "audience": "一年级学生，40分钟新授课",
+      "analysis_key": "PPT-ANALYSIS-001",
+      "audience_and_use": "一年级学生，40分钟日常新授课，供课堂投影、操作演示和即时互动使用。",
       "content_boundary": "只呈现1～5数量感知、对应、认读、表示与书写。",
       "must_not_preteach": ["比较大小", "第几", "分与合", "加法", "减法", "0的认识"],
       "teaching_sequence": ["观察数量", "一一对应", "物体到点子", "点子到数字", "数字书写", "多种表示", "练习与总结"],
+      "interaction_points": ["观察后说明怎样数才不重复、不遗漏", "逐个配对物体与点子并检查错误", "打乱顺序匹配点子与数字", "观察笔顺后空书和独立书写", "先作答再揭示练习反馈", "学生先总结再显示课堂结论"],
       "visualization_opportunities": ["生活物件与可移动单体", "物体—点子—数字对应", "数字笔顺与占格", "多种表征工作台"],
       "must_remain_editable": ["所有标题与问题", "数字1～5", "点子数量与位置", "书写笔顺轨迹", "匹配关系和答案"],
-      "recommended_page_count": 10
+      "recommended_page_count": 10,
+      "page_count_recommendation_reason": "本课单课时40分钟、教学任务聚焦且互动节点明确，10页可覆盖导入、对应、认读、书写、练习与总结；该值是黄金案例建议，不是平台固定页数。",
+      "analysis_quality_notes": {"lesson_boundary_preserved": true, "objective_sequence_complete": true, "editable_responsibilities_explicit": true}
     },
     "outline": [
-      {"page_key": "PAGE-01", "page_type": "cover", "teaching_task": "建立课题识别和统一视觉世界。"},
-      {"page_key": "PAGE-02", "page_type": "introduction", "teaching_task": "从生活图景中观察少量物体并提出怎样数的问题。"},
-      {"page_key": "PAGE-03", "page_type": "exploration", "teaching_task": "用一一对应方式数出1～5个物体。"},
-      {"page_key": "PAGE-04", "page_type": "concept", "teaching_task": "用点子表示物体的数量。"},
-      {"page_key": "PAGE-05", "page_type": "concept", "teaching_task": "把点子数量与数字1～5对应。"},
-      {"page_key": "PAGE-06", "page_type": "exploration", "teaching_task": "观察并书写数字1～3。"},
-      {"page_key": "PAGE-07", "page_type": "exploration", "teaching_task": "观察并书写数字4～5。"},
-      {"page_key": "PAGE-08", "page_type": "discussion", "teaching_task": "用物体、点子和数字表示同一个数量。"},
-      {"page_key": "PAGE-09", "page_type": "practice", "teaching_task": "完成物体、点子与数字的匹配和辨析。"},
-      {"page_key": "PAGE-10", "page_type": "summary", "teaching_task": "归纳可靠数数和多种表示的方法。"}
+      {"page_key": "PAGE-01", "position": 1, "page_type": "cover", "teaching_task": "建立课题识别和统一视觉世界。", "source_refs": ["LESSON-PLAN-001.teaching_content"], "student_focus": "识别课题和学习情境，不提前推断数字关系。", "interaction_intent": "只完成课题识别，不安排答案揭示。"},
+      {"page_key": "PAGE-02", "position": 2, "page_type": "introduction", "teaching_task": "从生活图景中观察少量物体并提出怎样数的问题。", "source_refs": ["LESSON-PLAN-001.PROC-01", "EV-MAT-01"], "student_focus": "独立观察、逐个点数并说明避免重复遗漏的方法。", "interaction_intent": "先观察点数，再交流数数顺序和检查方法。"},
+      {"page_key": "PAGE-03", "position": 3, "page_type": "exploration", "teaching_task": "用一一对应方式数出1～5个物体。", "source_refs": ["LESSON-PLAN-001.PROC-01", "LESSON-PLAN-001.PROC-02"], "student_focus": "在逐个出现的物体中保持一物一数。", "interaction_intent": "分步揭示五个位置，让学生同步点数并检查。"},
+      {"page_key": "PAGE-04", "position": 4, "page_type": "concept", "teaching_task": "用点子表示物体的数量。", "source_refs": ["LESSON-PLAN-001.PROC-02", "EV-MAT-02"], "student_focus": "理解每个物体对应一个点子，数量不受外观影响。", "interaction_intent": "完成物体与点子的匹配，并辨析多放或少放。"},
+      {"page_key": "PAGE-05", "position": 5, "page_type": "concept", "teaching_task": "把点子数量与数字1～5对应。", "source_refs": ["LESSON-PLAN-001.PROC-03", "EV-MAT-03"], "student_focus": "在打乱顺序后仍按数量匹配点子卡和数字卡。", "interaction_intent": "先拖拽或口答匹配，再揭示对应关系。"},
+      {"page_key": "PAGE-06", "position": 6, "page_type": "exploration", "teaching_task": "观察并书写数字1～3。", "source_refs": ["LESSON-PLAN-001.PROC-04", "EV-MAT-04"], "student_focus": "观察数字1～3的起笔、方向和占格。", "interaction_intent": "逐笔揭示轨迹后空书、描写并独立书写。"},
+      {"page_key": "PAGE-07", "position": 7, "page_type": "exploration", "teaching_task": "观察并书写数字4～5。", "source_refs": ["LESSON-PLAN-001.PROC-04", "EV-MAT-04"], "student_focus": "辨认数字4～5的方向、转折和田字格位置。", "interaction_intent": "逐笔揭示并对照局部错误，只返修错误数字。"},
+      {"page_key": "PAGE-08", "position": 8, "page_type": "discussion", "teaching_task": "用物体、点子和数字表示同一个数量。", "source_refs": ["LESSON-PLAN-001.PROC-05"], "student_focus": "发现表示方式改变时数量保持不变。", "interaction_intent": "学生任选两种表示并通过一一对应互相检查。"},
+      {"page_key": "PAGE-09", "position": 9, "page_type": "practice", "teaching_task": "完成物体、点子与数字的匹配和辨析。", "source_refs": ["LESSON-PLAN-001.PROC-05", "OBJ-01", "OBJ-02"], "student_focus": "说明匹配依据，并定位重复、遗漏或错配。", "interaction_intent": "先收集答案，再分两步揭示匹配和错误反馈。"},
+      {"page_key": "PAGE-10", "position": 10, "page_type": "summary", "teaching_task": "归纳可靠数数和多种表示的方法。", "source_refs": ["LESSON-PLAN-001.lesson_summary", "PROC-05"], "student_focus": "口述可靠数数方法和物体、点子、数字的联系。", "interaction_intent": "学生先总结，再揭示总结链和出口任务。"}
     ],
+    "outline_coverage_check": {"outline_all_objectives_covered": true, "outline_sequence_preserved": true, "outline_one_task_per_page": true, "outline_coverage_notes": "10页按教案目标与课堂顺序覆盖观察、对应、认读、书写、表示、练习和总结，每页只承担一个教学任务。"},
     "cover": {
+      "request_key": "PPT-COVER-REQUEST-001",
+      "subject": "纸艺黏土数学探索桌，五个不同的无文字学习物件。",
+      "composition": "主体集中在左侧约60%区域并形成清楚层次，右侧保留大面积干净标题区。",
+      "material_and_form": "纸艺与轻黏土结合，造型清楚、尺度稳定、接触关系可信。",
+      "palette_and_lighting": "清澈蓝绿、明亮柠檬黄和珊瑚红强调；使用明亮柔和主光与克制接触阴影。",
+      "aspect_ratio": "16:9",
+      "text_safe_area": "四周8%，右侧标题区不得被主体或高对比细节侵入。",
+      "negative_constraints": ["文字", "数字", "公式", "答案", "Logo", "水印", "拥挤构图"],
       "candidate_count": 3,
       "generation_template_key": "ppt.cover.prompt.generate",
       "image_generation_template_key": "ppt.cover.image.generate",
@@ -780,10 +816,10 @@
       "narrative_purpose": "让观众跟随星光邮差分辨雾谷中的真实回响信号，并在即将降落的悬停时刻留下一个可观察问题。",
       "complete_story": "星光邮差无人机带着一只密封包裹进入雾谷。导航失去方向后，峡谷两侧依次亮起回响灯；其中一束来自错误岔路。无人机先追随错误光束，发现前方是封闭岩壁，随后根据声音和灯光的同步重新寻找真实中转站。雾气散开，中转站显出四个清晰光点。无人机悬停等待判断，故事停在降落之前。",
       "scenes": [
-        {"scene_key": "SCENE-01", "position": 1, "purpose": "建立送达目标和雾谷失向", "location": "清晨的纸艺雾谷入口", "subjects": ["星光邮差无人机", "密封包裹"], "visible_change": "清晰航道被雾遮住，导航灯转为搜索状态", "actions": ["无人机进入峡谷", "雾层合拢", "导航灯扫过岩壁"], "narration": "星光邮差必须在雾散之前找到中转站。", "dialogue": "", "sound_intent": "轻柔推进音乐、远处风声、一次导航提示音", "start_state": "无人机沿清晰航道飞行", "end_state": "无人机在浓雾中减速搜索", "duration_seconds": 15},
-        {"scene_key": "SCENE-02", "position": 2, "purpose": "制造错误信号和选择", "location": "雾谷双岔路", "subjects": ["星光邮差无人机", "回响灯"], "visible_change": "右侧错误光束先亮，无人机靠近后发现封闭岩壁", "actions": ["四次回响在谷中传播", "错误光束偏离声音方向", "无人机急停并转向"], "narration": "回响从前方传来，可最后一束灯光却指向了错误方向。", "dialogue": "", "sound_intent": "四次清晰回响、音乐短暂收紧、急停气流声", "start_state": "无人机面对两个模糊方向", "end_state": "错误岔路被排除，无人机重新寻找同步信号", "duration_seconds": 15},
-        {"scene_key": "SCENE-03", "position": 3, "purpose": "找到真实中转站", "location": "雾谷尽头的中转站外", "subjects": ["星光邮差无人机", "中转站信标"], "visible_change": "雾层逐渐打开，中转站轮廓和分开的光点依次显现", "actions": ["无人机沿同步回响前进", "雾向两侧退开", "信标光点稳定"], "narration": "声音和灯光终于在同一个方向相遇。", "dialogue": "", "sound_intent": "回响变清晰、音乐由悬疑转为明亮", "start_state": "前方只有模糊轮廓", "end_state": "中转站和四个清晰光点完整可见", "duration_seconds": 10},
-        {"scene_key": "SCENE-04", "position": 4, "purpose": "在课程锚点处悬停交接", "location": "中转站降落平台前", "subjects": ["星光邮差无人机", "中转站信标"], "visible_change": "无人机从前进改为稳定悬停，四个光点保持清楚分开", "actions": ["无人机缓慢靠近", "四个光点同时稳定", "无人机悬停等待"], "narration": "信号已经出现，星光邮差还需要最后一次确认。", "dialogue": "", "sound_intent": "音乐轻停、悬停声降低，为教师提问留白", "start_state": "无人机接近平台", "end_state": "四个光点稳定亮起，无人机等待判断", "duration_seconds": 10}
+        {"scene_key": "SCENE-01", "position": 1, "purpose": "建立送达目标和雾谷失向", "location": "清晨的纸艺雾谷入口", "subjects": ["星光邮差无人机", "密封包裹"], "visible_change": "清晰航道被雾遮住，导航灯转为搜索状态", "actions": ["无人机进入峡谷", "雾层合拢", "导航灯扫过岩壁"], "narration": "星光邮差必须在雾散之前找到中转站。", "dialogue": "", "sound_intent": "轻柔推进音乐、远处风声、一次导航提示音", "start_state": "无人机沿清晰航道飞行", "end_state": "无人机在浓雾中减速搜索", "duration_seconds": 25},
+        {"scene_key": "SCENE-02", "position": 2, "purpose": "制造错误信号和选择", "location": "雾谷双岔路", "subjects": ["星光邮差无人机", "回响灯"], "visible_change": "右侧错误光束先亮，无人机靠近后发现封闭岩壁", "actions": ["四次回响在谷中传播", "错误光束偏离声音方向", "无人机急停并转向"], "narration": "回响从前方传来，可最后一束灯光却指向了错误方向。", "dialogue": "", "sound_intent": "四次清晰回响、音乐短暂收紧、急停气流声", "start_state": "无人机面对两个模糊方向", "end_state": "错误岔路被排除，无人机重新寻找同步信号", "duration_seconds": 25},
+        {"scene_key": "SCENE-03", "position": 3, "purpose": "找到真实中转站", "location": "雾谷尽头的中转站外", "subjects": ["星光邮差无人机", "中转站信标"], "visible_change": "雾层逐渐打开，中转站轮廓和分开的光点依次显现", "actions": ["无人机沿同步回响前进", "雾向两侧退开", "信标光点稳定"], "narration": "声音和灯光终于在同一个方向相遇。", "dialogue": "", "sound_intent": "回响变清晰、音乐由悬疑转为明亮", "start_state": "前方只有模糊轮廓", "end_state": "中转站和四个清晰光点完整可见", "duration_seconds": 20},
+        {"scene_key": "SCENE-04", "position": 4, "purpose": "在课程锚点处悬停交接", "location": "中转站降落平台前", "subjects": ["星光邮差无人机", "中转站信标"], "visible_change": "无人机从前进改为稳定悬停，四个光点保持清楚分开", "actions": ["无人机缓慢靠近", "四个光点同时稳定", "无人机悬停等待"], "narration": "信号已经出现，星光邮差还需要最后一次确认。", "dialogue": "", "sound_intent": "音乐轻停、悬停声降低，为教师提问留白", "start_state": "无人机接近平台", "end_state": "四个光点稳定亮起，无人机等待判断", "duration_seconds": 20}
       ],
       "handoff": {
         "course_anchor": "中转站在雾中显出四个清晰光点，无人机需要先确认信号数量再决定是否降落。",
@@ -791,31 +827,43 @@
         "handoff_moment": "四个光点稳定亮起、无人机悬停等待判断时停止。",
         "must_not_preteach": ["比较大小", "第几", "分与合", "加法", "减法", "0的认识"]
       },
-      "target_duration_seconds": 50
+    "duration_recommendation": {
+      "duration_mode": "system_recommended",
+      "recommended_duration_seconds": 90,
+        "duration_reason": "四个连续故事节拍需要完整建立目标、误导、纠正和课堂交接；90秒可保持低龄学生可理解的动作节奏，并把费用控制在四个可独立生成的镜头内。",
+        "estimated_shot_count": 4,
+      "pricing_quote_required": true
+    },
+    "target_duration_seconds": 90
     },
     "rough_storyboard": {
       "rough_storyboard_key": "VIDEO-ROUGH-001",
       "beats": [
-        {"beat_key": "BEAT-01", "scene_key": "SCENE-01", "position": 1, "primary_event": "无人机进入雾谷并失去清晰航道", "start_state": "航道清楚", "end_state": "浓雾中减速搜索", "duration_seconds": 15, "asset_needs": ["星光邮差无人机", "密封包裹", "雾谷入口场景"], "transition": "第一次回响从画外出现"},
-        {"beat_key": "BEAT-02", "scene_key": "SCENE-02", "position": 2, "primary_event": "错误光束把无人机引向封闭岩壁", "start_state": "两个方向都模糊", "end_state": "错误岔路被排除", "duration_seconds": 15, "asset_needs": ["星光邮差无人机", "双岔雾谷场景", "回响信标"], "transition": "声音与灯光重新同步"},
-        {"beat_key": "BEAT-03", "scene_key": "SCENE-03", "position": 3, "primary_event": "雾散后真实中转站和四个光点出现", "start_state": "只有模糊轮廓", "end_state": "四个光点清楚稳定", "duration_seconds": 10, "asset_needs": ["星光邮差无人机", "中转站场景", "回响信标"], "transition": "无人机向降落平台靠近"},
-        {"beat_key": "BEAT-04", "scene_key": "SCENE-04", "position": 4, "primary_event": "无人机在四个光点前悬停等待判断", "start_state": "继续靠近平台", "end_state": "悬停并留出课堂问题", "duration_seconds": 10, "asset_needs": ["星光邮差无人机", "中转站场景", "回响信标"], "transition": "画面冻结并交给教师提问"}
+        {"beat_key": "BEAT-01", "scene_key": "SCENE-01", "position": 1, "primary_event": "无人机进入雾谷并失去清晰航道", "start_state": "航道清楚", "end_state": "浓雾中减速搜索", "duration_seconds": 25, "asset_needs": ["星光邮差无人机", "密封包裹", "雾谷入口场景"], "transition": "第一次回响从画外出现"},
+        {"beat_key": "BEAT-02", "scene_key": "SCENE-02", "position": 2, "primary_event": "错误光束把无人机引向封闭岩壁", "start_state": "两个方向都模糊", "end_state": "错误岔路被排除", "duration_seconds": 25, "asset_needs": ["星光邮差无人机", "双岔雾谷场景", "回响信标"], "transition": "声音与灯光重新同步"},
+        {"beat_key": "BEAT-03", "scene_key": "SCENE-03", "position": 3, "primary_event": "雾散后真实中转站和四个光点出现", "start_state": "只有模糊轮廓", "end_state": "四个光点清楚稳定", "duration_seconds": 20, "asset_needs": ["星光邮差无人机", "中转站场景", "回响信标"], "transition": "无人机向降落平台靠近"},
+        {"beat_key": "BEAT-04", "scene_key": "SCENE-04", "position": 4, "primary_event": "无人机在四个光点前悬停等待判断", "start_state": "继续靠近平台", "end_state": "悬停并留出课堂问题", "duration_seconds": 20, "asset_needs": ["星光邮差无人机", "中转站场景", "回响信标"], "transition": "画面冻结并交给教师提问"}
       ],
-      "total_duration_seconds": 50
+      "total_duration_seconds": 90
     },
     "style_contract": {
       "style_key": "VIDEO-STYLE-001",
+      "request_key": "VIDEO-STYLE-REQUEST-001",
       "source_preset_key": "style.primary_math.paper_clay",
+      "subjects": "星光邮差无人机、密封星光包裹、纸艺雾谷、回响信标与中转站；以无人机和雾谷作为代表主体和场景。",
       "aspect_ratio": "16:9",
       "medium": "层叠纸艺峡谷与轻黏土无人机",
       "character_rules": "无人机为圆润但非玩具化的邮差机器，蓝绿色主体、黄色信号灯、同一包裹固定在腹部。",
       "scene_rules": "雾谷使用分层纸张深度，雾效半透明但不得遮住关键光点；中转站保持同一材质世界。",
       "palette_and_lighting": "冷蓝绿雾谷、暖黄色信标、少量珊瑚红警示；清晨柔光，错误岔路略冷，真实中转站逐渐变暖。",
       "camera_and_motion": "稳定跟随与一次主运镜；无人机动作连续，避免快速旋转和无目的摇镜。",
-      "negative_constraints": ["文字", "数字", "字幕", "Logo", "水印", "恐怖氛围", "成人化", "无人机身份漂移", "光点被雾遮挡"]
+      "negative_constraints": ["文字", "数字", "字幕", "Logo", "水印", "恐怖氛围", "成人化", "无人机身份漂移", "光点被雾遮挡"],
+      "candidate_count": 3,
+      "target_slot": "video.style.master"
     },
     "asset_inventory": {
       "asset_inventory_key": "VIDEO-ASSET-INVENTORY-001",
+      "deduplication_notes": "同一语义身份只保留一个基础资产；方向、距离和光照属于镜头使用状态，不另建资产；四个信标由ASSET-PROP-02复制，准确数量由后期控制。",
       "categories": {
         "character": ["ASSET-CHAR-01"],
         "scene": ["ASSET-SCENE-01", "ASSET-SCENE-02"],
@@ -823,35 +871,36 @@
         "creature": []
       },
       "assets": [
-        {"asset_key": "ASSET-CHAR-01", "asset_type": "character", "name": "星光邮差无人机", "source_scene_keys": ["SCENE-01", "SCENE-02", "SCENE-03", "SCENE-04"], "usage": "全片唯一主体，携带包裹并完成进入、急停、转向、靠近和悬停动作。", "identity": "蓝绿色圆润机身、黄色信号灯、两侧短翼、腹部包裹固定扣。", "target_slot": "video.assets.character.star_courier"},
-        {"asset_key": "ASSET-SCENE-01", "asset_type": "scene", "name": "雾谷与双岔路空镜", "source_scene_keys": ["SCENE-01", "SCENE-02"], "usage": "建立失向、回响和错误岔路。", "identity": "无人空镜，层叠蓝绿纸艺峡谷、半透明雾层、左前方封闭岩壁。", "target_slot": "video.assets.scene.mist_valley"},
-        {"asset_key": "ASSET-SCENE-02", "asset_type": "scene", "name": "中转站降落平台空镜", "source_scene_keys": ["SCENE-03", "SCENE-04"], "usage": "真实航道终点和课堂交接场景。", "identity": "无人空镜，纸艺峡谷尽头的圆形平台，四个信标安装位由后期控制光点。", "target_slot": "video.assets.scene.relay_station"},
-        {"asset_key": "ASSET-PROP-01", "asset_type": "prop", "name": "密封星光包裹", "source_scene_keys": ["SCENE-01", "SCENE-02", "SCENE-03", "SCENE-04"], "usage": "强调无人机的送达目标。", "identity": "单体小型哑光包裹，珊瑚红封带，无文字标签。", "target_slot": "video.assets.prop.sealed_parcel"},
-        {"asset_key": "ASSET-PROP-02", "asset_type": "prop", "name": "回响信标单体", "source_scene_keys": ["SCENE-02", "SCENE-03", "SCENE-04"], "usage": "作为可复用单体，由镜头层复制并控制四个准确光点。", "identity": "单体暖黄色圆形灯芯与蓝绿色短底座，无数字和文字。", "target_slot": "video.assets.prop.echo_beacon"}
+        {"asset_key": "ASSET-CHAR-01", "asset_type": "character", "name": "星光邮差无人机", "identity_key": "video.identity.star_courier", "source_scene_keys": ["SCENE-01", "SCENE-02", "SCENE-03", "SCENE-04"], "usage": "全片唯一主体，携带包裹并完成进入、急停、转向、靠近和悬停动作。", "identity": "蓝绿色圆润机身、黄色信号灯、两侧短翼、腹部包裹固定扣。", "framing_rule": "单体完整入镜，正面略俯视，并保留三视角一致性。", "target_slot": "video.assets.character.star_courier"},
+        {"asset_key": "ASSET-SCENE-01", "asset_type": "scene", "name": "雾谷与双岔路空镜", "identity_key": "video.identity.mist_valley", "source_scene_keys": ["SCENE-01", "SCENE-02"], "usage": "建立失向、回响和错误岔路。", "identity": "无人空镜，层叠蓝绿纸艺峡谷、半透明雾层、左前方封闭岩壁。", "framing_rule": "16:9无人空镜，双岔路层次清楚并保留无人机运动空间。", "target_slot": "video.assets.scene.mist_valley"},
+        {"asset_key": "ASSET-SCENE-02", "asset_type": "scene", "name": "中转站降落平台空镜", "identity_key": "video.identity.relay_station", "source_scene_keys": ["SCENE-03", "SCENE-04"], "usage": "真实航道终点和课堂交接场景。", "identity": "无人空镜，纸艺峡谷尽头的圆形平台，四个信标安装位由后期控制光点。", "framing_rule": "16:9无人空镜，平台和四个信标安装位清楚，并保留悬停空间。", "target_slot": "video.assets.scene.relay_station"},
+        {"asset_key": "ASSET-PROP-01", "asset_type": "prop", "name": "密封星光包裹", "identity_key": "video.identity.sealed_parcel", "source_scene_keys": ["SCENE-01", "SCENE-02", "SCENE-03", "SCENE-04"], "usage": "强调无人机的送达目标。", "identity": "单体小型哑光包裹，珊瑚红封带，无文字标签。", "framing_rule": "单体完整入镜，白色干净背景，正面略俯视，便于固定到无人机。", "target_slot": "video.assets.prop.sealed_parcel"},
+        {"asset_key": "ASSET-PROP-02", "asset_type": "prop", "name": "回响信标单体", "identity_key": "video.identity.echo_beacon", "source_scene_keys": ["SCENE-02", "SCENE-03", "SCENE-04"], "usage": "作为可复用单体，由镜头层复制并控制四个准确光点。", "identity": "单体暖黄色圆形灯芯与蓝绿色短底座，无数字和文字。", "framing_rule": "单体完整入镜，白色干净背景，正面略俯视，便于镜头层复制。", "target_slot": "video.assets.prop.echo_beacon"}
       ]
     },
+    "asset_image_prompt_package_key": "VIDEO-ASSET-PROMPTS-001",
     "asset_image_prompts": [
-      {"asset_key": "ASSET-CHAR-01", "target_slot": "video.assets.character.star_courier", "prompt_text": "16:9风格资产图，单体星光邮差无人机，蓝绿色圆润轻黏土机身，暖黄色信号灯，两侧短翼，腹部固定扣，三视角一致性参考，白色干净背景，柔和接触阴影。", "negative_constraints": ["文字", "数字", "Logo", "水印", "额外角色", "复杂武器", "身份漂移"]},
-      {"asset_key": "ASSET-SCENE-01", "target_slot": "video.assets.scene.mist_valley", "prompt_text": "16:9无人空镜，层叠蓝绿色纸艺雾谷与双岔路，半透明雾层，左前方封闭岩壁，清晨柔光，保留无人机运动空间。", "negative_constraints": ["人物", "无人机", "文字", "数字", "Logo", "水印", "浓雾遮满画面"]},
-      {"asset_key": "ASSET-SCENE-02", "target_slot": "video.assets.scene.relay_station", "prompt_text": "16:9无人空镜，纸艺雾谷尽头的中转站圆形降落平台，四个空信标安装位，暖光从后方穿过薄雾，前方保留悬停空间。", "negative_constraints": ["人物", "无人机", "已点亮准确光点", "文字", "数字", "Logo", "水印"]},
-      {"asset_key": "ASSET-PROP-01", "target_slot": "video.assets.prop.sealed_parcel", "prompt_text": "单体小型星光包裹，哑光轻黏土质感，珊瑚红封带，无标签，白色干净背景，正面略俯视，柔和接触阴影。", "negative_constraints": ["手持", "文字", "数字", "Logo", "水印", "多个包裹"]},
-      {"asset_key": "ASSET-PROP-02", "target_slot": "video.assets.prop.echo_beacon", "prompt_text": "单体回响信标，暖黄色圆形灯芯与蓝绿色短底座，纸艺黏土风格，白色干净背景，正面略俯视，柔和接触阴影。", "negative_constraints": ["文字", "数字", "Logo", "水印", "多个信标", "复杂仪表盘"]}
+      {"prompt_item_key": "VIDEO-ASSET-PROMPT-CHAR-01", "asset_key": "ASSET-CHAR-01", "consistency_key": "video.identity.star_courier", "target_slot": "video.assets.character.star_courier", "prompt_text": "16:9风格资产图，单体星光邮差无人机，蓝绿色圆润轻黏土机身，暖黄色信号灯，两侧短翼，腹部固定扣，三视角一致性参考，白色干净背景，柔和接触阴影。", "negative_constraints": ["文字", "数字", "Logo", "水印", "额外角色", "复杂武器", "身份漂移"]},
+      {"prompt_item_key": "VIDEO-ASSET-PROMPT-SCENE-01", "asset_key": "ASSET-SCENE-01", "consistency_key": "video.identity.mist_valley", "target_slot": "video.assets.scene.mist_valley", "prompt_text": "16:9无人空镜，层叠蓝绿色纸艺雾谷与双岔路，半透明雾层，左前方封闭岩壁，清晨柔光，保留无人机运动空间。", "negative_constraints": ["人物", "无人机", "文字", "数字", "Logo", "水印", "浓雾遮满画面"]},
+      {"prompt_item_key": "VIDEO-ASSET-PROMPT-SCENE-02", "asset_key": "ASSET-SCENE-02", "consistency_key": "video.identity.relay_station", "target_slot": "video.assets.scene.relay_station", "prompt_text": "16:9无人空镜，纸艺雾谷尽头的中转站圆形降落平台，四个空信标安装位，暖光从后方穿过薄雾，前方保留悬停空间。", "negative_constraints": ["人物", "无人机", "已点亮准确光点", "文字", "数字", "Logo", "水印"]},
+      {"prompt_item_key": "VIDEO-ASSET-PROMPT-PROP-01", "asset_key": "ASSET-PROP-01", "consistency_key": "video.identity.sealed_parcel", "target_slot": "video.assets.prop.sealed_parcel", "prompt_text": "单体小型星光包裹，哑光轻黏土质感，珊瑚红封带，无标签，白色干净背景，正面略俯视，柔和接触阴影。", "negative_constraints": ["手持", "文字", "数字", "Logo", "水印", "多个包裹"]},
+      {"prompt_item_key": "VIDEO-ASSET-PROMPT-PROP-02", "asset_key": "ASSET-PROP-02", "consistency_key": "video.identity.echo_beacon", "target_slot": "video.assets.prop.echo_beacon", "prompt_text": "单体回响信标，暖黄色圆形灯芯与蓝绿色短底座，纸艺黏土风格，白色干净背景，正面略俯视，柔和接触阴影。", "negative_constraints": ["文字", "数字", "Logo", "水印", "多个信标", "复杂仪表盘"]}
     ],
     "fine_storyboard": {
       "fine_storyboard_key": "VIDEO-FINE-001",
-      "target_duration_seconds": 50,
+      "target_duration_seconds": 90,
       "shots": [
         {
           "shot_key": "SHOT-01",
           "scene_key": "SCENE-01",
           "beat_key": "BEAT-01",
           "position": 1,
-          "duration_seconds": 15,
+          "duration_seconds": 25,
           "visible_beat": "无人机进入雾谷，清晰航道在前方逐渐消失。",
           "start_state": "无人机带包裹沿谷口稳定飞行，远景清楚。",
           "end_state": "雾层合拢，无人机减速悬停并开启搜索灯。",
           "camera": {"framing": "中远景转中景", "angle": "略高平视", "movement": "一次稳定跟随前移后缓慢停下", "start_composition": "无人机位于左下三分点，峡谷向右前延伸", "end_composition": "无人机居中，前方雾层占据背景"},
-          "action_timeline": ["0-5秒：无人机进入谷口", "5-10秒：雾层从两侧合拢", "10-15秒：无人机减速并亮起搜索灯"],
+          "action_timeline": ["0-8秒：无人机进入谷口", "8-17秒：雾层从两侧合拢", "17-25秒：无人机减速并亮起搜索灯"],
           "asset_usages": [{"image_index": 1, "asset_key": "ASSET-SCENE-01", "semantic_name": "雾谷空镜", "purpose": "背景与空间连续性"}, {"image_index": 2, "asset_key": "ASSET-CHAR-01", "semantic_name": "星光邮差", "purpose": "主体身份与动作"}, {"image_index": 3, "asset_key": "ASSET-PROP-01", "semantic_name": "密封包裹", "purpose": "送达目标连续性"}],
           "prompt_text": "层叠纸艺雾谷中，蓝绿色星光邮差无人机携带珊瑚红封带包裹稳定前行；雾从两侧逐渐合拢，无人机一次平滑减速并亮起暖黄搜索灯。镜头只做稳定跟随前移后停下，保持无人机与包裹形态、光线和尺度一致，无字幕无文字。",
           "negative_constraints": ["文字", "数字", "字幕", "Logo", "水印", "快速摇镜", "无人机变形", "包裹消失"],
@@ -866,12 +915,12 @@
           "scene_key": "SCENE-02",
           "beat_key": "BEAT-02",
           "position": 2,
-          "duration_seconds": 15,
+          "duration_seconds": 25,
           "visible_beat": "错误光束把无人机引向封闭岩壁，无人机急停并转向。",
           "start_state": "无人机悬停在双岔路，搜索灯扫过两侧。",
           "end_state": "错误岔路被排除，无人机朝同步回响方向转向。",
           "camera": {"framing": "中景", "angle": "平视", "movement": "一次缓慢横移跟随右转后急停", "start_composition": "双岔路对称展开，无人机居中", "end_composition": "封闭岩壁占右侧，无人机朝左前方转向"},
-          "action_timeline": ["0-4秒：四次回响灯依次闪动", "4-10秒：右侧错误光束先亮并吸引无人机", "10-15秒：岩壁显现，无人机急停转向"],
+          "action_timeline": ["0-7秒：四次回响灯依次闪动", "7-17秒：右侧错误光束先亮并吸引无人机", "17-25秒：岩壁显现，无人机急停转向"],
           "asset_usages": [{"image_index": 1, "asset_key": "ASSET-SCENE-01", "semantic_name": "双岔雾谷", "purpose": "错误岔路空间"}, {"image_index": 2, "asset_key": "ASSET-CHAR-01", "semantic_name": "星光邮差", "purpose": "急停与转向主体"}, {"image_index": 3, "asset_key": "ASSET-PROP-02", "semantic_name": "回响信标", "purpose": "复制为非数字化灯光信号"}],
           "prompt_text": "同一纸艺雾谷双岔路，无人机悬停搜索；暖黄回响信标短暂依次闪动，右侧错误光束先亮，无人机一次横移靠近后发现封闭岩壁，立即急停并转向左前方。保持同一无人机、包裹、雾密度和光线，画面不显示计数结果。",
           "negative_constraints": ["文字", "数字", "字幕", "Logo", "水印", "信标数量标签", "多次无目的运镜", "主体穿墙"],
@@ -886,12 +935,12 @@
           "scene_key": "SCENE-03",
           "beat_key": "BEAT-03",
           "position": 3,
-          "duration_seconds": 10,
+          "duration_seconds": 20,
           "visible_beat": "雾层打开，真实中转站和四个清晰光点显现。",
           "start_state": "无人机朝左前方同步回响方向飞行，前方只有轮廓。",
           "end_state": "中转站完整可见，四个暖黄光点清楚分开。",
           "camera": {"framing": "中远景", "angle": "平视略低", "movement": "一次缓慢推进", "start_composition": "无人机位于左侧，模糊站台在远处", "end_composition": "中转站居中，无人机位于前景左侧"},
-          "action_timeline": ["0-4秒：无人机沿同步回响前进", "4-7秒：雾向两侧打开", "7-10秒：四个光点由后期准确点亮并稳定"],
+          "action_timeline": ["0-8秒：无人机沿同步回响前进", "8-14秒：雾向两侧打开", "14-20秒：四个光点由后期准确点亮并稳定"],
           "asset_usages": [{"image_index": 1, "asset_key": "ASSET-SCENE-02", "semantic_name": "中转站空镜", "purpose": "目标场景"}, {"image_index": 2, "asset_key": "ASSET-CHAR-01", "semantic_name": "星光邮差", "purpose": "靠近主体"}, {"image_index": 3, "asset_key": "ASSET-PROP-02", "semantic_name": "回响信标单体", "purpose": "由后期复制为四个准确光点"}],
           "prompt_text": "同一星光邮差沿同步回响方向缓慢前进，纸艺雾层向两侧打开，暖色中转站逐渐显现。镜头一次缓慢推进；信标底座保持空白，四个准确光点由后期可编辑层控制，不在生成画面中绘制数字或标签。",
           "negative_constraints": ["文字", "数字", "字幕", "Logo", "水印", "生成模型自行决定光点数量", "无人机身份漂移"],
@@ -906,12 +955,12 @@
           "scene_key": "SCENE-04",
           "beat_key": "BEAT-04",
           "position": 4,
-          "duration_seconds": 10,
+          "duration_seconds": 20,
           "visible_beat": "无人机在四个清晰光点前稳定悬停，等待是否降落的判断。",
           "start_state": "中转站完整可见，无人机继续靠近平台。",
           "end_state": "四个光点稳定亮起，无人机悬停，画面留给课堂提问。",
           "camera": {"framing": "中景转固定全景", "angle": "平视", "movement": "一次轻微靠近后锁定", "start_composition": "无人机在左侧前景，中转站在中央", "end_composition": "无人机悬停于左下，四个光点居中清楚分开"},
-          "action_timeline": ["0-4秒：无人机轻微靠近", "4-7秒：无人机停止前进并稳定悬停", "7-10秒：四个光点保持稳定，音乐留白"],
+          "action_timeline": ["0-8秒：无人机轻微靠近", "8-14秒：无人机停止前进并稳定悬停", "14-20秒：四个光点保持稳定，音乐留白"],
           "asset_usages": [{"image_index": 1, "asset_key": "ASSET-SCENE-02", "semantic_name": "中转站平台", "purpose": "课堂交接场景"}, {"image_index": 2, "asset_key": "ASSET-CHAR-01", "semantic_name": "星光邮差", "purpose": "悬停主体"}, {"image_index": 3, "asset_key": "ASSET-PROP-02", "semantic_name": "回响信标单体", "purpose": "由后期复制为四个光点"}],
           "prompt_text": "同一中转站和星光邮差，无人机一次轻微靠近后稳定悬停，暖黄信标区域保持清楚。镜头锁定并留出教师提问时间；四个准确光点由后期可编辑层复制控制，画面不出现数字、字幕或答案。",
           "negative_constraints": ["文字", "数字", "字幕", "答案", "Logo", "水印", "无人机降落", "越过悬停时刻", "光点被遮挡"],
@@ -932,18 +981,18 @@
     "audio_plan": {
       "audio_plan_key": "AUDIO-PLAN-001",
       "tracks": [
-        {"track_key": "AUDIO-NARR-01", "kind": "narration", "shot_key": "SHOT-01", "timeline": {"start_seconds": 2, "end_seconds": 8}, "script_text": "星光邮差必须在雾散之前找到中转站。", "voice_profile": "亲切、清晰、中性成年旁白", "speech_rate": 0.95, "target_slot": "video.audio.narration.01", "subtitle_text": "星光邮差必须在雾散之前找到中转站。"},
-        {"track_key": "AUDIO-NARR-02", "kind": "narration", "shot_key": "SHOT-02", "timeline": {"start_seconds": 17, "end_seconds": 25}, "script_text": "回响从前方传来，可最后一束灯光却指向了错误方向。", "voice_profile": "亲切、清晰、中性成年旁白", "speech_rate": 0.95, "target_slot": "video.audio.narration.02", "subtitle_text": "回响从前方传来，可最后一束灯光却指向了错误方向。"},
-        {"track_key": "AUDIO-NARR-03", "kind": "narration", "shot_key": "SHOT-03", "timeline": {"start_seconds": 31, "end_seconds": 36}, "script_text": "声音和灯光终于在同一个方向相遇。", "voice_profile": "亲切、清晰、中性成年旁白", "speech_rate": 0.95, "target_slot": "video.audio.narration.03", "subtitle_text": "声音和灯光终于在同一个方向相遇。"},
-        {"track_key": "AUDIO-NARR-04", "kind": "narration", "shot_key": "SHOT-04", "timeline": {"start_seconds": 42, "end_seconds": 47}, "script_text": "信号已经出现，星光邮差还需要最后一次确认。", "voice_profile": "亲切、清晰、中性成年旁白", "speech_rate": 0.95, "target_slot": "video.audio.narration.04", "subtitle_text": "信号已经出现，星光邮差还需要最后一次确认。"},
-        {"track_key": "AUDIO-SFX-01", "kind": "sound_effect", "shot_key": "SHOT-02", "timeline": {"start_seconds": 16, "end_seconds": 21}, "script_text": "四次清楚、间隔稳定的回响声；第四次稍远。", "voice_profile": "not_applicable", "speech_rate": 1.0, "target_slot": "video.audio.sfx.echoes", "subtitle_text": ""},
-        {"track_key": "AUDIO-MUSIC-01", "kind": "music", "shot_key": null, "timeline": {"start_seconds": 0, "end_seconds": 50}, "script_text": "轻柔纸艺冒险配乐；错误岔路短暂收紧，中转站出现后转暖，47秒后降至留白。", "voice_profile": "not_applicable", "speech_rate": 1.0, "target_slot": "video.audio.music.main", "subtitle_text": ""}
+        {"track_key": "AUDIO-NARR-01", "kind": "narration", "shot_key": "SHOT-01", "timeline": {"start_seconds": 3, "end_seconds": 12}, "script_text": "星光邮差必须在雾散之前找到中转站。", "voice_profile": "亲切、清晰、中性成年旁白", "speech_rate": 0.95, "volume_intent": "清晰前景，四段旁白响度一致。", "ducking_rules": ["旁白开始前音乐平滑降低6dB", "旁白结束后音乐平滑恢复"], "target_slot": "video.audio.narration.01", "subtitle_text": "星光邮差必须在雾散之前找到中转站。"},
+        {"track_key": "AUDIO-NARR-02", "kind": "narration", "shot_key": "SHOT-02", "timeline": {"start_seconds": 30, "end_seconds": 42}, "script_text": "回响从前方传来，可最后一束灯光却指向了错误方向。", "voice_profile": "亲切、清晰、中性成年旁白", "speech_rate": 0.95, "volume_intent": "清晰前景，四段旁白响度一致。", "ducking_rules": ["旁白开始前音乐平滑降低6dB", "旁白结束后音乐平滑恢复"], "target_slot": "video.audio.narration.02", "subtitle_text": "回响从前方传来，可最后一束灯光却指向了错误方向。"},
+        {"track_key": "AUDIO-NARR-03", "kind": "narration", "shot_key": "SHOT-03", "timeline": {"start_seconds": 55, "end_seconds": 64}, "script_text": "声音和灯光终于在同一个方向相遇。", "voice_profile": "亲切、清晰、中性成年旁白", "speech_rate": 0.95, "volume_intent": "清晰前景，四段旁白响度一致。", "ducking_rules": ["旁白开始前音乐平滑降低6dB", "旁白结束后音乐平滑恢复"], "target_slot": "video.audio.narration.03", "subtitle_text": "声音和灯光终于在同一个方向相遇。"},
+        {"track_key": "AUDIO-NARR-04", "kind": "narration", "shot_key": "SHOT-04", "timeline": {"start_seconds": 74, "end_seconds": 84}, "script_text": "信号已经出现，星光邮差还需要最后一次确认。", "voice_profile": "亲切、清晰、中性成年旁白", "speech_rate": 0.95, "volume_intent": "清晰前景，四段旁白响度一致。", "ducking_rules": ["旁白开始前音乐平滑降低6dB", "旁白结束后音乐平滑恢复"], "target_slot": "video.audio.narration.04", "subtitle_text": "信号已经出现，星光邮差还需要最后一次确认。"},
+        {"track_key": "AUDIO-SFX-01", "kind": "sound_effect", "shot_key": "SHOT-02", "timeline": {"start_seconds": 27, "end_seconds": 38}, "script_text": "四次清楚、间隔稳定的回响声；第四次稍远。", "voice_profile": "not_applicable", "speech_rate": 1.0, "volume_intent": "清楚可辨但低于旁白。", "ducking_rules": ["与旁白重叠时降低3dB", "不得遮盖回响段旁白"], "target_slot": "video.audio.sfx.echoes", "subtitle_text": ""},
+        {"track_key": "AUDIO-MUSIC-01", "kind": "music", "shot_key": null, "timeline": {"start_seconds": 0, "end_seconds": 90}, "script_text": "轻柔纸艺冒险配乐；错误岔路短暂收紧，中转站出现后转暖，84秒后降至留白。", "voice_profile": "not_applicable", "speech_rate": 1.0, "volume_intent": "全片低位铺底，错误岔路收紧，84秒后降至留白。", "ducking_rules": ["旁白区间降低6dB", "回响出现时让出中频", "84秒后保持低音量"], "target_slot": "video.audio.music.main", "subtitle_text": ""}
       ],
-      "mix_rules": ["旁白期间音乐降低6dB", "回响声不得盖住旁白", "47秒后保留低音量悬停声并给教师提问留白", "字幕每行不超过14个汉字且不遮挡四个光点"]
+      "mix_rules": ["旁白期间音乐降低6dB", "回响声不得盖住旁白", "84秒后保留低音量悬停声并给教师提问留白", "字幕每行不超过14个汉字且不遮挡四个光点"]
     },
     "timeline_expectations": {
       "shot_order": ["SHOT-01", "SHOT-02", "SHOT-03", "SHOT-04"],
-      "total_duration_seconds": 50,
+      "total_duration_seconds": 90,
       "audio_tracks_bound_to_shots_or_ranges": true,
       "subtitle_editable": true,
       "ffmpeg_assembly_required": true,
@@ -954,7 +1003,7 @@
       "independent_story_complete_before_anchor": true,
       "only_final_shot_hands_off": true,
       "must_not_preteach_preserved": true,
-      "shot_durations_only_10_or_15": true,
+      "shot_durations_within_6_to_30": true,
       "candidate_is_not_formal_clip": true,
       "single_shot_failure_is_local": true,
       "visual_continuity_required": true,
@@ -963,9 +1012,9 @@
   },
   "delivery_expectations": {
     "enabled_branches": ["lesson_plan", "intro_options", "ppt", "video"],
-    "required_artifact_families": ["lesson_plan_docx_pdf", "intro_option_appendix", "editable_pptx_preview", "final_video_subtitles_audio", "quality_reports", "file_manifest"],
-    "golden_fixture_claim": "本Fixture只证明合同、上下文和结构可独立启动，不代表真实模型、PPTX或MP4已经生产完成。",
+    "required_artifact_families": ["lesson_plan_docx_pdf", "intro_option_appendix", "editable_pptx_preview", "final_video_subtitles_audio_plan", "quality_reports", "file_manifest"],
+    "golden_fixture_claim": "本Fixture只证明合同、上下文和结构可独立启动，不代表真实模型、PPTX、MP4或TTS音频已经生产完成。",
     "ordinary_ci_provider_policy": "deterministic_fake_only",
-    "milestone_exit_provider_policy": "real_text_image_video_and_tts_smoke_required"
+    "milestone_exit_provider_policy": "real_text_image_video_smoke_tts_deferred"
   }
 }

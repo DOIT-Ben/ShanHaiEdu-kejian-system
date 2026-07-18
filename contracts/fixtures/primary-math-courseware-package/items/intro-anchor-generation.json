@@ -10,7 +10,7 @@
   "spec": {
     "template_key": "intro.anchor",
     "title": "最小课程锚定",
-    "description": "只为九套独立创意补充唯一最小课程锚点、首问、交接和推荐度，不改写独立创意。",
+    "description": "只为一套或九套独立创意补充唯一最小课程锚点、首问、交接和推荐度，不改写独立创意。",
     "model_capability": "text.structured.zh_primary_math",
     "input_definition_ref": {
       "item_key": "intro.anchor.input",

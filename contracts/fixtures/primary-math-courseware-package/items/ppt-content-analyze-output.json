@@ -95,6 +95,14 @@
         "deletable": false
       },
       {
+        "field_key": "page_count_recommendation_reason",
+        "label": "页数建议理由",
+        "type": "rich_text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
         "field_key": "analysis_quality_notes",
         "label": "分析质量说明",
         "type": "rubric",

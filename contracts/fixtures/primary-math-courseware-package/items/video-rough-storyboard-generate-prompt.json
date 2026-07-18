@@ -45,7 +45,7 @@
       {
         "section_key": "quality_gate",
         "layer": "quality_gate",
-        "content": "不改写已选方案或母版剧本；节拍顺序连续、来源有效、单节拍单事件；总时长一致；最后节拍才到达handoff_moment；不包含Provider提示词、参考图位置、10/15秒shot硬切、资产文件或模型参数。",
+        "content": "不改写已选方案或母版剧本；节拍顺序连续、来源有效、单节拍单事件；总时长一致；最后节拍才到达handoff_moment；不包含Provider提示词、参考图位置、shot时长硬切、资产文件或模型参数。",
         "editable": false,
         "visible_to_teacher": false
       }

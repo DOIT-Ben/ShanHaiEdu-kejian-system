@@ -484,12 +484,14 @@
     },
     {
       "template_key": "intro.ideate",
-      "title": "三类九套独立创意",
-      "description": "在严格隔离课程上下文的条件下生成科普、应用、故事各三套独立创意。",
+      "title": "独立导入创意",
+      "description": "在严格隔离课程上下文的条件下，默认生成科普、应用、故事各三套独立创意，或只完善教师已有的一套创意。",
       "model_capability": "text.structured.creative_education",
       "input": {
-        "description": "只接收创意类别规则、年龄安全边界和通用媒介偏好。",
+        "description": "只接收生成方式、创意类别规则、年龄安全边界、通用媒介偏好和可选已有创意。",
         "fields": [
+          {"field_key": "generation_mode", "label": "生成方式", "value_type": "enum", "required": true, "source": "teacher", "visibility": "primary", "widget": "select", "default_value": "default_nine", "options": [{"value": "default_nine", "label": "三类九套"}, {"value": "refine_existing", "label": "完善已有创意"}]},
+          {"field_key": "existing_idea_ref", "label": "已有创意", "value_type": "reference", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea"},
           {"field_key": "ideas_per_category", "label": "每类方案数", "value_type": "number", "required": true, "source": "system", "visibility": "hidden", "widget": "number", "default_value": 3, "validation": {"minimum": 3, "maximum": 3}},
           {"field_key": "audience_age_band", "label": "受众年龄段", "value_type": "text", "required": true, "source": "system", "visibility": "hidden", "widget": "text", "default_value": "6-12岁"},
           {"field_key": "medium_preferences", "label": "媒介偏好", "value_type": "list", "required": false, "source": "teacher", "visibility": "secondary", "widget": "multiselect"},
@@ -498,7 +500,7 @@
         ]
       },
       "output": {
-        "description": "不含教材、知识点或课程锚点的九套独立创意。",
+        "description": "不含教材、知识点或课程锚点的一套或九套独立创意。",
         "definition_role": "intermediate",
         "fields": [
           {"field_key": "idea_set_key", "label": "创意集键", "type": "text", "required": true, "editable": false, "deletable": false, "visibility": "hidden"},
@@ -510,7 +512,7 @@
             "editable": true,
             "deletable": false,
             "repeatable": true,
-            "min_items": 9,
+            "min_items": 1,
             "max_items": 9,
             "children": [
               {"field_key": "idea_key", "label": "创意键", "type": "text", "required": true, "editable": false, "deletable": false},
@@ -541,9 +543,9 @@
       },
       "prompt": {
         "role": "你是面向儿童的独立创意策划师，擅长科普观察、真实任务和完整小故事。",
-        "task": "在不知道教材、学科、课题、教案和PPT的前提下，生成科普、应用、故事三类各三套、共九套实质不同的独立创意。此阶段不要补课程锚点、课堂问题、知识点或推荐分。",
-        "method": "科普类围绕值得观察或解释的现象与未知；应用类围绕真实任务、限制、选择或完成目标的需要；故事类围绕人物或主体的目标、变化、阻碍、误会或悬念。每套写清独立概念、开场钩子、去掉任何课程回接后仍然存在的观看价值、适合媒介和安全注意。创意可自然出现儿童、成人、动物、机器、自然或抽象主体，但不能因小学受众而默认使用教师、教室和课堂活动。",
-        "quality_gate": "每类恰好三套，总数九套；九套不能只替换标题、角色名或场景；不知道课程的人仍能理解事件，去掉未来锚点后仍值得观看或参与；不得泄漏教材、知识点、教案、PPT、课程标题、分镜、旁白、字幕、资产、Provider或费用；内容适龄、安全、不鼓励危险模仿。",
+        "task": "在不知道教材、学科、课题、教案和PPT的前提下，default_nine生成科普、应用、故事三类各三套、共九套实质不同的独立创意；refine_existing只完善教师已有的一套创意，不扩成九套。此阶段不要补课程锚点、课堂问题、知识点或推荐分。",
+        "method": "科普类围绕值得观察或解释的现象与未知；应用类围绕真实任务、限制、选择或完成目标的需要；故事类围绕人物或主体的目标、变化、阻碍、误会或悬念。每套写清独立概念、开场钩子、去掉任何课程回接后仍然存在的观看价值、适合媒介和安全注意。refine_existing保留教师原意，只补完整性、可观看价值和安全边界。创意可自然出现儿童、成人、动物、机器、自然或抽象主体，但不能因小学受众而默认使用教师、教室和课堂活动。",
+        "quality_gate": "default_nine每类恰好三套、总数九套且不能只替换标题、角色名或场景；refine_existing恰好一套且不改变教师核心创意。不知道课程的人仍能理解事件，去掉未来锚点后仍值得观看或参与；不得泄漏教材、知识点、教案、PPT、课程标题、分镜、旁白、字幕、资产、Provider或费用；内容适龄、安全、不鼓励危险模仿。",
         "context_bindings": [
           {"binding_key": "teacher_preferences", "source": "project.teacher_preferences", "required": false, "exposure": "summary", "max_items": 1, "max_bytes": 20000}
         ],
@@ -552,7 +554,7 @@
       "projection": {
         "output_format": "markdown",
         "renderer_id": "shanhai.intro_independent_ideas.markdown.v1",
-        "template": "# 三类九套独立创意\n\n{{independent_ideas}}\n\n## 多样性检查\n{{diversity_check}}",
+        "template": "# 独立导入创意\n\n{{independent_ideas}}\n\n## 多样性检查\n{{diversity_check}}",
         "allowed_variables": ["independent_ideas", "diversity_check"],
         "roles": ["teacher_view"],
         "teacher_visible": true
@@ -561,20 +563,20 @@
     {
       "template_key": "intro.anchor",
       "title": "最小课程锚定",
-      "description": "只为九套独立创意补充唯一最小课程锚点、首问、交接和推荐度，不改写独立创意。",
+      "description": "只为一套或九套独立创意补充唯一最小课程锚点、首问、交接和推荐度，不改写独立创意。",
       "model_capability": "text.structured.zh_primary_math",
       "input": {
-        "description": "输入九套独立创意，并注入已批准课时和教材证据。",
+        "description": "输入一套或九套独立创意，并注入已批准课时和教材证据。",
         "fields": [
           {"field_key": "independent_idea_set", "label": "独立创意集", "value_type": "reference", "required": true, "source": "system", "visibility": "hidden", "widget": "textarea"},
           {"field_key": "target_lesson_unit", "label": "目标课时", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
           {"field_key": "target_material_evidence", "label": "教材证据", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
-          {"field_key": "duration_preference_seconds", "label": "建议导入时长", "value_type": "number", "required": true, "source": "teacher", "visibility": "secondary", "widget": "number", "default_value": 45, "validation": {"minimum": 15, "maximum": 120}},
+          {"field_key": "duration_preference_seconds", "label": "建议导入时长", "value_type": "number", "required": false, "source": "teacher", "visibility": "secondary", "widget": "number", "validation": {"minimum": 60, "maximum": 180}},
           {"field_key": "anchor_requirements", "label": "锚点补充要求", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 4000}}
         ]
       },
       "output": {
-        "description": "三类九套完整导入方案、唯一最高推荐分和可冻结选择快照。",
+        "description": "一套或三类九套完整导入方案、默认路径唯一最高推荐分和可冻结选择快照。",
         "definition_role": "artifact",
         "fields": [
           {"field_key": "option_set_key", "label": "方案集键", "type": "text", "required": true, "editable": false, "deletable": false, "visibility": "hidden"},
@@ -587,7 +589,7 @@
             "editable": true,
             "deletable": false,
             "repeatable": true,
-            "min_items": 9,
+            "min_items": 1,
             "max_items": 9,
             "children": [
               {"field_key": "option_key", "label": "方案键", "type": "text", "required": true, "editable": false, "deletable": false},
@@ -626,8 +628,8 @@
       "prompt": {
         "role": "你是小学数学课堂导入锚定设计师，负责把已经成立的独立创意最小化地接回一个已批准课时。",
         "task": "逐套保留独立创意的标题、独立概念、钩子和观看价值，只补一个课程锚点、课堂第一问、交接时刻、不得提前讲授、适配理由、风险和推荐分。不得重写独立创意，不得生成分镜、旁白、字幕、资产或模型参数。",
-        "method": "先从批准课时与教材证据提取当前核心学习边界和不得提前讲授内容。对每套创意找到一个具体的触发事件、可见现象、真实选择或未完成行动作为唯一回接；锚点只负责把注意力带回课堂，不解释整节课。交接时刻必须可定位，课堂第一问必须可直接由教师提出。推荐度综合独立性、课时适配、可制作性、时长和风险，九套分数必须产生唯一最高值。",
-        "quality_gate": "科普、应用、故事各恰好三套；独立创意字段与上游逐字一致；每套只有一个课程锚点，且去掉锚点仍成立；不得提前讲出需要学生发现的定义、写法、方法或结论；最高推荐分必须唯一；不得因为小学受众默认教师、教室或儿童角色；输出不含教案正文、PPT、分镜、旁白、字幕、资产、Provider和费用。",
+        "method": "先从批准课时与教材证据提取当前核心学习边界和不得提前讲授内容。对每套创意找到一个具体的触发事件、可见现象、真实选择或未完成行动作为唯一回接；锚点只负责把注意力带回课堂，不解释整节课。交接时刻必须可定位，课堂第一问必须可直接由教师提出。推荐度综合独立性、课时适配、可制作性、时长和风险；default_nine必须产生唯一最高值，refine_existing只有一套并保留教师选择。",
+        "quality_gate": "default_nine科普、应用、故事各恰好三套，refine_existing恰好一套；独立创意字段与上游逐字一致；每套只有一个课程锚点，且去掉锚点仍成立；不得提前讲出需要学生发现的定义、写法、方法或结论；default_nine最高推荐分必须唯一；不得因为小学受众默认教师、教室或儿童角色；输出不含教案正文、PPT、分镜、旁白、字幕、资产、Provider和费用。",
         "context_bindings": [
           {"binding_key": "approved_lesson_unit", "source": "lesson_division.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 200000},
           {"binding_key": "approved_material", "source": "material.approved_parse", "required": true, "exposure": "summary", "max_items": 50, "max_bytes": 300000}
@@ -637,7 +639,7 @@
       "projection": {
         "output_format": "markdown",
         "renderer_id": "shanhai.intro_option_set.markdown.v1",
-        "template": "# 三类九套课堂导入设计\n\n{{options}}\n\n## 推荐结论\n{{recommendation_summary}}",
+        "template": "# 课堂导入设计\n\n{{options}}\n\n## 推荐结论\n{{recommendation_summary}}",
         "allowed_variables": ["options", "recommendation_summary"],
         "roles": ["teacher_view", "export"],
         "teacher_visible": true
@@ -654,7 +656,7 @@
         "fields": [
           {"field_key": "presentation_purpose", "label": "课件用途", "value_type": "enum", "required": true, "source": "teacher", "visibility": "primary", "widget": "select", "default_value": "daily_class", "options": [{"value": "daily_class", "label": "日常课堂"}, {"value": "open_class", "label": "公开课"}, {"value": "review", "label": "复习课"}]},
           {"field_key": "aspect_ratio", "label": "画幅", "value_type": "enum", "required": true, "source": "system", "visibility": "secondary", "widget": "select", "default_value": "16:9", "options": [{"value": "16:9", "label": "宽屏16:9"}]},
-          {"field_key": "preferred_page_count", "label": "期望页数", "value_type": "number", "required": false, "source": "teacher", "visibility": "secondary", "widget": "number", "validation": {"minimum": 5, "maximum": 60}},
+          {"field_key": "preferred_page_count", "label": "期望页数（可选）", "value_type": "number", "required": false, "source": "teacher", "visibility": "secondary", "widget": "number", "validation": {"minimum": 5, "maximum": 60}},
           {"field_key": "ppt_requirements", "label": "PPT补充要求", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 5000}},
           {"field_key": "approved_lesson_plan", "label": "已批准教案", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
           {"field_key": "approved_material_evidence", "label": "教材证据", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"}
@@ -674,14 +676,15 @@
           {"field_key": "visualization_opportunities", "label": "适合图片化的内容", "type": "list", "required": true, "editable": true, "deletable": false},
           {"field_key": "editable_information_requirements", "label": "必须可编辑的信息", "type": "list", "required": true, "editable": false, "deletable": false},
           {"field_key": "recommended_page_count", "label": "建议页数", "type": "number", "required": true, "editable": true, "deletable": false},
+          {"field_key": "page_count_recommendation_reason", "label": "页数建议理由", "type": "rich_text", "required": true, "editable": false, "deletable": false},
           {"field_key": "analysis_quality_notes", "label": "分析质量说明", "type": "rubric", "required": true, "editable": false, "deletable": false}
         ]
       },
       "prompt": {
         "role": "你是小学数学课堂PPT内容架构师，负责把批准教案转成适合投影与互动的页面任务，不重写教案。",
         "task": "分析批准教案、教材证据、课件用途和教师偏好，输出PPT的受众、内容边界、目标顺序、互动点、图片化机会、必须保持可编辑的信息和建议页数。此阶段不要写逐页设计或生成图片。",
-        "method": "按教案真实教学过程识别课堂启动、概念建构、方法形成、探究或例题、应用练习、辨析和总结中需要视觉支持的部分。区分图片主视觉与准确教学信息责任：现实场景、物件和认知情境适合图片化；标题、正文、数字、算式、答案、标注和精确数学关系必须保持PPT原生可编辑。页数服从教学节奏，不机械按教案段落一段一页。",
-        "quality_gate": "不得改变教案目标、知识边界、顺序和例题逻辑；不得复制完整教案；不得把准确文字、数字或数学关系交给图片模型；建议页数必须能覆盖关键教学环节且不过度拆页；输出必须标明所有必须可编辑的信息。",
+        "method": "按教案真实教学过程识别课堂启动、概念建构、方法形成、探究或例题、应用练习、辨析和总结中需要视觉支持的部分。区分图片主视觉与准确教学信息责任：现实场景、物件和认知情境适合图片化；标题、正文、数字、算式、答案、标注和精确数学关系必须保持PPT原生可编辑。教师未指定页数时，根据课时长度、页面教学任务、互动节点、主视觉需求和信息密度推荐精确页数，通常为10至20页；教师指定5至60页时尊重覆盖，并说明低于10页或高于20页的取舍。",
+        "quality_gate": "不得改变教案目标、知识边界、顺序和例题逻辑；不得复制完整教案；不得把准确文字、数字或数学关系交给图片模型；建议页数必须能覆盖关键教学环节且不过度拆页，并给出可解释理由；不得为落入10至20页机械凑页；输出必须标明所有必须可编辑的信息。",
         "context_bindings": [
           {"binding_key": "approved_lesson_plan", "source": "lesson_plan.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 600000},
           {"binding_key": "approved_material", "source": "material.approved_parse", "required": true, "exposure": "summary", "max_items": 50, "max_bytes": 300000},
@@ -692,8 +695,8 @@
       "projection": {
         "output_format": "markdown",
         "renderer_id": "shanhai.ppt_analysis.markdown.v1",
-        "template": "# PPT内容分析\n\n## 受众与边界\n{{audience_and_use}}\n\n{{ppt_content_boundary}}\n\n## 课堂顺序\n{{objective_sequence}}\n\n## 互动与图片化机会\n{{interaction_points}}\n\n{{visualization_opportunities}}\n\n## 可编辑要求与页数\n{{editable_information_requirements}}\n\n建议页数：{{recommended_page_count}}",
-        "allowed_variables": ["audience_and_use", "ppt_content_boundary", "objective_sequence", "interaction_points", "visualization_opportunities", "editable_information_requirements", "recommended_page_count"],
+        "template": "# PPT内容分析\n\n## 受众与边界\n{{audience_and_use}}\n\n{{ppt_content_boundary}}\n\n## 课堂顺序\n{{objective_sequence}}\n\n## 互动与图片化机会\n{{interaction_points}}\n\n{{visualization_opportunities}}\n\n## 可编辑要求与页数\n{{editable_information_requirements}}\n\n建议页数：{{recommended_page_count}}\n\n{{page_count_recommendation_reason}}",
+        "allowed_variables": ["audience_and_use", "ppt_content_boundary", "objective_sequence", "interaction_points", "visualization_opportunities", "editable_information_requirements", "recommended_page_count", "page_count_recommendation_reason"],
         "roles": ["teacher_view"],
         "teacher_visible": true
       }
@@ -1095,10 +1098,12 @@
       "model_capability": "text.structured.creative_video",
       "style_preset_refs": ["style.primary_math.paper_clay"],
       "input": {
-        "description": "输入目标时长、画幅、语言和创作要求；唯一业务上下文为已选导入方案快照。",
+        "description": "输入时长策略、可选目标时长、画幅、语言和创作要求；唯一业务上下文为已选导入方案快照。",
         "fields": [
           {"field_key": "selected_intro_snapshot_ref", "label": "已选导入方案", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
-          {"field_key": "video_target_duration_seconds", "label": "目标总时长", "value_type": "number", "required": true, "source": "teacher", "visibility": "primary", "widget": "number", "default_value": 50, "validation": {"minimum": 30, "maximum": 90}},
+          {"field_key": "video_duration_mode", "label": "时长方式", "value_type": "enum", "required": true, "source": "teacher", "visibility": "primary", "widget": "select", "default_value": "system_recommended", "options": [{"value": "system_recommended", "label": "系统按故事与价格推荐"}, {"value": "teacher_fixed", "label": "教师指定"}]},
+          {"field_key": "video_target_duration_seconds", "label": "目标总时长（可选）", "value_type": "number", "required": false, "source": "teacher", "visibility": "secondary", "widget": "number", "validation": {"minimum": 60, "maximum": 180}},
+          {"field_key": "video_cost_preference", "label": "费用偏好", "value_type": "enum", "required": true, "source": "teacher", "visibility": "secondary", "widget": "select", "default_value": "balanced", "options": [{"value": "economy", "label": "节省费用"}, {"value": "balanced", "label": "平衡"}, {"value": "quality", "label": "优先质量"}]},
           {"field_key": "video_aspect_ratio", "label": "视频画幅", "value_type": "enum", "required": true, "source": "teacher", "visibility": "secondary", "widget": "select", "default_value": "16:9", "options": [{"value": "16:9", "label": "横屏16:9"}, {"value": "9:16", "label": "竖屏9:16"}]},
           {"field_key": "video_language", "label": "语言", "value_type": "enum", "required": true, "source": "teacher", "visibility": "secondary", "widget": "select", "default_value": "zh-CN", "options": [{"value": "zh-CN", "label": "普通话"}]},
           {"field_key": "master_script_requirements", "label": "剧本补充要求", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 5000}}
@@ -1152,15 +1157,30 @@
               {"field_key": "master_must_not_preteach", "label": "不得提前讲授", "type": "list", "required": true, "editable": false, "deletable": false}
             ]
           },
+          {
+            "field_key": "master_duration_recommendation",
+            "label": "时长建议",
+            "type": "group",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "children": [
+              {"field_key": "master_duration_mode", "label": "时长方式", "type": "enum", "required": true, "editable": false, "deletable": false},
+              {"field_key": "master_recommended_duration_seconds", "label": "系统建议时长", "type": "number", "required": true, "editable": false, "deletable": false},
+              {"field_key": "master_duration_reason", "label": "建议理由", "type": "rich_text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "master_estimated_shot_count", "label": "预计镜头数", "type": "number", "required": true, "editable": false, "deletable": false},
+              {"field_key": "master_pricing_quote_required", "label": "进入分镜前需要服务端报价", "type": "boolean", "required": true, "editable": false, "deletable": false}
+            ]
+          },
           {"field_key": "master_target_duration_seconds", "label": "目标总时长", "type": "number", "required": true, "editable": true, "deletable": false},
           {"field_key": "master_script_quality", "label": "剧本质量检查", "type": "rubric", "required": true, "editable": false, "deletable": false}
         ]
       },
       "prompt": {
         "role": "你是独立创意课堂导入短片的母版编剧，负责把已选方案扩写为完整可生产故事。",
-        "task": "严格继承已选方案的标题、独立概念、钩子、课程锚点、课堂第一问、交接时刻和不得提前讲授内容，生成完整故事与场次。不得重新选择创意，不得读取或推测教案、教材、PPT。此阶段不要写shot级提示词。",
-        "method": "先让脱离课程仍成立的故事具有清楚的开始状态、目标或未知、可见变化和结局推进，再只在最后按上游唯一锚点回接。每个场次写明目的、地点、人物或主体、动作、旁白、对白、声音意图、开始和结束状态及预计时长。第一阶段画面优先无准确对白，旁白和对白保留为后期音频文本。总时长控制在30至90秒并符合目标。",
-        "quality_gate": "上游独立创意与锚点字段不得改写；完整故事不是梗概或shot列表；结尾准确停在handoff_moment；不得解释must_not_preteach；场次时长总和等于目标时长；不包含Provider、模型、参考图位置、费用、自动批准或下一工具。",
+        "task": "严格继承已选方案的标题、独立概念、钩子、课程锚点、课堂第一问、交接时刻和不得提前讲授内容，生成完整故事与场次，并给出60至180秒内的时长建议。不得重新选择创意，不得读取或推测教案、教材、PPT。此阶段不要写shot级提示词或臆造价格。",
+        "method": "先让脱离课程仍成立的故事具有清楚的开始状态、目标或未知、可见变化和结局推进，再只在最后按上游唯一锚点回接。每个场次写明目的、地点、人物或主体、动作、旁白、对白、声音意图、开始和结束状态及预计时长。根据故事场次、可见节拍、预计镜头数、节奏和交接点推荐60至180秒内的精确总时长；teacher_fixed时尊重教师目标，system_recommended时使用建议值。价格由服务端当前路由和版本化价格档案另行估算，模型只声明需要报价，不输出金额。",
+        "quality_gate": "上游独立创意与锚点字段不得改写；完整故事不是梗概或shot列表；结尾准确停在handoff_moment；不得解释must_not_preteach；建议时长和最终目标均在60至180秒，场次时长总和等于目标时长；建议理由与预计镜头数可复核；不包含Provider、模型、参考图位置、虚构费用、自动批准或下一工具。",
         "context_bindings": [
           {"binding_key": "selected_intro", "source": "intro_selection.snapshot", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 100000}
         ],
@@ -1225,7 +1245,7 @@
         "role": "你是创意短片粗分镜设计师，负责验证故事节奏、时长和可制作性。",
         "task": "把批准母版剧本按场次和故事节拍拆成粗分镜。每个beat只说明发生什么、学生看到什么变化、预计多长、需要哪些资产和怎样衔接；不要写逐秒运镜、参考图序号或视频模型提示词。",
         "method": "保持母版剧本场次、开始结束状态和唯一课堂交接不变。按可见变化拆分2个以上节拍，每个节拍只有一个主要事件，稳定引用来源scene_key。预计时长总和等于母版目标时长，并为后续人物、场景、道具、生物资产清单提供明确需求。",
-        "quality_gate": "不改写已选方案或母版剧本；节拍顺序连续、来源有效、单节拍单事件；总时长一致；最后节拍才到达handoff_moment；不包含Provider提示词、参考图位置、10/15秒shot硬切、资产文件或模型参数。",
+        "quality_gate": "不改写已选方案或母版剧本；节拍顺序连续、来源有效、单节拍单事件；总时长一致；最后节拍才到达handoff_moment；不包含Provider提示词、参考图位置、shot时长硬切、资产文件或模型参数。",
         "context_bindings": [
           {"binding_key": "selected_intro", "source": "intro_selection.snapshot", "required": true, "exposure": "summary", "max_items": 1, "max_bytes": 100000},
           {"binding_key": "approved_master_script", "source": "video.master_script.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 400000}
@@ -1559,13 +1579,13 @@
     {
       "template_key": "video.fine_storyboard.generate",
       "title": "视频细分镜与生成指令",
-      "description": "在母版、粗分镜、风格和已批准图片资产齐备后生成10/15秒逐shot合同。",
+      "description": "在母版、粗分镜、风格和已批准图片资产齐备后生成6至30秒逐shot合同。",
       "model_capability": "text.structured.creative_video",
       "style_preset_refs": ["style.primary_math.paper_clay"],
       "input": {
         "description": "读取已选方案、批准母版、粗分镜、风格和图片资产，可接受镜头数量偏好。",
         "fields": [
-          {"field_key": "fine_preferred_shot_count", "label": "期望镜头数", "value_type": "number", "required": false, "source": "teacher", "visibility": "secondary", "widget": "number", "validation": {"minimum": 2, "maximum": 12}},
+          {"field_key": "fine_preferred_shot_count", "label": "期望镜头数", "value_type": "number", "required": false, "source": "teacher", "visibility": "secondary", "widget": "number", "validation": {"minimum": 2, "maximum": 30}},
           {"field_key": "fine_storyboard_requirements", "label": "细分镜补充要求", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 5000}},
           {"field_key": "fine_master_script_ref", "label": "批准母版剧本", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
           {"field_key": "fine_rough_storyboard_ref", "label": "批准粗分镜", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
@@ -1594,7 +1614,7 @@
               {"field_key": "shot_scene_key", "label": "来源场次键", "type": "reference", "required": true, "editable": false, "deletable": false},
               {"field_key": "shot_beat_key", "label": "来源节拍键", "type": "reference", "required": true, "editable": false, "deletable": false},
               {"field_key": "shot_position", "label": "顺序", "type": "number", "required": true, "editable": true, "deletable": false},
-              {"field_key": "shot_duration_seconds", "label": "时长", "type": "enum", "required": true, "editable": true, "deletable": false, "options": [{"value": "10", "label": "10秒"}, {"value": "15", "label": "15秒"}]},
+              {"field_key": "shot_duration_seconds", "label": "时长（6至30秒）", "type": "number", "required": true, "editable": true, "deletable": false},
               {"field_key": "shot_visible_beat", "label": "唯一可见节拍", "type": "rich_text", "required": true, "editable": true, "deletable": false},
               {"field_key": "shot_start_state", "label": "开始状态", "type": "rich_text", "required": true, "editable": true, "deletable": false},
               {"field_key": "shot_end_state", "label": "结束状态", "type": "rich_text", "required": true, "editable": true, "deletable": false},
@@ -1613,10 +1633,10 @@
         ]
       },
       "prompt": {
-        "role": "你是创意短片细分镜导演，负责把已批准节拍和图片资产变成10秒或15秒逐shot生产合同。",
+        "role": "你是创意短片细分镜导演，负责把已批准节拍和图片资产变成6至30秒逐shot生产合同。",
         "task": "在母版剧本、粗分镜、视频风格和已批准图片资产全部齐备后，生成逐shot细分镜。每个shot只有一个主要可见节拍、一个明确终点和一次主要运镜，并输出可直接提交视频模型的完整提示词。",
-        "method": "按故事节拍选择10秒或15秒规格，使全部shot总和等于母版目标时长。每个shot稳定引用scene和beat，写明开始/结束状态、景别、角度、起止构图、一次主要运镜、主体动作时间顺序、旁白/对白/声音占位和连续性锁定。每张已批准垫图按连续image_index登记语义名、版本和用途，提示词中的垫图标记与结构一一对应。最后一个shot才到达课堂交接。",
-        "quality_gate": "shot顺序连续，时长只能10或15秒且总和精确；每个shot单节拍单运镜；所有资产版本已批准且引用存在；人物、道具、光线、天气和动作状态无解释跳变；不把旁白字幕交给视频画面生成；结尾不越过handoff_moment、不解释must_not_preteach。",
+        "method": "按故事节拍和逻辑Provider能力为每个shot选择6至30秒的精确时长，使全部shot总和等于已确认母版目标时长。每个shot稳定引用scene和beat，写明开始/结束状态、景别、角度、起止构图、一次主要运镜、主体动作时间顺序、旁白/对白/声音占位和连续性锁定。每张已批准垫图按连续image_index登记语义名、版本和用途，提示词中的垫图标记与结构一一对应。最后一个shot才到达课堂交接。",
+        "quality_gate": "shot顺序连续，每个时长为6至30秒且总和精确；每个shot单节拍单运镜；所有资产版本已批准且引用存在；人物、道具、光线、天气和动作状态无解释跳变；不把旁白字幕交给视频画面生成；结尾不越过handoff_moment、不解释must_not_preteach。",
         "context_bindings": [
           {"binding_key": "selected_intro", "source": "intro_selection.snapshot", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 100000},
           {"binding_key": "approved_master_script", "source": "video.master_script.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 400000},
@@ -1639,7 +1659,7 @@
       "template_key": "video.shots.generate",
       "title": "逐镜头候选视频生成",
       "description": "按细分镜逐shot生成候选视频，候选通过校验、采用并保存后才形成正式clip。",
-      "model_capability": "video.image_to_video.10s_15s",
+      "model_capability": "video.image_to_video.6s_30s",
       "style_preset_refs": ["style.primary_math.paper_clay"],
       "input": {
         "description": "输入一个shot合同、视频风格、候选数及必需关键帧与连续性参考。",
@@ -1683,8 +1703,8 @@
       "prompt": {
         "role": "你是服务端逐shot视频生成执行器。",
         "task": "严格按一个已冻结shot合同生成指定数量候选，按image_index顺序传入shot_keyframe和continuity_reference，不改写故事、时长、动作或固定槽位。",
-        "method": "通过模型网关选择满足video.image_to_video.10s_15s能力的路由；只传节点允许的参考资产与业务提示词。记录候选键、实际时长、分辨率、帧率、媒体类型、SHA-256和质量标记。候选阶段不创建clip_id；只有校验通过、被采用并原子保存到shot槽位后才形成正式clip。",
-        "quality_gate": "输出可播放且时长匹配10或15秒；首尾状态、主体身份、资产、动作、光线和镜头连续；无文字字幕水印Logo和儿童安全问题；失败只影响当前shot；Provider私有参数和临时URL不进入业务产物。",
+        "method": "通过模型网关选择满足video.image_to_video.6s_30s能力的路由；只传节点允许的参考资产与业务提示词。记录候选键、实际时长、分辨率、帧率、媒体类型、SHA-256和质量标记。候选阶段不创建clip_id；只有校验通过、被采用并原子保存到shot槽位后才形成正式clip。",
+        "quality_gate": "输出可播放且时长匹配6至30秒shot合同；首尾状态、主体身份、资产、动作、光线和镜头连续；无文字字幕水印Logo和儿童安全问题；失败只影响当前shot；Provider私有参数和临时URL不进入业务产物。",
         "context_bindings": [],
         "max_chars": 35000
       },
@@ -1771,7 +1791,7 @@
     {
       "template_key": "audio.tts.generate",
       "title": "TTS配音生成",
-      "description": "逐条执行旁白或对白计划并产生可审计音轨候选，声音参考仅按节点角色传入。",
+      "description": "为后续音频Provider保留的执行合同：逐条执行旁白或对白计划并产生可审计音轨候选；当前阶段不实现适配器或真实冒烟。",
       "model_capability": "audio.tts.child_friendly_zh",
       "input": {
         "description": "输入一个TTS音频计划项、候选数和可选声音参考。",

@@ -22,7 +22,7 @@
         "widget": "number",
         "validation": {
           "minimum": 2,
-          "maximum": 12
+          "maximum": 30
         }
       },
       {

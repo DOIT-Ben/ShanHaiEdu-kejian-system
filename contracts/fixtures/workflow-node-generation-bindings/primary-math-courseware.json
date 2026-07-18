@@ -626,7 +626,7 @@
       "title": "逐镜头候选视频生成",
       "phase": "video",
       "execution_kind": "model_generation",
-      "model_capability": "video.image_to_video.10s_15s",
+      "model_capability": "video.image_to_video.6s_30s",
       "generation_template_ref": {"item_key": "video.shots.generate", "kind": "generation_template"},
       "input_contract_refs": ["artifact:video_fine_storyboard", "contract:video_style"],
       "output_contract_refs": ["asset:video_clip_candidates"],

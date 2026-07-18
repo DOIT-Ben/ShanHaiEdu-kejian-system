@@ -261,7 +261,7 @@ def render_golden_case(golden: Mapping[str, Any]) -> str:
             "## 7. 阶段验收边界",
             "",
             "- 普通 CI：只运行确定性 Fake 和合同测试。",
-            "- 媒体阶段出口：必须补真实文本、图片、视频和 TTS 冒烟。",
+            "- 当前媒体阶段出口：必须补真实文本、图片和视频冒烟；TTS待音频Provider可用后独立验收。",
             "- 当前示例不会伪装成已生成 DOCX、PPTX、图片、音频或 MP4。",
             "",
         ]

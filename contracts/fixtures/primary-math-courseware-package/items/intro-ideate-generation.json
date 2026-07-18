@@ -3,14 +3,14 @@
   "kind": "generation_template",
   "metadata": {
     "key": "intro.ideate",
-    "name": "三类九套独立创意",
+    "name": "独立导入创意",
     "domain": "primary_math",
     "locale": "zh-CN"
   },
   "spec": {
     "template_key": "intro.ideate",
-    "title": "三类九套独立创意",
-    "description": "在严格隔离课程上下文的条件下生成科普、应用、故事各三套独立创意。",
+    "title": "独立导入创意",
+    "description": "在严格隔离课程上下文的条件下，默认生成科普、应用、故事各三套独立创意，或只完善教师已有的一套创意。",
     "model_capability": "text.structured.creative_education",
     "input_definition_ref": {
       "item_key": "intro.ideate.input",

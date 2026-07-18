@@ -81,21 +81,11 @@
           },
           {
             "field_key": "shot_duration_seconds",
-            "label": "时长",
-            "type": "enum",
+            "label": "时长（6至30秒）",
+            "type": "number",
             "required": true,
             "editable": true,
-            "deletable": false,
-            "options": [
-              {
-                "value": "10",
-                "label": "10秒"
-              },
-              {
-                "value": "15",
-                "label": "15秒"
-              }
-            ]
+            "deletable": false
           },
           {
             "field_key": "shot_visible_beat",

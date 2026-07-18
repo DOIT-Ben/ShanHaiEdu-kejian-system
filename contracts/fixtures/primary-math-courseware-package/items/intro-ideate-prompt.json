@@ -3,14 +3,14 @@
   "kind": "prompt_template",
   "metadata": {
     "key": "intro.ideate.prompt",
-    "name": "三类九套独立创意业务Prompt",
+    "name": "独立导入创意业务Prompt",
     "domain": "primary_math",
     "locale": "zh-CN"
   },
   "spec": {
     "template_key": "intro.ideate.prompt",
-    "title": "三类九套独立创意业务Prompt",
-    "description": "在严格隔离课程上下文的条件下生成科普、应用、故事各三套独立创意。",
+    "title": "独立导入创意业务Prompt",
+    "description": "在严格隔离课程上下文的条件下，默认生成科普、应用、故事各三套独立创意，或只完善教师已有的一套创意。",
     "model_capability": "text.structured.creative_education",
     "input_definition_ref": {
       "item_key": "intro.ideate.input",
@@ -31,21 +31,21 @@
       {
         "section_key": "task",
         "layer": "task",
-        "content": "在不知道教材、学科、课题、教案和PPT的前提下，生成科普、应用、故事三类各三套、共九套实质不同的独立创意。此阶段不要补课程锚点、课堂问题、知识点或推荐分。",
+        "content": "在不知道教材、学科、课题、教案和PPT的前提下，default_nine生成科普、应用、故事三类各三套、共九套实质不同的独立创意；refine_existing只完善教师已有的一套创意，不扩成九套。此阶段不要补课程锚点、课堂问题、知识点或推荐分。",
         "editable": true,
         "visible_to_teacher": true
       },
       {
         "section_key": "method",
         "layer": "method",
-        "content": "科普类围绕值得观察或解释的现象与未知；应用类围绕真实任务、限制、选择或完成目标的需要；故事类围绕人物或主体的目标、变化、阻碍、误会或悬念。每套写清独立概念、开场钩子、去掉任何课程回接后仍然存在的观看价值、适合媒介和安全注意。创意可自然出现儿童、成人、动物、机器、自然或抽象主体，但不能因小学受众而默认使用教师、教室和课堂活动。",
+        "content": "科普类围绕值得观察或解释的现象与未知；应用类围绕真实任务、限制、选择或完成目标的需要；故事类围绕人物或主体的目标、变化、阻碍、误会或悬念。每套写清独立概念、开场钩子、去掉任何课程回接后仍然存在的观看价值、适合媒介和安全注意。refine_existing保留教师原意，只补完整性、可观看价值和安全边界。创意可自然出现儿童、成人、动物、机器、自然或抽象主体，但不能因小学受众而默认使用教师、教室和课堂活动。",
         "editable": false,
         "visible_to_teacher": false
       },
       {
         "section_key": "quality_gate",
         "layer": "quality_gate",
-        "content": "每类恰好三套，总数九套；九套不能只替换标题、角色名或场景；不知道课程的人仍能理解事件，去掉未来锚点后仍值得观看或参与；不得泄漏教材、知识点、教案、PPT、课程标题、分镜、旁白、字幕、资产、Provider或费用；内容适龄、安全、不鼓励危险模仿。",
+        "content": "default_nine每类恰好三套、总数九套且不能只替换标题、角色名或场景；refine_existing恰好一套且不改变教师核心创意。不知道课程的人仍能理解事件，去掉未来锚点后仍值得观看或参与；不得泄漏教材、知识点、教案、PPT、课程标题、分镜、旁白、字幕、资产、Provider或费用；内容适龄、安全、不鼓励危险模仿。",
         "editable": false,
         "visible_to_teacher": false
       }

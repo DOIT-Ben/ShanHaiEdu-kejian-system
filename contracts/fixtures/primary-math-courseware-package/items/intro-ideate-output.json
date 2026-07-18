@@ -3,14 +3,14 @@
   "kind": "content_definition",
   "metadata": {
     "key": "intro.ideate.output",
-    "name": "三类九套独立创意输出",
+    "name": "独立导入创意输出",
     "domain": "primary_math",
     "locale": "zh-CN"
   },
   "spec": {
     "definition_key": "intro.ideate.output",
-    "title": "三类九套独立创意输出",
-    "description": "不含教材、知识点或课程锚点的九套独立创意。",
+    "title": "独立导入创意输出",
+    "description": "不含教材、知识点或课程锚点的一套或九套独立创意。",
     "definition_role": "intermediate",
     "fields": [
       {
@@ -30,7 +30,7 @@
         "editable": true,
         "deletable": false,
         "repeatable": true,
-        "min_items": 9,
+        "min_items": 1,
         "max_items": 9,
         "children": [
           {

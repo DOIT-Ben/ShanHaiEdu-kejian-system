@@ -11,7 +11,27 @@ from typing import Any, NoReturn, cast
 
 from jsonschema import Draft202012Validator, FormatChecker
 
-from workflow.content_package import validate_content_package
+from scripts.golden_courseware_branch_inputs import (
+    BRANCH_START_NODE_KEYS,
+    GOLDEN_PLANNING_NODE_KEYS,
+    PROVIDER_MEDIA_NODE_KEYS,
+    build_golden_branch_source_outputs,
+    build_golden_branch_start_inputs,
+)
+from scripts.golden_courseware_content_validation import (
+    validate_content_fields,
+    validate_input_fields,
+)
+from scripts.golden_courseware_downstream_validation import (
+    validate_golden_delivery,
+    validate_golden_video,
+)
+from scripts.golden_courseware_stage_inputs import (
+    GOLDEN_CHAIN_INPUT_NODE_KEYS,
+    MEDIA_BOUNDARY_OUTPUT_ONLY_NODE_KEYS,
+    build_golden_chain_inputs,
+)
+from workflow.content_package import ValidatedContentPackage, validate_content_package
 
 LESSON_SECTION_KEYS = [
     "teaching_content",
@@ -27,11 +47,6 @@ LESSON_SECTION_KEYS = [
     "differentiated_homework",
     "teaching_reflection",
 ]
-FORBIDDEN_VIDEO_SOURCES = {
-    "lesson_plan.approved_version",
-    "material.approved_parse",
-    "ppt_outline.approved_version",
-}
 
 
 class GoldenCoursewareValidationError(ValueError):
@@ -59,6 +74,57 @@ def _require_unique(values: list[object], *, code: str, label: str) -> None:
         _fail(code, f"duplicate {label}")
 
 
+def _validate_branch_source_outputs(case: dict[str, Any], package: ValidatedContentPackage) -> None:
+    try:
+        source_outputs = build_golden_branch_source_outputs(case)
+    except (KeyError, StopIteration, TypeError) as exc:
+        _fail(
+            "GOLDEN_CONTENT_SOURCE_INVALID",
+            f"golden aggregate cannot produce branch source output: {exc}",
+        )
+    if set(source_outputs) != set(GOLDEN_PLANNING_NODE_KEYS):
+        missing = sorted(set(GOLDEN_PLANNING_NODE_KEYS) - set(source_outputs))
+        unexpected = sorted(set(source_outputs) - set(GOLDEN_PLANNING_NODE_KEYS))
+        _fail(
+            "GOLDEN_CONTENT_SOURCE_INCOMPLETE",
+            f"planning outputs differ; missing={missing}, unexpected={unexpected}",
+        )
+    for node_key, payload in source_outputs.items():
+        generation = cast(dict[str, Any], package.items[node_key]["spec"])
+        output_key = cast(str, generation["output_definition_ref"]["item_key"])
+        output_spec = cast(dict[str, Any], package.items[output_key]["spec"])
+        fields = cast(list[dict[str, Any]], output_spec["fields"])
+        validate_content_fields(payload, fields, path=node_key, fail=_fail)
+
+
+def _validate_node_inputs(
+    node_inputs: dict[str, dict[str, Any]], package: ValidatedContentPackage
+) -> None:
+    for node_key, payload in node_inputs.items():
+        generation = cast(dict[str, Any], package.items[node_key]["spec"])
+        input_key = cast(str, generation["input_definition_ref"]["item_key"])
+        input_spec = cast(dict[str, Any], package.items[input_key]["spec"])
+        fields = cast(list[dict[str, Any]], input_spec["fields"])
+        validate_input_fields(payload, fields, path=node_key, fail=_fail)
+
+
+def _validate_branch_start_inputs(case: dict[str, Any], package: ValidatedContentPackage) -> None:
+    _validate_branch_source_outputs(case, package)
+    branch_inputs = build_golden_branch_start_inputs(case)
+    if tuple(branch_inputs) != BRANCH_START_NODE_KEYS:
+        _fail("GOLDEN_BRANCH_START_NODE_INVALID", "branch start nodes are incomplete")
+    _validate_node_inputs(branch_inputs, package)
+
+
+def _validate_chain_inputs(case: dict[str, Any], package: ValidatedContentPackage) -> None:
+    chain_inputs = build_golden_chain_inputs(case)
+    if tuple(chain_inputs) != GOLDEN_CHAIN_INPUT_NODE_KEYS:
+        _fail("GOLDEN_CHAIN_INPUT_INCOMPLETE", "planning chain inputs are incomplete")
+    if set(chain_inputs) & set(MEDIA_BOUNDARY_OUTPUT_ONLY_NODE_KEYS):
+        _fail("GOLDEN_MEDIA_BOUNDARY_INVALID", "media-bound planning nodes need real assets")
+    _validate_node_inputs(chain_inputs, package)
+
+
 def _validate_package_refs(
     case: dict[str, Any],
     *,
@@ -73,10 +139,25 @@ def _validate_package_refs(
             "GOLDEN_TEMPLATE_SET_MISMATCH",
             "golden case must declare exactly the package's 23 generation entrypoints",
         )
+    planning = set(GOLDEN_PLANNING_NODE_KEYS)
+    provider_media = set(PROVIDER_MEDIA_NODE_KEYS)
+    if planning & provider_media or planning | provider_media != entrypoints:
+        _fail(
+            "GOLDEN_TEMPLATE_SCOPE_MISMATCH",
+            "planning and provider-media node scopes must partition all entrypoints",
+        )
+    _validate_branch_start_inputs(case, package)
+    _validate_chain_inputs(case, package)
 
 
-def _validate_source_and_lesson(case: dict[str, Any]) -> None:
+def _validate_source(case: dict[str, Any]) -> None:
     source = cast(dict[str, Any], case["source"])
+    verification = cast(dict[str, Any], source["verification"])
+    if not all(
+        verification[key]
+        for key in ("hash_verified", "page_count_verified", "page_range_visually_verified")
+    ):
+        _fail("GOLDEN_SOURCE_VERIFICATION_INCOMPLETE", "golden source facts are not verified")
     page_indexes = cast(list[int], source["pdf_page_indexes"])
     printed_pages = cast(list[int], source["printed_pages"])
     mappings = cast(list[dict[str, Any]], source["page_mappings"])
@@ -86,17 +167,36 @@ def _validate_source_and_lesson(case: dict[str, Any]) -> None:
         _fail("GOLDEN_SOURCE_PAGE_MAPPING_INVALID", "printed page mapping is inconsistent")
 
     evidence = cast(list[dict[str, Any]], case["material_evidence"])
+    _require_unique(
+        [item["evidence_key"] for item in evidence],
+        code="GOLDEN_EVIDENCE_KEY_DUPLICATE",
+        label="material evidence key",
+    )
     evidence_keys = {item["evidence_key"] for item in evidence}
+    mapping_by_page = {(item["pdf_page_index"], item["printed_page"]): item for item in mappings}
     for mapping in mappings:
         if not set(cast(list[str], mapping["evidence_keys"])).issubset(evidence_keys):
             _fail("GOLDEN_EVIDENCE_REF_INVALID", "page mapping references missing evidence")
+    for item in evidence:
+        mapping = mapping_by_page.get((item["pdf_page_index"], item["printed_page"]))
+        if mapping is None or item["evidence_key"] not in mapping["evidence_keys"]:
+            _fail("GOLDEN_EVIDENCE_REF_INVALID", "evidence does not match its page mapping")
 
+
+def _validate_lesson(case: dict[str, Any]) -> None:
+    evidence = cast(list[dict[str, Any]], case["material_evidence"])
+    evidence_keys = {item["evidence_key"] for item in evidence}
     division = cast(dict[str, Any], case["lesson_division"])
     units = cast(list[dict[str, Any]], division["lesson_units"])
     if division["lesson_count"] != len(units):
         _fail("GOLDEN_LESSON_COUNT_INVALID", "lesson_count does not match lesson_units")
     if [unit["position"] for unit in units] != list(range(1, len(units) + 1)):
         _fail("GOLDEN_LESSON_POSITION_INVALID", "lesson positions must be contiguous")
+    _require_unique(
+        [unit["lesson_unit_key"] for unit in units],
+        code="GOLDEN_LESSON_KEY_DUPLICATE",
+        label="lesson unit key",
+    )
     project = cast(dict[str, Any], case["project"])
     expected_duration = project["lesson_duration_minutes"]
     if any(unit["duration_minutes"] != expected_duration for unit in units):
@@ -112,7 +212,8 @@ def _validate_source_and_lesson(case: dict[str, Any]) -> None:
             _fail("GOLDEN_KNOWLEDGE_BOUNDARY_INVALID", "lesson omits forbidden preteach items")
 
     lesson_plan = cast(dict[str, Any], case["lesson_plan"])
-    if lesson_plan["source_lesson_unit_key"] != units[0]["lesson_unit_key"]:
+    unit_keys = {unit["lesson_unit_key"] for unit in units}
+    if lesson_plan["source_lesson_unit_key"] not in unit_keys:
         _fail("GOLDEN_LESSON_PLAN_SOURCE_INVALID", "lesson plan source lesson is inconsistent")
     sections = cast(dict[str, Any], lesson_plan["sections"])
     if list(sections) != LESSON_SECTION_KEYS:
@@ -129,9 +230,19 @@ def _validate_source_and_lesson(case: dict[str, Any]) -> None:
 def _validate_intro(case: dict[str, Any]) -> None:
     option_set = cast(dict[str, Any], case["intro_option_set"])
     options = cast(list[dict[str, Any]], option_set["options"])
+    lesson_units = cast(list[dict[str, Any]], case["lesson_division"]["lesson_units"])
+    if option_set["lesson_unit_key"] not in {unit["lesson_unit_key"] for unit in lesson_units}:
+        _fail("GOLDEN_INTRO_LESSON_SOURCE_INVALID", "intro options reference a missing lesson")
     counts = Counter(option["category"] for option in options)
-    if counts != Counter({"science": 3, "application": 3, "story": 3}):
-        _fail("GOLDEN_INTRO_CATEGORY_COUNT_INVALID", "intro categories must be three each")
+    generation_mode = cast(str, option_set["generation_mode"])
+    if generation_mode == "default_nine":
+        if counts != Counter({"science": 3, "application": 3, "story": 3}):
+            _fail("GOLDEN_INTRO_CATEGORY_COUNT_INVALID", "intro categories must be three each")
+    elif generation_mode == "refine_existing":
+        if len(options) != 1:
+            _fail("GOLDEN_INTRO_CATEGORY_COUNT_INVALID", "refine_existing must keep one option")
+    else:
+        _fail("GOLDEN_INTRO_MODE_INVALID", "unsupported intro generation mode")
     _require_unique(
         [option["option_key"] for option in options],
         code="GOLDEN_INTRO_KEY_DUPLICATE",
@@ -140,6 +251,24 @@ def _validate_intro(case: dict[str, Any]) -> None:
     scores = [cast(int, option["recommendation_score"]) for option in options]
     if scores.count(max(scores)) != 1:
         _fail("GOLDEN_INTRO_RECOMMENDATION_INVALID", "highest recommendation must be unique")
+    forbidden = set(cast(list[str], case["knowledge_boundary"]["must_not_preteach"]))
+    process_keys = {
+        item["section_key"]
+        for item in cast(list[dict[str, Any]], case["lesson_plan"]["sections"]["teaching_process"])
+    }
+    valid_replacement_keys = {f"teaching_process.{key}" for key in process_keys}
+    for option in options:
+        if not forbidden.issubset(set(cast(list[str], option["must_not_preteach"]))):
+            _fail(
+                "GOLDEN_INTRO_KNOWLEDGE_BOUNDARY_INVALID",
+                "intro option omits forbidden preteach items",
+            )
+        replacement = option.get("replacement_field_key")
+        if replacement is not None and replacement not in valid_replacement_keys:
+            _fail(
+                "GOLDEN_INTRO_REPLACEMENT_INVALID",
+                "intro option references a missing teaching process section",
+            )
     selection = cast(dict[str, Any], case["intro_selection"])
     selected = next(
         (option for option in options if option["option_key"] == selection["option_key"]),
@@ -147,6 +276,31 @@ def _validate_intro(case: dict[str, Any]) -> None:
     )
     if selected is None or selected != selection["snapshot"]:
         _fail("GOLDEN_INTRO_SNAPSHOT_INVALID", "selected intro snapshot must be immutable copy")
+    recommended = next(
+        option for option in options if option["recommendation_score"] == max(scores)
+    )
+    selection_method = cast(str, selection["selection_method"])
+    if selection_method == "policy_default":
+        if selection["option_key"] != recommended["option_key"]:
+            _fail(
+                "GOLDEN_INTRO_SELECTION_INVALID",
+                "policy_default must use the unique top recommendation",
+            )
+    elif selection_method != "teacher_selected":
+        _fail("GOLDEN_INTRO_SELECTION_INVALID", "unsupported intro selection method")
+
+
+def _collect_stable_keys(value: object) -> set[str]:
+    keys: set[str] = set()
+    if isinstance(value, dict):
+        for field, child in cast(dict[str, object], value).items():
+            if field.endswith("_key") and isinstance(child, str):
+                keys.add(child)
+            keys.update(_collect_stable_keys(child))
+    elif isinstance(value, list):
+        for child in cast(list[object], value):
+            keys.update(_collect_stable_keys(child))
+    return keys
 
 
 def _validate_ppt(case: dict[str, Any]) -> None:
@@ -162,7 +316,23 @@ def _validate_ppt(case: dict[str, Any]) -> None:
         code="GOLDEN_PPT_PAGE_KEY_DUPLICATE",
         label="PPT page key",
     )
+    outline = cast(list[dict[str, Any]], ppt["outline"])
+    if [page["page_key"] for page in outline] != [page["page_key"] for page in pages]:
+        _fail("GOLDEN_PPT_OUTLINE_REF_INVALID", "PPT pages do not match the approved outline")
+
+    plan_key = cast(str, lesson_plan["lesson_plan_key"])
+    sections = cast(dict[str, Any], lesson_plan["sections"])
+    stable_keys = _collect_stable_keys(sections)
+    valid_source_refs = {
+        *cast(set[str], {item["evidence_key"] for item in case["material_evidence"]}),
+        *stable_keys,
+        *(f"{plan_key}.{key}" for key in stable_keys),
+        *(f"{plan_key}.{key}" for key in sections),
+    }
     for index, page in enumerate(pages):
+        source_refs = set(cast(list[str], page["source_refs"]))
+        if not source_refs or not source_refs.issubset(valid_source_refs):
+            _fail("GOLDEN_PPT_SOURCE_REF_INVALID", "PPT page references a missing source")
         canvas = cast(dict[str, Any], page["canvas"])
         if index == 0:
             if page["page_type"] != "cover" or canvas["background_mode"] != "cover_art":
@@ -182,83 +352,6 @@ def _validate_ppt(case: dict[str, Any]) -> None:
         for asset in cast(list[dict[str, Any]], page["asset_requirements"]):
             if asset["responsibility"] not in {"AI_SCENE", "AI_ASSET"}:
                 _fail("GOLDEN_PPT_ASSET_RESPONSIBILITY_INVALID", "AI asset role is invalid")
-
-
-def _validate_video(case: dict[str, Any]) -> None:
-    video = cast(dict[str, Any], case["video"])
-    selection = cast(dict[str, Any], case["intro_selection"])
-    if video["selected_intro_option_key"] != selection["option_key"]:
-        _fail("GOLDEN_VIDEO_SOURCE_INVALID", "video must use the selected intro option")
-    policy = cast(dict[str, Any], video["source_policy"])
-    if policy["allowed_sources"] != ["intro_selection.snapshot"]:
-        _fail("GOLDEN_VIDEO_CONTEXT_INVALID", "video has more than the selected snapshot")
-    if not FORBIDDEN_VIDEO_SOURCES.issubset(set(cast(list[str], policy["forbidden_sources"]))):
-        _fail("GOLDEN_VIDEO_CONTEXT_INVALID", "video forbidden sources are incomplete")
-
-    snapshot = cast(dict[str, Any], selection["snapshot"])
-    master = cast(dict[str, Any], video["master_script"])
-    if master["selected_intro_option_key"] != snapshot["option_key"]:
-        _fail("GOLDEN_VIDEO_MASTER_SOURCE_INVALID", "master script source is inconsistent")
-    handoff = cast(dict[str, Any], master["handoff"])
-    for key in ("course_anchor", "classroom_first_question", "handoff_moment"):
-        if handoff[key] != snapshot[key]:
-            _fail("GOLDEN_VIDEO_HANDOFF_INVALID", f"master script changed {key}")
-    if handoff["must_not_preteach"] != snapshot["must_not_preteach"]:
-        _fail("GOLDEN_VIDEO_HANDOFF_INVALID", "master script changed must_not_preteach")
-
-    rough = cast(dict[str, Any], video["rough_storyboard"])
-    beats = cast(list[dict[str, Any]], rough["beats"])
-    target_duration = cast(int, master["target_duration_seconds"])
-    if sum(cast(int, beat["duration_seconds"]) for beat in beats) != target_duration:
-        _fail("GOLDEN_VIDEO_ROUGH_DURATION_INVALID", "rough storyboard duration differs")
-
-    inventory = cast(dict[str, Any], video["asset_inventory"])
-    categories = cast(dict[str, list[str]], inventory["categories"])
-    if set(categories) != {"character", "scene", "prop", "creature"}:
-        _fail("GOLDEN_VIDEO_ASSET_CATEGORIES_INVALID", "asset categories must be explicit")
-    assets = cast(list[dict[str, Any]], inventory["assets"])
-    asset_keys = {asset["asset_key"] for asset in assets}
-    if set().union(*(set(values) for values in categories.values())) != asset_keys:
-        _fail("GOLDEN_VIDEO_ASSET_CATEGORIES_INVALID", "asset category refs are inconsistent")
-    if {
-        item["asset_key"] for item in cast(list[dict[str, Any]], video["asset_image_prompts"])
-    } != asset_keys:
-        _fail("GOLDEN_VIDEO_ASSET_PROMPTS_INVALID", "every asset needs one image prompt")
-
-    fine = cast(dict[str, Any], video["fine_storyboard"])
-    shots = cast(list[dict[str, Any]], fine["shots"])
-    if [shot["position"] for shot in shots] != list(range(1, len(shots) + 1)):
-        _fail("GOLDEN_VIDEO_SHOT_POSITION_INVALID", "shot positions must be contiguous")
-    _require_unique(
-        [shot["shot_key"] for shot in shots],
-        code="GOLDEN_VIDEO_SHOT_KEY_DUPLICATE",
-        label="shot key",
-    )
-    if any(shot["duration_seconds"] not in {10, 15} for shot in shots):
-        _fail("GOLDEN_VIDEO_SHOT_DURATION_INVALID", "shot duration must be 10 or 15 seconds")
-    if sum(cast(int, shot["duration_seconds"]) for shot in shots) != target_duration:
-        _fail("GOLDEN_VIDEO_SHOT_DURATION_INVALID", "shot duration sum differs from target")
-    for shot in shots:
-        usages = cast(list[dict[str, Any]], shot["asset_usages"])
-        if not {usage["asset_key"] for usage in usages}.issubset(asset_keys):
-            _fail("GOLDEN_VIDEO_SHOT_ASSET_INVALID", "shot references missing asset")
-    if any(shot.get("handoff_marker") for shot in shots[:-1]) or not shots[-1].get(
-        "handoff_marker"
-    ):
-        _fail("GOLDEN_VIDEO_HANDOFF_INVALID", "only the final shot may hand off")
-
-    shot_keys = {shot["shot_key"] for shot in shots}
-    clip_expectations = cast(list[dict[str, Any]], video["clip_expectations"])
-    if {item["shot_key"] for item in clip_expectations} != shot_keys:
-        _fail("GOLDEN_VIDEO_CLIP_EXPECTATION_INVALID", "clip expectations must cover shots")
-    if not all(item["formal_clip_after_adopt_and_save"] for item in clip_expectations):
-        _fail("GOLDEN_VIDEO_CLIP_EXPECTATION_INVALID", "candidate cannot be a formal clip")
-
-    audio = cast(dict[str, Any], video["audio_plan"])
-    for track in cast(list[dict[str, Any]], audio["tracks"]):
-        shot_key = track.get("shot_key")
-        if shot_key is not None and shot_key not in shot_keys:
-            _fail("GOLDEN_AUDIO_SHOT_REF_INVALID", "audio track references missing shot")
 
 
 def _validate_source_pdf(case: dict[str, Any], source_pdf: Path) -> None:
@@ -284,11 +377,13 @@ def validate_golden_case(
 ) -> None:
     """Validate cross-artifact golden invariants and optional authoritative PDF facts."""
 
-    _validate_package_refs(case, package_root=package_root, contracts_root=contracts_root)
-    _validate_source_and_lesson(case)
+    _validate_source(case)
+    _validate_lesson(case)
     _validate_intro(case)
     _validate_ppt(case)
-    _validate_video(case)
+    validate_golden_video(case, fail=_fail)
+    validate_golden_delivery(case, fail=_fail)
+    _validate_package_refs(case, package_root=package_root, contracts_root=contracts_root)
     if source_pdf is not None:
         _validate_source_pdf(case, source_pdf)
 

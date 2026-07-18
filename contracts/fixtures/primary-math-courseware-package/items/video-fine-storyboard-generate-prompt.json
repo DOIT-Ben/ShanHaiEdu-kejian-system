@@ -10,7 +10,7 @@
   "spec": {
     "template_key": "video.fine_storyboard.generate.prompt",
     "title": "视频细分镜与生成指令业务Prompt",
-    "description": "在母版、粗分镜、风格和已批准图片资产齐备后生成10/15秒逐shot合同。",
+    "description": "在母版、粗分镜、风格和已批准图片资产齐备后生成6至30秒逐shot合同。",
     "model_capability": "text.structured.creative_video",
     "input_definition_ref": {
       "item_key": "video.fine_storyboard.generate.input",
@@ -24,7 +24,7 @@
       {
         "section_key": "role",
         "layer": "role",
-        "content": "你是创意短片细分镜导演，负责把已批准节拍和图片资产变成10秒或15秒逐shot生产合同。",
+        "content": "你是创意短片细分镜导演，负责把已批准节拍和图片资产变成6至30秒逐shot生产合同。",
         "editable": false,
         "visible_to_teacher": true
       },
@@ -38,14 +38,14 @@
       {
         "section_key": "method",
         "layer": "method",
-        "content": "按故事节拍选择10秒或15秒规格，使全部shot总和等于母版目标时长。每个shot稳定引用scene和beat，写明开始/结束状态、景别、角度、起止构图、一次主要运镜、主体动作时间顺序、旁白/对白/声音占位和连续性锁定。每张已批准垫图按连续image_index登记语义名、版本和用途，提示词中的垫图标记与结构一一对应。最后一个shot才到达课堂交接。",
+        "content": "按故事节拍和逻辑Provider能力为每个shot选择6至30秒的精确时长，使全部shot总和等于已确认母版目标时长。每个shot稳定引用scene和beat，写明开始/结束状态、景别、角度、起止构图、一次主要运镜、主体动作时间顺序、旁白/对白/声音占位和连续性锁定。每张已批准垫图按连续image_index登记语义名、版本和用途，提示词中的垫图标记与结构一一对应。最后一个shot才到达课堂交接。",
         "editable": false,
         "visible_to_teacher": false
       },
       {
         "section_key": "quality_gate",
         "layer": "quality_gate",
-        "content": "shot顺序连续，时长只能10或15秒且总和精确；每个shot单节拍单运镜；所有资产版本已批准且引用存在；人物、道具、光线、天气和动作状态无解释跳变；不把旁白字幕交给视频画面生成；结尾不越过handoff_moment、不解释must_not_preteach。",
+        "content": "shot顺序连续，每个时长为6至30秒且总和精确；每个shot单节拍单运镜；所有资产版本已批准且引用存在；人物、道具、光线、天气和动作状态无解释跳变；不把旁白字幕交给视频画面生成；结尾不越过handoff_moment、不解释must_not_preteach。",
         "editable": false,
         "visible_to_teacher": false
       }
