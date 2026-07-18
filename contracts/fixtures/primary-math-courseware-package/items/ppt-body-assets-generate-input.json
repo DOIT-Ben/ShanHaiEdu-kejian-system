@@ -1,0 +1,73 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "ppt.body_assets.generate.input",
+    "name": "PPT正文图片生成输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "ppt.body_assets.generate.input",
+    "title": "PPT正文图片生成输入",
+    "description": "输入不可变图片任务项、PPT视觉合同和节点声明的参考资产。",
+    "fields": [
+      {
+        "field_key": "body_creation_package_ref",
+        "label": "正文图片任务包",
+        "value_type": "reference",
+        "required": true,
+        "source": "system",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "body_generation_quality",
+        "label": "逻辑质量档位",
+        "value_type": "enum",
+        "required": true,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "select",
+        "default_value": "balanced",
+        "options": [
+          {
+            "value": "fast",
+            "label": "快速"
+          },
+          {
+            "value": "balanced",
+            "label": "均衡"
+          },
+          {
+            "value": "quality",
+            "label": "高质量"
+          }
+        ]
+      },
+      {
+        "field_key": "body_candidates_per_item",
+        "label": "每项候选数",
+        "value_type": "number",
+        "required": true,
+        "source": "teacher",
+        "visibility": "primary",
+        "widget": "number",
+        "default_value": 2,
+        "validation": {
+          "minimum": 1,
+          "maximum": 4
+        }
+      },
+      {
+        "field_key": "body_reference_assets",
+        "label": "视觉参考资产",
+        "value_type": "asset",
+        "required": true,
+        "source": "system",
+        "visibility": "hidden",
+        "widget": "asset_picker"
+      }
+    ]
+  }
+}

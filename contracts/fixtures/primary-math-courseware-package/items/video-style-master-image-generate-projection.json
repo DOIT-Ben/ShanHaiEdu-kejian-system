@@ -1,0 +1,26 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "video.style_master.image.generate.projection",
+    "name": "视频视觉母图生成教师投影",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "video.style_master.image.generate.projection",
+    "title": "视频视觉母图生成教师投影",
+    "source_definition_ref": {
+      "item_key": "video.style_master.image.generate.output",
+      "kind": "content_definition"
+    },
+    "output_format": "markdown",
+    "renderer_id": "shanhai.image_candidates.markdown.v1",
+    "template": "# 视频视觉母图候选\n\n目标槽位：{{style_master_generation_target}}\n\n{{style_master_candidates}}",
+    "allowed_variables": [
+      "style_master_generation_target",
+      "style_master_candidates"
+    ],
+    "teacher_visible": true
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "video.rough_storyboard.generate.input",
+    "name": "视频粗分镜生成输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "video.rough_storyboard.generate.input",
+    "title": "视频粗分镜生成输入",
+    "description": "读取已选方案和批准母版剧本，可接受节奏与镜头密度偏好。",
+    "fields": [
+      {
+        "field_key": "rough_master_script_ref",
+        "label": "批准母版剧本",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "rough_pacing_preference",
+        "label": "节奏偏好",
+        "value_type": "enum",
+        "required": true,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "select",
+        "default_value": "balanced",
+        "options": [
+          {
+            "value": "calm",
+            "label": "舒缓"
+          },
+          {
+            "value": "balanced",
+            "label": "均衡"
+          },
+          {
+            "value": "lively",
+            "label": "活泼"
+          }
+        ]
+      },
+      {
+        "field_key": "rough_storyboard_requirements",
+        "label": "粗分镜补充要求",
+        "value_type": "rich_text",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "textarea",
+        "validation": {
+          "max_length": 4000
+        }
+      },
+      {
+        "field_key": "rough_selected_intro_ref",
+        "label": "已选导入方案",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      }
+    ]
+  }
+}

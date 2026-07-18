@@ -1,0 +1,118 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "video.asset_prompts.generate.output",
+    "name": "视频资产图片提示词输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "video.asset_prompts.generate.output",
+    "title": "视频资产图片提示词输出",
+    "description": "每个视频资产一个独立图片任务项，包含完整提示词、负面约束、一致性和固定槽位。",
+    "definition_role": "artifact",
+    "fields": [
+      {
+        "field_key": "video_asset_package_key",
+        "label": "图片任务包键",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "video_style_contract_ref",
+        "label": "视频风格版本",
+        "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "video_asset_prompt_items",
+        "label": "视频资产图片任务",
+        "type": "repeatable",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "repeatable": true,
+        "min_items": 1,
+        "children": [
+          {
+            "field_key": "video_asset_item_key",
+            "label": "任务键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "video_asset_source_key",
+            "label": "资产键",
+            "type": "reference",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "video_asset_prompt_type",
+            "label": "资产类型",
+            "type": "enum",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "video_asset_prompt_target_slot",
+            "label": "目标槽位",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "video_asset_prompt_text",
+            "label": "完整图片提示词",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "video_asset_negative_constraints",
+            "label": "负面约束",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "video_asset_prompt_aspect_ratio",
+            "label": "画幅",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "video_asset_prompt_consistency_key",
+            "label": "一致性键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "video_asset_prompt_coverage",
+        "label": "任务覆盖检查",
+        "type": "rubric",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      }
+    ]
+  }
+}

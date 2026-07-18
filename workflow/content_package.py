@@ -37,7 +37,16 @@ DEFAULT_CONTEXT_SOURCES = frozenset(
         "lesson_division.approved_version",
         "lesson_plan.approved_version",
         "material.approved_parse",
+        "ppt_outline.approved_version",
+        "ppt_page_spec.current_version",
+        "ppt_style.approved_version",
         "project.teacher_preferences",
+        "video.asset_inventory.current_version",
+        "video.assets.approved_versions",
+        "video.clips.approved_versions",
+        "video.master_script.approved_version",
+        "video.rough_storyboard.approved_version",
+        "video.style.approved_version",
     }
 )
 PROJECTION_VARIABLE = re.compile(r"\{\{([a-z][a-z0-9_.-]{1,159})\}\}")

@@ -1,0 +1,43 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "generation_template",
+  "metadata": {
+    "key": "ppt.content_analyze",
+    "name": "PPT内容分析",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "ppt.content_analyze",
+    "title": "PPT内容分析",
+    "description": "从批准教案和教材证据中提取PPT需要承接的教学顺序、图片化机会和可编辑信息。",
+    "model_capability": "text.structured.ppt_content",
+    "input_definition_ref": {
+      "item_key": "ppt.content_analyze.input",
+      "kind": "input_definition"
+    },
+    "prompt_template_ref": {
+      "item_key": "ppt.content_analyze.prompt",
+      "kind": "prompt_template"
+    },
+    "output_definition_ref": {
+      "item_key": "ppt.content_analyze.output",
+      "kind": "content_definition"
+    },
+    "style_preset_refs": [
+      {
+        "item_key": "style.primary_math.paper_clay",
+        "kind": "style_preset"
+      }
+    ],
+    "projection_refs": [
+      {
+        "role": "teacher_view",
+        "template_ref": {
+          "item_key": "ppt.content_analyze.projection",
+          "kind": "projection_template"
+        }
+      }
+    ]
+  }
+}

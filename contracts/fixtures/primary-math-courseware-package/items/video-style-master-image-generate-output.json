@@ -1,0 +1,95 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "video.style_master.image.generate.output",
+    "name": "视频视觉母图生成输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "video.style_master.image.generate.output",
+    "title": "视频视觉母图生成输出",
+    "description": "视觉母图候选文件事实和质量标记。",
+    "definition_role": "artifact",
+    "fields": [
+      {
+        "field_key": "style_master_generation_key",
+        "label": "生成请求键",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "style_master_generation_target",
+        "label": "目标槽位",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "style_master_candidates",
+        "label": "视觉母图候选",
+        "type": "repeatable",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "repeatable": true,
+        "min_items": 2,
+        "max_items": 4,
+        "children": [
+          {
+            "field_key": "style_master_result_key",
+            "label": "候选键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "style_master_width",
+            "label": "宽度",
+            "type": "number",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "style_master_height",
+            "label": "高度",
+            "type": "number",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "style_master_mime_type",
+            "label": "媒体类型",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "style_master_sha256",
+            "label": "文件摘要",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "style_master_quality_flags",
+            "label": "质量标记",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      }
+    ]
+  }
+}

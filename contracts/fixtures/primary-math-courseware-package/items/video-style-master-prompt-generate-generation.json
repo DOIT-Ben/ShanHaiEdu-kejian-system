@@ -1,0 +1,50 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "generation_template",
+  "metadata": {
+    "key": "video.style_master.prompt.generate",
+    "name": "视频视觉母图提示词",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "video.style_master.prompt.generate",
+    "title": "视频视觉母图提示词",
+    "description": "从已选方案、母版剧本和粗分镜中编译视频视觉母图请求，用于锁定视觉语言而非替代全部资产。",
+    "model_capability": "text.structured.image_prompt",
+    "input_definition_ref": {
+      "item_key": "video.style_master.prompt.generate.input",
+      "kind": "input_definition"
+    },
+    "prompt_template_ref": {
+      "item_key": "video.style_master.prompt.generate.prompt",
+      "kind": "prompt_template"
+    },
+    "output_definition_ref": {
+      "item_key": "video.style_master.prompt.generate.output",
+      "kind": "content_definition"
+    },
+    "style_preset_refs": [
+      {
+        "item_key": "style.primary_math.paper_clay",
+        "kind": "style_preset"
+      }
+    ],
+    "projection_refs": [
+      {
+        "role": "teacher_view",
+        "template_ref": {
+          "item_key": "video.style_master.prompt.generate.projection",
+          "kind": "projection_template"
+        }
+      },
+      {
+        "role": "provider_request",
+        "template_ref": {
+          "item_key": "video.style_master.prompt.generate.projection",
+          "kind": "projection_template"
+        }
+      }
+    ]
+  }
+}

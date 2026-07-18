@@ -1,0 +1,59 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "ppt.body_assets.generate.prompt",
+    "name": "PPT正文图片生成业务Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "ppt.body_assets.generate.prompt",
+    "title": "PPT正文图片生成业务Prompt",
+    "description": "按正文图片任务包批量生成独立候选并保持页面槽位、风格和文件血缘。",
+    "model_capability": "image.generate.education_16x9",
+    "input_definition_ref": {
+      "item_key": "ppt.body_assets.generate.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "ppt.body_assets.generate.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是服务端PPT正文图片批量生成执行器。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "逐项执行冻结的正文图片任务，使用PPT视觉母图和页面构图参考保持一致性，返回分组候选及文件事实。不得合并任务项或猜测目标槽位。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "每个任务项单独调用满足image.generate.education_16x9能力的网关路由；按节点参考资产策略传入ppt_style_master和page_composition_reference。记录任务键、页面键、固定槽位、候选文件摘要和质量标记。准确数量的可复用单体保持同一来源，数量由后续PPT装配控制。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "所有任务项均有结果或显式失败；候选可解码、风格一致、无文字数字公式水印Logo；文件和槽位血缘完整；失败项只重试自身，不重跑已通过页面；采用候选和写回项目保持独立。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 30000
+    }
+  }
+}

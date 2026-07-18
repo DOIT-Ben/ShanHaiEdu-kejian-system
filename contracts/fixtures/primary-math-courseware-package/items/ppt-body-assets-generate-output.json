@@ -1,0 +1,88 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "ppt.body_assets.generate.output",
+    "name": "PPT正文图片生成输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "ppt.body_assets.generate.output",
+    "title": "PPT正文图片生成输出",
+    "description": "按任务项分组的正文图片候选和文件事实。",
+    "definition_role": "artifact",
+    "fields": [
+      {
+        "field_key": "body_generation_batch_key",
+        "label": "生成批次键",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "body_generated_items",
+        "label": "生成结果",
+        "type": "repeatable",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "repeatable": true,
+        "min_items": 1,
+        "children": [
+          {
+            "field_key": "generated_body_item_key",
+            "label": "任务键",
+            "type": "reference",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "generated_body_page_key",
+            "label": "页面键",
+            "type": "reference",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "generated_body_target_slot",
+            "label": "目标槽位",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "generated_body_candidates",
+            "label": "候选文件",
+            "type": "repeatable",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "repeatable": true,
+            "min_items": 1
+          },
+          {
+            "field_key": "generated_body_quality_flags",
+            "label": "质量标记",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "body_generation_coverage",
+        "label": "批次覆盖检查",
+        "type": "rubric",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      }
+    ]
+  }
+}

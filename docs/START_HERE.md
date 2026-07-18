@@ -21,6 +21,7 @@
 - `docs/workflows/INTRO_ANCHORS.md`：三类九套与锚定隔离。
 - `docs/workflows/PPT_PRODUCTION.md`：PPT生产。
 - `docs/workflows/VIDEO_PRODUCTION.md`：视频生产。
+- `docs/workflows/generation-guide/README.md`：逐节点查看教师输入、系统Context、完整提示词、输出字段和黄金示例。
 
 只修改某一工作流时，不需要先读取全部前后端设计。
 

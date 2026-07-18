@@ -1,0 +1,73 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "video.style_master.prompt.generate.input",
+    "name": "视频视觉母图提示词输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "video.style_master.prompt.generate.input",
+    "title": "视频视觉母图提示词输入",
+    "description": "输入视觉方向、候选数和画幅，读取视频三个批准上下文。",
+    "fields": [
+      {
+        "field_key": "video_style_candidate_count",
+        "label": "视觉母图候选数",
+        "value_type": "number",
+        "required": true,
+        "source": "teacher",
+        "visibility": "primary",
+        "widget": "number",
+        "default_value": 3,
+        "validation": {
+          "minimum": 2,
+          "maximum": 4
+        }
+      },
+      {
+        "field_key": "video_style_preset",
+        "label": "视频视觉方向",
+        "value_type": "reference",
+        "required": true,
+        "source": "teacher",
+        "visibility": "primary",
+        "widget": "style_picker",
+        "allowed_item_kinds": [
+          "style_preset"
+        ]
+      },
+      {
+        "field_key": "video_style_requirements",
+        "label": "视觉补充要求",
+        "value_type": "rich_text",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "textarea",
+        "validation": {
+          "max_length": 5000
+        }
+      },
+      {
+        "field_key": "style_master_script_ref",
+        "label": "母版剧本",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "style_rough_storyboard_ref",
+        "label": "粗分镜",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      }
+    ]
+  }
+}

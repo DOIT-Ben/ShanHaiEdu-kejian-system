@@ -1,0 +1,83 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "audio.plan.generate.input",
+    "name": "配音音效音乐计划输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "audio.plan.generate.input",
+    "title": "配音音效音乐计划输入",
+    "description": "读取已选方案、批准母版剧本和正式clips，接受声音风格、语速和音乐偏好。",
+    "fields": [
+      {
+        "field_key": "audio_voice_style",
+        "label": "旁白风格",
+        "value_type": "text",
+        "required": true,
+        "source": "teacher",
+        "visibility": "primary",
+        "widget": "text",
+        "default_value": "亲切、清晰、自然，不幼稚化"
+      },
+      {
+        "field_key": "audio_speech_rate",
+        "label": "语速",
+        "value_type": "number",
+        "required": true,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "number",
+        "default_value": 0.95,
+        "validation": {
+          "minimum": 0.7,
+          "maximum": 1.2
+        }
+      },
+      {
+        "field_key": "audio_music_preference",
+        "label": "音乐偏好",
+        "value_type": "rich_text",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "textarea",
+        "validation": {
+          "max_length": 2000
+        }
+      },
+      {
+        "field_key": "audio_plan_requirements",
+        "label": "音频补充要求",
+        "value_type": "rich_text",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "textarea",
+        "validation": {
+          "max_length": 4000
+        }
+      },
+      {
+        "field_key": "audio_master_script_ref",
+        "label": "批准母版剧本",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "approved_video_clips_ref",
+        "label": "正式视频片段",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      }
+    ]
+  }
+}

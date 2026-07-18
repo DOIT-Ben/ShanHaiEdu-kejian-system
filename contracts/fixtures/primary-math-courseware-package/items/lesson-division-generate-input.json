@@ -1,0 +1,114 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "lesson.division.generate.input",
+    "name": "课时划分生成输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "lesson.division.generate.input",
+    "title": "课时划分生成输入",
+    "description": "教师可调整课时长度、课时数策略和特殊约束；教材内容只从批准的解析快照注入。",
+    "fields": [
+      {
+        "field_key": "duration_minutes",
+        "label": "每课时分钟数",
+        "description": "默认按小学数学40分钟课堂设计。",
+        "value_type": "number",
+        "required": true,
+        "source": "teacher",
+        "visibility": "primary",
+        "widget": "number",
+        "default_value": 40,
+        "validation": {
+          "minimum": 30,
+          "maximum": 60
+        }
+      },
+      {
+        "field_key": "lesson_count_mode",
+        "label": "课时数量",
+        "value_type": "enum",
+        "required": true,
+        "source": "teacher",
+        "visibility": "primary",
+        "widget": "select",
+        "default_value": "auto",
+        "options": [
+          {
+            "value": "auto",
+            "label": "自动划分"
+          },
+          {
+            "value": "specified",
+            "label": "指定数量"
+          }
+        ]
+      },
+      {
+        "field_key": "requested_lesson_count",
+        "label": "指定课时数",
+        "description": "仅在指定数量时使用；模型仍须报告容量或知识边界冲突。",
+        "value_type": "number",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "number",
+        "validation": {
+          "minimum": 1,
+          "maximum": 20
+        }
+      },
+      {
+        "field_key": "lesson_type_preferences",
+        "label": "课型偏好",
+        "value_type": "list",
+        "required": false,
+        "source": "teacher",
+        "visibility": "advanced",
+        "widget": "multiselect",
+        "options": [
+          {
+            "value": "new_learning",
+            "label": "新授课"
+          },
+          {
+            "value": "practice",
+            "label": "练习课"
+          },
+          {
+            "value": "review",
+            "label": "整理复习课"
+          },
+          {
+            "value": "activity",
+            "label": "活动课"
+          }
+        ]
+      },
+      {
+        "field_key": "special_requirements",
+        "label": "特殊要求",
+        "value_type": "rich_text",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "textarea",
+        "validation": {
+          "max_length": 4000
+        }
+      },
+      {
+        "field_key": "approved_material_scope",
+        "label": "已批准教材范围",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      }
+    ]
+  }
+}

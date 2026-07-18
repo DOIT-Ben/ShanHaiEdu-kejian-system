@@ -1,0 +1,146 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "ppt.outline.generate.output",
+    "name": "PPT大纲生成输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "ppt.outline.generate.output",
+    "title": "PPT大纲生成输出",
+    "description": "覆盖批准教案的页面任务、来源引用和顺序。",
+    "definition_role": "artifact",
+    "fields": [
+      {
+        "field_key": "outline_key",
+        "label": "大纲键",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "visibility": "hidden"
+      },
+      {
+        "field_key": "outline_source_lesson_plan_key",
+        "label": "来源教案键",
+        "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "outline_pages",
+        "label": "页面大纲",
+        "type": "repeatable",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "repeatable": true,
+        "min_items": 5,
+        "children": [
+          {
+            "field_key": "outline_page_key",
+            "label": "页面键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "outline_position",
+            "label": "顺序",
+            "type": "number",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "outline_page_type",
+            "label": "页面类型",
+            "type": "enum",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "outline_teaching_task",
+            "label": "唯一教学任务",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "outline_source_refs",
+            "label": "来源引用",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "min_items": 1
+          },
+          {
+            "field_key": "outline_student_focus",
+            "label": "学生关注点",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "outline_interaction_intent",
+            "label": "互动意图",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "outline_coverage_check",
+        "label": "大纲覆盖检查",
+        "type": "group",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "children": [
+          {
+            "field_key": "outline_all_objectives_covered",
+            "label": "目标已覆盖",
+            "type": "boolean",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "outline_sequence_preserved",
+            "label": "教学顺序已保持",
+            "type": "boolean",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "outline_one_task_per_page",
+            "label": "每页单任务",
+            "type": "boolean",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "outline_coverage_notes",
+            "label": "覆盖说明",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      }
+    ]
+  }
+}

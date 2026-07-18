@@ -1,0 +1,50 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "generation_template",
+  "metadata": {
+    "key": "ppt.cover.prompt.generate",
+    "name": "PPT封面图片提示词",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "ppt.cover.prompt.generate",
+    "title": "PPT封面图片提示词",
+    "description": "基于批准大纲和页规格生成封面主视觉的完整图片请求，不把准确课题文字交给图片模型。",
+    "model_capability": "text.structured.image_prompt",
+    "input_definition_ref": {
+      "item_key": "ppt.cover.prompt.generate.input",
+      "kind": "input_definition"
+    },
+    "prompt_template_ref": {
+      "item_key": "ppt.cover.prompt.generate.prompt",
+      "kind": "prompt_template"
+    },
+    "output_definition_ref": {
+      "item_key": "ppt.cover.prompt.generate.output",
+      "kind": "content_definition"
+    },
+    "style_preset_refs": [
+      {
+        "item_key": "style.primary_math.paper_clay",
+        "kind": "style_preset"
+      }
+    ],
+    "projection_refs": [
+      {
+        "role": "teacher_view",
+        "template_ref": {
+          "item_key": "ppt.cover.prompt.generate.projection",
+          "kind": "projection_template"
+        }
+      },
+      {
+        "role": "provider_request",
+        "template_ref": {
+          "item_key": "ppt.cover.prompt.generate.projection",
+          "kind": "projection_template"
+        }
+      }
+    ]
+  }
+}

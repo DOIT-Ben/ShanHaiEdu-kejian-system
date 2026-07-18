@@ -1,0 +1,176 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "audio.plan.generate.output",
+    "name": "配音音效音乐计划输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "audio.plan.generate.output",
+    "title": "配音音效音乐计划输出",
+    "description": "逐条音频、字幕和混音计划，时间与已选clips严格对齐。",
+    "definition_role": "artifact",
+    "fields": [
+      {
+        "field_key": "audio_plan_key",
+        "label": "音频计划键",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "audio_source_master_script_key",
+        "label": "来源母版剧本键",
+        "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "audio_tracks",
+        "label": "音频轨道项",
+        "type": "repeatable",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "repeatable": true,
+        "min_items": 1,
+        "children": [
+          {
+            "field_key": "audio_track_key",
+            "label": "音频键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "audio_track_kind",
+            "label": "类型",
+            "type": "enum",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "options": [
+              {
+                "value": "narration",
+                "label": "旁白"
+              },
+              {
+                "value": "dialogue",
+                "label": "对白"
+              },
+              {
+                "value": "sound_effect",
+                "label": "音效"
+              },
+              {
+                "value": "music",
+                "label": "音乐"
+              }
+            ]
+          },
+          {
+            "field_key": "audio_track_shot_key",
+            "label": "关联shot",
+            "type": "reference",
+            "required": false,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "audio_timeline_range",
+            "label": "时间线区间",
+            "type": "timeline",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "audio_script_text",
+            "label": "文本或声音说明",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "audio_voice_profile",
+            "label": "声音档案",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "audio_rate",
+            "label": "语速",
+            "type": "number",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "audio_expected_duration_seconds",
+            "label": "预计时长",
+            "type": "number",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "audio_volume_intent",
+            "label": "音量意图",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "audio_ducking_rules",
+            "label": "避让规则",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "audio_subtitle_text",
+            "label": "字幕文本",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "audio_target_slot",
+            "label": "目标槽位",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "audio_mix_plan",
+        "label": "混音与字幕计划",
+        "type": "timeline",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "audio_plan_quality",
+        "label": "音频计划质量",
+        "type": "rubric",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      }
+    ]
+  }
+}

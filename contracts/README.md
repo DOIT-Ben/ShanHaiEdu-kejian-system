@@ -12,7 +12,7 @@
 - `workflow-node-status.schema.json`：节点状态枚举。
 - `intro-option-set.schema.json`：三类九套导入设计、最小课程锚点和选择交接。
 - `ppt-page-spec.schema.json`：PPT逐页四层结构、白底和可编辑内容合同。
-- `video-shot.schema.json`：细分镜、垫图引用和10/15秒生成合同。
+- `video-shot.schema.json`：细分镜、垫图引用和6至30秒逻辑生成合同。
 - `creation-package.schema.json`：项目导入通用创作台的不可变包；兼容旧包，2.0包强制工作流来源、上下文快照和目标槽位。
 - `content-definition.schema.json`：动态内容字段树。
 - `material-evidence-package.schema.json`：教材PDF页级文本块、图片引用和来源追溯合同。
@@ -23,14 +23,20 @@
 - `prompt-template.schema.json`：业务Prompt分层、Context白名单和教师修订策略。
 - `projection-template.schema.json`：结构化事实到完整提示词和教师可读文档的确定性投影。
 - `generation-template.schema.json`：输入、风格、Prompt、输出、投影和逻辑能力的组合。
+- `builtin-generation-source.schema.json`：仓库内置业务生成源的紧凑声明合同；由确定性构建器展开为可发布内容包。
+- `golden-courseware-case.schema.json`：黄金教材、教案、三类九套、PPT、视频、音频和交付期望的跨成果测试合同。
 - `workflow-node-generation-binding.schema.json`：业务节点执行类型、生成模板、三类参考策略、校验修复和审核策略的声明式绑定目录。
 - `markdown-template-draft.schema.json`：普通Markdown导入后的可审核模板草稿。
 - `mock-scenarios.json`：前端必须覆盖的关键 Mock 场景。
 - `fixtures/stage0/`：项目、上传、任务、工作流聚合、错误和SSE的确定性合同样例。
 - `fixtures/creation-lifecycle/`：project/standalone批次、提示词版本、采用、项目写回、CreationPackage 2.0和stale事件样例。
 - `fixtures/workflow-node-generation-bindings/`：覆盖教材、课时、教案、三类九套、PPT、图片、视频、音频和交付的完整脱敏节点目录样例。
+- `fixtures/primary-math-courseware-package/`：由内置生成源确定性展开的首套小学数学业务内容包；23个模型节点均有输入、Prompt、输出、投影和生成模板。
+- `fixtures/golden-projects/`：不包含原教材和媒体文件的脱敏黄金项目；固定可复现实例、上下文隔离、跨成果质量不变量和分支可消费的精确规划输出。
 - `generated/`：由当前OpenAPI确定性生成的bundle和TypeScript类型，不是第二份手工合同。
 - `typescript/client.ts`：基于生成paths和openapi-fetch的共享客户端工厂。
+
+上述首套业务内容包的人类可读确定性投影位于`docs/workflows/generation-guide/`。它供产品负责人、内容管理员和开发者审查，不是第二套机器合同，也不是教师公共界面。
 
 ## 使用规则
 
@@ -85,3 +91,18 @@ uv run pytest tests\contract\test_generation_template_contracts.py
 uv run python scripts\validate_workflow_node_catalog.py contracts\fixtures\workflow-node-generation-bindings\primary-math-courseware.json
 uv run pytest tests\contract\test_workflow_node_generation_binding.py
 ```
+
+构建并校验首套内置业务内容包与黄金项目：
+
+```powershell
+uv run python scripts\build_builtin_generation_package.py workflow\builtin\primary_math_courseware\generation-source.json <空输出目录>
+uv run python scripts\render_builtin_generation_guide.py --check
+uv run python scripts\validate_content_package.py contracts\fixtures\primary-math-courseware-package
+uv run python scripts\validate_golden_courseware.py contracts\fixtures\golden-projects\numbers-1-to-5\golden-project.json
+uv run python scripts\validate_golden_courseware.py contracts\fixtures\golden-projects\numbers-1-to-5\golden-project.json --source-pdf <受控本地教材PDF>
+uv run pytest tests\contract\test_golden_courseware_package.py
+```
+
+`scripts/golden_courseware_branch_inputs.py` 将跨成果聚合数据确定性投影为教案、PPT和视频分支入口，以及16个符合各自 `ContentDefinition` 的规划型节点输出；`scripts/golden_courseware_stage_inputs.py` 继续连接不依赖真实媒体的内部阶段。其余7个节点依赖真实图片、视频、TTS文件或最终媒体质检，只保留合同和Provider门禁，不在黄金Fixture中伪造候选文件、SHA或质量报告。
+
+普通CI只运行脱敏Fixture和确定性构建，不要求教材原件或真实Provider。传入受控本地PDF的命令额外核验SHA-256、总页数和黄金页段；真实文本、图片和视频仍属于对应适配器任务与里程碑出口。TTS当前只保留计划数据，待音频Provider可用后独立验收。

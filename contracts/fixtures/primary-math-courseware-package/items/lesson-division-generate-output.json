@@ -1,0 +1,250 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "lesson.division.generate.output",
+    "name": "课时划分生成输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "lesson.division.generate.output",
+    "title": "课时划分生成输出",
+    "description": "覆盖批准教材范围且不重叠的课时划分、知识边界和划分依据。",
+    "definition_role": "artifact",
+    "fields": [
+      {
+        "field_key": "division_key",
+        "label": "课时划分键",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "visibility": "hidden",
+        "generation_instruction": "使用项目内稳定键，不使用数据库UUID。"
+      },
+      {
+        "field_key": "scope_summary",
+        "label": "教材范围摘要",
+        "type": "rich_text",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "visibility": "primary",
+        "generation_instruction": "概括批准页段的知识内容和边界，不复制大段教材原文。"
+      },
+      {
+        "field_key": "lesson_count",
+        "label": "课时数",
+        "type": "number",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "visibility": "primary",
+        "validation_rules": [
+          {
+            "minimum": 1
+          },
+          {
+            "equals_repeatable_count": "lesson_units"
+          }
+        ]
+      },
+      {
+        "field_key": "lesson_units",
+        "label": "课时列表",
+        "type": "repeatable",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "repeatable": true,
+        "min_items": 1,
+        "visibility": "primary",
+        "children": [
+          {
+            "field_key": "lesson_unit_key",
+            "label": "课时键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "position",
+            "label": "顺序",
+            "type": "number",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "title",
+            "label": "课题名称",
+            "type": "text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "lesson_type",
+            "label": "课型",
+            "type": "enum",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "options": [
+              {
+                "value": "new_learning",
+                "label": "新授课"
+              },
+              {
+                "value": "practice",
+                "label": "练习课"
+              },
+              {
+                "value": "review",
+                "label": "整理复习课"
+              },
+              {
+                "value": "activity",
+                "label": "活动课"
+              }
+            ]
+          },
+          {
+            "field_key": "duration_minutes",
+            "label": "课时分钟数",
+            "type": "number",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "core_learning_outcome",
+            "label": "核心学习结果",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "material_scope",
+            "label": "对应教材范围",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "evidence_refs",
+            "label": "教材证据引用",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "min_items": 1
+          },
+          {
+            "field_key": "prior_learning",
+            "label": "前置基础",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "content_boundary",
+            "label": "本课讲授边界",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "must_not_preteach",
+            "label": "不得提前讲授",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "teaching_focus",
+            "label": "教学重点",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "learning_difficulty",
+            "label": "学习难点",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "division_reason",
+            "label": "划分理由",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "following_connection",
+            "label": "后续衔接",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "coverage_check",
+        "label": "覆盖检查",
+        "type": "group",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "visibility": "secondary",
+        "children": [
+          {
+            "field_key": "all_evidence_covered",
+            "label": "批准证据已覆盖",
+            "type": "boolean",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "overlap_free",
+            "label": "课时边界无重叠",
+            "type": "boolean",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "progression_rationale",
+            "label": "认知进阶说明",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "unresolved_questions",
+            "label": "待确认问题",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "video.assets.generate.prompt",
+    "name": "视频四类图片资产生成业务Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "video.assets.generate.prompt",
+    "title": "视频四类图片资产生成业务Prompt",
+    "description": "按视频资产图片任务逐项生成候选，继承视觉母图并保持四类资产身份、槽位和文件血缘。",
+    "model_capability": "image.generate.education_16x9",
+    "input_definition_ref": {
+      "item_key": "video.assets.generate.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "video.assets.generate.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是服务端视频四类图片资产批量生成执行器。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "逐项执行冻结的character、scene、prop和creature图片任务，使用批准视觉母图维持风格一致，返回候选和文件事实。不得合并任务或改变固定槽位。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "每项独立调用满足image.generate.education_16x9能力的网关路由；按video_style_master角色传入视觉母图。记录任务键、资产键、类型、槽位、候选摘要和质量标记。场景保持无人空镜、道具保持单体，除非任务合同明确要求变体。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "候选可解码、风格一致、角色或物件身份稳定、无文字字幕公式水印Logo；每项有结果或显式失败；失败项只重试自身；候选采用不等于创建已批准资产版本或写回项目。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 30000
+    }
+  }
+}

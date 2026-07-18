@@ -1,0 +1,134 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "video.rough_storyboard.generate.output",
+    "name": "视频粗分镜生成输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "video.rough_storyboard.generate.output",
+    "title": "视频粗分镜生成输出",
+    "description": "按故事节拍拆解的粗分镜、资产需求和总时长检查。",
+    "definition_role": "artifact",
+    "fields": [
+      {
+        "field_key": "rough_storyboard_key",
+        "label": "粗分镜键",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "rough_master_script_key",
+        "label": "来源母版剧本键",
+        "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "rough_beats",
+        "label": "故事节拍",
+        "type": "repeatable",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "repeatable": true,
+        "min_items": 2,
+        "children": [
+          {
+            "field_key": "rough_beat_key",
+            "label": "节拍键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "rough_scene_key",
+            "label": "来源场次键",
+            "type": "reference",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "rough_position",
+            "label": "顺序",
+            "type": "number",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "rough_primary_event",
+            "label": "唯一主要事件",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "rough_start_state",
+            "label": "开始状态",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "rough_end_state",
+            "label": "结束状态",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "rough_duration_seconds",
+            "label": "预计时长",
+            "type": "number",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "rough_asset_needs",
+            "label": "资产需求",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "rough_transition",
+            "label": "衔接",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "rough_total_duration_seconds",
+        "label": "总时长",
+        "type": "number",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "rough_storyboard_quality",
+        "label": "粗分镜质量",
+        "type": "rubric",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      }
+    ]
+  }
+}

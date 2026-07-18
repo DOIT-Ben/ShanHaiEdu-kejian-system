@@ -1,0 +1,698 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "lesson_plan.generate.output",
+    "name": "分课时教案生成输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "lesson_plan.generate.output",
+    "title": "分课时教案生成输出",
+    "description": "由内容定义版本固定的十二部分教案事实；删除任何导入附录后仍可独立试讲。",
+    "definition_role": "artifact",
+    "fields": [
+      {
+        "field_key": "teaching_content",
+        "label": "一、教学内容",
+        "type": "group",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "visibility": "primary",
+        "children": [
+          {
+            "field_key": "lesson_plan_key",
+            "label": "教案键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "source_lesson_unit_key",
+            "label": "来源课时键",
+            "type": "reference",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "lesson_topic",
+            "label": "课题",
+            "type": "text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "subject",
+            "label": "学科",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "grade",
+            "label": "年级",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "lesson_type",
+            "label": "课型",
+            "type": "enum",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "duration_minutes",
+            "label": "课时分钟数",
+            "type": "number",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "teaching_scope",
+            "label": "教学范围",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "teaching_evidence_refs",
+            "label": "教材证据",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "min_items": 1
+          },
+          {
+            "field_key": "content_boundary",
+            "label": "内容边界",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "must_not_preteach",
+            "label": "不得提前讲授",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "material_analysis",
+        "label": "二、教材分析",
+        "type": "group",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "children": [
+          {
+            "field_key": "prior_learning",
+            "label": "前置基础",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "current_focus",
+            "label": "本课核心",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "next_learning",
+            "label": "后续衔接",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "teaching_value",
+            "label": "教学价值",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "learner_analysis",
+        "label": "三、学情分析",
+        "type": "group",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "children": [
+          {
+            "field_key": "confirmed_learner_facts",
+            "label": "已确认班级事实",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "general_learning_characteristics",
+            "label": "一般学习特点",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "likely_learning_difficulties",
+            "label": "可能困难",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "likely_misconceptions",
+            "label": "典型错误",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "differentiation_needs",
+            "label": "分层支持",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "learner_unknowns",
+            "label": "待确认学情",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "design_intent",
+        "label": "四、设计意图",
+        "type": "group",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "children": [
+          {
+            "field_key": "teaching_main_line",
+            "label": "教学主线",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "learning_sequence",
+            "label": "学习路径",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "evaluation_alignment",
+            "label": "教学习评一致性",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "teaching_objectives",
+        "label": "五、教学目标",
+        "type": "repeatable",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "repeatable": true,
+        "min_items": 1,
+        "children": [
+          {
+            "field_key": "objective_key",
+            "label": "目标键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "competency_focus",
+            "label": "核心素养指向",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "observable_outcome",
+            "label": "可观察学习结果",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "completion_condition",
+            "label": "完成条件",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "success_criteria",
+            "label": "成功标准",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "objective_evidence_refs",
+            "label": "目标证据",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "assessment_evidence_keys",
+            "label": "评价证据键",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "key_difficulties_and_strategies",
+        "label": "六、教学重难点及突破策略",
+        "type": "group",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "children": [
+          {
+            "field_key": "key_learning_focus",
+            "label": "教学重点",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "central_learning_difficulty",
+            "label": "教学难点",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "breakthrough_strategies",
+            "label": "突破策略",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "preparation",
+        "label": "七、教学准备",
+        "type": "group",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "children": [
+          {
+            "field_key": "teacher_resources",
+            "label": "教师准备",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "student_resources",
+            "label": "学生准备",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "digital_resources",
+            "label": "数字资源",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "safety_requirements",
+            "label": "安全要求",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "teaching_process",
+        "label": "八、教学过程",
+        "type": "repeatable",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "repeatable": true,
+        "min_items": 4,
+        "children": [
+          {
+            "field_key": "process_section_key",
+            "label": "环节键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "process_type",
+            "label": "环节类型",
+            "type": "enum",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "process_title",
+            "label": "环节名称",
+            "type": "text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "process_minutes",
+            "label": "时间",
+            "type": "number",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "process_objective_keys",
+            "label": "关联目标",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "teacher_actions",
+            "label": "教师活动",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "student_actions",
+            "label": "学生活动",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "key_questions",
+            "label": "关键提问",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "expected_responses",
+            "label": "预设回答",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "process_possible_errors",
+            "label": "可能错误",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "scaffolds_and_followups",
+            "label": "追问与支架",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "process_assessment_evidence",
+            "label": "评价证据",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "board_updates",
+            "label": "板书增量",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "process_transition",
+            "label": "过渡",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "process_design_rationale",
+            "label": "设计意图",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "board_design",
+        "label": "九、板书设计",
+        "type": "group",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "children": [
+          {
+            "field_key": "board_layout",
+            "label": "空间布局",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "board_final_content",
+            "label": "最终保留内容",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "board_build_order",
+            "label": "生成顺序",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "lesson_summary",
+        "label": "十、课堂总结",
+        "type": "group",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "children": [
+          {
+            "field_key": "summary_questions",
+            "label": "总结问题",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "student_summary_evidence",
+            "label": "学生总结证据",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "teacher_closure",
+            "label": "教师收束",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "differentiated_homework",
+        "label": "十一、分层作业",
+        "type": "repeatable",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "repeatable": true,
+        "children": [
+          {
+            "field_key": "homework_key",
+            "label": "作业键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "homework_level",
+            "label": "层级",
+            "type": "enum",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "homework_task",
+            "label": "任务",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "homework_objective_keys",
+            "label": "关联目标",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "homework_expected_minutes",
+            "label": "预计用时",
+            "type": "number",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "homework_criteria",
+            "label": "评价标准",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "homework_answer_guidance",
+            "label": "答案与指导",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "teaching_reflection",
+        "label": "十二、教学反思",
+        "type": "group",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "children": [
+          {
+            "field_key": "reflection_state",
+            "label": "反思状态",
+            "type": "enum",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "default_value": "not_taught"
+          },
+          {
+            "field_key": "reflection_prompts",
+            "label": "课后反思提示",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "teacher_reflection_record",
+            "label": "教师实际记录",
+            "type": "rich_text",
+            "required": false,
+            "editable": true,
+            "deletable": false
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "video.asset_inventory.generate.projection",
+    "name": "视频四类资产清单教师投影",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "video.asset_inventory.generate.projection",
+    "title": "视频四类资产清单教师投影",
+    "source_definition_ref": {
+      "item_key": "video.asset_inventory.generate.output",
+      "kind": "content_definition"
+    },
+    "output_format": "markdown",
+    "renderer_id": "shanhai.video_asset_inventory.markdown.v1",
+    "template": "# 视频四类资产清单\n\n{{video_assets}}\n\n## 四类汇总\n{{asset_category_summary}}\n\n## 去重说明\n{{asset_deduplication_notes}}",
+    "allowed_variables": [
+      "video_assets",
+      "asset_category_summary",
+      "asset_deduplication_notes"
+    ],
+    "teacher_visible": true
+  }
+}

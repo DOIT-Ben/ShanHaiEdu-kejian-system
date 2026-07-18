@@ -1,0 +1,76 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "ppt.body_asset_prompts.generate.input",
+    "name": "PPT正文图片任务包输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "ppt.body_asset_prompts.generate.input",
+    "title": "PPT正文图片任务包输入",
+    "description": "读取页规格、批准视觉合同、教案和教材，为每个正文资产生成完整提示词。",
+    "fields": [
+      {
+        "field_key": "body_asset_scope",
+        "label": "生成范围",
+        "value_type": "enum",
+        "required": true,
+        "source": "teacher",
+        "visibility": "primary",
+        "widget": "select",
+        "default_value": "all_missing",
+        "options": [
+          {
+            "value": "all_missing",
+            "label": "全部缺失资产"
+          },
+          {
+            "value": "selected_pages",
+            "label": "选定页面"
+          }
+        ]
+      },
+      {
+        "field_key": "selected_page_keys",
+        "label": "选定页面",
+        "value_type": "list",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "multiselect"
+      },
+      {
+        "field_key": "body_prompt_requirements",
+        "label": "正文图片补充要求",
+        "value_type": "rich_text",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "textarea",
+        "validation": {
+          "max_length": 5000
+        }
+      },
+      {
+        "field_key": "body_page_specs",
+        "label": "逐页规格",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "body_style_contract",
+        "label": "PPT视觉合同",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      }
+    ]
+  }
+}

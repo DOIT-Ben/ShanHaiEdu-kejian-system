@@ -1,0 +1,50 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "generation_template",
+  "metadata": {
+    "key": "ppt.body_asset_prompts.generate",
+    "name": "PPT正文图片任务包",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "ppt.body_asset_prompts.generate",
+    "title": "PPT正文图片任务包",
+    "description": "把逐页资产要求编译为可批量导入图片创作台的不可变任务项。",
+    "model_capability": "text.structured.image_prompt",
+    "input_definition_ref": {
+      "item_key": "ppt.body_asset_prompts.generate.input",
+      "kind": "input_definition"
+    },
+    "prompt_template_ref": {
+      "item_key": "ppt.body_asset_prompts.generate.prompt",
+      "kind": "prompt_template"
+    },
+    "output_definition_ref": {
+      "item_key": "ppt.body_asset_prompts.generate.output",
+      "kind": "content_definition"
+    },
+    "style_preset_refs": [
+      {
+        "item_key": "style.primary_math.paper_clay",
+        "kind": "style_preset"
+      }
+    ],
+    "projection_refs": [
+      {
+        "role": "teacher_view",
+        "template_ref": {
+          "item_key": "ppt.body_asset_prompts.generate.projection",
+          "kind": "projection_template"
+        }
+      },
+      {
+        "role": "export",
+        "template_ref": {
+          "item_key": "ppt.body_asset_prompts.generate.projection",
+          "kind": "projection_template"
+        }
+      }
+    ]
+  }
+}

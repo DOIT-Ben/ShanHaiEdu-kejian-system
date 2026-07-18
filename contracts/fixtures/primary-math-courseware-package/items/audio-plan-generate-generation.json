@@ -1,0 +1,45 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "generation_template",
+  "metadata": {
+    "key": "audio.plan.generate",
+    "name": "配音音效音乐计划",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "audio.plan.generate",
+    "title": "配音音效音乐计划",
+    "description": "在正式clips选定后规划旁白、对白、音效、音乐和字幕，绑定shot或明确时间线区间。",
+    "model_capability": "text.structured.audio_plan",
+    "input_definition_ref": {
+      "item_key": "audio.plan.generate.input",
+      "kind": "input_definition"
+    },
+    "prompt_template_ref": {
+      "item_key": "audio.plan.generate.prompt",
+      "kind": "prompt_template"
+    },
+    "output_definition_ref": {
+      "item_key": "audio.plan.generate.output",
+      "kind": "content_definition"
+    },
+    "style_preset_refs": [],
+    "projection_refs": [
+      {
+        "role": "teacher_view",
+        "template_ref": {
+          "item_key": "audio.plan.generate.projection",
+          "kind": "projection_template"
+        }
+      },
+      {
+        "role": "export",
+        "template_ref": {
+          "item_key": "audio.plan.generate.projection",
+          "kind": "projection_template"
+        }
+      }
+    ]
+  }
+}

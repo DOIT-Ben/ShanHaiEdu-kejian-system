@@ -1,0 +1,103 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "ppt.cover.image.generate.output",
+    "name": "PPT封面候选生成输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "ppt.cover.image.generate.output",
+    "title": "PPT封面候选生成输出",
+    "description": "封面图片候选的文件事实与质量标记，不包含临时下载URL。",
+    "definition_role": "artifact",
+    "fields": [
+      {
+        "field_key": "cover_generation_request_key",
+        "label": "生成请求键",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "cover_generation_target",
+        "label": "目标槽位",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "cover_candidates",
+        "label": "封面候选",
+        "type": "repeatable",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "repeatable": true,
+        "min_items": 2,
+        "max_items": 4,
+        "children": [
+          {
+            "field_key": "cover_result_key",
+            "label": "候选键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "cover_artifact_kind",
+            "label": "产物类型",
+            "type": "enum",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "cover_width",
+            "label": "宽度",
+            "type": "number",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "cover_height",
+            "label": "高度",
+            "type": "number",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "cover_mime_type",
+            "label": "媒体类型",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "cover_sha256",
+            "label": "文件摘要",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "cover_quality_flags",
+            "label": "质量标记",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      }
+    ]
+  }
+}

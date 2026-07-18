@@ -1,0 +1,131 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "video.master_script.generate.input",
+    "name": "视频母版剧本生成输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "video.master_script.generate.input",
+    "title": "视频母版剧本生成输入",
+    "description": "输入时长策略、可选目标时长、画幅、语言和创作要求；唯一业务上下文为已选导入方案快照。",
+    "fields": [
+      {
+        "field_key": "selected_intro_snapshot_ref",
+        "label": "已选导入方案",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "video_duration_mode",
+        "label": "时长方式",
+        "value_type": "enum",
+        "required": true,
+        "source": "teacher",
+        "visibility": "primary",
+        "widget": "select",
+        "default_value": "system_recommended",
+        "options": [
+          {
+            "value": "system_recommended",
+            "label": "系统按故事与价格推荐"
+          },
+          {
+            "value": "teacher_fixed",
+            "label": "教师指定"
+          }
+        ]
+      },
+      {
+        "field_key": "video_target_duration_seconds",
+        "label": "目标总时长（可选）",
+        "value_type": "number",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "number",
+        "validation": {
+          "minimum": 60,
+          "maximum": 180
+        }
+      },
+      {
+        "field_key": "video_cost_preference",
+        "label": "费用偏好",
+        "value_type": "enum",
+        "required": true,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "select",
+        "default_value": "balanced",
+        "options": [
+          {
+            "value": "economy",
+            "label": "节省费用"
+          },
+          {
+            "value": "balanced",
+            "label": "平衡"
+          },
+          {
+            "value": "quality",
+            "label": "优先质量"
+          }
+        ]
+      },
+      {
+        "field_key": "video_aspect_ratio",
+        "label": "视频画幅",
+        "value_type": "enum",
+        "required": true,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "select",
+        "default_value": "16:9",
+        "options": [
+          {
+            "value": "16:9",
+            "label": "横屏16:9"
+          },
+          {
+            "value": "9:16",
+            "label": "竖屏9:16"
+          }
+        ]
+      },
+      {
+        "field_key": "video_language",
+        "label": "语言",
+        "value_type": "enum",
+        "required": true,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "select",
+        "default_value": "zh-CN",
+        "options": [
+          {
+            "value": "zh-CN",
+            "label": "普通话"
+          }
+        ]
+      },
+      {
+        "field_key": "master_script_requirements",
+        "label": "剧本补充要求",
+        "value_type": "rich_text",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "textarea",
+        "validation": {
+          "max_length": 5000
+        }
+      }
+    ]
+  }
+}

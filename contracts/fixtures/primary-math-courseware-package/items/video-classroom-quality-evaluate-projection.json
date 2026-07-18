@@ -1,0 +1,32 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "video.classroom_quality.evaluate.projection",
+    "name": "视频课堂质量评估教师投影",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "video.classroom_quality.evaluate.projection",
+    "title": "视频课堂质量评估教师投影",
+    "source_definition_ref": {
+      "item_key": "video.classroom_quality.evaluate.output",
+      "kind": "content_definition"
+    },
+    "output_format": "markdown",
+    "renderer_id": "shanhai.video_classroom_quality.markdown.v1",
+    "template": "# 视频课堂质量报告\n\n独立创意：{{independent_creative_score}}\n\n课堂交接：{{handoff_accuracy_score}}\n\n未提前讲授：{{no_preteach_score}}\n\n连续性：{{continuity_score}}\n\n课堂可用性：{{classroom_usability_score}}\n\n## 发现\n{{classroom_quality_findings}}\n\n通过：{{classroom_quality_passed}}\n\n{{classroom_quality_summary}}",
+    "allowed_variables": [
+      "independent_creative_score",
+      "handoff_accuracy_score",
+      "no_preteach_score",
+      "continuity_score",
+      "classroom_usability_score",
+      "classroom_quality_findings",
+      "classroom_quality_passed",
+      "classroom_quality_summary"
+    ],
+    "teacher_visible": true
+  }
+}

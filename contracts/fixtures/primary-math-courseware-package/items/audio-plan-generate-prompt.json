@@ -1,0 +1,84 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "audio.plan.generate.prompt",
+    "name": "配音音效音乐计划业务Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "audio.plan.generate.prompt",
+    "title": "配音音效音乐计划业务Prompt",
+    "description": "在正式clips选定后规划旁白、对白、音效、音乐和字幕，绑定shot或明确时间线区间。",
+    "model_capability": "text.structured.audio_plan",
+    "input_definition_ref": {
+      "item_key": "audio.plan.generate.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "audio.plan.generate.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是儿童友好课堂短片的音频与字幕导演。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "在正式clips已经选定后，依据已选方案和批准母版剧本规划旁白、对白、音效、音乐和字幕。每项绑定shot或明确时间线区间，并为后续TTS和FFmpeg合成提供固定目标槽位。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "以母版剧本旁白对白为事实源，不临时改写故事或课程交接。检查每段文本按设定语速能在clip时长内读完；数学读法和单位准确；字幕停留时间可读。音乐和音效服务动作，不遮盖旁白；使用ducking规则控制音量。图片/视频模型产生的原始声音不承担准确对白。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "所有正式clip均在时间线中覆盖；旁白、字幕、音效与动作对齐；文本不越过handoff_moment、不解释must_not_preteach；语速、时长、音量和字幕可读性合法；不包含TTS Provider、密钥、私有参数或实际文件路径。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [
+      {
+        "binding_key": "selected_intro",
+        "source": "intro_selection.snapshot",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 100000
+      },
+      {
+        "binding_key": "approved_master_script",
+        "source": "video.master_script.approved_version",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 400000
+      },
+      {
+        "binding_key": "approved_clips",
+        "source": "video.clips.approved_versions",
+        "required": true,
+        "exposure": "full",
+        "max_items": 20,
+        "max_bytes": 500000
+      }
+    ],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 40000
+    }
+  }
+}

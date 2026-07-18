@@ -1,0 +1,31 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "ppt.cover.prompt.generate.projection",
+    "name": "PPT封面图片提示词教师投影",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "ppt.cover.prompt.generate.projection",
+    "title": "PPT封面图片提示词教师投影",
+    "source_definition_ref": {
+      "item_key": "ppt.cover.prompt.generate.output",
+      "kind": "content_definition"
+    },
+    "output_format": "prompt_text",
+    "renderer_id": "shanhai.image_prompt.v1",
+    "template": "封面主体：{{cover_subject}}。构图与留白：{{cover_composition}}。材质造型：{{cover_material_and_form}}。配色与光线：{{cover_palette_and_lighting}}。画幅：{{cover_aspect_ratio}}。标题安全区：{{cover_text_safe_area}}。禁止：{{cover_negative_constraints}}。",
+    "allowed_variables": [
+      "cover_subject",
+      "cover_composition",
+      "cover_material_and_form",
+      "cover_palette_and_lighting",
+      "cover_aspect_ratio",
+      "cover_text_safe_area",
+      "cover_negative_constraints"
+    ],
+    "teacher_visible": true
+  }
+}

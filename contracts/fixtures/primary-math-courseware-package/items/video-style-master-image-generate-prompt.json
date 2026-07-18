@@ -1,0 +1,59 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "video.style_master.image.generate.prompt",
+    "name": "视频视觉母图生成业务Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "video.style_master.image.generate.prompt",
+    "title": "视频视觉母图生成业务Prompt",
+    "description": "执行视觉母图图片请求，产生用于批准风格合同的可审计候选。",
+    "model_capability": "image.generate.education_16x9",
+    "input_definition_ref": {
+      "item_key": "video.style_master.image.generate.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "video.style_master.image.generate.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是服务端视频视觉母图生成执行器。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "通过图片模型网关执行已冻结视觉母图指令，生成指定数量候选并返回文件事实。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "按style_reference角色传入可选参考资产；对每个候选记录稳定键、尺寸、媒体类型和SHA-256。Provider路由与私有参数停留在适配层，不进入业务结果。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "候选可解码、画幅正确、视觉语言清楚、儿童安全且无文字水印Logo；失败结果不冒充候选；候选采用和项目写回保持独立。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 20000
+    }
+  }
+}

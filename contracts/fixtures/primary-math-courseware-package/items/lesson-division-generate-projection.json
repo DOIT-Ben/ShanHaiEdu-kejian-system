@@ -1,0 +1,27 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "lesson.division.generate.projection",
+    "name": "课时划分生成教师投影",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "lesson.division.generate.projection",
+    "title": "课时划分生成教师投影",
+    "source_definition_ref": {
+      "item_key": "lesson.division.generate.output",
+      "kind": "content_definition"
+    },
+    "output_format": "markdown",
+    "renderer_id": "shanhai.lesson_division.markdown.v1",
+    "template": "# 课时划分\n\n## 教材范围\n{{scope_summary}}\n\n## 课时总表\n{{lesson_units}}\n\n## 覆盖与合理性检查\n{{coverage_check}}",
+    "allowed_variables": [
+      "scope_summary",
+      "lesson_units",
+      "coverage_check"
+    ],
+    "teacher_visible": true
+  }
+}

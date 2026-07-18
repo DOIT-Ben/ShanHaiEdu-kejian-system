@@ -1,0 +1,36 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "lesson_plan.generate.projection",
+    "name": "分课时教案生成教师投影",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "lesson_plan.generate.projection",
+    "title": "分课时教案生成教师投影",
+    "source_definition_ref": {
+      "item_key": "lesson_plan.generate.output",
+      "kind": "content_definition"
+    },
+    "output_format": "markdown",
+    "renderer_id": "shanhai.lesson_plan.markdown.v1",
+    "template": "# 分课时教案\n\n## 一、教学内容\n{{teaching_content}}\n\n## 二、教材分析\n{{material_analysis}}\n\n## 三、学情分析\n{{learner_analysis}}\n\n## 四、设计意图\n{{design_intent}}\n\n## 五、教学目标\n{{teaching_objectives}}\n\n## 六、教学重难点及突破策略\n{{key_difficulties_and_strategies}}\n\n## 七、教学准备\n{{preparation}}\n\n## 八、教学过程\n{{teaching_process}}\n\n## 九、板书设计\n{{board_design}}\n\n## 十、课堂总结\n{{lesson_summary}}\n\n## 十一、分层作业\n{{differentiated_homework}}\n\n## 十二、教学反思\n{{teaching_reflection}}",
+    "allowed_variables": [
+      "teaching_content",
+      "material_analysis",
+      "learner_analysis",
+      "design_intent",
+      "teaching_objectives",
+      "key_difficulties_and_strategies",
+      "preparation",
+      "teaching_process",
+      "board_design",
+      "lesson_summary",
+      "differentiated_homework",
+      "teaching_reflection"
+    ],
+    "teacher_visible": true
+  }
+}

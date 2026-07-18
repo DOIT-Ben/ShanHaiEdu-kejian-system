@@ -1,0 +1,26 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "ppt.pages.generate.projection",
+    "name": "PPT逐页四层设计教师投影",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "ppt.pages.generate.projection",
+    "title": "PPT逐页四层设计教师投影",
+    "source_definition_ref": {
+      "item_key": "ppt.pages.generate.output",
+      "kind": "content_definition"
+    },
+    "output_format": "markdown",
+    "renderer_id": "shanhai.ppt_page_specs.markdown.v1",
+    "template": "# PPT逐页设计与制作方案\n\n{{page_specs}}\n\n## 整套质量检查\n{{page_set_quality}}",
+    "allowed_variables": [
+      "page_specs",
+      "page_set_quality"
+    ],
+    "teacher_visible": true
+  }
+}

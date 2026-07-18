@@ -1,2 +1,5 @@
+/.gitattributes text eol=lf
 *.sh text eol=lf
 *.sha256 text eol=lf
+/contracts/fixtures/primary-math-courseware-package/** text eol=lf
+/docs/workflows/generation-guide/*.md text eol=lf

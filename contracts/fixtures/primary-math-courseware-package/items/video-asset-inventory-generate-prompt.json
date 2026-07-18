@@ -1,0 +1,76 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "video.asset_inventory.generate.prompt",
+    "name": "视频四类资产清单业务Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "video.asset_inventory.generate.prompt",
+    "title": "视频四类资产清单业务Prompt",
+    "description": "从批准母版剧本和粗分镜扫描、分类并去重人物、场景、道具和生物资产。",
+    "model_capability": "text.structured.creative_video",
+    "input_definition_ref": {
+      "item_key": "video.asset_inventory.generate.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "video.asset_inventory.generate.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是创意短片资产制片，负责从已批准故事事实中建立可复用的四类图片资产清单。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "联合扫描母版剧本和粗分镜，登记实际需要的人物character、场景scene、道具prop和生物creature。没有某类时保留空分类，不强行创造；同一基础身份去重，明确造型或状态变体另建版本。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "每项建立稳定asset_key和identity_key，记录来源scene/beat、用途、外观与状态、默认构图和项目目标槽位。场景默认无人空镜，道具默认单体无手持；不同资产不得塞进一张全家福。人物、动物、机器或抽象主体都只按故事真实需要登记，不因小学受众强制儿童或教室。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "所有粗分镜资产需求均被覆盖且引用有效；同一基础身份不重复；场景与道具遵守默认独立构图；四类汇总与资产记录一致；不生成图片提示词、文件、Provider参数或未在故事出现的装饰资产。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [
+      {
+        "binding_key": "approved_master_script",
+        "source": "video.master_script.approved_version",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 400000
+      },
+      {
+        "binding_key": "approved_rough_storyboard",
+        "source": "video.rough_storyboard.approved_version",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 300000
+      }
+    ],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 30000
+    }
+  }
+}

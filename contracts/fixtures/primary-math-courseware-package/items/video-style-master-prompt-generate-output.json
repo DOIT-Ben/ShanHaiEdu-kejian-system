@@ -1,0 +1,98 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "video.style_master.prompt.generate.output",
+    "name": "视频视觉母图提示词输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "video.style_master.prompt.generate.output",
+    "title": "视频视觉母图提示词输出",
+    "description": "可生成视觉母图的完整提示词组件和风格合同目标。",
+    "definition_role": "prompt_components",
+    "fields": [
+      {
+        "field_key": "style_master_request_key",
+        "label": "请求键",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "style_master_subjects",
+        "label": "代表主体与场景",
+        "type": "rich_text",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "style_master_medium",
+        "label": "媒介与写实程度",
+        "type": "rich_text",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "style_master_design_rules",
+        "label": "造型材质与线条",
+        "type": "rich_text",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "style_master_palette_lighting",
+        "label": "配色光线质感",
+        "type": "rich_text",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "style_master_camera_motion",
+        "label": "摄影机与运动语言",
+        "type": "rich_text",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "style_master_aspect_ratio",
+        "label": "画幅",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "style_master_negative_constraints",
+        "label": "禁止项",
+        "type": "list",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "style_master_candidate_count",
+        "label": "候选数",
+        "type": "number",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "style_master_target_slot",
+        "label": "目标槽位",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      }
+    ]
+  }
+}

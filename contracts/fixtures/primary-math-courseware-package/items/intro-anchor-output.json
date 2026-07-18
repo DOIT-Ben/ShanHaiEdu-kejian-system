@@ -1,0 +1,211 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "intro.anchor.output",
+    "name": "最小课程锚定输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "intro.anchor.output",
+    "title": "最小课程锚定输出",
+    "description": "一套或三类九套完整导入方案、默认路径唯一最高推荐分和可冻结选择快照。",
+    "definition_role": "artifact",
+    "fields": [
+      {
+        "field_key": "option_set_key",
+        "label": "方案集键",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "visibility": "hidden"
+      },
+      {
+        "field_key": "source_lesson_unit_key",
+        "label": "来源课时键",
+        "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "visibility": "hidden"
+      },
+      {
+        "field_key": "options",
+        "label": "导入方案",
+        "type": "repeatable",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "repeatable": true,
+        "min_items": 1,
+        "max_items": 9,
+        "children": [
+          {
+            "field_key": "option_key",
+            "label": "方案键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "source_idea_key",
+            "label": "独立创意键",
+            "type": "reference",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "option_category",
+            "label": "类别",
+            "type": "enum",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "option_title",
+            "label": "标题",
+            "type": "text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "anchored_independent_concept",
+            "label": "独立创意",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "anchored_hook",
+            "label": "钩子",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "anchored_viewer_value",
+            "label": "独立价值",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "anchored_medium",
+            "label": "建议媒介",
+            "type": "enum",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "suggested_duration_seconds",
+            "label": "建议时长",
+            "type": "number",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "course_anchor",
+            "label": "唯一课程锚点",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "classroom_first_question",
+            "label": "课堂第一问",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "handoff_moment",
+            "label": "交接时刻",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "option_must_not_preteach",
+            "label": "不得提前讲授",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "fit_reason",
+            "label": "适配理由",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "recommendation_score",
+            "label": "推荐分",
+            "type": "number",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "option_risks",
+            "label": "风险",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "recommendation_summary",
+        "label": "推荐结论",
+        "type": "group",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "children": [
+          {
+            "field_key": "recommended_option_key",
+            "label": "最高推荐方案",
+            "type": "reference",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "recommendation_reason",
+            "label": "推荐理由",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "single_highest_score",
+            "label": "最高分唯一",
+            "type": "boolean",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      }
+    ]
+  }
+}

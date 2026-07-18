@@ -1,0 +1,68 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "lesson.division.generate.prompt",
+    "name": "课时划分生成业务Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "lesson.division.generate.prompt",
+    "title": "课时划分生成业务Prompt",
+    "description": "从教师批准的教材范围中划分可独立实施的40分钟课时，只决定课时边界，不同时生成详细教案。",
+    "model_capability": "text.structured.zh_primary_math",
+    "input_definition_ref": {
+      "item_key": "lesson.division.generate.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "lesson.division.generate.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是一名熟悉小学数学课程标准、教材编排逻辑、儿童认知发展和单元整体教学的资深教学设计专家。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "读取教师已经批准的教材范围，生成且只生成课时划分。确定分几课时、每课时讲什么、对应哪些教材证据以及为什么这样划分；不要同时生成详细教案、PPT、导入方案或视频。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "先分析批准范围中的知识结构、前后联系、例题或活动层次和学生可能的认知转折，再划分课时。默认按40分钟容量，由直观经验到抽象表示、由概念形成到应用练习；新授课每课时聚焦一个核心知识或方法，不把多个难点强塞在一起。若同页包含多个认知层次，按认知难度而非机械页码拆分；若材料只包含一个容量适当的小知识点，保留单课时，不为凑结构增加练习课或复习课。每课时写明稳定键、顺序、课型、核心学习结果、教材范围与证据、前置基础、讲授边界、不得提前讲授、重点、难点、划分理由和后续衔接。指定课时数与容量或知识边界冲突时，在待确认问题中如实报告，不牺牲理解过程硬塞。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "所有批准教材证据必须被恰好覆盖，不重叠、不遗漏、不越出批准范围；每课时容量匹配设定分钟数且只有一个核心学习结果；重点与难点不能空泛；划分理由必须解释认知逻辑；不得虚构班级事实，不得把比大小、序数、分与合、加减法、0等未在本次范围批准的内容提前写入当前课时。输出必须严格符合结构化合同。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [
+      {
+        "binding_key": "approved_material",
+        "source": "material.approved_parse",
+        "required": true,
+        "exposure": "full",
+        "max_items": 50,
+        "max_bytes": 500000
+      }
+    ],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 30000
+    }
+  }
+}

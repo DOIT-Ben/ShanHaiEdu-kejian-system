@@ -1,0 +1,283 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "video.master_script.generate.output",
+    "name": "视频母版剧本生成输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "video.master_script.generate.output",
+    "title": "视频母版剧本生成输出",
+    "description": "包含完整故事、场次、旁白对白、声音意图和唯一课程交接的母版剧本。",
+    "definition_role": "artifact",
+    "fields": [
+      {
+        "field_key": "master_script_key",
+        "label": "母版剧本键",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "visibility": "hidden"
+      },
+      {
+        "field_key": "master_selected_intro_option_key",
+        "label": "已选方案键",
+        "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "master_title",
+        "label": "短片标题",
+        "type": "text",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "narrative_purpose",
+        "label": "叙事目的",
+        "type": "rich_text",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "complete_story",
+        "label": "完整故事",
+        "type": "rich_text",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "master_scenes",
+        "label": "场次",
+        "type": "repeatable",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "repeatable": true,
+        "min_items": 1,
+        "children": [
+          {
+            "field_key": "master_scene_key",
+            "label": "场次键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "master_scene_position",
+            "label": "顺序",
+            "type": "number",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "master_scene_purpose",
+            "label": "场次目的",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "master_scene_location",
+            "label": "地点",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "master_scene_subjects",
+            "label": "人物或主体",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "master_visible_change",
+            "label": "可见变化",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "master_actions",
+            "label": "动作",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "master_narration",
+            "label": "旁白",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "master_dialogue",
+            "label": "对白",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "master_sound_intent",
+            "label": "声音意图",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "master_start_state",
+            "label": "开始状态",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "master_end_state",
+            "label": "结束状态",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "master_scene_duration_seconds",
+            "label": "预计时长",
+            "type": "number",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "master_handoff",
+        "label": "课堂交接",
+        "type": "group",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "children": [
+          {
+            "field_key": "master_course_anchor",
+            "label": "唯一课程锚点",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "master_classroom_first_question",
+            "label": "课堂第一问",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "master_handoff_moment",
+            "label": "交接时刻",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "master_must_not_preteach",
+            "label": "不得提前讲授",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "master_duration_recommendation",
+        "label": "时长建议",
+        "type": "group",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "children": [
+          {
+            "field_key": "master_duration_mode",
+            "label": "时长方式",
+            "type": "enum",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "master_recommended_duration_seconds",
+            "label": "系统建议时长",
+            "type": "number",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "master_duration_reason",
+            "label": "建议理由",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "master_estimated_shot_count",
+            "label": "预计镜头数",
+            "type": "number",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "master_pricing_quote_required",
+            "label": "进入分镜前需要服务端报价",
+            "type": "boolean",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "master_target_duration_seconds",
+        "label": "目标总时长",
+        "type": "number",
+        "required": true,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "master_script_quality",
+        "label": "剧本质量检查",
+        "type": "rubric",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      }
+    ]
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "ppt.pages.generate.input",
+    "name": "PPT逐页四层设计输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "ppt.pages.generate.input",
+    "title": "PPT逐页四层设计输入",
+    "description": "输入批准大纲和页面设计约束，读取批准教案及教材证据。",
+    "fields": [
+      {
+        "field_key": "approved_outline_ref",
+        "label": "已批准PPT大纲",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "page_style_preset",
+        "label": "视觉风格",
+        "value_type": "reference",
+        "required": true,
+        "source": "teacher",
+        "visibility": "primary",
+        "widget": "style_picker",
+        "allowed_item_kinds": [
+          "style_preset"
+        ]
+      },
+      {
+        "field_key": "page_design_requirements",
+        "label": "逐页设计要求",
+        "value_type": "rich_text",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "textarea",
+        "validation": {
+          "max_length": 5000
+        }
+      },
+      {
+        "field_key": "pages_lesson_plan",
+        "label": "已批准教案",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "pages_material_evidence",
+        "label": "教材证据",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      }
+    ]
+  }
+}

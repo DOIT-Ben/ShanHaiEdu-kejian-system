@@ -1,0 +1,100 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "ppt.content_analyze.input",
+    "name": "PPT内容分析输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "ppt.content_analyze.input",
+    "title": "PPT内容分析输入",
+    "description": "输入课件用途、画幅和教师页数偏好；教学事实从批准上下文读取。",
+    "fields": [
+      {
+        "field_key": "presentation_purpose",
+        "label": "课件用途",
+        "value_type": "enum",
+        "required": true,
+        "source": "teacher",
+        "visibility": "primary",
+        "widget": "select",
+        "default_value": "daily_class",
+        "options": [
+          {
+            "value": "daily_class",
+            "label": "日常课堂"
+          },
+          {
+            "value": "open_class",
+            "label": "公开课"
+          },
+          {
+            "value": "review",
+            "label": "复习课"
+          }
+        ]
+      },
+      {
+        "field_key": "aspect_ratio",
+        "label": "画幅",
+        "value_type": "enum",
+        "required": true,
+        "source": "system",
+        "visibility": "secondary",
+        "widget": "select",
+        "default_value": "16:9",
+        "options": [
+          {
+            "value": "16:9",
+            "label": "宽屏16:9"
+          }
+        ]
+      },
+      {
+        "field_key": "preferred_page_count",
+        "label": "期望页数（可选）",
+        "value_type": "number",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "number",
+        "validation": {
+          "minimum": 5,
+          "maximum": 60
+        }
+      },
+      {
+        "field_key": "ppt_requirements",
+        "label": "PPT补充要求",
+        "value_type": "rich_text",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "textarea",
+        "validation": {
+          "max_length": 5000
+        }
+      },
+      {
+        "field_key": "approved_lesson_plan",
+        "label": "已批准教案",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "approved_material_evidence",
+        "label": "教材证据",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      }
+    ]
+  }
+}

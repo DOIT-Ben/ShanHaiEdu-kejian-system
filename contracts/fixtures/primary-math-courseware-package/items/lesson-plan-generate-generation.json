@@ -1,0 +1,45 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "generation_template",
+  "metadata": {
+    "key": "lesson_plan.generate",
+    "name": "分课时教案生成",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "lesson_plan.generate",
+    "title": "分课时教案生成",
+    "description": "为一个已批准课时生成默认十二部分教案；三类九套由兄弟节点独立生成，不嵌入教案字段树。",
+    "model_capability": "text.structured.zh_primary_math",
+    "input_definition_ref": {
+      "item_key": "lesson_plan.generate.input",
+      "kind": "input_definition"
+    },
+    "prompt_template_ref": {
+      "item_key": "lesson_plan.generate.prompt",
+      "kind": "prompt_template"
+    },
+    "output_definition_ref": {
+      "item_key": "lesson_plan.generate.output",
+      "kind": "content_definition"
+    },
+    "style_preset_refs": [],
+    "projection_refs": [
+      {
+        "role": "teacher_view",
+        "template_ref": {
+          "item_key": "lesson_plan.generate.projection",
+          "kind": "projection_template"
+        }
+      },
+      {
+        "role": "export",
+        "template_ref": {
+          "item_key": "lesson_plan.generate.projection",
+          "kind": "projection_template"
+        }
+      }
+    ]
+  }
+}

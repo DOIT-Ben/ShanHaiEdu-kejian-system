@@ -1,0 +1,1020 @@
+{
+  "case_version": "shanhai.golden-courseware-case/v1",
+  "case_key": "primary-math.numbers-1-to-5",
+  "title": "1～5的认识全流程黄金项目",
+  "source": {
+    "source_key": "material.renjiao.grade1.volume1.numbers-1-to-5",
+    "file_name": "五以内数的认识人教版小学数学课本教材.pdf",
+    "sha256": "22af2828fba7d3524fca1a77707d18977624bac790870dd219b459d5b830b9e1",
+    "pdf_page_count": 22,
+    "pdf_page_indexes": [3, 4, 5],
+    "printed_pages": [14, 15, 16],
+    "page_mappings": [
+      {
+        "pdf_page_index": 3,
+        "printed_page": 14,
+        "evidence_keys": ["EV-MAT-01"],
+        "scope_summary": "通过生活化图景感知1～5个物体的数量，建立按个计数的学习起点。"
+      },
+      {
+        "pdf_page_index": 4,
+        "printed_page": 15,
+        "evidence_keys": ["EV-MAT-02", "EV-MAT-03"],
+        "scope_summary": "把物体数量、点子表示和数字1～5建立对应，支持认读与多种表示。"
+      },
+      {
+        "pdf_page_index": 5,
+        "printed_page": 16,
+        "evidence_keys": ["EV-MAT-04"],
+        "scope_summary": "呈现数字1～5的规范书写与练习，形成从数量到数字表达的闭环。"
+      }
+    ],
+    "verification": {
+      "hash_verified": true,
+      "page_count_verified": true,
+      "page_range_visually_verified": true,
+      "raw_source_committed": false
+    }
+  },
+  "project": {
+    "project_key": "PROJECT-GOLDEN-001",
+    "subject": "小学数学",
+    "grade": "一年级",
+    "textbook_version": "人民教育出版社",
+    "volume": "一年级上册",
+    "unit_title": "5以内数的认识和加、减法",
+    "topic": "1～5的认识",
+    "lesson_duration_minutes": 40,
+    "enabled_branches": ["lesson_plan", "intro_options", "ppt", "video"]
+  },
+  "knowledge_boundary": {
+    "must_teach": [
+      "从具体物体中感知1～5的数量",
+      "使用一一对应方式数出1～5个物体",
+      "建立物体数量、点子图和数字1～5之间的对应",
+      "认读数字1～5",
+      "按规范笔顺书写数字1～5",
+      "用不同方式表示同一个1～5的数量"
+    ],
+    "may_practice": [
+      "在熟悉情境中按要求取出1～5个物体",
+      "在物体、点子和数字之间进行匹配",
+      "口头说明自己数数和表示数量的方法"
+    ],
+    "must_not_preteach": ["比较大小", "第几", "分与合", "加法", "减法", "0的认识"]
+  },
+  "material_evidence": [
+    {
+      "evidence_key": "EV-MAT-01",
+      "pdf_page_index": 3,
+      "printed_page": 14,
+      "locator": "印刷页14的主题图及数量观察任务",
+      "supported_claim": "本课从具体情境中的少量物体出发，让学生通过观察和逐个对应形成1～5的数量感知。"
+    },
+    {
+      "evidence_key": "EV-MAT-02",
+      "pdf_page_index": 4,
+      "printed_page": 15,
+      "locator": "印刷页15的物体数量与点子表示",
+      "supported_claim": "教材使用不同表征承接从具体数量到抽象数字的过渡。"
+    },
+    {
+      "evidence_key": "EV-MAT-03",
+      "pdf_page_index": 4,
+      "printed_page": 15,
+      "locator": "印刷页15的数字1～5认读内容",
+      "supported_claim": "学生需要把数字符号与相应数量稳定对应，而不是只会顺口背数。"
+    },
+    {
+      "evidence_key": "EV-MAT-04",
+      "pdf_page_index": 5,
+      "printed_page": 16,
+      "locator": "印刷页16的数字书写示范与练习",
+      "supported_claim": "本课包含数字1～5的规范书写，需关注起笔、方向、占格和书写姿势。"
+    }
+  ],
+  "teacher_preferences": {
+    "execution_mode": "guided",
+    "lesson_detail_level": "open_class",
+    "presentation_purpose": "daily_class",
+    "ppt_aspect_ratio": "16:9",
+    "ppt_preferred_page_count": 10,
+    "video_duration_mode": "system_recommended",
+    "video_target_duration_seconds": 90,
+    "video_cost_preference": "balanced",
+    "video_aspect_ratio": "16:9",
+    "video_language": "zh-CN",
+    "visual_style_key": "style.primary_math.paper_clay",
+    "audio_voice_style": "亲切、清晰、自然，不幼稚化",
+    "audio_speech_rate": 0.95
+  },
+  "generation_templates": [
+    "lesson.division.generate",
+    "lesson_plan.generate",
+    "intro.ideate",
+    "intro.anchor",
+    "ppt.content_analyze",
+    "ppt.outline.generate",
+    "ppt.pages.generate",
+    "ppt.cover.prompt.generate",
+    "ppt.cover.image.generate",
+    "ppt.body_asset_prompts.generate",
+    "ppt.body_assets.generate",
+    "video.master_script.generate",
+    "video.rough_storyboard.generate",
+    "video.style_master.prompt.generate",
+    "video.style_master.image.generate",
+    "video.asset_inventory.generate",
+    "video.asset_prompts.generate",
+    "video.assets.generate",
+    "video.fine_storyboard.generate",
+    "video.shots.generate",
+    "audio.plan.generate",
+    "audio.tts.generate",
+    "video.classroom_quality.evaluate"
+  ],
+  "lesson_division": {
+    "division_key": "DIVISION-GOLDEN-001",
+    "lesson_count": 1,
+    "lesson_units": [
+      {
+        "lesson_unit_key": "LESSON-001",
+        "position": 1,
+        "title": "1～5的认识",
+        "lesson_type": "new_learning",
+        "duration_minutes": 40,
+        "core_learning_outcome": "学生能在具体情境中数出1～5个物体，把数量与点子、数字对应，并规范书写数字1～5。",
+        "material_scope": "PDF物理页3～5，对应教材印刷页14～16。",
+        "evidence_refs": ["EV-MAT-01", "EV-MAT-02", "EV-MAT-03", "EV-MAT-04"],
+        "content_boundary": "完成数量感知、一一对应计数、物数与点数和数字对应、认读及书写1～5；只在1～5范围内做表示活动。",
+        "must_not_preteach": ["比较大小", "第几", "分与合", "加法", "减法", "0的认识"],
+        "teaching_focus": "把具体物体的数量与点子、数字1～5建立稳定对应。",
+        "learning_difficulty": "学生从逐个数物体过渡到理解不同表征可以表示同一个数量，并能规范书写数字。",
+        "division_reason": "所选三页围绕同一核心概念形成从具体数量、图示表征到数字书写的完整40分钟学习链；物理页6已进入比大小，必须另属后续课时。"
+      }
+    ],
+    "coverage_assertions": {
+      "all_selected_pages_covered_once": true,
+      "overlap_free": true,
+      "excluded_next_topic": "比较大小",
+      "capacity_reasonable_for_40_minutes": true
+    }
+  },
+  "lesson_plan": {
+    "lesson_plan_key": "LESSON-PLAN-001",
+    "source_lesson_unit_key": "LESSON-001",
+    "sections": {
+      "teaching_content": {
+        "topic": "1～5的认识",
+        "lesson_type": "新授课",
+        "duration_minutes": 40,
+        "scope": "PDF物理页3～5，教材印刷页14～16。",
+        "evidence_refs": ["EV-MAT-01", "EV-MAT-02", "EV-MAT-03", "EV-MAT-04"],
+        "content_boundary": "在1～5范围内完成数数、对应、认读、表示和书写。",
+        "must_not_preteach": ["比较大小", "第几", "分与合", "加法", "减法", "0的认识"]
+      },
+      "material_analysis": {
+        "prior_learning": "学生在生活中接触过少量物体的多少和口头数数，但是否能稳定一一对应、是否认识数字符号尚不能假定。",
+        "current_focus": "把具体数量、点子和数字1～5连接起来，并形成规范书写经验。",
+        "next_learning": "后续才进入比较大小、序数、分与合以及加减法等内容。",
+        "teaching_value": "为数感、符号意识和后续运算建立可观察、可操作的基础。"
+      },
+      "learner_analysis": {
+        "confirmed_facts": [],
+        "general_learning_characteristics": ["一年级学生更容易借助具体物体、动作和图示理解抽象数字", "短时、多轮、可操作的任务比长段讲解更适合本课"],
+        "likely_difficulties": ["口头数词与所指物体不同步", "能背诵1～5但不能把数字和数量稳定对应", "数字书写方向或占格不规范"],
+        "likely_misconceptions": ["重复数同一个物体或漏数", "把物体大小当成数量多少", "把数字形状画成图案而不是按笔顺书写"],
+        "differentiation_needs": ["需要支持的学生使用移动物件和点子卡逐一配对", "学有余力的学生用两种以上方式表示同一数量并说明理由"],
+        "unknowns": ["班级是否已系统接触数字书写", "学生握笔与书写基础", "课堂是否具备实物投放条件"]
+      },
+      "design_intent": {
+        "teaching_main_line": "看见数量—逐个对应—转换表征—认读数字—规范书写—用多种方式表示。",
+        "learning_sequence": "从可移动实物和生活图景出发，经点子图过渡到数字符号，再回到操作和表达检验对应关系。",
+        "evaluation_alignment": "每个目标在操作、口头说明、匹配任务或书写样例中留下可观察证据。"
+      },
+      "teaching_objectives": [
+        {
+          "objective_key": "OBJ-01",
+          "competency_focus": ["数感"],
+          "observable_outcome": "面对1～5个排列方式不同的物体，学生能逐个对应并准确说出数量。",
+          "condition": "允许移动物件或用手指点数。",
+          "success_criteria": "连续三组任务均无重复、无遗漏，并能说明最后一个数词表示这一组物体的总数。",
+          "evidence_refs": ["EV-MAT-01"],
+          "assessment_evidence_keys": ["AE-01", "AE-04"]
+        },
+        {
+          "objective_key": "OBJ-02",
+          "competency_focus": ["数感", "符号意识"],
+          "observable_outcome": "学生能在物体、点子图和数字1～5之间完成匹配，并用两种方式表示一个给定数量。",
+          "condition": "使用物件卡、点子卡和数字卡。",
+          "success_criteria": "五组匹配至少四组正确，且口头说明一种对应理由。",
+          "evidence_refs": ["EV-MAT-02", "EV-MAT-03"],
+          "assessment_evidence_keys": ["AE-02", "AE-04"]
+        },
+        {
+          "objective_key": "OBJ-03",
+          "competency_focus": ["符号意识"],
+          "observable_outcome": "学生能按示范笔顺在田字格中书写数字1～5。",
+          "condition": "先观察示范并进行一次空书，再独立书写。",
+          "success_criteria": "起笔、方向和占格基本正确，五个数字中至少四个可清晰辨认。",
+          "evidence_refs": ["EV-MAT-04"],
+          "assessment_evidence_keys": ["AE-03", "AE-04"]
+        }
+      ],
+      "key_difficulties_and_strategies": {
+        "key_learning_focus": "建立数量、点子与数字1～5的对应。",
+        "central_learning_difficulty": "理解最后一个数词表示所数物体的总数，并跨不同表征保持数量不变。",
+        "breakthrough_strategies": ["让学生移动物体并一边点一边数", "用一物一点的方式显化一一对应", "在物体、点子和数字卡之间反复双向匹配", "通过错误示例追问哪里重复或遗漏"]
+      },
+      "preparation": {
+        "teacher_resources": ["1～5个可移动实物若干组", "点子卡1～5", "数字卡1～5", "田字格书写示范"],
+        "student_resources": ["每组一套小物件与点子卡", "田字格练习纸和铅笔"],
+        "digital_resources": ["可编辑数字和点子PPT页面"],
+        "safety_requirements": ["小物件不得入口，活动结束按组清点收回"]
+      },
+      "teaching_process": [
+        {
+          "section_key": "PROC-01",
+          "process_type": "learning_start",
+          "title": "观察小站：你看见了多少",
+          "minutes": 5,
+          "objective_keys": ["OBJ-01"],
+          "teacher_actions": ["呈现三组数量不超过5的生活物件图，先不显示数字", "邀请学生说出自己怎样确保不重复、不遗漏"],
+          "student_actions": ["独立观察并用手指逐个点数", "同桌比较不同点数顺序是否得到同一总数"],
+          "key_questions": ["你怎样知道自己没有漏掉？", "从不同物体开始数，结果会变吗？"],
+          "expected_responses": ["数一个点一个", "把数过的物体移到一边", "顺序改变但总数不变"],
+          "possible_errors": ["重复数同一物体", "漏掉边缘物体"],
+          "scaffolds": ["让学生移动物体或做已数标记", "请学生复演错误并找出重复位置"],
+          "board_updates": ["板书“数一个，点一个”，记录不重复、不遗漏的计数方法"],
+          "transition": "确认逐个计数的方法后，进入物体与点子的一一对应。",
+          "design_rationale": "先暴露学生真实计数策略，为从具体物体过渡到点子表征建立共同经验。",
+          "assessment_evidence": [{"evidence_key": "AE-01", "criterion": "逐个对应且说出总数"}]
+        },
+        {
+          "section_key": "PROC-02",
+          "process_type": "core_exploration",
+          "title": "一物一点：把数量留下来",
+          "minutes": 10,
+          "objective_keys": ["OBJ-01", "OBJ-02"],
+          "teacher_actions": ["为每个物体配一个点子，逐组示范1～5", "故意给一组多放或少放一个点子，组织辨析"],
+          "student_actions": ["为物件组摆出同样多的点子", "检查同伴是否一物一点并说明修改理由"],
+          "key_questions": ["为什么这个点子不能少？", "物体换了样子，点子还能表示它的数量吗？"],
+          "expected_responses": ["每个物体都要有一个点子", "点子表示数量，不表示物体长什么样"],
+          "possible_errors": ["按物体大小配点子", "多放或少放点子"],
+          "scaffolds": ["用连线或移动方式显化一一对应", "让学生逐个核对而不是只看整体"],
+          "board_updates": ["补充“一个物体对应一个点子”的配对示意"],
+          "transition": "稳定一一对应后，把点子数量与数字符号连接起来。",
+          "design_rationale": "借助点子中介淡化物体外观差异，突出数量不随表征对象变化。",
+          "assessment_evidence": [{"evidence_key": "AE-02", "criterion": "物体与点子一一对应且匹配正确"}]
+        },
+        {
+          "section_key": "PROC-03",
+          "process_type": "symbolization",
+          "title": "点子和数字做朋友",
+          "minutes": 10,
+          "objective_keys": ["OBJ-02"],
+          "teacher_actions": ["依次呈现点子卡和数字卡1～5，组织双向匹配", "打乱卡片顺序，让学生说明匹配依据"],
+          "student_actions": ["把数字卡放到对应点子卡旁", "从数字出发摆出相应数量物件"],
+          "key_questions": ["数字4为什么能和这些不同物体放在一起？", "看到数字3，你能用什么方式表示？"],
+          "expected_responses": ["它们都有4个", "可以摆3个物体或画3个点"],
+          "possible_errors": ["按卡片位置而不是数量匹配", "只会顺序认读，打乱后混淆"],
+          "scaffolds": ["退回点子中介重新数", "用相邻数字卡帮助定位但不讲比较大小"],
+          "board_updates": ["形成物体—点子—数字1～5的对应链"],
+          "transition": "完成数量与数字的双向匹配后，进入数字规范书写。",
+          "design_rationale": "通过打乱顺序后的双向匹配，检验学生是否真正建立数量与符号联系。",
+          "assessment_evidence": [{"evidence_key": "AE-02", "criterion": "物体、点子和数字双向匹配"}]
+        },
+        {
+          "section_key": "PROC-04",
+          "process_type": "writing_practice",
+          "title": "把1～5写清楚",
+          "minutes": 10,
+          "objective_keys": ["OBJ-03"],
+          "teacher_actions": ["分组示范1～3和4～5的起笔、方向与占格", "组织空书、描写和独立书写，巡视给出局部反馈"],
+          "student_actions": ["观察并说出起笔位置", "空书一次后描写，再独立书写1～5"],
+          "key_questions": ["这个数字从哪里起笔？", "怎样让数字在格子里站稳？"],
+          "expected_responses": ["按示范方向写", "注意上下和左右位置"],
+          "possible_errors": ["反向书写", "数字过小或超出格子", "把4或5写成封闭图形"],
+          "scaffolds": ["放大笔顺轨迹并让学生空书", "只返修错误数字，不要求整行重写"],
+          "board_updates": ["按1～5顺序补充起笔方向和田字格占位提示"],
+          "transition": "规范书写完成后，用多种表示任务综合回看本课学习。",
+          "design_rationale": "采用观察、空书、描写和独立书写的递进练习，降低低年级书写负荷。",
+          "assessment_evidence": [{"evidence_key": "AE-03", "criterion": "五个数字至少四个方向和占格基本正确"}]
+        },
+        {
+          "section_key": "PROC-05",
+          "process_type": "application_and_closure",
+          "title": "同一个数量可以怎样表示",
+          "minutes": 5,
+          "objective_keys": ["OBJ-01", "OBJ-02", "OBJ-03"],
+          "teacher_actions": ["给出一个1～5的数量，让学生任选两种方式表示", "用出口卡收集数数、匹配和书写证据并收束"],
+          "student_actions": ["用物件、点子、数字或动作中的两种表示同一数量", "完成一项匹配和一个数字书写"],
+          "key_questions": ["表示方法变了，什么没有变？", "今天怎样让别人看懂一个数量？"],
+          "expected_responses": ["数量没有变", "可以用物体、点子或数字表示"],
+          "possible_errors": ["两种表示的数量不一致"],
+          "scaffolds": ["让学生逐个对应检查两种表示"],
+          "board_updates": ["完成“物体—点子—数字”总结链并圈出数量不变"],
+          "transition": "以出口卡结束课堂，不进入比较大小、序数或运算内容。",
+          "design_rationale": "用两种表示和出口卡同时回收数量感知、符号对应与书写证据。",
+          "assessment_evidence": [{"evidence_key": "AE-04", "criterion": "两种表示数量一致且数字书写可辨认"}]
+        }
+      ],
+      "board_design": {
+        "layout": "左侧保留课题与数数方法，中部按1～5纵向建立物体—点子—数字对应，右侧记录书写笔顺提醒。",
+        "final_content": ["1～5的认识", "数一个，点一个，不重复，不遗漏", "物体数量 ↔ 点子 ↔ 数字", "数字1～5书写起笔与方向"],
+        "build_order": ["先记录数数方法", "随探究逐行建立三种表征", "书写时补充笔顺提醒", "总结时圈出数量不变"]
+      },
+      "lesson_summary": {
+        "summary_questions": ["今天我们用哪些方式表示1～5？", "怎样数才能不重复、不遗漏？", "写数字时要注意什么？"],
+        "student_evidence": ["能展示两种数量表示", "能口述一一对应数数方法", "能指出一个书写注意点"],
+        "teacher_closure": "物体可以不同，表示方法也可以不同；只要一一对应，所表示的数量就保持一致。"
+      },
+      "differentiated_homework": [
+        {
+          "homework_key": "HW-A",
+          "level": "基础巩固",
+          "task": "从家中选择三组1～5个安全物品，逐个数并写出对应数字。",
+          "objective_keys": ["OBJ-01", "OBJ-03"],
+          "expected_minutes": 5,
+          "criteria": "不重复、不遗漏，数字清晰可辨认。",
+          "answer_guidance": "物品可不同，只检查数量与数字是否对应。"
+        },
+        {
+          "homework_key": "HW-B",
+          "level": "能力提升",
+          "task": "任选一个1～5的数量，用物体、点子和数字三种方式表示。",
+          "objective_keys": ["OBJ-02"],
+          "expected_minutes": 5,
+          "criteria": "三种表示的数量一致，并能口头说明。",
+          "answer_guidance": "表示形式不限，但三者必须一一对应。"
+        },
+        {
+          "homework_key": "HW-C",
+          "level": "拓展挑战",
+          "task": "设计一张不写数字的数量卡，请家人猜是1～5中的哪个数，再解释设计。",
+          "objective_keys": ["OBJ-02"],
+          "expected_minutes": 8,
+          "criteria": "线索足以确定数量且没有使用比较、加减或分合知识。",
+          "answer_guidance": "可以使用点子、物体或动作痕迹。"
+        }
+      ],
+      "teaching_reflection": {
+        "state": "not_taught",
+        "prompts": ["哪些学生仍不能稳定一一对应？", "物体—点子—数字的哪个转换最容易出错？", "数字书写的主要问题是方向、占格还是握笔？", "下次应保留或调整哪个支架？"],
+        "teacher_record": ""
+      }
+    },
+    "quality_expectations": {
+      "twelve_sections_complete": true,
+      "body_has_executable_intro": true,
+      "intro_options_are_not_embedded": true,
+      "process_minutes_total": 40,
+      "all_objectives_have_process_and_assessment": true,
+      "no_fabricated_post_lesson_reflection": true
+    }
+  },
+  "intro_option_set": {
+    "option_set_key": "INTRO-SET-001",
+    "generation_mode": "default_nine",
+    "lesson_unit_key": "LESSON-001",
+    "options": [
+      {
+        "option_key": "INTRO-SCI-01",
+        "category": "science",
+        "title": "会变队形的萤火信号",
+        "independent_concept": "薄雾中的萤火群会短暂聚成不同队形，再迅速散开；观察者需要发现哪些光点属于同一次信号。",
+        "hook": "第一轮信号刚亮起就被雾遮住，第二轮光点却换了位置。",
+        "viewer_value": "即使没有课程回接，观众也会想辨认信号并观察队形变化。",
+        "suggested_medium": "video",
+        "duration_seconds": 45,
+        "replacement_field_key": "teaching_process.PROC-01",
+        "course_anchor": "最后一轮信号稳定为五个清晰光点时画面冻结，只让学生观察这个可数集合。",
+        "classroom_first_question": "你看见了几个清晰光点？你怎样保证没有重复数？",
+        "handoff_moment": "五个光点全部稳定且尚未出现任何数字标记时停止。",
+        "must_not_preteach": ["比较大小", "第几", "分与合", "加法", "减法", "0的认识"],
+        "fit_reason": "光点天然适合一一对应计数，又不会替课堂解释数字与数量关系。",
+        "risks": ["闪烁过快会妨碍低年级观察", "不能用屏幕数字标注光点"],
+        "recommendation_score": 88,
+        "recommendation_reason": "视觉清楚、制作可控，能自然进入逐个点数。"
+      },
+      {
+        "option_key": "INTRO-SCI-02",
+        "category": "science",
+        "title": "贝壳里的回声节拍",
+        "independent_concept": "海边研究员把不同贝壳靠近耳边，听见长短不同的回声节拍，并尝试找出重复出现的清晰声响。",
+        "hook": "一个贝壳突然传出规律的短促回声，最后一拍却消失了。",
+        "viewer_value": "观众可以独立聆听节拍、寻找规律并期待消失声音的答案。",
+        "suggested_medium": "mixed",
+        "duration_seconds": 40,
+        "replacement_field_key": "teaching_process.PROC-01",
+        "course_anchor": "保留一组由四次清晰声响形成的波纹图，但不显示数字或结论。",
+        "classroom_first_question": "刚才有几次清晰声响？还能用什么把这些声响留下来？",
+        "handoff_moment": "第四个波纹刚扩散完、研究员尚未记录时停止。",
+        "must_not_preteach": ["比较大小", "第几", "分与合", "加法", "减法", "0的认识"],
+        "fit_reason": "把听觉事件转成可见波纹，可引出数量的多种表示。",
+        "risks": ["环境音可能影响辨听", "波纹数量必须由后期准确控制"],
+        "recommendation_score": 82,
+        "recommendation_reason": "跨感官有新意，但课堂设备与声音清晰度要求较高。"
+      },
+      {
+        "option_key": "INTRO-SCI-03",
+        "category": "science",
+        "title": "雨滴怎样走到叶尖",
+        "independent_concept": "微距镜头观察雨滴在叶脉上汇聚、停顿和滑向叶尖的路径，展示表面张力带来的细小变化。",
+        "hook": "几颗雨滴同时靠近叶尖，其中一颗停在叶脉分叉处。",
+        "viewer_value": "观众可以欣赏真实自然现象并猜测雨滴下一步的运动。",
+        "suggested_medium": "video",
+        "duration_seconds": 45,
+        "replacement_field_key": "teaching_process.PROC-01",
+        "course_anchor": "画面停在三颗彼此分开的雨滴上，仅保留可观察对象。",
+        "classroom_first_question": "叶面上有几颗清楚分开的雨滴？你会怎样表示？",
+        "handoff_moment": "三颗雨滴稳定停住且未开始合并时停止。",
+        "must_not_preteach": ["比较大小", "第几", "分与合", "加法", "减法", "0的认识"],
+        "fit_reason": "具体对象清楚、数量小，能从自然观察平滑回到数量表示。",
+        "risks": ["不能让雨滴在定格前合并", "不展开表面张力知识讲解"],
+        "recommendation_score": 79,
+        "recommendation_reason": "画面优美但微距运动和雨滴一致性制作难度较高。"
+      },
+      {
+        "option_key": "INTRO-APP-01",
+        "category": "application",
+        "title": "机器人补给舱装载",
+        "independent_concept": "一台维护机器人要把少量补给盒放进带独立卡槽的运输舱，漏放或重复扫描都会让舱门无法关闭。",
+        "hook": "舱门只差一步就能关闭，扫描灯却提示还有一个卡槽状态不明。",
+        "viewer_value": "观众可以独立参与装载检查并判断哪个步骤出了问题。",
+        "suggested_medium": "video",
+        "duration_seconds": 45,
+        "replacement_field_key": "teaching_process.PROC-01",
+        "course_anchor": "机器人重新打开舱门，露出五个已占用卡槽，但没有数字标签。",
+        "classroom_first_question": "舱里有几个补给盒？怎样检查才不会重复或遗漏？",
+        "handoff_moment": "所有补给盒与卡槽一一对齐、机器人准备重新扫描时停止。",
+        "must_not_preteach": ["比较大小", "第几", "分与合", "加法", "减法", "0的认识"],
+        "fit_reason": "卡槽与物体天然形成一一对应，适合建立可靠数数方法。",
+        "risks": ["不能出现屏幕计数结果", "机械结构不能过于复杂"],
+        "recommendation_score": 85,
+        "recommendation_reason": "任务目标明确，一一对应可见，视频制作可控。"
+      },
+      {
+        "option_key": "INTRO-APP-02",
+        "category": "application",
+        "title": "果园巡检卡缺了一栏",
+        "independent_concept": "果园巡检员用图形卡记录几处幼苗保护罩是否完好，一阵风吹走了其中一张记录卡。",
+        "hook": "巡检结束时，记录板上有一处空白，却没人记得对应哪组保护罩。",
+        "viewer_value": "观众可以独立推理怎样留下可靠记录，并体验真实巡检任务。",
+        "suggested_medium": "mixed",
+        "duration_seconds": 90,
+        "replacement_field_key": "teaching_process.PROC-01",
+        "course_anchor": "巡检员面对一组四个保护罩，准备选择一种不易丢失的数量记录方式。",
+        "classroom_first_question": "这组有几个保护罩？除了画物体，还能怎样记录数量？",
+        "handoff_moment": "记录笔刚落到空白卡上、尚未写出任何数字时停止。",
+        "must_not_preteach": ["比较大小", "第几", "分与合", "加法", "减法", "0的认识"],
+        "fit_reason": "真实记录需求能引出图示和数字两类表示。",
+        "risks": ["避免把记录任务变成统计表教学", "不出现编号顺序问题"],
+        "recommendation_score": 80,
+        "recommendation_reason": "应用价值真实，但需要控制情境信息量。"
+      },
+      {
+        "option_key": "INTRO-APP-03",
+        "category": "application",
+        "title": "舞台灯光试亮清单",
+        "independent_concept": "舞台管理员在演出前逐盏试亮几组独立灯具，并用标记确认每盏灯都被检查过。",
+        "hook": "所有灯看似都亮过，控制台却仍显示一项未确认。",
+        "viewer_value": "观众可以独立帮助管理员设计不重复、不遗漏的检查方法。",
+        "suggested_medium": "performance",
+        "duration_seconds": 35,
+        "replacement_field_key": "teaching_process.PROC-01",
+        "course_anchor": "舞台上只保留三盏清楚分开的灯，让管理员准备逐盏确认。",
+        "classroom_first_question": "现在亮着几盏灯？怎样做标记才能一盏不漏？",
+        "handoff_moment": "第一盏灯旁的空标记框刚出现时停止。",
+        "must_not_preteach": ["比较大小", "第几", "分与合", "加法", "减法", "0的认识"],
+        "fit_reason": "逐盏确认直接支持一一对应数数。",
+        "risks": ["灯光闪烁需避免刺激", "标记框不能预写数字"],
+        "recommendation_score": 77,
+        "recommendation_reason": "可现场表演，但视觉效果依赖教室灯光条件。"
+      },
+      {
+        "option_key": "INTRO-STO-01",
+        "category": "story",
+        "title": "星光邮差与四声回响",
+        "independent_concept": "一台星光邮差无人机穿过雾谷寻找中转站，只能依靠峡谷中的回响灯信号辨认正确航道。",
+        "hook": "雾中传来四声回响，最后一束灯光却来自错误方向。",
+        "viewer_value": "观众会关心无人机能否分辨真实信号、避开迷雾并按时送达包裹。",
+        "suggested_medium": "video",
+        "duration_seconds": 90,
+        "replacement_field_key": "teaching_process.PROC-01",
+        "course_anchor": "中转站在雾中显出四个清晰光点，无人机需要先确认信号数量再决定是否降落。",
+        "classroom_first_question": "你看见了几个清晰光点？可以用哪些方式把这个数量表示出来？",
+        "handoff_moment": "四个光点稳定亮起、无人机悬停等待判断时停止。",
+        "must_not_preteach": ["比较大小", "第几", "分与合", "加法", "减法", "0的认识"],
+        "fit_reason": "故事先独立成立，最后的四个光点提供清楚、唯一且不泄题的数量入口。",
+        "risks": ["雾效不能遮住光点", "不得在仪表盘显示数字4", "最后必须停在问题而非给出结论"],
+        "recommendation_score": 92,
+        "recommendation_reason": "独立故事完整、钩子明确、视觉资产数量可控，课程锚点最小且适合约90秒多镜头制作。"
+      },
+      {
+        "option_key": "INTRO-STO-02",
+        "category": "story",
+        "title": "纸船码头的空位",
+        "independent_concept": "夜间纸船码头等待几艘运送种子的纸船靠岸，其中一艘被水草挡住，管理员必须确认是否都已到达。",
+        "hook": "码头铃声响起，水面只看见晃动的影子，最后一个泊位似乎仍然空着。",
+        "viewer_value": "观众会期待受阻纸船脱困并帮助管理员确认到港情况。",
+        "suggested_medium": "video",
+        "duration_seconds": 50,
+        "replacement_field_key": "teaching_process.PROC-01",
+        "course_anchor": "水草散开后，码头前出现三艘清楚分开的纸船。",
+        "classroom_first_question": "现在有几艘纸船？你怎样把这个数量记下来？",
+        "handoff_moment": "三艘纸船同时进入灯光范围、管理员尚未记录时停止。",
+        "must_not_preteach": ["比较大小", "第几", "分与合", "加法", "减法", "0的认识"],
+        "fit_reason": "故事有独立目标，定格后的少量对象便于观察和表示。",
+        "risks": ["不能把泊位空缺转成减法问题", "水面反光不能造成重复船影"],
+        "recommendation_score": 84,
+        "recommendation_reason": "叙事温和、对象清楚，但水面连续性制作要求较高。"
+      },
+      {
+        "option_key": "INTRO-STO-03",
+        "category": "story",
+        "title": "小修表匠的齿轮盒",
+        "independent_concept": "修表匠准备让一座老钟重新走动，却发现装关键齿轮的几个小盒标签全部脱落。",
+        "hook": "钟摆即将停止，修表匠必须在最后一次摆动前找到需要的齿轮盒。",
+        "viewer_value": "观众会跟随修复过程寻找线索，并期待老钟重新发声。",
+        "suggested_medium": "video",
+        "duration_seconds": 45,
+        "replacement_field_key": "teaching_process.PROC-01",
+        "course_anchor": "桌面只留下五个外观清楚的齿轮，修表匠准备建立新的记录。",
+        "classroom_first_question": "桌面上有几个齿轮？怎样表示能让修表匠一眼看懂？",
+        "handoff_moment": "五个齿轮整齐分开、空白记录卡刚放到桌面时停止。",
+        "must_not_preteach": ["比较大小", "第几", "分与合", "加法", "减法", "0的认识"],
+        "fit_reason": "修复目标独立成立，空白记录卡能自然连接数量表示。",
+        "risks": ["齿轮结构不能过度复杂", "不得引出排序或大小比较"],
+        "recommendation_score": 81,
+        "recommendation_reason": "故事完整且适合实物风格，但精细机械资产生成难度中等。"
+      }
+    ],
+    "quality_expectations": {
+      "category_counts": {"science": 3, "application": 3, "story": 3},
+      "highest_recommendation_unique": true,
+      "independent_before_anchor": true,
+      "single_course_anchor_per_option": true,
+      "no_storyboard_or_provider_fields": true
+    }
+  },
+  "intro_selection": {
+    "selection_key": "INTRO-SELECTION-001",
+    "selection_method": "teacher_selected",
+    "option_key": "INTRO-STO-01",
+    "snapshot": {
+      "option_key": "INTRO-STO-01",
+      "category": "story",
+      "title": "星光邮差与四声回响",
+      "independent_concept": "一台星光邮差无人机穿过雾谷寻找中转站，只能依靠峡谷中的回响灯信号辨认正确航道。",
+      "hook": "雾中传来四声回响，最后一束灯光却来自错误方向。",
+      "viewer_value": "观众会关心无人机能否分辨真实信号、避开迷雾并按时送达包裹。",
+      "suggested_medium": "video",
+      "duration_seconds": 90,
+      "replacement_field_key": "teaching_process.PROC-01",
+      "course_anchor": "中转站在雾中显出四个清晰光点，无人机需要先确认信号数量再决定是否降落。",
+      "classroom_first_question": "你看见了几个清晰光点？可以用哪些方式把这个数量表示出来？",
+      "handoff_moment": "四个光点稳定亮起、无人机悬停等待判断时停止。",
+      "must_not_preteach": ["比较大小", "第几", "分与合", "加法", "减法", "0的认识"],
+      "fit_reason": "故事先独立成立，最后的四个光点提供清楚、唯一且不泄题的数量入口。",
+      "risks": ["雾效不能遮住光点", "不得在仪表盘显示数字4", "最后必须停在问题而非给出结论"],
+      "recommendation_score": 92,
+      "recommendation_reason": "独立故事完整、钩子明确、视觉资产数量可控，课程锚点最小且适合约90秒多镜头制作。"
+    }
+  },
+  "ppt": {
+    "source_lesson_plan_key": "LESSON-PLAN-001",
+    "outline_key": "PPT-OUTLINE-001",
+    "page_spec_set_key": "PPT-PAGE-SPECS-001",
+    "body_package_key": "PPT-BODY-PROMPTS-001",
+    "analysis": {
+      "analysis_key": "PPT-ANALYSIS-001",
+      "audience_and_use": "一年级学生，40分钟日常新授课，供课堂投影、操作演示和即时互动使用。",
+      "content_boundary": "只呈现1～5数量感知、对应、认读、表示与书写。",
+      "must_not_preteach": ["比较大小", "第几", "分与合", "加法", "减法", "0的认识"],
+      "teaching_sequence": ["观察数量", "一一对应", "物体到点子", "点子到数字", "数字书写", "多种表示", "练习与总结"],
+      "interaction_points": ["观察后说明怎样数才不重复、不遗漏", "逐个配对物体与点子并检查错误", "打乱顺序匹配点子与数字", "观察笔顺后空书和独立书写", "先作答再揭示练习反馈", "学生先总结再显示课堂结论"],
+      "visualization_opportunities": ["生活物件与可移动单体", "物体—点子—数字对应", "数字笔顺与占格", "多种表征工作台"],
+      "must_remain_editable": ["所有标题与问题", "数字1～5", "点子数量与位置", "书写笔顺轨迹", "匹配关系和答案"],
+      "recommended_page_count": 10,
+      "page_count_recommendation_reason": "本课单课时40分钟、教学任务聚焦且互动节点明确，10页可覆盖导入、对应、认读、书写、练习与总结；该值是黄金案例建议，不是平台固定页数。",
+      "analysis_quality_notes": {"lesson_boundary_preserved": true, "objective_sequence_complete": true, "editable_responsibilities_explicit": true}
+    },
+    "outline": [
+      {"page_key": "PAGE-01", "position": 1, "page_type": "cover", "teaching_task": "建立课题识别和统一视觉世界。", "source_refs": ["LESSON-PLAN-001.teaching_content"], "student_focus": "识别课题和学习情境，不提前推断数字关系。", "interaction_intent": "只完成课题识别，不安排答案揭示。"},
+      {"page_key": "PAGE-02", "position": 2, "page_type": "introduction", "teaching_task": "从生活图景中观察少量物体并提出怎样数的问题。", "source_refs": ["LESSON-PLAN-001.PROC-01", "EV-MAT-01"], "student_focus": "独立观察、逐个点数并说明避免重复遗漏的方法。", "interaction_intent": "先观察点数，再交流数数顺序和检查方法。"},
+      {"page_key": "PAGE-03", "position": 3, "page_type": "exploration", "teaching_task": "用一一对应方式数出1～5个物体。", "source_refs": ["LESSON-PLAN-001.PROC-01", "LESSON-PLAN-001.PROC-02"], "student_focus": "在逐个出现的物体中保持一物一数。", "interaction_intent": "分步揭示五个位置，让学生同步点数并检查。"},
+      {"page_key": "PAGE-04", "position": 4, "page_type": "concept", "teaching_task": "用点子表示物体的数量。", "source_refs": ["LESSON-PLAN-001.PROC-02", "EV-MAT-02"], "student_focus": "理解每个物体对应一个点子，数量不受外观影响。", "interaction_intent": "完成物体与点子的匹配，并辨析多放或少放。"},
+      {"page_key": "PAGE-05", "position": 5, "page_type": "concept", "teaching_task": "把点子数量与数字1～5对应。", "source_refs": ["LESSON-PLAN-001.PROC-03", "EV-MAT-03"], "student_focus": "在打乱顺序后仍按数量匹配点子卡和数字卡。", "interaction_intent": "先拖拽或口答匹配，再揭示对应关系。"},
+      {"page_key": "PAGE-06", "position": 6, "page_type": "exploration", "teaching_task": "观察并书写数字1～3。", "source_refs": ["LESSON-PLAN-001.PROC-04", "EV-MAT-04"], "student_focus": "观察数字1～3的起笔、方向和占格。", "interaction_intent": "逐笔揭示轨迹后空书、描写并独立书写。"},
+      {"page_key": "PAGE-07", "position": 7, "page_type": "exploration", "teaching_task": "观察并书写数字4～5。", "source_refs": ["LESSON-PLAN-001.PROC-04", "EV-MAT-04"], "student_focus": "辨认数字4～5的方向、转折和田字格位置。", "interaction_intent": "逐笔揭示并对照局部错误，只返修错误数字。"},
+      {"page_key": "PAGE-08", "position": 8, "page_type": "discussion", "teaching_task": "用物体、点子和数字表示同一个数量。", "source_refs": ["LESSON-PLAN-001.PROC-05"], "student_focus": "发现表示方式改变时数量保持不变。", "interaction_intent": "学生任选两种表示并通过一一对应互相检查。"},
+      {"page_key": "PAGE-09", "position": 9, "page_type": "practice", "teaching_task": "完成物体、点子与数字的匹配和辨析。", "source_refs": ["LESSON-PLAN-001.PROC-05", "OBJ-01", "OBJ-02"], "student_focus": "说明匹配依据，并定位重复、遗漏或错配。", "interaction_intent": "先收集答案，再分两步揭示匹配和错误反馈。"},
+      {"page_key": "PAGE-10", "position": 10, "page_type": "summary", "teaching_task": "归纳可靠数数和多种表示的方法。", "source_refs": ["LESSON-PLAN-001.lesson_summary", "PROC-05"], "student_focus": "口述可靠数数方法和物体、点子、数字的联系。", "interaction_intent": "学生先总结，再揭示总结链和出口任务。"}
+    ],
+    "outline_coverage_check": {"outline_all_objectives_covered": true, "outline_sequence_preserved": true, "outline_one_task_per_page": true, "outline_coverage_notes": "10页按教案目标与课堂顺序覆盖观察、对应、认读、书写、表示、练习和总结，每页只承担一个教学任务。"},
+    "cover": {
+      "request_key": "PPT-COVER-REQUEST-001",
+      "subject": "纸艺黏土数学探索桌，五个不同的无文字学习物件。",
+      "composition": "主体集中在左侧约60%区域并形成清楚层次，右侧保留大面积干净标题区。",
+      "material_and_form": "纸艺与轻黏土结合，造型清楚、尺度稳定、接触关系可信。",
+      "palette_and_lighting": "清澈蓝绿、明亮柠檬黄和珊瑚红强调；使用明亮柔和主光与克制接触阴影。",
+      "aspect_ratio": "16:9",
+      "text_safe_area": "四周8%，右侧标题区不得被主体或高对比细节侵入。",
+      "negative_constraints": ["文字", "数字", "公式", "答案", "Logo", "水印", "拥挤构图"],
+      "candidate_count": 3,
+      "generation_template_key": "ppt.cover.prompt.generate",
+      "image_generation_template_key": "ppt.cover.image.generate",
+      "approval_required": true,
+      "target_slot": "ppt.cover.hero",
+      "prompt_expectation": "纸艺黏土数学探索桌，五个不同的学习物件围绕空白标题区形成清楚层次；16:9，明亮柔和光线，禁止文字、数字、公式、Logo和水印。"
+    },
+    "style_contract": {
+      "style_key": "PPT-STYLE-001",
+      "source_preset_key": "style.primary_math.paper_clay",
+      "cover_background_mode": "cover_art",
+      "body_background_mode": "solid_white",
+      "body_background_color": "#FFFFFF",
+      "palette": ["清澈蓝绿", "明亮柠檬黄", "珊瑚红强调", "纯白"],
+      "typography": "数字、题面、问题和答案使用PPT原生无衬线文本；低年级投影字号不小于28pt。",
+      "image_rules": ["现实物件由AI_SCENE或AI_ASSET承担", "准确数量由单体复制或可编辑对象控制", "图片不含准确文字数字公式"],
+      "layout_rules": ["每页一个教学任务", "主视觉优先", "安全区内不遮挡", "正文保持充分留白"]
+    },
+    "page_specs": [
+      {
+        "page_key": "PAGE-01",
+        "position": 1,
+        "page_type": "cover",
+        "teaching_task": "建立课题识别和统一视觉世界。",
+        "source_refs": ["LESSON-PLAN-001.teaching_content"],
+        "canvas": {"aspect_ratio": "16:9", "background_mode": "cover_art", "safe_area": "四周8%，右侧保留标题区"},
+        "main_visual": {"visual_decision": "other", "image_strategy": "original_asset", "description": "纸艺黏土数学探索桌，真实学习物件构成单一主视觉，右侧留出标题。"},
+        "asset_requirements": [{"asset_key": "PPT-ASSET-01", "responsibility": "AI_SCENE", "target_slot": "ppt.PAGE-01.main_visual", "prompt_text": "16:9纸艺黏土数学探索桌，清澈蓝绿与柠檬黄，几件无文字学习物件围绕桌面中央，右侧大面积干净留白，明亮柔和光线，真实接触阴影。", "negative_constraints": ["文字", "数字", "公式", "Logo", "水印", "拥挤构图"]}],
+        "editable_elements": [{"element_key": "PPT-TEXT-01", "responsibility": "EDITABLE_MATH", "content": "1～5的认识"}],
+        "layout": {"title": "右侧居中偏上", "main_visual": "左侧约60%", "subtitle": "标题下方"},
+        "interaction": {"mode": "none"},
+        "speaker_notes": "教师只做课题识别，不在封面解释数字关系。"
+      },
+      {
+        "page_key": "PAGE-02",
+        "position": 2,
+        "page_type": "introduction",
+        "teaching_task": "从生活图景中观察少量物体并提出怎样数的问题。",
+        "source_refs": ["LESSON-PLAN-001.PROC-01", "EV-MAT-01"],
+        "canvas": {"aspect_ratio": "16:9", "background_mode": "solid_white", "background_color": "#FFFFFF", "safe_area": "四周8%"},
+        "main_visual": {"visual_decision": "quantity_relation", "image_strategy": "textbook_reconstruction", "description": "白底上的纸艺观察小站，多个彼此分开的生活物件组，数量由PPT实例控制。"},
+        "asset_requirements": [{"asset_key": "PPT-ASSET-02", "responsibility": "AI_SCENE", "target_slot": "ppt.PAGE-02.main_visual", "prompt_text": "白色无纹理背景上的纸艺观察小站，几个空托盘和无文字生活物件，元素彼此分开，便于PPT后续复制控制准确数量，明亮自然光。", "negative_constraints": ["文字", "数字", "公式", "答案", "水印", "固定准确数量"]}],
+        "editable_elements": [{"element_key": "PPT-Q-02", "responsibility": "EDITABLE_MATH", "content": "你看见了多少？怎样数才不会重复、遗漏？"}],
+        "layout": {"title": "左上", "main_visual": "中央大区", "question": "下方独立问题区"},
+        "interaction": {"mode": "observe_then_answer", "reveal": "先图后问题"},
+        "speaker_notes": "让学生先独立点数，再交流数数顺序。"
+      },
+      {
+        "page_key": "PAGE-03",
+        "position": 3,
+        "page_type": "exploration",
+        "teaching_task": "用一一对应方式数出1～5个物体。",
+        "source_refs": ["LESSON-PLAN-001.PROC-01", "LESSON-PLAN-001.PROC-02"],
+        "canvas": {"aspect_ratio": "16:9", "background_mode": "solid_white", "background_color": "#FFFFFF", "safe_area": "四周8%"},
+        "main_visual": {"visual_decision": "operation", "image_strategy": "original_asset", "description": "一个可复用纸艺苹果单体和五个空位，PPT复制实例逐个进入。"},
+        "asset_requirements": [{"asset_key": "PPT-ASSET-03", "responsibility": "AI_ASSET", "target_slot": "ppt.PAGE-03.apple_unit", "prompt_text": "单个红色轻黏土苹果，完整独立物件，正面略俯视，白色透明或可抠背景，柔和接触阴影，造型简洁。", "negative_constraints": ["多个苹果", "文字", "数字", "公式", "手持", "水印"]}],
+        "editable_elements": [{"element_key": "PPT-DIAGRAM-03", "responsibility": "EDITABLE_DIAGRAM", "content": "五个可编辑占位框与逐个进入动画"}, {"element_key": "PPT-Q-03", "responsibility": "EDITABLE_MATH", "content": "数一个，点一个"}],
+        "layout": {"main_visual": "中部横向五个独立位置", "method_label": "右下"},
+        "interaction": {"mode": "step_reveal", "steps": 5},
+        "speaker_notes": "逐个复制同一苹果资产，数量和显隐由PPT控制。"
+      },
+      {
+        "page_key": "PAGE-04",
+        "position": 4,
+        "page_type": "concept",
+        "teaching_task": "用点子表示物体的数量。",
+        "source_refs": ["LESSON-PLAN-001.PROC-02", "EV-MAT-02"],
+        "canvas": {"aspect_ratio": "16:9", "background_mode": "solid_white", "background_color": "#FFFFFF", "safe_area": "四周8%"},
+        "main_visual": {"visual_decision": "quantity_relation", "image_strategy": "mixed", "description": "纸艺一一对应操作板承托可编辑物件与点子层。"},
+        "asset_requirements": [{"asset_key": "PPT-ASSET-04", "responsibility": "AI_ASSET", "target_slot": "ppt.PAGE-04.correspondence_board", "prompt_text": "横向纸艺一一对应操作板，左右两排空白圆形槽位，中间留连线空间，白底，蓝绿色边缘，轻微纸张层次。", "negative_constraints": ["文字", "数字", "现成点子", "公式", "水印", "复杂装饰"]}],
+        "editable_elements": [{"element_key": "PPT-DIAGRAM-04", "responsibility": "EDITABLE_DIAGRAM", "content": "可编辑物件实例、点子和一一对应连线"}, {"element_key": "PPT-Q-04", "responsibility": "EDITABLE_MATH", "content": "一个物体配一个点子"}],
+        "layout": {"operation_board": "中央80%", "question": "底部"},
+        "interaction": {"mode": "match_and_check"},
+        "speaker_notes": "故意多放或少放一个可编辑点子，引导学生辨析。"
+      },
+      {
+        "page_key": "PAGE-05",
+        "position": 5,
+        "page_type": "concept",
+        "teaching_task": "把点子数量与数字1～5对应。",
+        "source_refs": ["LESSON-PLAN-001.PROC-03", "EV-MAT-03"],
+        "canvas": {"aspect_ratio": "16:9", "background_mode": "solid_white", "background_color": "#FFFFFF", "safe_area": "四周8%"},
+        "main_visual": {"visual_decision": "quantity_relation", "image_strategy": "mixed", "description": "白底纸艺配对台，点子卡与数字卡都由PPT可编辑层填写。"},
+        "asset_requirements": [{"asset_key": "PPT-ASSET-05", "responsibility": "AI_ASSET", "target_slot": "ppt.PAGE-05.matching_stage", "prompt_text": "白底上的纸艺卡片配对台，两列各五个空白卡槽，蓝绿边缘与柔和阴影，中央保留匹配连线空间。", "negative_constraints": ["文字", "数字", "点子", "公式", "答案", "水印"]}],
+        "editable_elements": [{"element_key": "PPT-MATH-05", "responsibility": "EDITABLE_MATH", "content": "点子1～5与数字1～5卡片"}, {"element_key": "PPT-DIAGRAM-05", "responsibility": "EDITABLE_DIAGRAM", "content": "可编辑匹配连线"}],
+        "layout": {"dot_cards": "左列", "number_cards": "右列", "matching_space": "中央"},
+        "interaction": {"mode": "drag_match_or_reveal"},
+        "speaker_notes": "打乱数字顺序，避免学生只靠位置或顺口背数。"
+      },
+      {
+        "page_key": "PAGE-06",
+        "position": 6,
+        "page_type": "exploration",
+        "teaching_task": "观察并书写数字1～3。",
+        "source_refs": ["LESSON-PLAN-001.PROC-04", "EV-MAT-04"],
+        "canvas": {"aspect_ratio": "16:9", "background_mode": "solid_white", "background_color": "#FFFFFF", "safe_area": "四周8%"},
+        "main_visual": {"visual_decision": "operation", "image_strategy": "mixed", "description": "纸艺书写台与铅笔作为情境，笔顺轨迹和数字由可编辑层承担。"},
+        "asset_requirements": [{"asset_key": "PPT-ASSET-06", "responsibility": "AI_ASSET", "target_slot": "ppt.PAGE-06.writing_desk", "prompt_text": "白底纸艺书写台，单支黄色铅笔、空白田字格练习卡和柔和接触阴影，构图简洁，右侧留演示区。", "negative_constraints": ["文字", "数字", "笔顺", "公式", "水印", "手部"]}],
+        "editable_elements": [{"element_key": "PPT-MATH-06", "responsibility": "EDITABLE_MATH", "content": "数字1、2、3及可编辑笔顺轨迹"}, {"element_key": "PPT-DIAGRAM-06", "responsibility": "EDITABLE_DIAGRAM", "content": "田字格与起笔方向动画"}],
+        "layout": {"writing_desk": "左侧35%", "editable_demo": "右侧55%"},
+        "interaction": {"mode": "stroke_reveal"},
+        "speaker_notes": "先观察起笔与方向，再空书、描写和独立写。"
+      },
+      {
+        "page_key": "PAGE-07",
+        "position": 7,
+        "page_type": "exploration",
+        "teaching_task": "观察并书写数字4～5。",
+        "source_refs": ["LESSON-PLAN-001.PROC-04", "EV-MAT-04"],
+        "canvas": {"aspect_ratio": "16:9", "background_mode": "solid_white", "background_color": "#FFFFFF", "safe_area": "四周8%"},
+        "main_visual": {"visual_decision": "operation", "image_strategy": "mixed", "description": "同一书写世界中的翻页练习卡，数字和笔顺继续可编辑。"},
+        "asset_requirements": [{"asset_key": "PPT-ASSET-07", "responsibility": "AI_ASSET", "target_slot": "ppt.PAGE-07.writing_card", "prompt_text": "白底上的单张翻页纸艺练习卡与一支蓝绿色铅笔，空白田字格，轻微翘角和真实纸张阴影。", "negative_constraints": ["文字", "数字", "笔顺", "公式", "水印", "手部"]}],
+        "editable_elements": [{"element_key": "PPT-MATH-07", "responsibility": "EDITABLE_MATH", "content": "数字4、5及可编辑笔顺轨迹"}, {"element_key": "PPT-DIAGRAM-07", "responsibility": "EDITABLE_DIAGRAM", "content": "田字格与局部错误对比"}],
+        "layout": {"writing_card": "左侧35%", "editable_demo": "右侧55%"},
+        "interaction": {"mode": "stroke_reveal_and_compare"},
+        "speaker_notes": "重点观察4和5的方向、转折和占格，只返修错误数字。"
+      },
+      {
+        "page_key": "PAGE-08",
+        "position": 8,
+        "page_type": "discussion",
+        "teaching_task": "用物体、点子和数字表示同一个数量。",
+        "source_refs": ["LESSON-PLAN-001.PROC-05"],
+        "canvas": {"aspect_ratio": "16:9", "background_mode": "solid_white", "background_color": "#FFFFFF", "safe_area": "四周8%"},
+        "main_visual": {"visual_decision": "transformation", "image_strategy": "mixed", "description": "三工位纸艺表示台承托物体、点子和数字三种可编辑表示。"},
+        "asset_requirements": [{"asset_key": "PPT-ASSET-08", "responsibility": "AI_ASSET", "target_slot": "ppt.PAGE-08.representation_workbench", "prompt_text": "白底三工位纸艺表示台，三个相连但清楚分隔的空白托盘，中间有柔和过渡路径，蓝绿与黄色边缘。", "negative_constraints": ["文字", "数字", "点子", "公式", "答案", "水印"]}],
+        "editable_elements": [{"element_key": "PPT-DIAGRAM-08", "responsibility": "EDITABLE_DIAGRAM", "content": "物体实例、点子和数字三个可编辑工位及对应关系"}, {"element_key": "PPT-Q-08", "responsibility": "EDITABLE_MATH", "content": "表示方法变了，什么没有变？"}],
+        "layout": {"three_stations": "中央横向", "question": "下方"},
+        "interaction": {"mode": "student_choose_two_representations"},
+        "speaker_notes": "让学生选择两种表示并逐个对应检查。"
+      },
+      {
+        "page_key": "PAGE-09",
+        "position": 9,
+        "page_type": "practice",
+        "teaching_task": "完成物体、点子与数字的匹配和辨析。",
+        "source_refs": ["LESSON-PLAN-001.PROC-05", "OBJ-01", "OBJ-02"],
+        "canvas": {"aspect_ratio": "16:9", "background_mode": "solid_white", "background_color": "#FFFFFF", "safe_area": "四周8%"},
+        "main_visual": {"visual_decision": "quantity_relation", "image_strategy": "mixed", "description": "纸艺匹配轨道提供三排空槽，题目、对象和答案由可编辑层控制。"},
+        "asset_requirements": [{"asset_key": "PPT-ASSET-09", "responsibility": "AI_ASSET", "target_slot": "ppt.PAGE-09.practice_board", "prompt_text": "白底纸艺匹配轨道，三排各五个空白卡槽，清楚间距和轻微阴影，适合覆盖可编辑卡片与连线。", "negative_constraints": ["文字", "数字", "点子", "公式", "答案", "水印"]}],
+        "editable_elements": [{"element_key": "PPT-MATH-09", "responsibility": "EDITABLE_MATH", "content": "物体、点子、数字1～5练习卡与反馈"}, {"element_key": "PPT-DIAGRAM-09", "responsibility": "EDITABLE_DIAGRAM", "content": "匹配连线和错误标记"}],
+        "layout": {"practice_board": "中央80%", "feedback": "右下"},
+        "interaction": {"mode": "answer_then_reveal", "feedback_steps": 2},
+        "speaker_notes": "先收集学生答案再揭示对应关系，错误时回到一一对应。"
+      },
+      {
+        "page_key": "PAGE-10",
+        "position": 10,
+        "page_type": "summary",
+        "teaching_task": "归纳可靠数数和多种表示的方法。",
+        "source_refs": ["LESSON-PLAN-001.lesson_summary", "PROC-05"],
+        "canvas": {"aspect_ratio": "16:9", "background_mode": "solid_white", "background_color": "#FFFFFF", "safe_area": "四周8%"},
+        "main_visual": {"visual_decision": "transformation", "image_strategy": "mixed", "description": "白底纸艺三段桥连接物体、点子和数字三个区域，作为总结视觉。"},
+        "asset_requirements": [{"asset_key": "PPT-ASSET-10", "responsibility": "AI_ASSET", "target_slot": "ppt.PAGE-10.summary_bridge", "prompt_text": "白底纸艺三段桥，三个清楚平台由简洁路径连接，蓝绿、黄色和少量珊瑚红，平台保持空白，柔和阴影。", "negative_constraints": ["文字", "数字", "点子", "公式", "答案", "水印"]}],
+        "editable_elements": [{"element_key": "PPT-DIAGRAM-10", "responsibility": "EDITABLE_DIAGRAM", "content": "物体—点子—数字可编辑总结链"}, {"element_key": "PPT-TEXT-10", "responsibility": "EDITABLE_MATH", "content": "数一个，点一个；表示不同，数量不变"}],
+        "layout": {"summary_bridge": "中央", "summary_text": "下方两行"},
+        "interaction": {"mode": "student_summary_then_reveal"},
+        "speaker_notes": "请学生先说方法，再出现总结文字和出口任务。"
+      }
+    ],
+    "assembly_expectations": {
+      "format": "pptx",
+      "page_count": 10,
+      "all_text_editable": true,
+      "all_math_editable": true,
+      "images_replaceable": true,
+      "speaker_notes_preserved": true,
+      "preview_and_pptx_same_source": true,
+      "page_local_staleness": true
+    },
+    "quality_expectations": {
+      "outline_approval_required": true,
+      "cover_approval_required": true,
+      "final_pptx_approval_required": true,
+      "body_pages_pure_white": true,
+      "one_teaching_task_per_page": true,
+      "main_visual_per_page": true,
+      "no_text_or_math_baked_into_ai_images": true,
+      "no_placeholder_assets": true
+    }
+  },
+  "video": {
+    "selected_intro_option_key": "INTRO-STO-01",
+    "source_policy": {
+      "allowed_sources": ["intro_selection.snapshot"],
+      "forbidden_sources": ["lesson_plan.approved_version", "material.approved_parse", "ppt_outline.approved_version", "ppt_page_spec.current_version"]
+    },
+    "master_script": {
+      "master_script_key": "VIDEO-MASTER-001",
+      "selected_intro_option_key": "INTRO-STO-01",
+      "title": "星光邮差与四声回响",
+      "narrative_purpose": "让观众跟随星光邮差分辨雾谷中的真实回响信号，并在即将降落的悬停时刻留下一个可观察问题。",
+      "complete_story": "星光邮差无人机带着一只密封包裹进入雾谷。导航失去方向后，峡谷两侧依次亮起回响灯；其中一束来自错误岔路。无人机先追随错误光束，发现前方是封闭岩壁，随后根据声音和灯光的同步重新寻找真实中转站。雾气散开，中转站显出四个清晰光点。无人机悬停等待判断，故事停在降落之前。",
+      "scenes": [
+        {"scene_key": "SCENE-01", "position": 1, "purpose": "建立送达目标和雾谷失向", "location": "清晨的纸艺雾谷入口", "subjects": ["星光邮差无人机", "密封包裹"], "visible_change": "清晰航道被雾遮住，导航灯转为搜索状态", "actions": ["无人机进入峡谷", "雾层合拢", "导航灯扫过岩壁"], "narration": "星光邮差必须在雾散之前找到中转站。", "dialogue": "", "sound_intent": "轻柔推进音乐、远处风声、一次导航提示音", "start_state": "无人机沿清晰航道飞行", "end_state": "无人机在浓雾中减速搜索", "duration_seconds": 25},
+        {"scene_key": "SCENE-02", "position": 2, "purpose": "制造错误信号和选择", "location": "雾谷双岔路", "subjects": ["星光邮差无人机", "回响灯"], "visible_change": "右侧错误光束先亮，无人机靠近后发现封闭岩壁", "actions": ["四次回响在谷中传播", "错误光束偏离声音方向", "无人机急停并转向"], "narration": "回响从前方传来，可最后一束灯光却指向了错误方向。", "dialogue": "", "sound_intent": "四次清晰回响、音乐短暂收紧、急停气流声", "start_state": "无人机面对两个模糊方向", "end_state": "错误岔路被排除，无人机重新寻找同步信号", "duration_seconds": 25},
+        {"scene_key": "SCENE-03", "position": 3, "purpose": "找到真实中转站", "location": "雾谷尽头的中转站外", "subjects": ["星光邮差无人机", "中转站信标"], "visible_change": "雾层逐渐打开，中转站轮廓和分开的光点依次显现", "actions": ["无人机沿同步回响前进", "雾向两侧退开", "信标光点稳定"], "narration": "声音和灯光终于在同一个方向相遇。", "dialogue": "", "sound_intent": "回响变清晰、音乐由悬疑转为明亮", "start_state": "前方只有模糊轮廓", "end_state": "中转站和四个清晰光点完整可见", "duration_seconds": 20},
+        {"scene_key": "SCENE-04", "position": 4, "purpose": "在课程锚点处悬停交接", "location": "中转站降落平台前", "subjects": ["星光邮差无人机", "中转站信标"], "visible_change": "无人机从前进改为稳定悬停，四个光点保持清楚分开", "actions": ["无人机缓慢靠近", "四个光点同时稳定", "无人机悬停等待"], "narration": "信号已经出现，星光邮差还需要最后一次确认。", "dialogue": "", "sound_intent": "音乐轻停、悬停声降低，为教师提问留白", "start_state": "无人机接近平台", "end_state": "四个光点稳定亮起，无人机等待判断", "duration_seconds": 20}
+      ],
+      "handoff": {
+        "course_anchor": "中转站在雾中显出四个清晰光点，无人机需要先确认信号数量再决定是否降落。",
+        "classroom_first_question": "你看见了几个清晰光点？可以用哪些方式把这个数量表示出来？",
+        "handoff_moment": "四个光点稳定亮起、无人机悬停等待判断时停止。",
+        "must_not_preteach": ["比较大小", "第几", "分与合", "加法", "减法", "0的认识"]
+      },
+    "duration_recommendation": {
+      "duration_mode": "system_recommended",
+      "recommended_duration_seconds": 90,
+        "duration_reason": "四个连续故事节拍需要完整建立目标、误导、纠正和课堂交接；90秒可保持低龄学生可理解的动作节奏，并把费用控制在四个可独立生成的镜头内。",
+        "estimated_shot_count": 4,
+      "pricing_quote_required": true
+    },
+    "target_duration_seconds": 90
+    },
+    "rough_storyboard": {
+      "rough_storyboard_key": "VIDEO-ROUGH-001",
+      "beats": [
+        {"beat_key": "BEAT-01", "scene_key": "SCENE-01", "position": 1, "primary_event": "无人机进入雾谷并失去清晰航道", "start_state": "航道清楚", "end_state": "浓雾中减速搜索", "duration_seconds": 25, "asset_needs": ["星光邮差无人机", "密封包裹", "雾谷入口场景"], "transition": "第一次回响从画外出现"},
+        {"beat_key": "BEAT-02", "scene_key": "SCENE-02", "position": 2, "primary_event": "错误光束把无人机引向封闭岩壁", "start_state": "两个方向都模糊", "end_state": "错误岔路被排除", "duration_seconds": 25, "asset_needs": ["星光邮差无人机", "双岔雾谷场景", "回响信标"], "transition": "声音与灯光重新同步"},
+        {"beat_key": "BEAT-03", "scene_key": "SCENE-03", "position": 3, "primary_event": "雾散后真实中转站和四个光点出现", "start_state": "只有模糊轮廓", "end_state": "四个光点清楚稳定", "duration_seconds": 20, "asset_needs": ["星光邮差无人机", "中转站场景", "回响信标"], "transition": "无人机向降落平台靠近"},
+        {"beat_key": "BEAT-04", "scene_key": "SCENE-04", "position": 4, "primary_event": "无人机在四个光点前悬停等待判断", "start_state": "继续靠近平台", "end_state": "悬停并留出课堂问题", "duration_seconds": 20, "asset_needs": ["星光邮差无人机", "中转站场景", "回响信标"], "transition": "画面冻结并交给教师提问"}
+      ],
+      "total_duration_seconds": 90
+    },
+    "style_contract": {
+      "style_key": "VIDEO-STYLE-001",
+      "request_key": "VIDEO-STYLE-REQUEST-001",
+      "source_preset_key": "style.primary_math.paper_clay",
+      "subjects": "星光邮差无人机、密封星光包裹、纸艺雾谷、回响信标与中转站；以无人机和雾谷作为代表主体和场景。",
+      "aspect_ratio": "16:9",
+      "medium": "层叠纸艺峡谷与轻黏土无人机",
+      "character_rules": "无人机为圆润但非玩具化的邮差机器，蓝绿色主体、黄色信号灯、同一包裹固定在腹部。",
+      "scene_rules": "雾谷使用分层纸张深度，雾效半透明但不得遮住关键光点；中转站保持同一材质世界。",
+      "palette_and_lighting": "冷蓝绿雾谷、暖黄色信标、少量珊瑚红警示；清晨柔光，错误岔路略冷，真实中转站逐渐变暖。",
+      "camera_and_motion": "稳定跟随与一次主运镜；无人机动作连续，避免快速旋转和无目的摇镜。",
+      "negative_constraints": ["文字", "数字", "字幕", "Logo", "水印", "恐怖氛围", "成人化", "无人机身份漂移", "光点被雾遮挡"],
+      "candidate_count": 3,
+      "target_slot": "video.style.master"
+    },
+    "asset_inventory": {
+      "asset_inventory_key": "VIDEO-ASSET-INVENTORY-001",
+      "deduplication_notes": "同一语义身份只保留一个基础资产；方向、距离和光照属于镜头使用状态，不另建资产；四个信标由ASSET-PROP-02复制，准确数量由后期控制。",
+      "categories": {
+        "character": ["ASSET-CHAR-01"],
+        "scene": ["ASSET-SCENE-01", "ASSET-SCENE-02"],
+        "prop": ["ASSET-PROP-01", "ASSET-PROP-02"],
+        "creature": []
+      },
+      "assets": [
+        {"asset_key": "ASSET-CHAR-01", "asset_type": "character", "name": "星光邮差无人机", "identity_key": "video.identity.star_courier", "source_scene_keys": ["SCENE-01", "SCENE-02", "SCENE-03", "SCENE-04"], "usage": "全片唯一主体，携带包裹并完成进入、急停、转向、靠近和悬停动作。", "identity": "蓝绿色圆润机身、黄色信号灯、两侧短翼、腹部包裹固定扣。", "framing_rule": "单体完整入镜，正面略俯视，并保留三视角一致性。", "target_slot": "video.assets.character.star_courier"},
+        {"asset_key": "ASSET-SCENE-01", "asset_type": "scene", "name": "雾谷与双岔路空镜", "identity_key": "video.identity.mist_valley", "source_scene_keys": ["SCENE-01", "SCENE-02"], "usage": "建立失向、回响和错误岔路。", "identity": "无人空镜，层叠蓝绿纸艺峡谷、半透明雾层、左前方封闭岩壁。", "framing_rule": "16:9无人空镜，双岔路层次清楚并保留无人机运动空间。", "target_slot": "video.assets.scene.mist_valley"},
+        {"asset_key": "ASSET-SCENE-02", "asset_type": "scene", "name": "中转站降落平台空镜", "identity_key": "video.identity.relay_station", "source_scene_keys": ["SCENE-03", "SCENE-04"], "usage": "真实航道终点和课堂交接场景。", "identity": "无人空镜，纸艺峡谷尽头的圆形平台，四个信标安装位由后期控制光点。", "framing_rule": "16:9无人空镜，平台和四个信标安装位清楚，并保留悬停空间。", "target_slot": "video.assets.scene.relay_station"},
+        {"asset_key": "ASSET-PROP-01", "asset_type": "prop", "name": "密封星光包裹", "identity_key": "video.identity.sealed_parcel", "source_scene_keys": ["SCENE-01", "SCENE-02", "SCENE-03", "SCENE-04"], "usage": "强调无人机的送达目标。", "identity": "单体小型哑光包裹，珊瑚红封带，无文字标签。", "framing_rule": "单体完整入镜，白色干净背景，正面略俯视，便于固定到无人机。", "target_slot": "video.assets.prop.sealed_parcel"},
+        {"asset_key": "ASSET-PROP-02", "asset_type": "prop", "name": "回响信标单体", "identity_key": "video.identity.echo_beacon", "source_scene_keys": ["SCENE-02", "SCENE-03", "SCENE-04"], "usage": "作为可复用单体，由镜头层复制并控制四个准确光点。", "identity": "单体暖黄色圆形灯芯与蓝绿色短底座，无数字和文字。", "framing_rule": "单体完整入镜，白色干净背景，正面略俯视，便于镜头层复制。", "target_slot": "video.assets.prop.echo_beacon"}
+      ]
+    },
+    "asset_image_prompt_package_key": "VIDEO-ASSET-PROMPTS-001",
+    "asset_image_prompts": [
+      {"prompt_item_key": "VIDEO-ASSET-PROMPT-CHAR-01", "asset_key": "ASSET-CHAR-01", "consistency_key": "video.identity.star_courier", "target_slot": "video.assets.character.star_courier", "prompt_text": "16:9风格资产图，单体星光邮差无人机，蓝绿色圆润轻黏土机身，暖黄色信号灯，两侧短翼，腹部固定扣，三视角一致性参考，白色干净背景，柔和接触阴影。", "negative_constraints": ["文字", "数字", "Logo", "水印", "额外角色", "复杂武器", "身份漂移"]},
+      {"prompt_item_key": "VIDEO-ASSET-PROMPT-SCENE-01", "asset_key": "ASSET-SCENE-01", "consistency_key": "video.identity.mist_valley", "target_slot": "video.assets.scene.mist_valley", "prompt_text": "16:9无人空镜，层叠蓝绿色纸艺雾谷与双岔路，半透明雾层，左前方封闭岩壁，清晨柔光，保留无人机运动空间。", "negative_constraints": ["人物", "无人机", "文字", "数字", "Logo", "水印", "浓雾遮满画面"]},
+      {"prompt_item_key": "VIDEO-ASSET-PROMPT-SCENE-02", "asset_key": "ASSET-SCENE-02", "consistency_key": "video.identity.relay_station", "target_slot": "video.assets.scene.relay_station", "prompt_text": "16:9无人空镜，纸艺雾谷尽头的中转站圆形降落平台，四个空信标安装位，暖光从后方穿过薄雾，前方保留悬停空间。", "negative_constraints": ["人物", "无人机", "已点亮准确光点", "文字", "数字", "Logo", "水印"]},
+      {"prompt_item_key": "VIDEO-ASSET-PROMPT-PROP-01", "asset_key": "ASSET-PROP-01", "consistency_key": "video.identity.sealed_parcel", "target_slot": "video.assets.prop.sealed_parcel", "prompt_text": "单体小型星光包裹，哑光轻黏土质感，珊瑚红封带，无标签，白色干净背景，正面略俯视，柔和接触阴影。", "negative_constraints": ["手持", "文字", "数字", "Logo", "水印", "多个包裹"]},
+      {"prompt_item_key": "VIDEO-ASSET-PROMPT-PROP-02", "asset_key": "ASSET-PROP-02", "consistency_key": "video.identity.echo_beacon", "target_slot": "video.assets.prop.echo_beacon", "prompt_text": "单体回响信标，暖黄色圆形灯芯与蓝绿色短底座，纸艺黏土风格，白色干净背景，正面略俯视，柔和接触阴影。", "negative_constraints": ["文字", "数字", "Logo", "水印", "多个信标", "复杂仪表盘"]}
+    ],
+    "fine_storyboard": {
+      "fine_storyboard_key": "VIDEO-FINE-001",
+      "target_duration_seconds": 90,
+      "shots": [
+        {
+          "shot_key": "SHOT-01",
+          "scene_key": "SCENE-01",
+          "beat_key": "BEAT-01",
+          "position": 1,
+          "duration_seconds": 25,
+          "visible_beat": "无人机进入雾谷，清晰航道在前方逐渐消失。",
+          "start_state": "无人机带包裹沿谷口稳定飞行，远景清楚。",
+          "end_state": "雾层合拢，无人机减速悬停并开启搜索灯。",
+          "camera": {"framing": "中远景转中景", "angle": "略高平视", "movement": "一次稳定跟随前移后缓慢停下", "start_composition": "无人机位于左下三分点，峡谷向右前延伸", "end_composition": "无人机居中，前方雾层占据背景"},
+          "action_timeline": ["0-8秒：无人机进入谷口", "8-17秒：雾层从两侧合拢", "17-25秒：无人机减速并亮起搜索灯"],
+          "asset_usages": [{"image_index": 1, "asset_key": "ASSET-SCENE-01", "semantic_name": "雾谷空镜", "purpose": "背景与空间连续性"}, {"image_index": 2, "asset_key": "ASSET-CHAR-01", "semantic_name": "星光邮差", "purpose": "主体身份与动作"}, {"image_index": 3, "asset_key": "ASSET-PROP-01", "semantic_name": "密封包裹", "purpose": "送达目标连续性"}],
+          "prompt_text": "层叠纸艺雾谷中，蓝绿色星光邮差无人机携带珊瑚红封带包裹稳定前行；雾从两侧逐渐合拢，无人机一次平滑减速并亮起暖黄搜索灯。镜头只做稳定跟随前移后停下，保持无人机与包裹形态、光线和尺度一致，无字幕无文字。",
+          "negative_constraints": ["文字", "数字", "字幕", "Logo", "水印", "快速摇镜", "无人机变形", "包裹消失"],
+          "narration": "星光邮差必须在雾散之前找到中转站。",
+          "dialogue": "",
+          "sound_intent": "轻柔推进音乐、远处风声、一次导航提示音",
+          "continuity_locks": ["无人机蓝绿色机身与黄色灯", "包裹固定在腹部", "清晨冷蓝绿光线"],
+          "handoff_marker": false
+        },
+        {
+          "shot_key": "SHOT-02",
+          "scene_key": "SCENE-02",
+          "beat_key": "BEAT-02",
+          "position": 2,
+          "duration_seconds": 25,
+          "visible_beat": "错误光束把无人机引向封闭岩壁，无人机急停并转向。",
+          "start_state": "无人机悬停在双岔路，搜索灯扫过两侧。",
+          "end_state": "错误岔路被排除，无人机朝同步回响方向转向。",
+          "camera": {"framing": "中景", "angle": "平视", "movement": "一次缓慢横移跟随右转后急停", "start_composition": "双岔路对称展开，无人机居中", "end_composition": "封闭岩壁占右侧，无人机朝左前方转向"},
+          "action_timeline": ["0-7秒：四次回响灯依次闪动", "7-17秒：右侧错误光束先亮并吸引无人机", "17-25秒：岩壁显现，无人机急停转向"],
+          "asset_usages": [{"image_index": 1, "asset_key": "ASSET-SCENE-01", "semantic_name": "双岔雾谷", "purpose": "错误岔路空间"}, {"image_index": 2, "asset_key": "ASSET-CHAR-01", "semantic_name": "星光邮差", "purpose": "急停与转向主体"}, {"image_index": 3, "asset_key": "ASSET-PROP-02", "semantic_name": "回响信标", "purpose": "复制为非数字化灯光信号"}],
+          "prompt_text": "同一纸艺雾谷双岔路，无人机悬停搜索；暖黄回响信标短暂依次闪动，右侧错误光束先亮，无人机一次横移靠近后发现封闭岩壁，立即急停并转向左前方。保持同一无人机、包裹、雾密度和光线，画面不显示计数结果。",
+          "negative_constraints": ["文字", "数字", "字幕", "Logo", "水印", "信标数量标签", "多次无目的运镜", "主体穿墙"],
+          "narration": "回响从前方传来，可最后一束灯光却指向了错误方向。",
+          "dialogue": "",
+          "sound_intent": "四次清晰回响、音乐短暂收紧、急停气流声",
+          "continuity_locks": ["无人机与包裹外观不变", "错误岔路保持偏冷", "转向结束姿态衔接SHOT-03"],
+          "handoff_marker": false
+        },
+        {
+          "shot_key": "SHOT-03",
+          "scene_key": "SCENE-03",
+          "beat_key": "BEAT-03",
+          "position": 3,
+          "duration_seconds": 20,
+          "visible_beat": "雾层打开，真实中转站和四个清晰光点显现。",
+          "start_state": "无人机朝左前方同步回响方向飞行，前方只有轮廓。",
+          "end_state": "中转站完整可见，四个暖黄光点清楚分开。",
+          "camera": {"framing": "中远景", "angle": "平视略低", "movement": "一次缓慢推进", "start_composition": "无人机位于左侧，模糊站台在远处", "end_composition": "中转站居中，无人机位于前景左侧"},
+          "action_timeline": ["0-8秒：无人机沿同步回响前进", "8-14秒：雾向两侧打开", "14-20秒：四个光点由后期准确点亮并稳定"],
+          "asset_usages": [{"image_index": 1, "asset_key": "ASSET-SCENE-02", "semantic_name": "中转站空镜", "purpose": "目标场景"}, {"image_index": 2, "asset_key": "ASSET-CHAR-01", "semantic_name": "星光邮差", "purpose": "靠近主体"}, {"image_index": 3, "asset_key": "ASSET-PROP-02", "semantic_name": "回响信标单体", "purpose": "由后期复制为四个准确光点"}],
+          "prompt_text": "同一星光邮差沿同步回响方向缓慢前进，纸艺雾层向两侧打开，暖色中转站逐渐显现。镜头一次缓慢推进；信标底座保持空白，四个准确光点由后期可编辑层控制，不在生成画面中绘制数字或标签。",
+          "negative_constraints": ["文字", "数字", "字幕", "Logo", "水印", "生成模型自行决定光点数量", "无人机身份漂移"],
+          "narration": "声音和灯光终于在同一个方向相遇。",
+          "dialogue": "",
+          "sound_intent": "回响变清晰、音乐由悬疑转为明亮",
+          "continuity_locks": ["无人机朝向与SHOT-02结尾一致", "包裹保持固定", "场景光线由冷转暖但材质不变"],
+          "handoff_marker": false
+        },
+        {
+          "shot_key": "SHOT-04",
+          "scene_key": "SCENE-04",
+          "beat_key": "BEAT-04",
+          "position": 4,
+          "duration_seconds": 20,
+          "visible_beat": "无人机在四个清晰光点前稳定悬停，等待是否降落的判断。",
+          "start_state": "中转站完整可见，无人机继续靠近平台。",
+          "end_state": "四个光点稳定亮起，无人机悬停，画面留给课堂提问。",
+          "camera": {"framing": "中景转固定全景", "angle": "平视", "movement": "一次轻微靠近后锁定", "start_composition": "无人机在左侧前景，中转站在中央", "end_composition": "无人机悬停于左下，四个光点居中清楚分开"},
+          "action_timeline": ["0-8秒：无人机轻微靠近", "8-14秒：无人机停止前进并稳定悬停", "14-20秒：四个光点保持稳定，音乐留白"],
+          "asset_usages": [{"image_index": 1, "asset_key": "ASSET-SCENE-02", "semantic_name": "中转站平台", "purpose": "课堂交接场景"}, {"image_index": 2, "asset_key": "ASSET-CHAR-01", "semantic_name": "星光邮差", "purpose": "悬停主体"}, {"image_index": 3, "asset_key": "ASSET-PROP-02", "semantic_name": "回响信标单体", "purpose": "由后期复制为四个光点"}],
+          "prompt_text": "同一中转站和星光邮差，无人机一次轻微靠近后稳定悬停，暖黄信标区域保持清楚。镜头锁定并留出教师提问时间；四个准确光点由后期可编辑层复制控制，画面不出现数字、字幕或答案。",
+          "negative_constraints": ["文字", "数字", "字幕", "答案", "Logo", "水印", "无人机降落", "越过悬停时刻", "光点被遮挡"],
+          "narration": "信号已经出现，星光邮差还需要最后一次确认。",
+          "dialogue": "",
+          "sound_intent": "音乐轻停、悬停声降低，为教师提问留白",
+          "continuity_locks": ["无人机与包裹不变", "四个光点位置稳定", "镜头结尾可安全冻结"],
+          "handoff_marker": true
+        }
+      ]
+    },
+    "clip_expectations": [
+      {"shot_key": "SHOT-01", "candidate_count": 2, "formal_clip_after_adopt_and_save": true, "target_slot": "video.shots.SHOT-01.clip"},
+      {"shot_key": "SHOT-02", "candidate_count": 2, "formal_clip_after_adopt_and_save": true, "target_slot": "video.shots.SHOT-02.clip"},
+      {"shot_key": "SHOT-03", "candidate_count": 2, "formal_clip_after_adopt_and_save": true, "target_slot": "video.shots.SHOT-03.clip"},
+      {"shot_key": "SHOT-04", "candidate_count": 2, "formal_clip_after_adopt_and_save": true, "target_slot": "video.shots.SHOT-04.clip"}
+    ],
+    "audio_plan": {
+      "audio_plan_key": "AUDIO-PLAN-001",
+      "tracks": [
+        {"track_key": "AUDIO-NARR-01", "kind": "narration", "shot_key": "SHOT-01", "timeline": {"start_seconds": 3, "end_seconds": 12}, "script_text": "星光邮差必须在雾散之前找到中转站。", "voice_profile": "亲切、清晰、中性成年旁白", "speech_rate": 0.95, "volume_intent": "清晰前景，四段旁白响度一致。", "ducking_rules": ["旁白开始前音乐平滑降低6dB", "旁白结束后音乐平滑恢复"], "target_slot": "video.audio.narration.01", "subtitle_text": "星光邮差必须在雾散之前找到中转站。"},
+        {"track_key": "AUDIO-NARR-02", "kind": "narration", "shot_key": "SHOT-02", "timeline": {"start_seconds": 30, "end_seconds": 42}, "script_text": "回响从前方传来，可最后一束灯光却指向了错误方向。", "voice_profile": "亲切、清晰、中性成年旁白", "speech_rate": 0.95, "volume_intent": "清晰前景，四段旁白响度一致。", "ducking_rules": ["旁白开始前音乐平滑降低6dB", "旁白结束后音乐平滑恢复"], "target_slot": "video.audio.narration.02", "subtitle_text": "回响从前方传来，可最后一束灯光却指向了错误方向。"},
+        {"track_key": "AUDIO-NARR-03", "kind": "narration", "shot_key": "SHOT-03", "timeline": {"start_seconds": 55, "end_seconds": 64}, "script_text": "声音和灯光终于在同一个方向相遇。", "voice_profile": "亲切、清晰、中性成年旁白", "speech_rate": 0.95, "volume_intent": "清晰前景，四段旁白响度一致。", "ducking_rules": ["旁白开始前音乐平滑降低6dB", "旁白结束后音乐平滑恢复"], "target_slot": "video.audio.narration.03", "subtitle_text": "声音和灯光终于在同一个方向相遇。"},
+        {"track_key": "AUDIO-NARR-04", "kind": "narration", "shot_key": "SHOT-04", "timeline": {"start_seconds": 74, "end_seconds": 84}, "script_text": "信号已经出现，星光邮差还需要最后一次确认。", "voice_profile": "亲切、清晰、中性成年旁白", "speech_rate": 0.95, "volume_intent": "清晰前景，四段旁白响度一致。", "ducking_rules": ["旁白开始前音乐平滑降低6dB", "旁白结束后音乐平滑恢复"], "target_slot": "video.audio.narration.04", "subtitle_text": "信号已经出现，星光邮差还需要最后一次确认。"},
+        {"track_key": "AUDIO-SFX-01", "kind": "sound_effect", "shot_key": "SHOT-02", "timeline": {"start_seconds": 27, "end_seconds": 38}, "script_text": "四次清楚、间隔稳定的回响声；第四次稍远。", "voice_profile": "not_applicable", "speech_rate": 1.0, "volume_intent": "清楚可辨但低于旁白。", "ducking_rules": ["与旁白重叠时降低3dB", "不得遮盖回响段旁白"], "target_slot": "video.audio.sfx.echoes", "subtitle_text": ""},
+        {"track_key": "AUDIO-MUSIC-01", "kind": "music", "shot_key": null, "timeline": {"start_seconds": 0, "end_seconds": 90}, "script_text": "轻柔纸艺冒险配乐；错误岔路短暂收紧，中转站出现后转暖，84秒后降至留白。", "voice_profile": "not_applicable", "speech_rate": 1.0, "volume_intent": "全片低位铺底，错误岔路收紧，84秒后降至留白。", "ducking_rules": ["旁白区间降低6dB", "回响出现时让出中频", "84秒后保持低音量"], "target_slot": "video.audio.music.main", "subtitle_text": ""}
+      ],
+      "mix_rules": ["旁白期间音乐降低6dB", "回响声不得盖住旁白", "84秒后保留低音量悬停声并给教师提问留白", "字幕每行不超过14个汉字且不遮挡四个光点"]
+    },
+    "timeline_expectations": {
+      "shot_order": ["SHOT-01", "SHOT-02", "SHOT-03", "SHOT-04"],
+      "total_duration_seconds": 90,
+      "audio_tracks_bound_to_shots_or_ranges": true,
+      "subtitle_editable": true,
+      "ffmpeg_assembly_required": true,
+      "source_versions_and_output_sha256_recorded": true
+    },
+    "quality_expectations": {
+      "selected_intro_snapshot_preserved": true,
+      "independent_story_complete_before_anchor": true,
+      "only_final_shot_hands_off": true,
+      "must_not_preteach_preserved": true,
+      "shot_durations_within_6_to_30": true,
+      "candidate_is_not_formal_clip": true,
+      "single_shot_failure_is_local": true,
+      "visual_continuity_required": true,
+      "real_provider_required_only_at_media_milestone_exit": true
+    }
+  },
+  "delivery_expectations": {
+    "enabled_branches": ["lesson_plan", "intro_options", "ppt", "video"],
+    "required_artifact_families": ["lesson_plan_docx_pdf", "intro_option_appendix", "editable_pptx_preview", "final_video_subtitles_audio_plan", "quality_reports", "file_manifest"],
+    "golden_fixture_claim": "本Fixture只证明合同、上下文和结构可独立启动，不代表真实模型、PPTX、MP4或TTS音频已经生产完成。",
+    "ordinary_ci_provider_policy": "deterministic_fake_only",
+    "milestone_exit_provider_policy": "real_text_image_video_smoke_tts_deferred"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "intro.anchor.projection",
+    "name": "最小课程锚定教师投影",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "intro.anchor.projection",
+    "title": "最小课程锚定教师投影",
+    "source_definition_ref": {
+      "item_key": "intro.anchor.output",
+      "kind": "content_definition"
+    },
+    "output_format": "markdown",
+    "renderer_id": "shanhai.intro_option_set.markdown.v1",
+    "template": "# 课堂导入设计\n\n{{options}}\n\n## 推荐结论\n{{recommendation_summary}}",
+    "allowed_variables": [
+      "options",
+      "recommendation_summary"
+    ],
+    "teacher_visible": true
+  }
+}
