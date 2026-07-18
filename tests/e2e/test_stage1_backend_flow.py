@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import io
 import os
 import subprocess
+import sys
 import time
 from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 from uuid import UUID
 
+import dramatiq
 import httpx
 import pytest
+from dramatiq.brokers.redis import RedisBroker
+from dramatiq.worker import Worker
 from pypdf import PdfWriter
 from redis import Redis
 from redis.exceptions import RedisError
@@ -57,7 +62,7 @@ from apps.api.prompt_runtime.service import PromptSnapshotService
 from apps.api.reliability.models import OutboxEvent
 from apps.api.reliability.outbox import OutboxDispatcher
 from apps.api.reliability.sse import EventReplayRepository, parse_last_event_id
-from apps.api.settings import Settings
+from apps.api.settings import Settings, get_settings
 from apps.api.uploads.confirmation_service import UploadConfirmationService
 from apps.api.uploads.schemas import ConfirmUploadRequest, CreateUploadSessionRequest
 from apps.api.uploads.session_service import UploadSessionService
@@ -156,7 +161,7 @@ def create_approved_artifact(
 
 async def test_stage1_backend_vertical_flow_uses_real_services_and_fake_model(
     postgres_database_url: str,
-    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     run_migration(postgres_database_url, "head")
     settings = stage1_settings(postgres_database_url)
@@ -241,28 +246,10 @@ async def test_stage1_backend_vertical_flow_uses_real_services_and_fake_model(
             job_id = UUID(confirmed.json()["data"]["job_id"])
 
         factory = build_session_factory(app.state.database_engine)
-        worker = MaterialParseJobRunner(
-            factory,
-            storage=storage,
-            parser=PypdfMaterialParser(),
-            limits=settings_parse_limits(settings),
-            settings=settings,
-            temp_root=tmp_path,
-        )
-
-        def publish(event: OutboxEvent) -> None:
-            assert redis_client.ping() is True
-            if event.topic == "generation.job.queued" and event.aggregate_id == job_id:
-                assert worker.run(job_id, worker_id="stage1-worker") == "succeeded"
-
-        dispatcher = OutboxDispatcher(
-            factory,
-            worker_id="stage1-dispatcher",
-            lease_seconds=settings.worker_lease_seconds,
-            retry_seconds=settings.outbox_retry_seconds,
-        )
-        assert dispatcher.dispatch_batch(publish) >= 1
-        assert worker.run(job_id, worker_id="stage1-worker-redelivery") == "ignored"
+        monkeypatch.setenv("SHANHAI_DATABASE_URL", postgres_database_url)
+        monkeypatch.setenv("SHANHAI_ENVIRONMENT", "test")
+        get_settings.cache_clear()
+        dispatch_material_job_through_redis(factory, settings, job_id)
 
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             job_response = await client.get(f"/api/v2/generation-jobs/{job_id}")
@@ -485,6 +472,59 @@ async def test_stage1_backend_vertical_flow_uses_real_services_and_fake_model(
         if immutable_object is not None:
             storage.delete(bucket=immutable_object[0], key=immutable_object[1])
         app.state.database_engine.dispose()
+
+
+def dispatch_material_job_through_redis(factory, settings: Settings, job_id: UUID) -> None:
+    original_broker = dramatiq.get_broker()
+    broker = RedisBroker(url=settings.redis_url.get_secret_value())
+    dramatiq.set_broker(broker)
+    existing_tasks = sys.modules.get("workers.tasks")
+    original_actor = existing_tasks.process_generation_job if existing_tasks is not None else None
+    worker_tasks = (
+        importlib.reload(existing_tasks)
+        if existing_tasks is not None
+        else importlib.import_module("workers.tasks")
+    )
+    worker = Worker(broker, worker_threads=1)
+    worker.start()
+    try:
+        dispatcher = OutboxDispatcher(
+            factory,
+            worker_id="stage1-dispatcher",
+            lease_seconds=settings.worker_lease_seconds,
+            retry_seconds=settings.outbox_retry_seconds,
+        )
+
+        def publish(event: OutboxEvent) -> None:
+            if event.topic == "generation.job.queued" and event.aggregate_id == job_id:
+                worker_tasks.process_generation_job.send(str(job_id))
+
+        assert dispatcher.dispatch_batch(publish) >= 1
+        broker.join(worker_tasks.process_generation_job.queue_name, timeout=30_000)
+        with factory() as session:
+            job = session.get(GenerationJob, job_id)
+            assert job is not None and job.status == "succeeded"
+
+        worker_tasks.process_generation_job.send(str(job_id))
+        broker.join(worker_tasks.process_generation_job.queue_name, timeout=30_000)
+        with factory() as session:
+            assert (
+                session.scalar(
+                    select(func.count())
+                    .select_from(MaterialParseVersion)
+                    .where(MaterialParseVersion.generation_job_id == job_id)
+                )
+                == 1
+            )
+    finally:
+        worker.stop(timeout=30_000)
+        broker.close()
+        dramatiq.set_broker(original_broker)
+        if original_actor is None:
+            importlib.reload(worker_tasks)
+        else:
+            worker_tasks.process_generation_job = original_actor
+        get_settings.cache_clear()
 
 
 def settings_parse_limits(settings: Settings):
