@@ -139,6 +139,7 @@ def bind_project_asset(
             scope=f"project_assets.bind:{slot_id}:{actor.principal_id}",
             key=idempotency_key,
             payload=payload.model_dump(mode="json"),
+            authorize=lambda: ProjectAssetService(session, actor).require_slot_access(slot_id),
             command=command,
         )
     return AssetBindingEnvelope(
@@ -183,6 +184,9 @@ def unbind_project_asset(
             scope=f"project_assets.unbind:{binding_id}:{actor.principal_id}",
             key=idempotency_key,
             payload={"binding_id": str(binding_id)},
+            authorize=lambda: ProjectAssetService(session, actor).require_binding_access(
+                binding_id
+            ),
             command=command,
         )
     return AssetBindingEnvelope(

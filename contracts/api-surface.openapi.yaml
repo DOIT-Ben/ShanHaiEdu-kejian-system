@@ -116,7 +116,7 @@ paths:
               type: object
               additionalProperties: false
               properties:
-                title: {type: string, minLength: 1}
+                title: {type: string, minLength: 1, maxLength: 255}
                 execution_mode:
                   $ref: '#/components/schemas/AutomationPolicyMode'
                 automation_mode:
@@ -145,6 +145,9 @@ paths:
       responses:
         '200':
           description: Versioned policy controlling pauses and automatic actions
+          headers:
+            ETag:
+              schema: {type: string}
           content:
             application/json:
               schema:
@@ -167,6 +170,9 @@ paths:
       responses:
         '200':
           description: Updated automation policy
+          headers:
+            ETag:
+              schema: {type: string}
           content:
             application/json:
               schema:
@@ -1119,10 +1125,10 @@ components:
       additionalProperties: false
       required: [title, knowledge_point]
       properties:
-        title: {type: string, minLength: 1}
-        knowledge_point: {type: string, minLength: 1}
-        grade: {type: [string, 'null']}
-        textbook_edition: {type: [string, 'null']}
+        title: {type: string, minLength: 1, maxLength: 255}
+        knowledge_point: {type: string, minLength: 1, maxLength: 255}
+        grade: {type: [string, 'null'], maxLength: 40}
+        textbook_edition: {type: [string, 'null'], maxLength: 120}
         automation_mode:
           $ref: '#/components/schemas/AutomationMode'
         execution_mode:
@@ -1701,7 +1707,7 @@ components:
       required: [studio_type, title]
       properties:
         studio_type: {$ref: '#/components/schemas/StudioType'}
-        title: {type: string, minLength: 1}
+        title: {type: string, minLength: 1, maxLength: 255}
         creation_package_id: {type: [string, 'null'], format: uuid}
     ProjectCreateCreationBatchRequest:
       type: object
@@ -1710,7 +1716,7 @@ components:
       properties:
         source_kind: {const: project}
         studio_type: {$ref: '#/components/schemas/StudioType'}
-        title: {type: string, minLength: 1}
+        title: {type: string, minLength: 1, maxLength: 255}
         creation_package_id: {type: string, format: uuid}
     StandaloneCreateCreationBatchRequest:
       type: object
@@ -1719,7 +1725,7 @@ components:
       properties:
         source_kind: {const: standalone}
         studio_type: {$ref: '#/components/schemas/StudioType'}
-        title: {type: string, minLength: 1}
+        title: {type: string, minLength: 1, maxLength: 255}
     CreateCreationBatchRequest:
       oneOf:
         - $ref: '#/components/schemas/ProjectCreateCreationBatchRequest'

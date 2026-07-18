@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 
+import pytest
 from sqlalchemy import func, select
 
 from apps.api.artifacts.models import Approval, Artifact
@@ -9,6 +10,7 @@ from apps.api.artifacts.repository import ArtifactRepository
 from apps.api.artifacts.service import ArtifactService
 from apps.api.content_runtime.registry import BUILTIN_CONTENT_DEFINITION_VERSION_ID
 from apps.api.database import build_engine, build_session_factory
+from apps.api.errors import ApiError
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.reliability.models import EventStreamEntry, OutboxEvent
@@ -46,9 +48,11 @@ def test_approval_pointer_event_and_outbox_commit_or_rollback_together(
                 request_id="req-submit",
             )
 
-        baseline_approvals = session.scalar(select(func.count()).select_from(Approval))
-        baseline_events = session.scalar(select(func.count()).select_from(EventStreamEntry))
-        baseline_outbox = session.scalar(select(func.count()).select_from(OutboxEvent))
+        baseline_approvals = int(session.scalar(select(func.count()).select_from(Approval)) or 0)
+        baseline_events = int(
+            session.scalar(select(func.count()).select_from(EventStreamEntry)) or 0
+        )
+        baseline_outbox = int(session.scalar(select(func.count()).select_from(OutboxEvent)) or 0)
         session.rollback()
 
         try:
@@ -154,3 +158,61 @@ def test_concurrent_double_approval_returns_one_deterministic_record(
             )
             == 1
         )
+
+
+def test_approved_version_is_no_longer_a_returnable_submission(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session:
+        with session.begin():
+            actor = seed_test_actor(session)
+            project = ProjectRepository(session, actor).create(
+                CreateProjectRequest(title="Fractions", knowledge_point="One half")
+            )
+            service = ArtifactService(session, actor)
+            artifact = service.create(
+                project.id,
+                artifact_key="lesson-plan:terminal-approval",
+                artifact_type="lesson_plan",
+                branch_key="lesson_plan",
+                content_definition_version_id=BUILTIN_CONTENT_DEFINITION_VERSION_ID,
+                draft_branch="main",
+                initial_content={"title": "Approve once"},
+                request_id="req-terminal-create",
+            )
+            draft = ArtifactRepository(session, actor).get_draft(artifact.id, "main")
+            assert draft is not None
+            version = service.submit(
+                artifact.id,
+                "main",
+                expected_lock_version=draft.lock_version,
+                source_kind="manual",
+                request_id="req-terminal-submit",
+            )
+            service.review(
+                version.id,
+                action="approve",
+                comment="Approved",
+                request_id="req-terminal-approve",
+            )
+
+        session.refresh(artifact)
+        assert artifact.current_submitted_version_id is None
+        assert artifact.current_approved_version_id == version.id
+        assert artifact.status == "approved"
+        session.rollback()
+
+        with pytest.raises(ApiError) as conflict:
+            with session.begin():
+                ArtifactService(session, actor).review(
+                    version.id,
+                    action="request_changes",
+                    comment="Too late",
+                    request_id="req-terminal-return",
+                )
+        assert conflict.value.code == "ARTIFACT_STATE_CONFLICT"
+
+        session.refresh(artifact)
+        assert artifact.current_approved_version_id == version.id
+        assert artifact.status == "approved"

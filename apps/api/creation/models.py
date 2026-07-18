@@ -131,13 +131,26 @@ class CreationBatch(MutableAuditMixin, Base):
             "AND source_node_run_id IS NULL)",
             name="source_fields_consistent",
         ),
+        CheckConstraint(
+            "source_kind <> 'standalone' OR owner_user_id IS NOT NULL",
+            name="standalone_owner_required",
+        ),
         CheckConstraint("lock_version >= 1", name="lock_version_positive"),
         Index("ix_creation_batches_organization_created", "organization_id", "created_at"),
+        Index(
+            "ix_creation_batches_organization_owner_created",
+            "organization_id",
+            "owner_user_id",
+            "created_at",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     organization_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False
+    )
+    owner_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="RESTRICT")
     )
     source_kind: Mapped[str] = mapped_column(String(20), nullable=False)
     creation_package_id: Mapped[UUID | None] = mapped_column(

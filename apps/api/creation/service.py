@@ -7,6 +7,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from apps.api.assets.repository import FileAssetRepository
+from apps.api.creation.access import CreationBatchAccessService
 from apps.api.creation.models import (
     Adoption,
     CreationBatch,
@@ -31,7 +32,6 @@ from apps.api.creation.schemas import (
 from apps.api.database import utc_now
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, ProjectAction
-from apps.api.identity.permissions import ProjectAccessService
 from apps.api.ids import new_uuid7
 from apps.api.jobs.schemas import AcceptedJobData
 from apps.api.reliability.events import EventResource, EventWriter, append_outbox_only
@@ -84,6 +84,7 @@ class CreationService:
         request_id: str,
     ) -> PromptVersionRead:
         request_payload = payload.model_dump(mode="json")
+        self._require_item(item_id, ProjectAction.GENERATE)
 
         def command() -> CommandResult:
             context = self._require_item(item_id, ProjectAction.GENERATE, for_update=True)
@@ -132,6 +133,11 @@ class CreationService:
             scope=f"creation_prompt_versions.save:{item_id}",
             key=idempotency_key,
             payload=request_payload,
+            authorize=lambda: self._require_item(
+                item_id,
+                ProjectAction.GENERATE,
+                for_update=True,
+            ),
             command=command,
         )
         return PromptVersionRead.model_validate(result.body)
@@ -186,15 +192,20 @@ class CreationService:
         idempotency_key: str,
         request_id: str,
     ) -> AdoptionRead:
+        self._require_result(result_id, ProjectAction.GENERATE)
+
         def command() -> CommandResult:
-            context = self._repository.get_result_context(result_id, for_update=True)
-            if context is None or context.result.status != "available":
+            context = self._require_result(
+                result_id,
+                ProjectAction.GENERATE,
+                for_update=True,
+            )
+            if context.result.status != "available":
                 raise ApiError(
                     status_code=404,
                     code="GENERATION_RESULT_NOT_FOUND",
                     message="The generation result was not found.",
                 )
-            self._authorize_batch(context.batch, ProjectAction.GENERATE)
             adoption = Adoption(
                 id=new_uuid7(),
                 organization_id=self._actor.organization_id,
@@ -234,6 +245,11 @@ class CreationService:
             scope=f"creation_results.adopt:{result_id}",
             key=idempotency_key,
             payload=payload.model_dump(mode="json"),
+            authorize=lambda: self._require_result(
+                result_id,
+                ProjectAction.GENERATE,
+                for_update=True,
+            ),
             command=command,
         )
         return AdoptionRead.model_validate(result.body)
@@ -287,17 +303,38 @@ class CreationService:
                 code="CREATION_ITEM_NOT_FOUND",
                 message="The creation item was not found.",
             )
-        self._authorize_batch(context.batch, action)
+        self._authorize_batch(context.batch, action, for_update=for_update)
         return context
 
-    def _authorize_batch(self, batch: CreationBatch, action: ProjectAction) -> None:
-        if batch.source_project_id is not None:
-            ProjectAccessService(self._session, self._actor).require(
-                batch.source_project_id,
-                action,
+    def _authorize_batch(
+        self,
+        batch: CreationBatch,
+        action: ProjectAction,
+        *,
+        for_update: bool,
+    ) -> None:
+        CreationBatchAccessService(self._session, self._actor).require(
+            batch,
+            action,
+            for_update=for_update,
+        )
+
+    def _require_result(
+        self,
+        result_id: UUID,
+        action: ProjectAction,
+        *,
+        for_update: bool = False,
+    ):
+        context = self._repository.get_result_context(result_id, for_update=for_update)
+        if context is None:
+            raise ApiError(
+                status_code=404,
+                code="GENERATION_RESULT_NOT_FOUND",
+                message="The generation result was not found.",
             )
-        elif self._actor.user_id is None or self._actor.is_system:
-            raise ApiError(status_code=403, code="PERMISSION_DENIED", message="Access denied.")
+        self._authorize_batch(context.batch, action, for_update=for_update)
+        return context
 
     def _validate_reference_assets(self, version_ids: list[UUID]) -> None:
         repository = FileAssetRepository(self._session, self._actor)

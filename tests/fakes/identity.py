@@ -20,19 +20,25 @@ from apps.api.identity.models import (
 
 TEST_USER_ID = UUID("01900000-0000-7000-8000-000000000101")
 TEST_PRINCIPAL_ID = UUID("01900000-0000-7000-8000-000000000102")
+TEST_MEMBER_ID = UUID("01900000-0000-7000-8000-000000000103")
 
 
 def seed_test_actor(
     session: Session,
     *,
     organization_id: UUID = SYSTEM_ORGANIZATION_ID,
+    user_id: UUID = TEST_USER_ID,
+    principal_id: UUID = TEST_PRINCIPAL_ID,
+    member_id: UUID = TEST_MEMBER_ID,
+    email: str = "test-owner@example.test",
+    display_name: str = "Test Owner",
 ) -> ActorContext:
     now = datetime.now(UTC)
     session.add(
         User(
-            id=TEST_USER_ID,
-            email="test-owner@example.test",
-            display_name="Test Owner",
+            id=user_id,
+            email=email,
+            display_name=display_name,
             status="active",
             created_at=now,
         )
@@ -41,19 +47,19 @@ def seed_test_actor(
     session.add_all(
         (
             OrganizationMember(
-                id=UUID("01900000-0000-7000-8000-000000000103"),
+                id=member_id,
                 organization_id=organization_id,
-                user_id=TEST_USER_ID,
+                user_id=user_id,
                 role="member",
                 status="active",
                 created_at=now,
             ),
             Principal(
-                id=TEST_PRINCIPAL_ID,
+                id=principal_id,
                 organization_id=organization_id,
-                user_id=TEST_USER_ID,
+                user_id=user_id,
                 principal_type="user",
-                display_name="Test Owner",
+                display_name=display_name,
                 status="active",
                 created_at=now,
             ),
@@ -62,8 +68,8 @@ def seed_test_actor(
     session.flush()
     return ActorContext(
         organization_id=organization_id,
-        principal_id=TEST_PRINCIPAL_ID,
-        user_id=TEST_USER_ID,
+        principal_id=principal_id,
+        user_id=user_id,
         actor_type="user",
         organization_role="member",
     )

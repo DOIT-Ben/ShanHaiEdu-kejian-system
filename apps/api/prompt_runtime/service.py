@@ -44,7 +44,11 @@ class PromptSnapshotService:
         context: AssembledContext,
         prompt: CompiledPrompt,
     ) -> FrozenPromptSnapshots:
-        node, run = self._require_node_and_run(node_run_id, action=ProjectAction.GENERATE)
+        node, run = self._require_node_and_run(
+            node_run_id,
+            action=ProjectAction.GENERATE,
+            for_update=True,
+        )
         if prompt.context_hash != context.content_hash:
             raise PromptSnapshotError(
                 "PROMPT_CONTEXT_HASH_MISMATCH",
@@ -127,8 +131,9 @@ class PromptSnapshotService:
         node_run_id: UUID,
         *,
         action: ProjectAction,
+        for_update: bool = False,
     ) -> tuple[NodeRun, WorkflowRun]:
-        node = self._workflow_repository.get_node(node_run_id)
+        node = self._workflow_repository.get_node(node_run_id, for_update=for_update)
         if node is None:
             raise PromptSnapshotError("NODE_RUN_NOT_FOUND", "node run was not found")
         run = self._workflow_repository.get_run(node.workflow_run_id)

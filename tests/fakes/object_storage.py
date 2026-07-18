@@ -18,6 +18,7 @@ class PresignedPut:
 class FakeObjectStorage:
     def __init__(self) -> None:
         self.last_presigned: PresignedPut | None = None
+        self.presigned_requests: list[PresignedPut] = []
         self._objects: dict[tuple[str, str], ObjectMetadata] = {}
         self._payloads: dict[tuple[str, str], bytes] = {}
 
@@ -29,6 +30,7 @@ class FakeObjectStorage:
         expires: timedelta,
     ) -> str:
         self.last_presigned = PresignedPut(bucket=bucket, key=key, expires=expires)
+        self.presigned_requests.append(self.last_presigned)
         return f"https://object-storage.test/{bucket}/{key}?signature=fake"
 
     def stat(self, *, bucket: str, key: str) -> ObjectMetadata:

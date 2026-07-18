@@ -2021,6 +2021,7 @@ export interface operations {
             /** @description Versioned policy controlling pauses and automatic actions */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2051,6 +2052,7 @@ export interface operations {
             /** @description Updated automation policy */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {

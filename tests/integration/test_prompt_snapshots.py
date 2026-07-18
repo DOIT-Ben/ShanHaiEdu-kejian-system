@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 
 import httpx
 import pytest
@@ -14,6 +16,7 @@ from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.prompt_runtime.models import ContextSnapshot, PromptSnapshot
 from apps.api.prompt_runtime.service import PromptSnapshotError, PromptSnapshotService
 from apps.api.settings import Settings
+from apps.api.workflows.models import NodeRun
 from apps.api.workflows.service import WorkflowRuntimeService
 from tests.contract.test_stage0_resources import assert_contract_response
 from tests.fakes.identity import configure_test_identity, seed_test_actor
@@ -212,6 +215,49 @@ def test_snapshot_service_is_idempotent_and_never_overwrites_frozen_prompt(
                 prompt=changed,
             )
         assert caught.value.code == "PROMPT_SNAPSHOT_ALREADY_FROZEN"
+
+
+def test_prompt_freeze_serializes_with_node_execution_start(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session, session.begin():
+        actor = seed_test_actor(session)
+        project = ProjectRepository(session, actor).create(
+            CreateProjectRequest(title="Fractions", knowledge_point="One half")
+        )
+        run = WorkflowRuntimeService(session, actor).start_project_run(project.id)
+        node = WorkflowRuntimeService(session, actor).create_project_node_run(
+            run.id,
+            node_key="prepare",
+            status=NodeStatus.READY,
+        )
+        context, compiled = compiled_fixture()
+
+    def freeze() -> None:
+        with factory() as worker_session, worker_session.begin():
+            PromptSnapshotService(worker_session, actor).freeze(
+                node.id,
+                context=context,
+                prompt=compiled,
+            )
+
+    executor = ThreadPoolExecutor(max_workers=1)
+    try:
+        with factory() as locker, locker.begin():
+            locked_node = locker.get(NodeRun, node.id, with_for_update=True)
+            assert locked_node is not None
+            locked_node.status = NodeStatus.QUEUED.value
+            locker.flush()
+            future = executor.submit(freeze)
+            with pytest.raises(FutureTimeoutError):
+                future.result(timeout=0.5)
+
+        with pytest.raises(PromptSnapshotError) as frozen:
+            future.result(timeout=5)
+        assert frozen.value.code == "PROMPT_SNAPSHOT_NODE_FROZEN"
+    finally:
+        executor.shutdown(wait=True)
 
 
 async def test_prompt_preview_endpoint_returns_only_the_safe_projection(

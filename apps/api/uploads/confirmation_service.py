@@ -80,14 +80,18 @@ class UploadConfirmationService:
             ttl_seconds=idempotency_ttl_seconds,
         )
         with self._session.begin():
-            ProjectAccessService(self._session, self._actor).require(
-                project_id,
-                ProjectAction.GENERATE,
-            )
             replay = idempotency.lookup(
                 scope="material_uploads.confirm",
                 key=idempotency_key,
                 payload=idempotency_payload,
+                authorize=lambda: ProjectAccessService(
+                    self._session,
+                    self._actor,
+                ).require(
+                    project_id,
+                    ProjectAction.GENERATE,
+                    for_update=True,
+                ),
             )
         if replay is not None:
             return AcceptedJobData.model_validate(replay.body)
@@ -108,6 +112,14 @@ class UploadConfirmationService:
                     scope="material_uploads.confirm",
                     key=idempotency_key,
                     payload=idempotency_payload,
+                    authorize=lambda: ProjectAccessService(
+                        self._session,
+                        self._actor,
+                    ).require(
+                        project_id,
+                        ProjectAction.GENERATE,
+                        for_update=True,
+                    ),
                     command=lambda: self._confirmation_command(
                         project_id=project_id,
                         material_id=material_id,

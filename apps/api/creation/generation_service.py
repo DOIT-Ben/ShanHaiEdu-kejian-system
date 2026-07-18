@@ -6,6 +6,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from apps.api.creation.access import CreationBatchAccessService
 from apps.api.creation.models import CreationBatch
 from apps.api.creation.repository import CreationRepository
 from apps.api.creation.schemas import (
@@ -15,7 +16,6 @@ from apps.api.creation.schemas import (
 )
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, ProjectAction
-from apps.api.identity.permissions import ProjectAccessService
 from apps.api.ids import new_uuid7
 from apps.api.jobs.models import GenerationJob
 from apps.api.jobs.schemas import AcceptedJobData
@@ -192,6 +192,7 @@ class CreationGenerationService:
             scope=f"creation.generate:{batch.id}:{item_id or 'batch'}",
             key=idempotency_key,
             payload=creation_request,
+            authorize=lambda: self._authorize_batch(batch, for_update=True),
             command=command,
         )
         return AcceptedJobData.model_validate(result.body)
@@ -204,7 +205,7 @@ class CreationGenerationService:
                 code="CREATION_ITEM_NOT_FOUND",
                 message="The creation item was not found.",
             )
-        self._authorize_batch(context.batch)
+        self._authorize_batch(context.batch, for_update=False)
         return context
 
     def _require_batch(self, batch_id: UUID) -> CreationBatch:
@@ -215,17 +216,15 @@ class CreationGenerationService:
                 code="CREATION_BATCH_NOT_FOUND",
                 message="The creation batch was not found.",
             )
-        self._authorize_batch(batch)
+        self._authorize_batch(batch, for_update=False)
         return batch
 
-    def _authorize_batch(self, batch: CreationBatch) -> None:
-        if batch.source_project_id is not None:
-            ProjectAccessService(self._session, self._actor).require(
-                batch.source_project_id,
-                ProjectAction.GENERATE,
-            )
-        elif self._actor.user_id is None or self._actor.is_system:
-            raise ApiError(status_code=403, code="PERMISSION_DENIED", message="Access denied.")
+    def _authorize_batch(self, batch: CreationBatch, *, for_update: bool) -> None:
+        CreationBatchAccessService(self._session, self._actor).require(
+            batch,
+            ProjectAction.GENERATE,
+            for_update=for_update,
+        )
 
     @staticmethod
     def _prompt_stale() -> ApiError:

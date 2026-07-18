@@ -51,8 +51,10 @@ class IdempotencyService:
         scope: str,
         key: str,
         payload: Mapping[str, Any],
+        authorize: Callable[[], object],
         command: Callable[[], CommandResult],
     ) -> CommandResult:
+        authorize()
         request_hash = canonical_request_hash(payload)
         self._lock_key(scope, key)
         existing = self._find(scope, key)
@@ -85,7 +87,9 @@ class IdempotencyService:
         scope: str,
         key: str,
         payload: Mapping[str, Any],
+        authorize: Callable[[], object],
     ) -> CommandResult | None:
+        authorize()
         request_hash = canonical_request_hash(payload)
         self._lock_key(scope, key)
         return self._replay(self._find(scope, key), request_hash, scope)

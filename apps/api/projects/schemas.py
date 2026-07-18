@@ -33,8 +33,6 @@ class CreateProjectRequest(BaseModel):
 
 
 class ProjectRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     id: UUID
     title: str
     subject: Literal["primary_math"]
@@ -42,7 +40,7 @@ class ProjectRead(BaseModel):
     textbook_edition: str | None
     knowledge_point: str
     status: Literal["draft", "active", "archived"]
-    automation_mode: AutomationMode
+    execution_mode: AutomationPolicyMode
     content_release_id: UUID
     workflow_definition_version_id: UUID
     created_at: datetime

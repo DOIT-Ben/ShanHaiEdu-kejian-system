@@ -13,7 +13,7 @@ from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.dependencies import get_actor_context
 from apps.api.identity.permissions import ProjectAccessService
 from apps.api.lessons.repository import LessonRepository
-from apps.api.projects.schemas import ProjectRead
+from apps.api.projects.read_service import ProjectReadService
 from apps.api.workflows.repository import WorkflowRuntimeRepository
 from apps.api.workflows.schemas import (
     NodeRunRead,
@@ -43,7 +43,7 @@ def get_project_workflow(
     lessons = LessonRepository(session, actor).list_for_project(project_id)
     return WorkflowEnvelope(
         data=WorkflowAggregateData(
-            project=ProjectRead.model_validate(project),
+            project=ProjectReadService(session, actor).present(project),
             workflow_run=(
                 WorkflowRunRead.model_validate(workflow_run) if workflow_run is not None else None
             ),

@@ -45,13 +45,7 @@ class GenerationJobService:
         idempotency_key: str,
         request_id: str,
     ) -> GenerationJobRead:
-        job = self._require_job(job_id, for_update=False)
-        if job.project_id is None:
-            raise self._job_not_found()
-        ProjectAccessService(self._session, self._actor).require(
-            job.project_id,
-            ProjectAction.GENERATE,
-        )
+        self._authorize_cancel(job_id, for_update=False)
         payload = {"job_id": str(job_id), "command": "cancel"}
 
         def command() -> CommandResult:
@@ -76,6 +70,7 @@ class GenerationJobService:
             scope=f"generation_jobs.cancel:{self._actor.principal_id}",
             key=idempotency_key,
             payload=payload,
+            authorize=lambda: self._authorize_cancel(job_id, for_update=True),
             command=command,
         )
         return GenerationJobRead.model_validate(result.body)
@@ -169,6 +164,17 @@ class GenerationJobService:
         job = self._repository.get(job_id, for_update=for_update)
         if job is None:
             raise self._job_not_found()
+        return job
+
+    def _authorize_cancel(self, job_id: UUID, *, for_update: bool) -> GenerationJob:
+        job = self._require_job(job_id, for_update=for_update)
+        if job.project_id is None:
+            raise self._job_not_found()
+        ProjectAccessService(self._session, self._actor).require(
+            job.project_id,
+            ProjectAction.GENERATE,
+            for_update=for_update,
+        )
         return job
 
     def _require_system_actor(self) -> None:

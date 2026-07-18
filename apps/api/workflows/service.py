@@ -110,7 +110,7 @@ class WorkflowRuntimeService:
         content_hash: str,
         snapshot: dict[str, object],
     ) -> NodeInputSnapshot:
-        node = self._require_node(node_run_id)
+        node = self._require_node(node_run_id, for_update=True)
         run = self._require_run(node.workflow_run_id)
         ProjectAccessService(self._session, self._actor).require(
             run.project_id,

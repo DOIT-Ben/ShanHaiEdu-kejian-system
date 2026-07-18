@@ -20,6 +20,7 @@ from apps.api.projects.policy_schemas import (
     UpdateAutomationPolicyRequest,
 )
 from apps.api.projects.policy_service import AutomationPolicyService
+from apps.api.projects.read_service import ProjectReadService
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import (
     CreateProjectRequest,
@@ -55,6 +56,7 @@ def create_project(
 
     def command() -> CommandResult:
         project = ProjectRepository(session, actor).create(payload)
+        data = ProjectReadService(session, actor).present(project)
         EventWriter(session, actor.organization_id).append(
             project_id=project.id,
             event_type="project.created",
@@ -64,7 +66,7 @@ def create_project(
         )
         return CommandResult(
             status_code=201,
-            body=ProjectRead.model_validate(project).model_dump(mode="json"),
+            body=data.model_dump(mode="json"),
             resource_type="project",
             resource_id=project.id,
         )
@@ -78,6 +80,7 @@ def create_project(
             scope=f"projects.create:{actor.principal_id}",
             key=idempotency_key,
             payload=payload.model_dump(mode="json"),
+            authorize=lambda: require_project_creator(actor),
             command=command,
         )
     return ProjectEnvelope(
@@ -108,13 +111,18 @@ def list_projects(
         limit=page_limit,
     )
     return ProjectListEnvelope(
-        data=ProjectListData(items=[ProjectRead.model_validate(project) for project in projects]),
+        data=ProjectListData(items=ProjectReadService(session, actor).present_many(projects)),
         meta=PageMeta(next_cursor=next_cursor),
         request_id=request.state.request_id,
     )
 
 
-@router.get("/{project_id}", response_model=ProjectEnvelope, operation_id="getProject")
+@router.get(
+    "/{project_id}",
+    response_model=ProjectEnvelope,
+    operation_id="getProject",
+    responses={200: {"headers": {"ETag": {"schema": {"type": "string"}}}}},
+)
 def get_project(
     project_id: UUID,
     request: Request,
@@ -123,9 +131,10 @@ def get_project(
     session: Annotated[Session, Depends(get_session)],
 ) -> ProjectEnvelope:
     project = ProjectAccessService(session, actor).require(project_id, ProjectAction.VIEW)
-    response.headers["ETag"] = f'W/"{project.lock_version}"'
+    data, policy_version = ProjectReadService(session, actor).present_with_policy_version(project)
+    response.headers["ETag"] = f'W/"{project.lock_version}-{policy_version}"'
     return ProjectEnvelope(
-        data=ProjectRead.model_validate(project),
+        data=data,
         request_id=request.state.request_id,
     )
 
@@ -134,6 +143,7 @@ def get_project(
     "/{project_id}/automation-policy",
     response_model=AutomationPolicyEnvelope,
     operation_id="getProjectAutomationPolicy",
+    responses={200: {"headers": {"ETag": {"schema": {"type": "string"}}}}},
 )
 def get_project_automation_policy(
     project_id: UUID,
@@ -151,13 +161,17 @@ def get_project_automation_policy(
     "/{project_id}/automation-policy",
     response_model=AutomationPolicyEnvelope,
     operation_id="updateProjectAutomationPolicy",
+    responses={200: {"headers": {"ETag": {"schema": {"type": "string"}}}}},
 )
 def update_project_automation_policy(
     project_id: UUID,
     payload: UpdateAutomationPolicyRequest,
     request: Request,
     response: Response,
-    idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8)],
+    idempotency_key: Annotated[
+        str,
+        Header(alias="Idempotency-Key", min_length=8, max_length=128),
+    ],
     if_match: Annotated[str, Header(alias="If-Match")],
     actor: Annotated[ActorContext, Depends(get_actor_context)],
     session: Annotated[Session, Depends(get_session)],
@@ -225,3 +239,12 @@ def stream_project_events(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+def require_project_creator(actor: ActorContext) -> None:
+    if actor.user_id is None or actor.is_system:
+        raise ApiError(
+            status_code=403,
+            code="PERMISSION_DENIED",
+            message="Project creation requires a user actor.",
+        )

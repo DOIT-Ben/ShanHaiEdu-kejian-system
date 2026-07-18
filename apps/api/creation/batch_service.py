@@ -63,6 +63,7 @@ class CreationBatchService:
             scope=f"creation_batches.create:{self._actor.principal_id}",
             key=idempotency_key,
             payload=current.model_dump(mode="json"),
+            authorize=lambda: self._authorize_create(current),
             command=command,
         )
         if result.body.get("source_kind") == "project":
@@ -168,10 +169,36 @@ class CreationBatchService:
         )
         return batch
 
+    def _authorize_create(
+        self,
+        payload: ProjectCreateCreationBatchRequest | StandaloneCreateCreationBatchRequest,
+    ) -> None:
+        if isinstance(payload, ProjectCreateCreationBatchRequest):
+            package = self._repository.get_package(payload.creation_package_id, for_update=True)
+            if package is None:
+                raise ApiError(
+                    status_code=422,
+                    code="CREATION_PACKAGE_REQUIRED",
+                    message="A current ready creation package is required.",
+                )
+            ProjectAccessService(self._session, self._actor).require(
+                package.source_project_id,
+                ProjectAction.GENERATE,
+                for_update=True,
+            )
+            return
+        if self._actor.user_id is None or self._actor.is_system:
+            raise ApiError(
+                status_code=403,
+                code="PERMISSION_DENIED",
+                message="Standalone creation requires a user actor.",
+            )
+
     def _new_batch(self, **values: object) -> CreationBatch:
         batch = CreationBatch(
             id=new_uuid7(),
             organization_id=self._actor.organization_id,
+            owner_user_id=self._actor.user_id,
             created_by=self._actor.principal_id,
             updated_by=self._actor.principal_id,
             **values,

@@ -9,6 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, Request, Response, status
 from sqlalchemy.orm import Session
 
+from apps.api.artifacts.approval_service import ArtifactApprovalService
 from apps.api.artifacts.models import Approval, Artifact, ArtifactDraft, ArtifactVersion
 from apps.api.artifacts.repository import ArtifactRepository
 from apps.api.artifacts.schemas import (
@@ -28,8 +29,9 @@ from apps.api.artifacts.schemas import (
 from apps.api.artifacts.service import ArtifactService
 from apps.api.dependencies import get_session
 from apps.api.errors import ApiError
-from apps.api.identity.context import ActorContext
+from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.dependencies import get_actor_context
+from apps.api.identity.permissions import ProjectAccessService
 from apps.api.reliability.idempotency import CommandResult, IdempotencyService
 from apps.api.settings import Settings
 
@@ -82,6 +84,11 @@ def create_artifact(
             scope=f"artifacts.create:{project_id}:{actor.principal_id}",
             key=idempotency_key,
             payload=payload.model_dump(mode="json"),
+            authorize=lambda: ProjectAccessService(session, actor).require(
+                project_id,
+                ProjectAction.EDIT,
+                for_update=True,
+            ),
             command=command,
         )
     return ArtifactEnvelope(
@@ -156,6 +163,12 @@ def save_artifact_draft(
             scope=f"artifacts.draft.save:{artifact_id}:{draft_branch}:{actor.principal_id}",
             key=idempotency_key,
             payload=request_payload,
+            authorize=lambda: require_artifact_access(
+                session,
+                actor,
+                artifact_id,
+                ProjectAction.EDIT,
+            ),
             command=command,
         )
     data = ArtifactDraftRead.model_validate(result.body)
@@ -207,6 +220,12 @@ def submit_artifact_version(
             scope=f"artifacts.version.submit:{artifact_id}:{actor.principal_id}",
             key=idempotency_key,
             payload=request_payload,
+            authorize=lambda: require_artifact_access(
+                session,
+                actor,
+                artifact_id,
+                ProjectAction.EDIT,
+            ),
             command=command,
         )
     return ArtifactVersionEnvelope(
@@ -255,11 +274,33 @@ def review_artifact_version(
             scope=f"artifacts.review:{artifact_version_id}:{actor.principal_id}",
             key=idempotency_key,
             payload=payload.model_dump(mode="json"),
+            authorize=lambda: ArtifactApprovalService(session, actor).require_access(
+                artifact_version_id,
+                action=payload.action,
+                for_update=True,
+            ),
             command=command,
         )
     return ApprovalEnvelope(
         data=ApprovalRead.model_validate(result.body), request_id=request.state.request_id
     )
+
+
+def require_artifact_access(
+    session: Session,
+    actor: ActorContext,
+    artifact_id: UUID,
+    action: ProjectAction,
+) -> Artifact:
+    artifact = ArtifactRepository(session, actor).get(artifact_id, for_update=True)
+    if artifact is None:
+        raise artifact_not_found()
+    ProjectAccessService(session, actor).require(
+        artifact.project_id,
+        action,
+        for_update=True,
+    )
+    return artifact
 
 
 def serialize_artifact(

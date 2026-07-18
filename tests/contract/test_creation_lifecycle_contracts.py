@@ -5,6 +5,8 @@ from copy import deepcopy
 import pytest
 from jsonschema import ValidationError
 
+from apps.api.main import create_app
+from apps.api.settings import Settings
 from tests.contract.test_stage0_contracts import (
     CONTRACTS,
     load_json,
@@ -83,6 +85,48 @@ def test_execution_modes_share_a_new_policy_contract_without_removing_legacy_inp
     validate({**shared_project, "execution_mode": "guided"}, current_project)
     validate({**shared_project, "automation_mode": "assisted"}, legacy_project)
     assert_invalid({**shared_project, "automation_mode": "assisted"}, current_project)
+
+
+def test_project_limits_and_policy_etags_match_runtime_contract() -> None:
+    openapi = load_openapi()
+    operations = operations_by_id(openapi)
+    project_fields = openapi["components"]["schemas"]["CreateProjectRequest"]["properties"]
+    assert project_fields["title"]["maxLength"] == 255
+    assert project_fields["knowledge_point"]["maxLength"] == 255
+    assert project_fields["grade"]["maxLength"] == 40
+    assert project_fields["textbook_edition"]["maxLength"] == 120
+
+    for operation_id in (
+        "getProject",
+        "getProjectAutomationPolicy",
+        "updateProjectAutomationPolicy",
+    ):
+        assert "ETag" in operations[operation_id]["responses"]["200"]["headers"]
+
+    runtime = create_app(settings=Settings(_env_file=None, environment="test")).openapi()
+    runtime_operations = operations_by_id(runtime)
+    runtime_schemas = runtime["components"]["schemas"]
+    assert (
+        runtime_schemas["SavePromptVersionRequest"]["properties"]["reference_asset_version_ids"][
+            "uniqueItems"
+        ]
+        is True
+    )
+    assert (
+        runtime_schemas["LegacyGenerateCreationBatchRequest"]["properties"]["item_ids"][
+            "uniqueItems"
+        ]
+        is True
+    )
+    update = runtime_operations["updateProjectAutomationPolicy"]
+    parameters = {parameter["name"]: parameter for parameter in update["parameters"]}
+    assert parameters["Idempotency-Key"]["schema"]["maxLength"] == 128
+    for operation_id in (
+        "getProject",
+        "getProjectAutomationPolicy",
+        "updateProjectAutomationPolicy",
+    ):
+        assert "ETag" in runtime_operations[operation_id]["responses"]["200"]["headers"]
 
 
 def test_creation_batch_source_is_a_strict_discriminated_union() -> None:

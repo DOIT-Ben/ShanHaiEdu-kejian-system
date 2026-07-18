@@ -10,12 +10,14 @@ from sqlalchemy.orm import Session
 from apps.api.assets.project_contracts import ReplaceMode
 from apps.api.assets.project_repository import ProjectAssetRepository
 from apps.api.assets.project_service import ProjectAssetService
+from apps.api.creation.access import CreationBatchAccessService
 from apps.api.creation.models import CreationBatch, CreationItem, SaveToProjectOperation
 from apps.api.creation.repository import CreationRepository
 from apps.api.creation.schemas import (
     ProjectSourceSaveRequest,
     SaveAdoptionToProjectRequest,
     SaveToProjectOperationRead,
+    StandaloneSourceSaveRequest,
 )
 from apps.api.database import utc_now
 from apps.api.errors import ApiError
@@ -52,6 +54,17 @@ class CreationSaveService:
         request_id: str,
     ) -> SaveToProjectOperationRead:
         request_payload = payload.model_dump(mode="json")
+        current = self._repository.get_adoption_context(adoption_id)
+        if current is None or current.item.active_adoption_id != adoption_id:
+            raise ApiError(
+                status_code=409,
+                code="CANDIDATE_NOT_ADOPTED",
+                message="The candidate is not the active adoption for this item.",
+            )
+        CreationBatchAccessService(self._session, self._actor).require(
+            current.batch,
+            ProjectAction.EDIT,
+        )
 
         def command() -> CommandResult:
             context = self._repository.get_adoption_context(adoption_id, for_update=True)
@@ -61,6 +74,11 @@ class CreationSaveService:
                     code="CANDIDATE_NOT_ADOPTED",
                     message="The candidate is not the active adoption for this item.",
                 )
+            CreationBatchAccessService(self._session, self._actor).require(
+                context.batch,
+                ProjectAction.EDIT,
+                for_update=True,
+            )
             if context.result.file_asset_version_id is None:
                 raise ApiError(
                     status_code=409,
@@ -144,11 +162,39 @@ class CreationSaveService:
             scope=f"creation_adoptions.save:{adoption_id}",
             key=idempotency_key,
             payload=request_payload,
+            authorize=lambda: self._require_save_access(adoption_id, payload),
             command=command,
         )
         body = dict(result.body)
         body["idempotent_replay"] = result.replayed
         return SaveToProjectOperationRead.model_validate(body)
+
+    def _require_save_access(
+        self,
+        adoption_id: UUID,
+        payload: SaveAdoptionToProjectRequest,
+    ) -> None:
+        context = self._repository.get_adoption_context(adoption_id, for_update=True)
+        if context is None:
+            raise ApiError(
+                status_code=409,
+                code="CANDIDATE_NOT_ADOPTED",
+                message="The candidate is not the active adoption for this item.",
+            )
+        CreationBatchAccessService(self._session, self._actor).require(
+            context.batch,
+            ProjectAction.EDIT,
+            for_update=True,
+        )
+        if isinstance(payload, StandaloneSourceSaveRequest):
+            try:
+                ProjectAccessService(self._session, self._actor).require(
+                    payload.project_id,
+                    ProjectAction.EDIT,
+                    for_update=True,
+                )
+            except ApiError as exc:
+                raise self._target_forbidden() from exc
 
     def resolve_target(
         self,

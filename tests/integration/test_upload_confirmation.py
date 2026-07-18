@@ -1,17 +1,20 @@
 from __future__ import annotations
 
+import json
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import func, select
 
+import apps.api.uploads.session_service as upload_session_module
 from apps.api.assets.models import FileAsset, FileAssetVersion
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import ApiError
 from apps.api.jobs.models import GenerationJob
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
-from apps.api.reliability.models import EventStreamEntry
+from apps.api.reliability.models import EventStreamEntry, IdempotencyRecord
 from apps.api.uploads.confirmation_service import UploadConfirmationService
 from apps.api.uploads.models import SourceMaterial, UploadSession
 from apps.api.uploads.schemas import ConfirmUploadRequest, CreateUploadSessionRequest
@@ -21,6 +24,114 @@ from tests.fakes.identity import seed_test_actor
 from tests.fakes.object_storage import FakeObjectStorage
 
 SHA256 = "a" * 64
+
+
+def test_upload_session_replay_treats_subsecond_signing_window_as_expired(
+    migrated_database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = datetime(2026, 7, 19, tzinfo=UTC)
+    monkeypatch.setattr(upload_session_module, "utc_now", lambda: now)
+    factory = build_session_factory(build_engine(migrated_database_url))
+    storage = FakeObjectStorage()
+    with factory() as session:
+        with session.begin():
+            actor = seed_test_actor(session)
+            project = ProjectRepository(session, actor).create(
+                CreateProjectRequest(title="Fractions", knowledge_point="One half")
+            )
+        service = UploadSessionService(
+            session=session,
+            storage=storage,
+            actor=actor,
+            bucket="shanhaiedu",
+            ttl_seconds=900,
+            max_size_bytes=10_000,
+        )
+        payload = CreateUploadSessionRequest(
+            filename="lesson.pdf",
+            media_type="application/pdf",
+            size_bytes=4,
+            sha256=SHA256,
+        )
+        created = service.create_session(
+            project.id,
+            payload,
+            idempotency_key="create-upload-subsecond-window",
+            request_id="req-create-upload-subsecond-window",
+        )
+        with session.begin():
+            upload = session.get(UploadSession, created.upload_session_id)
+            assert upload is not None
+            upload.expires_at = now + timedelta(milliseconds=500)
+
+        with pytest.raises(ApiError) as expired:
+            service.create_session(
+                project.id,
+                payload,
+                idempotency_key="create-upload-subsecond-window",
+                request_id="req-replay-upload-subsecond-window",
+            )
+
+        assert expired.value.status_code == 409
+        assert expired.value.code == "PRECONDITION_NOT_MET"
+        assert len(storage.presigned_requests) == 1
+
+
+def test_upload_session_replay_resigns_without_persisting_the_presigned_url(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    storage = FakeObjectStorage()
+    with factory() as session:
+        with session.begin():
+            actor = seed_test_actor(session)
+            project = ProjectRepository(session, actor).create(
+                CreateProjectRequest(title="Fractions", knowledge_point="One half")
+            )
+        service = UploadSessionService(
+            session=session,
+            storage=storage,
+            actor=actor,
+            bucket="shanhaiedu",
+            ttl_seconds=900,
+            max_size_bytes=10_000,
+        )
+        payload = CreateUploadSessionRequest(
+            filename="lesson.pdf",
+            media_type="application/pdf",
+            size_bytes=4,
+            sha256=SHA256,
+        )
+
+        first = service.create_session(
+            project.id,
+            payload,
+            idempotency_key="create-upload-private-url",
+            request_id="req-create-upload-private-url",
+        )
+        replay = service.create_session(
+            project.id,
+            payload,
+            idempotency_key="create-upload-private-url",
+            request_id="req-replay-upload-private-url",
+        )
+
+        record = session.scalar(
+            select(IdempotencyRecord).where(
+                IdempotencyRecord.scope == "material_uploads.create",
+                IdempotencyRecord.idempotency_key == "create-upload-private-url",
+            )
+        )
+        assert record is not None
+        persisted = json.dumps(record.response_body_json)
+        assert "upload_url" not in persisted
+        assert "signature" not in persisted
+        assert first.upload_session_id == replay.upload_session_id
+        assert first.material_id == replay.material_id
+        assert len(storage.presigned_requests) == 2
+        assert session.scalar(select(func.count()).select_from(UploadSession)) == 1
+        assert session.scalar(select(func.count()).select_from(SourceMaterial)) == 1
 
 
 def test_upload_confirmation_validates_object_and_commits_atomically(
