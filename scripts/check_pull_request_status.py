@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate a pull request's status and review evidence declarations."""
+"""Validate a pull request's status, review, and size declarations."""
 
 from __future__ import annotations
 
@@ -148,7 +148,7 @@ def main() -> int:
             print(f"error: {error}", file=sys.stderr)
         return 1
 
-    print("PR status and review declarations are consistent with the pull request")
+    print("PR declarations are consistent with the pull request")
     return 0
 
 
