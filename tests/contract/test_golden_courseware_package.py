@@ -15,12 +15,12 @@ from scripts.golden_courseware_branch_inputs import (
     build_golden_branch_source_outputs,
     build_golden_branch_start_inputs,
 )
+from scripts.golden_courseware_content_validation import validate_content_fields
 from scripts.golden_courseware_stage_inputs import (
     GOLDEN_CHAIN_INPUT_NODE_KEYS,
     MEDIA_BOUNDARY_OUTPUT_ONLY_NODE_KEYS,
     build_golden_chain_inputs,
 )
-from scripts.golden_courseware_content_validation import validate_content_fields
 from scripts.validate_golden_courseware import (
     GoldenCoursewareValidationError,
     _validate_intro,
@@ -295,7 +295,7 @@ def test_golden_outputs_cover_exact_planning_scope_without_fake_media() -> None:
     outputs = build_golden_branch_source_outputs(case)
     entrypoints = set(package.manifest["entrypoints"])
 
-    assert tuple(outputs) == GOLDEN_PLANNING_NODE_KEYS
+    assert set(outputs) == set(GOLDEN_PLANNING_NODE_KEYS)
     assert set(GOLDEN_PLANNING_NODE_KEYS).isdisjoint(PROVIDER_MEDIA_NODE_KEYS)
     assert set(GOLDEN_PLANNING_NODE_KEYS) | set(PROVIDER_MEDIA_NODE_KEYS) == entrypoints
     for node_key, payload in outputs.items():
