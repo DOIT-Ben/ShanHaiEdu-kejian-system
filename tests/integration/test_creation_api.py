@@ -49,6 +49,11 @@ async def test_creation_http_flow_matches_the_shared_contract(
             assert "automation_mode" not in created_project
             project_id = UUID(created_project["id"])
 
+            initial_project = await client.get(f"/api/v2/projects/{project_id}")
+            assert initial_project.status_code == 200, initial_project.text
+            assert_contract_response(initial_project, operation_id="getProject", status="200")
+            initial_project_etag = initial_project.headers["ETag"]
+
             policy = await client.get(f"/api/v2/projects/{project_id}/automation-policy")
             assert policy.status_code == 200, policy.text
             assert_contract_response(
@@ -76,6 +81,7 @@ async def test_creation_http_flow_matches_the_shared_contract(
             workflow = await client.get(f"/api/v2/projects/{project_id}/workflow")
             assert project_detail.status_code == 200, project_detail.text
             assert project_detail.json()["data"]["execution_mode"] == "guided"
+            assert project_detail.headers["ETag"] != initial_project_etag
             assert project_list.status_code == 200, project_list.text
             assert project_list.json()["data"]["items"][0]["execution_mode"] == "guided"
             assert workflow.status_code == 200, workflow.text

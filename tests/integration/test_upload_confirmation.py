@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import func, select
 
+import apps.api.uploads.session_service as upload_session_module
 from apps.api.assets.models import FileAsset, FileAssetVersion
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import ApiError
@@ -22,6 +24,58 @@ from tests.fakes.identity import seed_test_actor
 from tests.fakes.object_storage import FakeObjectStorage
 
 SHA256 = "a" * 64
+
+
+def test_upload_session_replay_treats_subsecond_signing_window_as_expired(
+    migrated_database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = datetime(2026, 7, 19, tzinfo=UTC)
+    monkeypatch.setattr(upload_session_module, "utc_now", lambda: now)
+    factory = build_session_factory(build_engine(migrated_database_url))
+    storage = FakeObjectStorage()
+    with factory() as session:
+        with session.begin():
+            actor = seed_test_actor(session)
+            project = ProjectRepository(session, actor).create(
+                CreateProjectRequest(title="Fractions", knowledge_point="One half")
+            )
+        service = UploadSessionService(
+            session=session,
+            storage=storage,
+            actor=actor,
+            bucket="shanhaiedu",
+            ttl_seconds=900,
+            max_size_bytes=10_000,
+        )
+        payload = CreateUploadSessionRequest(
+            filename="lesson.pdf",
+            media_type="application/pdf",
+            size_bytes=4,
+            sha256=SHA256,
+        )
+        created = service.create_session(
+            project.id,
+            payload,
+            idempotency_key="create-upload-subsecond-window",
+            request_id="req-create-upload-subsecond-window",
+        )
+        with session.begin():
+            upload = session.get(UploadSession, created.upload_session_id)
+            assert upload is not None
+            upload.expires_at = now + timedelta(milliseconds=500)
+
+        with pytest.raises(ApiError) as expired:
+            service.create_session(
+                project.id,
+                payload,
+                idempotency_key="create-upload-subsecond-window",
+                request_id="req-replay-upload-subsecond-window",
+            )
+
+        assert expired.value.status_code == 409
+        assert expired.value.code == "PRECONDITION_NOT_MET"
+        assert len(storage.presigned_requests) == 1
 
 
 def test_upload_session_replay_resigns_without_persisting_the_presigned_url(

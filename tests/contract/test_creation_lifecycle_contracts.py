@@ -96,7 +96,11 @@ def test_project_limits_and_policy_etags_match_runtime_contract() -> None:
     assert project_fields["grade"]["maxLength"] == 40
     assert project_fields["textbook_edition"]["maxLength"] == 120
 
-    for operation_id in ("getProjectAutomationPolicy", "updateProjectAutomationPolicy"):
+    for operation_id in (
+        "getProject",
+        "getProjectAutomationPolicy",
+        "updateProjectAutomationPolicy",
+    ):
         assert "ETag" in operations[operation_id]["responses"]["200"]["headers"]
 
     runtime = create_app(settings=Settings(_env_file=None, environment="test")).openapi()
@@ -117,7 +121,11 @@ def test_project_limits_and_policy_etags_match_runtime_contract() -> None:
     update = runtime_operations["updateProjectAutomationPolicy"]
     parameters = {parameter["name"]: parameter for parameter in update["parameters"]}
     assert parameters["Idempotency-Key"]["schema"]["maxLength"] == 128
-    for operation_id in ("getProjectAutomationPolicy", "updateProjectAutomationPolicy"):
+    for operation_id in (
+        "getProject",
+        "getProjectAutomationPolicy",
+        "updateProjectAutomationPolicy",
+    ):
         assert "ETag" in runtime_operations[operation_id]["responses"]["200"]["headers"]
 
 
