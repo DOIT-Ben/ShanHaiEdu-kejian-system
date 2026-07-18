@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import ctypes
+import errno
 import json
 import os
 import shutil
+import sys
 import tempfile
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager
@@ -19,6 +22,9 @@ from workflow.content_package import (
 )
 
 OUTPUT_LOCK_SUFFIX = ".compile.lock"
+_AT_FDCWD = -100
+_RENAME_NOREPLACE = 1
+_RENAME_EXCL = 0x4
 
 
 class MarkdownTemplateCompilationError(ValueError):
@@ -44,8 +50,8 @@ def write_compiled_content_package(
 ) -> None:
     """Atomically write and validate a compiled package without overwriting paths."""
 
-    output = output_root.resolve()
-    if output.exists():
+    output = Path(os.path.abspath(output_root))
+    if _path_exists(output):
         raise MarkdownTemplateCompilationError(
             "MARKDOWN_COMPILE_OUTPUT_EXISTS",
             f"Output path already exists: {output.name}",
@@ -86,12 +92,14 @@ def _write_reserved_content_package(
                 f"Compiled content package failed validation: {exc.code}",
             ) from exc
         _require_output_absent(output)
-        temporary.rename(output)
+        _publish_directory_no_replace(temporary, output)
     except MarkdownTemplateCompilationError:
         raise
     except OSError as exc:
         code = (
-            "MARKDOWN_COMPILE_OUTPUT_EXISTS" if output.exists() else "MARKDOWN_COMPILE_WRITE_FAILED"
+            "MARKDOWN_COMPILE_OUTPUT_EXISTS"
+            if _target_exists(exc, output)
+            else "MARKDOWN_COMPILE_WRITE_FAILED"
         )
         raise MarkdownTemplateCompilationError(
             code,
@@ -103,11 +111,60 @@ def _write_reserved_content_package(
 
 
 def _require_output_absent(output: Path) -> None:
-    if output.exists():
+    if _path_exists(output):
         raise MarkdownTemplateCompilationError(
             "MARKDOWN_COMPILE_OUTPUT_EXISTS",
             f"Output path already exists: {output.name}",
         )
+
+
+def _path_exists(path: Path) -> bool:
+    return os.path.lexists(path)
+
+
+def _target_exists(error: OSError, output: Path) -> bool:
+    return error.errno in {errno.EEXIST, errno.ENOTEMPTY} or _path_exists(output)
+
+
+def _publish_directory_no_replace(source: Path, output: Path) -> None:
+    if sys.platform == "win32":
+        os.rename(source, output)
+        return
+    if sys.platform.startswith("linux"):
+        _call_no_replace(
+            "renameat2",
+            (ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint),
+            (_AT_FDCWD, os.fsencode(source), _AT_FDCWD, os.fsencode(output), _RENAME_NOREPLACE),
+            output,
+        )
+        return
+    if sys.platform == "darwin":
+        _call_no_replace(
+            "renamex_np",
+            (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint),
+            (os.fsencode(source), os.fsencode(output), _RENAME_EXCL),
+            output,
+        )
+        return
+    raise OSError(errno.ENOTSUP, "Atomic no-replace directory publishing is unavailable")
+
+
+def _call_no_replace(
+    function_name: str,
+    argument_types: tuple[Any, ...],
+    arguments: tuple[Any, ...],
+    output: Path,
+) -> None:
+    library = ctypes.CDLL(None, use_errno=True)
+    function = cast(Any, getattr(library, function_name, None))
+    if function is None:
+        raise OSError(errno.ENOTSUP, f"{function_name} is unavailable")
+    function.argtypes = list(argument_types)
+    function.restype = ctypes.c_int
+    if function(*arguments) == 0:
+        return
+    error_number = ctypes.get_errno()
+    raise OSError(error_number, os.strerror(error_number), output)
 
 
 @contextmanager

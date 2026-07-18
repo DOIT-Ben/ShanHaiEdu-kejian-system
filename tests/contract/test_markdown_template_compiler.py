@@ -504,7 +504,7 @@ def test_writer_refuses_a_target_created_after_the_final_absence_check(
         contracts_root=CONTRACTS,
     )
     output = tmp_path / "compiled-package"
-    original_require_absent = package_writer_module._require_output_absent
+    original_require_absent = cast(Any, package_writer_module)._require_output_absent
     absence_checks = 0
 
     def require_absent_then_race(path: Path) -> None:
