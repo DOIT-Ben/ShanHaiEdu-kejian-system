@@ -108,7 +108,7 @@ Generated code, schemas, migrations and focused fixtures may exceed size trigger
 
 Use test-driven development for domain behavior and bug fixes. Report exact commands and failures.
 
-Independent review is mandatory before a Pull Request becomes Ready or merges. The reviewer subagent reports findings first with file and line references, verifies the relevant commands, and records residual risk. All P0 and P1 findings must be closed. P2 and P3 findings must be fixed or explicitly accepted with a reason in the Pull Request. The primary agent posts the final review disposition and remains accountable for the merge decision.
+Independent review is mandatory before a Pull Request becomes Ready or merges. The reviewer subagent reports findings first with file and line references, verifies the relevant commands, and records residual risk. The review evidence binds the exact base SHA and head SHA. Any push, rebase or other head change invalidates the approval and requires a new review of the final diff. All P0 and P1 findings must be closed. P2 and P3 findings must be fixed or explicitly accepted with a reason in the Pull Request. The primary agent posts the final review disposition and remains accountable for the merge decision.
 
 This evidence-based approval does not require a second GitHub account and must not be represented as a fabricated GitHub `APPROVED` review. GitHub branch protection enforces required checks, linear history and resolved conversations; the Pull Request records the subagent review evidence.
 
