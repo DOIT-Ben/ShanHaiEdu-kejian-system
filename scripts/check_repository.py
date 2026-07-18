@@ -102,6 +102,13 @@ PROJECT_MEMORY_FORBIDDEN_PATTERNS = (
         ),
     ),
     (
+        "concrete commit state",
+        re.compile(
+            r"(?im)^\s*(?:[-*]\s*)?(?:当前\s*)?(?:提交|commit)"
+            r"\s*[:\N{FULLWIDTH COLON}]"
+        ),
+    ),
+    (
         "concrete pull request state",
         re.compile(
             r"(?im)^\s*(?:[-*]\s*)?(?:当前\s*)?(?:PR|Pull Request)"

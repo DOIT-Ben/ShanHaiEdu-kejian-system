@@ -66,10 +66,11 @@ def test_project_memory_index_requires_canonical_sections(tmp_path: Path) -> Non
     (
         (f"本机入口: {WINDOWS_ABSOLUTE_PATH}", "local absolute path"),
         (
-            "当前提交: 0123456789abcdef0123456789abcdef01234567",
+            "版本指纹: 0123456789abcdef0123456789abcdef01234567",
             "full commit SHA",
         ),
         ("当前分支: feat/123-live", "concrete branch state"),
+        ("当前提交: 0c636a8", "concrete commit state"),
         ("当前 PR: #93", "concrete pull request state"),
         ("当前端口: 8000", "concrete port state"),
     ),
