@@ -12,6 +12,7 @@ from apps.api.artifacts import models as artifact_models
 from apps.api.assets import models as asset_models
 from apps.api.assets import project_models as project_asset_models
 from apps.api.content_runtime import models as content_runtime_models
+from apps.api.creation import models as creation_models
 from apps.api.database import Base, sqlalchemy_url
 from apps.api.identity import models as identity_models
 from apps.api.jobs import models as job_models
@@ -32,6 +33,7 @@ _registered_models = (
     asset_models,
     project_asset_models,
     content_runtime_models,
+    creation_models,
     identity_models,
     job_models,
     lesson_models,

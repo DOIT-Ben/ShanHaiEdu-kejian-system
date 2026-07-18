@@ -92,3 +92,41 @@ class EventWriter:
         self._session.add_all((entry, outbox))
         self._session.flush()
         return entry
+
+
+def append_outbox_only(
+    session: Session,
+    organization_id: UUID,
+    *,
+    event_type: str,
+    resource: EventResource,
+    payload: dict[str, Any],
+    request_id: str | None,
+) -> OutboxEvent:
+    """Write a tenant event that has no project-scoped SSE stream."""
+    event_id = new_uuid7()
+    occurred_at = utc_now()
+    summary = {
+        "event_id": str(event_id),
+        "event_type": event_type,
+        "occurred_at": occurred_at.isoformat(),
+        "project_id": None,
+        "resource": {"type": resource.type, "id": str(resource.id)},
+        "payload": payload,
+        "request_id": request_id,
+    }
+    outbox = OutboxEvent(
+        event_id=event_id,
+        organization_id=organization_id,
+        topic=event_type,
+        aggregate_type=resource.type,
+        aggregate_id=resource.id,
+        payload_json=summary,
+        status="pending",
+        available_at=occurred_at,
+        attempt_count=0,
+        created_at=occurred_at,
+    )
+    session.add(outbox)
+    session.flush()
+    return outbox

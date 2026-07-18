@@ -7,10 +7,11 @@ from apps.api.ids import new_uuid7
 from apps.api.projects.schemas import CreateProjectRequest
 
 
-def test_create_project_defaults_to_assisted_primary_math_workflow() -> None:
+def test_create_project_defaults_to_guided_primary_math_workflow() -> None:
     request = CreateProjectRequest(title="Fractions", knowledge_point="Understanding one half")
 
-    assert request.automation_mode == "assisted"
+    assert request.automation_mode is None
+    assert request.execution_mode == "guided"
     assert request.grade is None
 
 

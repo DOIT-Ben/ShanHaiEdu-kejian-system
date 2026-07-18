@@ -6,7 +6,9 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from apps.api.projects.policy_schemas import AutomationPolicyMode
 
 AutomationMode = Literal["manual", "assisted", "automatic"]
 
@@ -18,7 +20,16 @@ class CreateProjectRequest(BaseModel):
     knowledge_point: str = Field(min_length=1, max_length=255)
     grade: str | None = Field(default=None, max_length=40)
     textbook_edition: str | None = Field(default=None, max_length=120)
-    automation_mode: AutomationMode = "assisted"
+    automation_mode: AutomationMode | None = None
+    execution_mode: AutomationPolicyMode | None = None
+
+    @model_validator(mode="after")
+    def select_execution_mode(self) -> CreateProjectRequest:
+        if self.automation_mode is not None and self.execution_mode is not None:
+            raise ValueError("automation_mode and execution_mode are mutually exclusive")
+        if self.automation_mode is None and self.execution_mode is None:
+            self.execution_mode = "guided"
+        return self
 
 
 class ProjectRead(BaseModel):

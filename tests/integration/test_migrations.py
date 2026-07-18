@@ -20,6 +20,11 @@ EXPECTED_TABLES = {
     "artifact_versions",
     "artifacts",
     "branch_runs",
+    "creation_batches",
+    "creation_items",
+    "creation_package_items",
+    "creation_packages",
+    "creation_prompt_versions",
     "content_definition_versions",
     "content_package_versions",
     "content_packages",
@@ -29,6 +34,7 @@ EXPECTED_TABLES = {
     "file_asset_versions",
     "file_assets",
     "generation_jobs",
+    "generation_results",
     "generation_attempts",
     "idempotency_records",
     "lesson_branch_configs",
@@ -44,8 +50,10 @@ EXPECTED_TABLES = {
     "prompt_snapshots",
     "project_members",
     "project_asset_slots",
+    "project_automation_policies",
     "event_stream_entries",
     "source_materials",
+    "save_to_project_operations",
     "upload_sessions",
     "usage_records",
     "users",
@@ -103,7 +111,7 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
             )
             == 3
         )
-    assert ScriptDirectory.from_config(config).get_current_head() == "b4a7c2d9e805"
+    assert ScriptDirectory.from_config(config).get_current_head() == "d2e5f8a1c604"
     previous = os.environ.get("SHANHAI_DATABASE_URL")
     os.environ["SHANHAI_DATABASE_URL"] = postgres_database_url
     try:
@@ -163,6 +171,18 @@ def test_stage0_project_data_survives_identity_migration(postgres_database_url: 
         ).one()
         assert pinned_versions == (
             UUID("01970000-0000-7000-8000-000000000003"),
+            UUID("01970000-0000-7000-8000-000000000006"),
+        )
+        policy = connection.execute(
+            text(
+                "SELECT mode, policy_version, workflow_definition_version_id "
+                "FROM project_automation_policies WHERE project_id = :id"
+            ),
+            {"id": project_id},
+        ).one()
+        assert policy == (
+            "guided",
+            1,
             UUID("01970000-0000-7000-8000-000000000006"),
         )
         principal = connection.execute(

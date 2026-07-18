@@ -13,7 +13,8 @@ from apps.api.database import utc_now
 from apps.api.identity.context import ActorContext
 from apps.api.identity.models import ProjectMember
 from apps.api.ids import new_uuid7
-from apps.api.projects.models import Project
+from apps.api.projects.models import AutomationPolicy, Project
+from apps.api.projects.policy_schemas import initial_policy_values
 from apps.api.projects.schemas import CreateProjectRequest
 
 
@@ -46,7 +47,10 @@ class ProjectRepository:
             knowledge_point=request.knowledge_point,
             default_language="zh-CN",
             status="draft",
-            automation_mode=request.automation_mode,
+            automation_mode=(
+                request.automation_mode
+                or ("automatic" if request.execution_mode == "automatic" else "assisted")
+            ),
             owner_principal_id=self._actor.principal_id,
             content_release_id=self._defaults.content_release_id,
             workflow_definition_version_id=self._defaults.workflow_definition_version_id,
@@ -63,6 +67,23 @@ class ProjectRepository:
             created_at=utc_now(),
         )
         self._session.add(membership)
+        policy_mode, node_rules = initial_policy_values(
+            execution_mode=request.execution_mode,
+            automation_mode=request.automation_mode,
+        )
+        self._session.add(
+            AutomationPolicy(
+                id=new_uuid7(),
+                organization_id=self._actor.organization_id,
+                project_id=project.id,
+                workflow_definition_version_id=project.workflow_definition_version_id,
+                mode=policy_mode,
+                node_rules_json=node_rules,
+                policy_version=1,
+                created_at=utc_now(),
+                created_by=self._actor.principal_id,
+            )
+        )
         self._session.flush()
         return project
 

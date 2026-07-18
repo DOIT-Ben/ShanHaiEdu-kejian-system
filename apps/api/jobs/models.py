@@ -6,6 +6,7 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Uuid
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from apps.api.database import Base, MutableAuditMixin
@@ -24,7 +25,8 @@ class GenerationJob(MutableAuditMixin, Base):
         CheckConstraint("attempt_count >= 0", name="attempt_count_nonnegative"),
         CheckConstraint("lock_version >= 1", name="lock_version_positive"),
         CheckConstraint(
-            "project_id IS NOT NULL OR source_material_id IS NOT NULL",
+            "project_id IS NOT NULL OR source_material_id IS NOT NULL "
+            "OR creation_prompt_version_id IS NOT NULL OR creation_batch_id IS NOT NULL",
             name="stage0_source_present",
         ),
         Index(
@@ -46,6 +48,13 @@ class GenerationJob(MutableAuditMixin, Base):
     source_material_id: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("source_materials.id", ondelete="RESTRICT")
     )
+    creation_prompt_version_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("creation_prompt_versions.id", ondelete="RESTRICT")
+    )
+    creation_batch_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("creation_batches.id", ondelete="RESTRICT")
+    )
+    creation_request_json: Mapped[dict[str, object] | None] = mapped_column(JSONB)
     job_type: Mapped[str] = mapped_column(String(100), nullable=False)
     status: Mapped[str] = mapped_column(String(30), nullable=False)
     progress_percent: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
