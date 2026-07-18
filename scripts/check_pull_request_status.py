@@ -25,6 +25,11 @@ SIZE_DECLARATION = re.compile(
     r"`(?P<choice>pr-size-(?:within-limit|review-map-required))`",
     re.MULTILINE,
 )
+MARKDOWN_H2_SECTION = re.compile(
+    r"^##[ \t]+.*?(?=^##[ \t]+|\Z)",
+    re.MULTILINE | re.DOTALL,
+)
+FIRST_REQUIRED_GOVERNANCE_PR = 93
 
 
 def validate_status_declaration(body: str, changed_files: set[str]) -> list[str]:
@@ -40,34 +45,62 @@ def validate_status_declaration(body: str, changed_files: set[str]) -> list[str]
     return []
 
 
-def _review_field(body: str, label: str) -> str:
-    field = re.search(
+def _review_field_values(section: str, label: str) -> list[str]:
+    fields = re.finditer(
         rf"^\s*{re.escape(label)}\s*[\uFF1A:]\s*(?P<value>.*?)\s*$",
-        body,
+        section,
         re.MULTILINE,
     )
-    if field is None:
-        return ""
-    return field.group("value").strip().strip("`").strip()
+    return [field.group("value").strip().strip("`").strip() for field in fields]
 
 
-def validate_review_declaration(body: str, base_sha: str, head_sha: str) -> list[str]:
+def validate_review_declaration(
+    body: str,
+    base_sha: str,
+    head_sha: str,
+    *,
+    required: bool = False,
+    is_draft: bool = True,
+) -> list[str]:
     if REVIEW_MARKER.search(body) is None:
+        if required:
+            return ["PR must contain exactly one subagent review section"]
         return []
+
+    review_sections = [
+        match.group()
+        for match in MARKDOWN_H2_SECTION.finditer(body)
+        if REVIEW_MARKER.search(match.group()) is not None
+    ]
+    if len(review_sections) != 1:
+        return ["PR must contain exactly one subagent review section"]
+    section = review_sections[0]
 
     choices = [
         match.group("choice")
-        for match in REVIEW_DECLARATION.finditer(body)
+        for match in REVIEW_DECLARATION.finditer(section)
         if match.group("checked").lower() == "x"
     ]
     if len(choices) != 1:
         return ["PR must select exactly one subagent review declaration"]
-    if choices[0] == "subagent-review-pending":
-        return []
 
     errors: list[str] = []
-    declared_base = _review_field(body, "Base SHA")
-    declared_head = _review_field(body, "Head SHA")
+    base_fields = _review_field_values(section, "Base SHA")
+    head_fields = _review_field_values(section, "Head SHA")
+    if len(base_fields) != 1:
+        errors.append("subagent review section must contain exactly one Base SHA field")
+    if len(head_fields) != 1:
+        errors.append("subagent review section must contain exactly one Head SHA field")
+    if errors:
+        return errors
+
+    if choices[0] == "subagent-review-pending":
+        if not is_draft:
+            return ["non-draft PR must select subagent-review-approved"]
+        return []
+
+    declared_base = base_fields[0]
+    declared_head = head_fields[0]
     if FULL_SHA.fullmatch(declared_base) is None:
         errors.append("subagent-review-approved requires a full 40-character Base SHA")
     elif declared_base.lower() != base_sha.lower():
@@ -84,8 +117,13 @@ def validate_size_declaration(
     changed_file_count: int,
     additions: int,
     deletions: int,
+    binary_file_count: int = 0,
+    *,
+    required: bool = False,
 ) -> list[str]:
     if SIZE_MARKER.search(body) is None:
+        if required:
+            return ["PR must select exactly one pull request size declaration"]
         return []
 
     choices = [
@@ -96,7 +134,9 @@ def validate_size_declaration(
     if len(choices) != 1:
         return ["PR must select exactly one pull request size declaration"]
 
-    exceeds_raw_trigger = changed_file_count > 20 or additions - deletions > 800
+    exceeds_raw_trigger = (
+        changed_file_count > 20 or additions - deletions > 800 or binary_file_count > 0
+    )
     if exceeds_raw_trigger and choices[0] != "pr-size-review-map-required":
         return ["PR exceeds the raw size trigger but does not require a review map"]
     if not exceeds_raw_trigger and choices[0] != "pr-size-within-limit":
@@ -114,21 +154,41 @@ def changed_files(base_sha: str, head_sha: str) -> set[str]:
     return {line for line in result.stdout.splitlines() if line}
 
 
-def changed_line_counts(base_sha: str, head_sha: str) -> tuple[int, int]:
+def parse_numstat(output: str) -> tuple[int, int, int]:
+    additions = 0
+    deletions = 0
+    binary_file_count = 0
+    for line in output.splitlines():
+        parts = line.split("\t", 2)
+        if len(parts) != 3:
+            binary_file_count += 1
+            continue
+        added, deleted, _path = parts
+        if added.isdigit() and deleted.isdigit():
+            additions += int(added)
+            deletions += int(deleted)
+        else:
+            binary_file_count += 1
+    return additions, deletions, binary_file_count
+
+
+def changed_line_counts(base_sha: str, head_sha: str) -> tuple[int, int, int]:
     result = subprocess.run(
         ["git", "diff", "--numstat", f"{base_sha}...{head_sha}"],
         check=True,
         capture_output=True,
         text=True,
     )
-    additions = 0
-    deletions = 0
-    for line in result.stdout.splitlines():
-        added, deleted, _path = line.split("\t", 2)
-        if added.isdigit() and deleted.isdigit():
-            additions += int(added)
-            deletions += int(deleted)
-    return additions, deletions
+    return parse_numstat(result.stdout)
+
+
+def parse_bool(value: str) -> bool:
+    normalized = value.lower()
+    if normalized == "true":
+        return True
+    if normalized == "false":
+        return False
+    raise argparse.ArgumentTypeError("expected true or false")
 
 
 def main() -> int:
@@ -136,13 +196,33 @@ def main() -> int:
     parser.add_argument("--base-sha", required=True)
     parser.add_argument("--head-sha", required=True)
     parser.add_argument("--body", required=True)
+    parser.add_argument("--pr-number", required=True, type=int)
+    parser.add_argument("--is-draft", required=True, type=parse_bool)
     args = parser.parse_args()
 
     files = changed_files(args.base_sha, args.head_sha)
-    additions, deletions = changed_line_counts(args.base_sha, args.head_sha)
+    additions, deletions, binary_file_count = changed_line_counts(args.base_sha, args.head_sha)
+    declarations_required = args.pr_number >= FIRST_REQUIRED_GOVERNANCE_PR
     errors = validate_status_declaration(args.body, files)
-    errors.extend(validate_review_declaration(args.body, args.base_sha, args.head_sha))
-    errors.extend(validate_size_declaration(args.body, len(files), additions, deletions))
+    errors.extend(
+        validate_review_declaration(
+            args.body,
+            args.base_sha,
+            args.head_sha,
+            required=declarations_required,
+            is_draft=args.is_draft,
+        )
+    )
+    errors.extend(
+        validate_size_declaration(
+            args.body,
+            len(files),
+            additions,
+            deletions,
+            binary_file_count,
+            required=declarations_required,
+        )
+    )
     if errors:
         for error in errors:
             print(f"error: {error}", file=sys.stderr)
