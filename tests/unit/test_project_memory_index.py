@@ -37,6 +37,7 @@ VALID_INDEX = """\
 
 内容。
 """
+WINDOWS_ABSOLUTE_PATH = "E" + ":" + r"\workspace\ShanHaiEdu"
 
 
 def validate(tmp_path: Path, text: str) -> list[str]:
@@ -63,7 +64,7 @@ def test_project_memory_index_requires_canonical_sections(tmp_path: Path) -> Non
 @pytest.mark.parametrize(
     ("ephemeral", "expected"),
     (
-        (r"本机入口: E:\\workspace\\ShanHaiEdu", "local absolute path"),
+        (f"本机入口: {WINDOWS_ABSOLUTE_PATH}", "local absolute path"),
         (
             "当前提交: 0123456789abcdef0123456789abcdef01234567",
             "full commit SHA",

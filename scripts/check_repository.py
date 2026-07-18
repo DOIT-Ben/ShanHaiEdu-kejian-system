@@ -27,6 +27,7 @@ REQUIRED = {
     "docs/governance/TEAM_WORKFLOW.md",
     "docs/governance/DOCUMENT_POLICY.md",
     "docs/governance/DELIVERY_ROADMAP.md",
+    "docs/governance/项目记忆与接手索引.md",
     "contracts/api-surface.openapi.yaml",
     "contracts/generated/openapi.bundle.yaml",
     "contracts/generated/typescript/schema.ts",
@@ -73,6 +74,47 @@ STALE_BACKEND_CLAIMS = (
 BACKEND_STAGE_ACKNOWLEDGEMENT = re.compile(
     rf"^当前阶段{FULLWIDTH_COLON}.*阶段1",
     re.MULTILINE,
+)
+PROJECT_MEMORY_SECTIONS = (
+    "# 项目记忆与接手索引",
+    "## 职责和权威",
+    "## 接手读取顺序",
+    "## 稳定产品原则",
+    "## 模块与事实入口",
+    "## 验证入口",
+    "## 记忆边界",
+    "## 维护责任",
+)
+PROJECT_MEMORY_FORBIDDEN_PATTERNS = (
+    (
+        "local absolute path",
+        re.compile(r"(?i)(?<![a-z0-9_])[a-z]:[\\/]"),
+    ),
+    (
+        "full commit SHA",
+        re.compile(r"(?i)(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])"),
+    ),
+    (
+        "concrete branch state",
+        re.compile(
+            r"(?im)^\s*(?:[-*]\s*)?(?:当前\s*)?(?:分支|branch)"
+            r"\s*[:\N{FULLWIDTH COLON}]"
+        ),
+    ),
+    (
+        "concrete pull request state",
+        re.compile(
+            r"(?im)^\s*(?:[-*]\s*)?(?:当前\s*)?(?:PR|Pull Request)"
+            r"\s*[:\N{FULLWIDTH COLON}]"
+        ),
+    ),
+    (
+        "concrete port state",
+        re.compile(
+            r"(?im)^\s*(?:[-*]\s*)?(?:当前\s*)?(?:端口|port)"
+            r"\s*[:\N{FULLWIDTH COLON}]"
+        ),
+    ),
 )
 
 
@@ -181,6 +223,23 @@ def check_current_status(status: Path, root: Path, errors: list[str]) -> None:
             errors.append(f"CURRENT_STATUS.md contains a stale backend claim: {claim}")
 
 
+def check_project_memory_index(index: Path, errors: list[str]) -> None:
+    try:
+        text = index.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        errors.append(f"cannot read project memory index: {exc}")
+        return
+
+    lines = set(text.splitlines())
+    for section in PROJECT_MEMORY_SECTIONS:
+        if section not in lines:
+            errors.append(f"project memory index missing required section: {section}")
+
+    for label, pattern in PROJECT_MEMORY_FORBIDDEN_PATTERNS:
+        if pattern.search(text) is not None:
+            errors.append(f"project memory index contains {label}")
+
+
 def check_checksum_manifest(manifest: Path, errors: list[str]) -> None:
     try:
         lines = manifest.read_text(encoding="utf-8").splitlines()
@@ -239,6 +298,7 @@ def main() -> int:
     check_yaml(files, errors)
     check_markdown_links(files, errors)
     check_current_status(ROOT / "CURRENT_STATUS.md", ROOT, errors)
+    check_project_memory_index(ROOT / "docs/governance/项目记忆与接手索引.md", errors)
     check_checksum_manifest(FRONTEND_CHECKSUMS, errors)
     report_size_triggers(files)
 
