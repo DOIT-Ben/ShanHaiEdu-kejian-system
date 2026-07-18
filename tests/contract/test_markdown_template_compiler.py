@@ -240,13 +240,19 @@ def test_compilation_profile_is_validated_at_the_boundary() -> None:
     )
 
 
-@pytest.mark.parametrize("title_owner", ["document", "section"])
-def test_projection_titles_reject_template_expression_syntax(title_owner: str) -> None:
+@pytest.mark.parametrize("title_owner", ["document", "section", "subsection"])
+@pytest.mark.parametrize("unsafe_title", ["{{overview}}", "基本信息\n\n## 注入标题"])
+def test_projection_titles_reject_structure_syntax(
+    title_owner: str,
+    unsafe_title: str,
+) -> None:
     draft = ready_draft()
     if title_owner == "document":
-        draft["title"] = "{{overview}}"
+        draft["title"] = unsafe_title
+    elif title_owner == "section":
+        draft["sections"][0]["title"] = unsafe_title
     else:
-        draft["sections"][0]["title"] = "{{overview}}"
+        draft["sections"][5]["subsections"][0]["title"] = unsafe_title
 
     assert_compilation_error(
         draft,
@@ -326,7 +332,10 @@ def test_forbidden_context_source_is_rejected_before_package_writing() -> None:
     )
 
 
-@pytest.mark.parametrize("capability", ["text.gpt-4o", "text.gpt4o"])
+@pytest.mark.parametrize(
+    "capability",
+    ["text.gpt-4o", "text.gpt4o", "text.deepseek", "text.grok"],
+)
 def test_provider_specific_model_capability_is_rejected(capability: str) -> None:
     profile = compilation_profile()
     profile["model_capability"] = capability

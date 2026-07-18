@@ -12,19 +12,20 @@ from typing import Any, cast
 from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 
 MAX_NODE_CATALOG_BYTES = 5_000_000
-ALLOWED_CAPABILITY_PREFIXES = ("text.", "vision.", "image.", "video.", "audio.")
-FORBIDDEN_CAPABILITY_TOKENS = frozenset(
+REGISTERED_MODEL_CAPABILITIES = frozenset(
     {
-        "anthropic",
-        "azure",
-        "claude",
-        "doubao",
-        "gemini",
-        "google",
-        "gpt",
-        "openai",
-        "provider",
-        "qwen",
+        "audio.tts.child_friendly_zh",
+        "image.generate.education_16x9",
+        "text.structured.audio_plan",
+        "text.structured.creative_education",
+        "text.structured.creative_video",
+        "text.structured.image_prompt",
+        "text.structured.ppt_content",
+        "text.structured.ppt_design",
+        "text.structured.ppt_page_design",
+        "text.structured.zh_primary_math",
+        "video.image_to_video.6s_30s",
+        "vision.evaluate.classroom_video",
     }
 )
 FORBIDDEN_EXECUTOR_TOKENS = frozenset(
@@ -257,15 +258,12 @@ def _validate_reference_role(role: dict[str, Any]) -> None:
 
 
 def validate_model_capability(capability: str) -> None:
-    """Reject Provider-specific names at the shared workflow contract boundary."""
+    """Require a registered logical capability at the workflow contract boundary."""
 
-    normalized = capability.lower()
-    if not capability.startswith(ALLOWED_CAPABILITY_PREFIXES) or any(
-        token in normalized for token in FORBIDDEN_CAPABILITY_TOKENS
-    ):
+    if capability not in REGISTERED_MODEL_CAPABILITIES:
         raise NodeGenerationBindingError(
             "NODE_BINDING_CAPABILITY_FORBIDDEN",
-            f"model capability must be provider-neutral: {capability}",
+            f"model capability must be registered and provider-neutral: {capability}",
         )
 
 

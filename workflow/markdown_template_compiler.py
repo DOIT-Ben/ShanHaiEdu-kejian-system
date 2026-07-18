@@ -138,10 +138,10 @@ def _validate_draft_semantics(draft: Mapping[str, Any]) -> None:
             subsection_title = cast(str, subsection["title"])
             titles.append(subsection_title)
             fragments.extend((subsection_title, cast(str, subsection["body_markdown"])))
-    if any("{{" in title or "}}" in title for title in titles):
+    if any("\r" in title or "\n" in title or "{{" in title or "}}" in title for title in titles):
         raise MarkdownTemplateCompilationError(
             "MARKDOWN_COMPILE_TEMPLATE_SYNTAX_FORBIDDEN",
-            "Template titles cannot contain projection expression syntax",
+            "Template titles must be single-line and cannot contain projection expressions",
         )
     try:
         for fragment in fragments:
