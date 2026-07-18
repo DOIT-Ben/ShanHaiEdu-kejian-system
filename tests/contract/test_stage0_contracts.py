@@ -72,8 +72,10 @@ def resolve_external_refs(value: Any) -> Any:
     if not isinstance(value, dict):
         return value
     reference = value.get("$ref")
-    if isinstance(reference, str) and reference.startswith("./"):
-        return resolve_external_refs(load_json(CONTRACTS / reference[2:]))
+    if isinstance(reference, str) and not reference.startswith("#"):
+        relative_reference = reference[2:] if reference.startswith("./") else reference
+        if "://" not in relative_reference:
+            return resolve_external_refs(load_json(CONTRACTS / relative_reference))
     return {key: resolve_external_refs(item) for key, item in value.items()}
 
 
@@ -89,7 +91,11 @@ def test_mock_registry_and_all_stage0_fixtures_match_contracts() -> None:
     operations = operations_by_id(openapi)
 
     scenario_ids: set[str] = set()
-    for scenario in registry["stage0_contract_scenarios"]:
+    contract_scenarios = [
+        *registry["stage0_contract_scenarios"],
+        *registry["creation_contract_scenarios"],
+    ]
+    for scenario in contract_scenarios:
         assert scenario["id"] not in scenario_ids
         scenario_ids.add(scenario["id"])
         fixture_path = (CONTRACTS / scenario["fixture"]).resolve()
@@ -104,7 +110,7 @@ def test_mock_registry_and_all_stage0_fixtures_match_contracts() -> None:
                 scenario["media_type"],
             )
         else:
-            schema = load_json(CONTRACTS / scenario["schema_file"])
+            schema = resolve_external_refs(load_json(CONTRACTS / scenario["schema_file"]))
         validate(fixture, schema)
 
 

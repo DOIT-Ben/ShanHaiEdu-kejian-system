@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shanhaiedu.local/contracts/creation-lifecycle-event.schema.json",
+  "title": "CreationLifecycleEvent",
+  "allOf": [
+    {"$ref": "#/$defs/base_event"},
+    {
+      "oneOf": [
+        {"$ref": "#/$defs/prompt_version_saved"},
+        {"$ref": "#/$defs/candidate_adopted"},
+        {"$ref": "#/$defs/project_save_completed"},
+        {"$ref": "#/$defs/downstream_stale_propagated"}
+      ]
+    }
+  ],
+  "$defs": {
+    "base_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_id", "sequence_no", "event_type", "occurred_at", "resource", "payload"],
+      "properties": {
+        "event_id": {"type": "string", "format": "uuid"},
+        "sequence_no": {"type": "integer", "minimum": 1},
+        "event_type": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+        },
+        "occurred_at": {"type": "string", "format": "date-time"},
+        "project_id": {"type": ["string", "null"], "format": "uuid"},
+        "resource": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "id"],
+          "properties": {
+            "type": {"type": "string", "minLength": 1},
+            "id": {"type": "string", "format": "uuid"}
+          }
+        },
+        "payload": {"type": "object", "additionalProperties": true},
+        "request_id": {"type": ["string", "null"]}
+      }
+    },
+    "prompt_version_saved": {
+      "type": "object",
+      "properties": {
+        "event_type": {"const": "creation.prompt_version.saved"},
+        "resource": {
+          "type": "object",
+          "properties": {"type": {"const": "prompt_version"}}
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["creation_item_id", "prompt_version_id", "version_no"],
+          "properties": {
+            "creation_item_id": {"type": "string", "format": "uuid"},
+            "prompt_version_id": {"type": "string", "format": "uuid"},
+            "version_no": {"type": "integer", "minimum": 1}
+          }
+        }
+      }
+    },
+    "candidate_adopted": {
+      "type": "object",
+      "properties": {
+        "event_type": {"const": "creation.candidate.adopted"},
+        "resource": {
+          "type": "object",
+          "properties": {"type": {"const": "adoption"}}
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["creation_item_id", "generation_result_id", "adoption_mode"],
+          "properties": {
+            "creation_item_id": {"type": "string", "format": "uuid"},
+            "generation_result_id": {"type": "string", "format": "uuid"},
+            "adoption_mode": {"enum": ["teacher", "automation_policy"]}
+          }
+        }
+      }
+    },
+    "project_save_completed": {
+      "type": "object",
+      "properties": {
+        "event_type": {"const": "creation.project_save.completed"},
+        "resource": {
+          "type": "object",
+          "properties": {"type": {"const": "save_to_project_operation"}}
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["adoption_id", "binding_id", "target_project_id", "target_slot_key"],
+          "properties": {
+            "adoption_id": {"type": "string", "format": "uuid"},
+            "binding_id": {"type": "string", "format": "uuid"},
+            "target_project_id": {"type": "string", "format": "uuid"},
+            "target_slot_key": {"type": "string", "minLength": 1, "maxLength": 160}
+          }
+        }
+      }
+    },
+    "downstream_stale_propagated": {
+      "type": "object",
+      "properties": {
+        "event_type": {"const": "workflow.downstream_stale.propagated"},
+        "resource": {
+          "type": "object",
+          "properties": {"type": {"enum": ["artifact", "node_run"]}}
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source_version_id", "affected_resource_ids", "reason_code"],
+          "properties": {
+            "source_version_id": {"type": "string", "format": "uuid"},
+            "affected_resource_ids": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {"type": "string", "format": "uuid"}
+            },
+            "reason_code": {"const": "UPSTREAM_APPROVED_VERSION_CHANGED"}
+          }
+        }
+      }
+    }
+  }
+}

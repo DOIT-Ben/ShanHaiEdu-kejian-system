@@ -50,3 +50,17 @@
 - 新增可选字段为兼容变更；消费者须忽略未知字段。
 - 删除、改名、改变枚举语义、从可选改必填、收窄类型为破坏性变更。
 - 对未知节点状态，前端展示“状态待升级”并允许刷新，不能误判为成功。
+- 替换现有对象形状时，使用包含完整旧分支和强判别新分支的`oneOf`；新分支必须以`source_kind`等稳定判别字段收窄，不能依赖字段猜测来源。
+- 旧枚举、字段和端点先在OpenAPI标记`deprecated`并由服务端适配到新领域命令；Issue #11完成全部消费者迁移且可观测使用量归零前不得删除。
+- 旧`manual/assisted`只作为兼容输入，分别映射为带不同节点规则的`guided`；历史策略快照保留原始值，不在读取时伪装成新事实。
+- 兼容适配器可以在一次旧请求内调用多个新命令，但必须分别产生提示词版本、采用、写回和审计事实；新客户端不得依赖该复合行为。
+
+## 创作命令错误
+
+- `CREATION_PACKAGE_REQUIRED`：project来源缺少CreationPackage。
+- `CREATION_SOURCE_MISMATCH`：批次来源判别与实际来源不一致。
+- `PROMPT_VERSION_STALE`：生成请求引用的提示词版本已不允许执行。
+- `CANDIDATE_NOT_ADOPTED`：写回请求没有有效采用记录。
+- `TARGET_OVERRIDE_FORBIDDEN`：project来源尝试覆盖包内项目或槽位。
+- `PROJECT_TARGET_FORBIDDEN`：standalone来源无目标权限或目标槽位不允许该资产。
+- `IDEMPOTENCY_CONFLICT`：同一幂等键对应不同请求摘要。

@@ -1,0 +1,12 @@
+{
+  "data": {
+    "operation_id": "018f1000-0000-7000-8000-000000000041",
+    "adoption_id": "018f1000-0000-7000-8000-000000000031",
+    "status": "completed",
+    "binding_id": "018f1000-0000-7000-8000-000000000042",
+    "target_project_id": "018f1000-0000-7000-8000-000000000003",
+    "target_slot_key": "lesson.01.ppt.page.05.main_visual",
+    "idempotent_replay": false
+  },
+  "request_id": "req-project-save-001"
+}

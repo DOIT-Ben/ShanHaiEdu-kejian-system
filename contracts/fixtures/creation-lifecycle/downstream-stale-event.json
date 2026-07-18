@@ -1,0 +1,19 @@
+{
+  "event_id": "018f1000-0000-7000-8000-000000000061",
+  "sequence_no": 42,
+  "event_type": "workflow.downstream_stale.propagated",
+  "occurred_at": "2026-07-18T03:07:00Z",
+  "project_id": "018f1000-0000-7000-8000-000000000003",
+  "resource": {
+    "type": "artifact",
+    "id": "018f1000-0000-7000-8000-000000000062"
+  },
+  "payload": {
+    "source_version_id": "018f1000-0000-7000-8000-000000000063",
+    "affected_resource_ids": [
+      "018f1000-0000-7000-8000-000000000062"
+    ],
+    "reason_code": "UPSTREAM_APPROVED_VERSION_CHANGED"
+  },
+  "request_id": "req-stale-001"
+}

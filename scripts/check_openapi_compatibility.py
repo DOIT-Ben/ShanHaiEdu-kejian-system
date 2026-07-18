@@ -154,6 +154,46 @@ def compare_schema(
             errors.append(f"{location}: schema changed incompatibly")
         return
 
+    base_variants = resolved_base.get("oneOf")
+    current_variants = resolved_current.get("oneOf")
+    if isinstance(base_variants, list):
+        candidate_variants = (
+            current_variants if isinstance(current_variants, list) else [resolved_current]
+        )
+        for base_variant in base_variants:
+            for current_variant in candidate_variants:
+                variant_errors: list[str] = []
+                compare_schema(
+                    base_document,
+                    current_document,
+                    base_variant,
+                    current_variant,
+                    location,
+                    variant_errors,
+                )
+                if not variant_errors:
+                    break
+            else:
+                errors.append(f"{location}: backward-compatible schema branch was removed")
+                return
+        return
+
+    if isinstance(current_variants, list):
+        for variant in current_variants:
+            variant_errors: list[str] = []
+            compare_schema(
+                base_document,
+                current_document,
+                resolved_base,
+                variant,
+                location,
+                variant_errors,
+            )
+            if not variant_errors:
+                return
+        errors.append(f"{location}: no backward-compatible schema branch remains")
+        return
+
     for keyword in ("type", "const"):
         if keyword in resolved_base and resolved_base.get(keyword) != resolved_current.get(keyword):
             errors.append(f"{location}: {keyword} changed")

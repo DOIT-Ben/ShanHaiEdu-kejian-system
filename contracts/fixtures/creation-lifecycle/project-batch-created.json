@@ -1,0 +1,27 @@
+{
+  "data": {
+    "id": "018f1000-0000-7000-8000-000000000001",
+    "source_kind": "project",
+    "creation_package_id": "018f1000-0000-7000-8000-000000000002",
+    "source": {
+      "project_id": "018f1000-0000-7000-8000-000000000003",
+      "workflow_run_id": "018f1000-0000-7000-8000-000000000004",
+      "source_node_run_id": "018f1000-0000-7000-8000-000000000005"
+    },
+    "studio_type": "image",
+    "title": "百分数PPT正文图片",
+    "status": "ready",
+    "items": [
+      {
+        "id": "018f1000-0000-7000-8000-000000000006",
+        "item_key": "ppt.page.05.main_visual",
+        "title": "第5页主视觉",
+        "status": "ready",
+        "current_prompt_version_id": null,
+        "active_adoption_id": null,
+        "target_slot_key": "lesson.01.ppt.page.05.main_visual"
+      }
+    ]
+  },
+  "request_id": "req-project-batch-001"
+}
