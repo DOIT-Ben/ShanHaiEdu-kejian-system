@@ -1,0 +1,299 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shanhaiedu.local/contracts/golden-courseware-case.schema.json",
+  "title": "GoldenCoursewareCase",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "case_version",
+    "case_key",
+    "title",
+    "source",
+    "project",
+    "knowledge_boundary",
+    "material_evidence",
+    "teacher_preferences",
+    "generation_templates",
+    "lesson_division",
+    "lesson_plan",
+    "intro_option_set",
+    "intro_selection",
+    "ppt",
+    "video",
+    "delivery_expectations"
+  ],
+  "properties": {
+    "case_version": {"const": "shanhai.golden-courseware-case/v1"},
+    "case_key": {"$ref": "#/$defs/key"},
+    "title": {"type": "string", "minLength": 1},
+    "source": {"$ref": "#/$defs/source"},
+    "project": {"$ref": "#/$defs/project"},
+    "knowledge_boundary": {"$ref": "#/$defs/knowledgeBoundary"},
+    "material_evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/evidence"}
+    },
+    "teacher_preferences": {"type": "object", "additionalProperties": true},
+    "generation_templates": {
+      "type": "array",
+      "minItems": 23,
+      "maxItems": 23,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/key"}
+    },
+    "lesson_division": {"$ref": "#/$defs/lessonDivision"},
+    "lesson_plan": {"$ref": "#/$defs/lessonPlan"},
+    "intro_option_set": {"$ref": "#/$defs/introOptionSet"},
+    "intro_selection": {"$ref": "#/$defs/introSelection"},
+    "ppt": {"$ref": "#/$defs/ppt"},
+    "video": {"$ref": "#/$defs/video"},
+    "delivery_expectations": {"type": "object", "additionalProperties": true}
+  },
+  "$defs": {
+    "key": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{1,159}$"},
+    "nonEmptyStrings": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_key", "file_name", "sha256", "pdf_page_count", "pdf_page_indexes", "printed_pages", "page_mappings", "verification"],
+      "properties": {
+        "source_key": {"$ref": "#/$defs/key"},
+        "file_name": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "pdf_page_count": {"type": "integer", "minimum": 1},
+        "pdf_page_indexes": {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 1}, "uniqueItems": true},
+        "printed_pages": {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 1}, "uniqueItems": true},
+        "page_mappings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pdf_page_index", "printed_page", "evidence_keys", "scope_summary"],
+            "properties": {
+              "pdf_page_index": {"type": "integer", "minimum": 1},
+              "printed_page": {"type": "integer", "minimum": 1},
+              "evidence_keys": {"$ref": "#/$defs/nonEmptyStrings"},
+              "scope_summary": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        "verification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["hash_verified", "page_count_verified", "page_range_visually_verified", "raw_source_committed"],
+          "properties": {
+            "hash_verified": {"type": "boolean"},
+            "page_count_verified": {"type": "boolean"},
+            "page_range_visually_verified": {"type": "boolean"},
+            "raw_source_committed": {"const": false}
+          }
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_key", "subject", "grade", "textbook_version", "volume", "unit_title", "topic", "lesson_duration_minutes", "enabled_branches"],
+      "properties": {
+        "project_key": {"$ref": "#/$defs/key"},
+        "subject": {"const": "小学数学"},
+        "grade": {"type": "string", "minLength": 1},
+        "textbook_version": {"type": "string", "minLength": 1},
+        "volume": {"type": "string", "minLength": 1},
+        "unit_title": {"type": "string", "minLength": 1},
+        "topic": {"type": "string", "minLength": 1},
+        "lesson_duration_minutes": {"type": "integer", "minimum": 30, "maximum": 60},
+        "enabled_branches": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["lesson_plan", "intro_options", "ppt", "video"]}}
+      }
+    },
+    "knowledgeBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["must_teach", "may_practice", "must_not_preteach"],
+      "properties": {
+        "must_teach": {"$ref": "#/$defs/nonEmptyStrings"},
+        "may_practice": {"$ref": "#/$defs/nonEmptyStrings"},
+        "must_not_preteach": {"$ref": "#/$defs/nonEmptyStrings"}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_key", "pdf_page_index", "printed_page", "locator", "supported_claim"],
+      "properties": {
+        "evidence_key": {"$ref": "#/$defs/key"},
+        "pdf_page_index": {"type": "integer", "minimum": 1},
+        "printed_page": {"type": "integer", "minimum": 1},
+        "locator": {"type": "string", "minLength": 1},
+        "supported_claim": {"type": "string", "minLength": 1}
+      }
+    },
+    "lessonDivision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["division_key", "lesson_count", "lesson_units", "coverage_assertions"],
+      "properties": {
+        "division_key": {"$ref": "#/$defs/key"},
+        "lesson_count": {"type": "integer", "minimum": 1},
+        "lesson_units": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["lesson_unit_key", "position", "title", "lesson_type", "duration_minutes", "core_learning_outcome", "material_scope", "evidence_refs", "content_boundary", "must_not_preteach", "teaching_focus", "learning_difficulty", "division_reason"],
+            "properties": {
+              "lesson_unit_key": {"$ref": "#/$defs/key"},
+              "position": {"type": "integer", "minimum": 1},
+              "title": {"type": "string", "minLength": 1},
+              "lesson_type": {"enum": ["new_learning", "practice", "review", "activity"]},
+              "duration_minutes": {"type": "integer", "minimum": 30, "maximum": 60},
+              "core_learning_outcome": {"type": "string", "minLength": 1},
+              "material_scope": {"type": "string", "minLength": 1},
+              "evidence_refs": {"$ref": "#/$defs/nonEmptyStrings"},
+              "content_boundary": {"type": "string", "minLength": 1},
+              "must_not_preteach": {"$ref": "#/$defs/nonEmptyStrings"},
+              "teaching_focus": {"type": "string", "minLength": 1},
+              "learning_difficulty": {"type": "string", "minLength": 1},
+              "division_reason": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        "coverage_assertions": {"type": "object", "additionalProperties": true}
+      }
+    },
+    "lessonPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lesson_plan_key", "source_lesson_unit_key", "sections", "quality_expectations"],
+      "properties": {
+        "lesson_plan_key": {"$ref": "#/$defs/key"},
+        "source_lesson_unit_key": {"$ref": "#/$defs/key"},
+        "sections": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["teaching_content", "material_analysis", "learner_analysis", "design_intent", "teaching_objectives", "key_difficulties_and_strategies", "preparation", "teaching_process", "board_design", "lesson_summary", "differentiated_homework", "teaching_reflection"],
+          "properties": {
+            "teaching_content": {"type": "object", "additionalProperties": true},
+            "material_analysis": {"type": "object", "additionalProperties": true},
+            "learner_analysis": {"type": "object", "additionalProperties": true},
+            "design_intent": {"type": "object", "additionalProperties": true},
+            "teaching_objectives": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": true}},
+            "key_difficulties_and_strategies": {"type": "object", "additionalProperties": true},
+            "preparation": {"type": "object", "additionalProperties": true},
+            "teaching_process": {"type": "array", "minItems": 4, "items": {"type": "object", "additionalProperties": true, "required": ["section_key", "minutes", "objective_keys", "teacher_actions", "student_actions", "key_questions", "assessment_evidence"]}},
+            "board_design": {"type": "object", "additionalProperties": true},
+            "lesson_summary": {"type": "object", "additionalProperties": true},
+            "differentiated_homework": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+            "teaching_reflection": {"type": "object", "additionalProperties": true}
+          }
+        },
+        "quality_expectations": {"type": "object", "additionalProperties": true}
+      }
+    },
+    "introOption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["option_key", "category", "title", "independent_concept", "hook", "viewer_value", "suggested_medium", "duration_seconds", "replacement_field_key", "course_anchor", "classroom_first_question", "handoff_moment", "must_not_preteach", "fit_reason", "risks", "recommendation_score", "recommendation_reason"],
+      "properties": {
+        "option_key": {"type": "string", "pattern": "^INTRO-(SCI|APP|STO)-[0-9]{2}$"},
+        "category": {"enum": ["science", "application", "story"]},
+        "title": {"type": "string", "minLength": 1},
+        "independent_concept": {"type": "string", "minLength": 1},
+        "hook": {"type": "string", "minLength": 1},
+        "viewer_value": {"type": "string", "minLength": 1},
+        "suggested_medium": {"enum": ["video", "image", "physical_object", "question", "performance", "mixed"]},
+        "duration_seconds": {"type": "integer", "minimum": 10, "maximum": 600},
+        "replacement_field_key": {"type": ["string", "null"]},
+        "course_anchor": {"type": "string", "minLength": 1},
+        "classroom_first_question": {"type": "string", "minLength": 1},
+        "handoff_moment": {"type": "string", "minLength": 1},
+        "must_not_preteach": {"$ref": "#/$defs/nonEmptyStrings"},
+        "fit_reason": {"type": "string", "minLength": 1},
+        "risks": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "recommendation_score": {"type": "integer", "minimum": 1, "maximum": 100},
+        "recommendation_reason": {"type": "string", "minLength": 1}
+      }
+    },
+    "introOptionSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["option_set_key", "lesson_unit_key", "options", "quality_expectations"],
+      "properties": {
+        "option_set_key": {"$ref": "#/$defs/key"},
+        "lesson_unit_key": {"$ref": "#/$defs/key"},
+        "options": {"type": "array", "minItems": 9, "maxItems": 9, "items": {"$ref": "#/$defs/introOption"}},
+        "quality_expectations": {"type": "object", "additionalProperties": true}
+      }
+    },
+    "introSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selection_key", "option_key", "snapshot"],
+      "properties": {
+        "selection_key": {"$ref": "#/$defs/key"},
+        "option_key": {"type": "string", "pattern": "^INTRO-(SCI|APP|STO)-[0-9]{2}$"},
+        "snapshot": {"$ref": "#/$defs/introOption"}
+      }
+    },
+    "pptPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["page_key", "position", "page_type", "teaching_task", "source_refs", "canvas", "main_visual", "asset_requirements", "editable_elements", "layout", "interaction", "speaker_notes"],
+      "properties": {
+        "page_key": {"type": "string", "pattern": "^PAGE-[0-9]{2,}$"},
+        "position": {"type": "integer", "minimum": 1},
+        "page_type": {"enum": ["cover", "introduction", "concept", "exploration", "example", "practice", "discussion", "summary", "other"]},
+        "teaching_task": {"type": "string", "minLength": 1},
+        "source_refs": {"$ref": "#/$defs/nonEmptyStrings"},
+        "canvas": {"type": "object", "additionalProperties": true, "required": ["aspect_ratio", "background_mode"]},
+        "main_visual": {"type": "object", "additionalProperties": true, "required": ["visual_decision", "image_strategy", "description"]},
+        "asset_requirements": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": true, "required": ["asset_key", "responsibility", "target_slot", "prompt_text", "negative_constraints"]}},
+        "editable_elements": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": true, "required": ["element_key", "responsibility", "content"]}},
+        "layout": {"type": "object", "additionalProperties": true},
+        "interaction": {"type": "object", "additionalProperties": true},
+        "speaker_notes": {"type": "string", "minLength": 1}
+      }
+    },
+    "ppt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_lesson_plan_key", "analysis", "outline", "cover", "style_contract", "page_specs", "assembly_expectations", "quality_expectations"],
+      "properties": {
+        "source_lesson_plan_key": {"$ref": "#/$defs/key"},
+        "analysis": {"type": "object", "additionalProperties": true},
+        "outline": {"type": "array", "minItems": 5, "items": {"type": "object", "additionalProperties": true}},
+        "cover": {"type": "object", "additionalProperties": true},
+        "style_contract": {"type": "object", "additionalProperties": true},
+        "page_specs": {"type": "array", "minItems": 5, "items": {"$ref": "#/$defs/pptPage"}},
+        "assembly_expectations": {"type": "object", "additionalProperties": true},
+        "quality_expectations": {"type": "object", "additionalProperties": true}
+      }
+    },
+    "video": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selected_intro_option_key", "source_policy", "master_script", "rough_storyboard", "style_contract", "asset_inventory", "asset_image_prompts", "fine_storyboard", "clip_expectations", "audio_plan", "timeline_expectations", "quality_expectations"],
+      "properties": {
+        "selected_intro_option_key": {"type": "string", "pattern": "^INTRO-(SCI|APP|STO)-[0-9]{2}$"},
+        "source_policy": {"type": "object", "additionalProperties": false, "required": ["allowed_sources", "forbidden_sources"], "properties": {"allowed_sources": {"$ref": "#/$defs/nonEmptyStrings"}, "forbidden_sources": {"$ref": "#/$defs/nonEmptyStrings"}}},
+        "master_script": {"type": "object", "additionalProperties": true, "required": ["master_script_key", "selected_intro_option_key", "title", "complete_story", "scenes", "handoff", "target_duration_seconds"]},
+        "rough_storyboard": {"type": "object", "additionalProperties": true, "required": ["rough_storyboard_key", "beats", "total_duration_seconds"]},
+        "style_contract": {"type": "object", "additionalProperties": true},
+        "asset_inventory": {"type": "object", "additionalProperties": true, "required": ["asset_inventory_key", "categories", "assets"]},
+        "asset_image_prompts": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": true, "required": ["asset_key", "target_slot", "prompt_text", "negative_constraints"]}},
+        "fine_storyboard": {"type": "object", "additionalProperties": true, "required": ["fine_storyboard_key", "target_duration_seconds", "shots"]},
+        "clip_expectations": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": true, "required": ["shot_key", "candidate_count", "formal_clip_after_adopt_and_save"]}},
+        "audio_plan": {"type": "object", "additionalProperties": true, "required": ["audio_plan_key", "tracks"]},
+        "timeline_expectations": {"type": "object", "additionalProperties": true},
+        "quality_expectations": {"type": "object", "additionalProperties": true}
+      }
+    }
+  }
+}
