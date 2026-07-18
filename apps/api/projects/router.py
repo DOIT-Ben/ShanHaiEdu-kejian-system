@@ -78,6 +78,7 @@ def create_project(
             scope=f"projects.create:{actor.principal_id}",
             key=idempotency_key,
             payload=payload.model_dump(mode="json"),
+            authorize=lambda: require_project_creator(actor),
             command=command,
         )
     return ProjectEnvelope(
@@ -225,3 +226,12 @@ def stream_project_events(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+def require_project_creator(actor: ActorContext) -> None:
+    if actor.user_id is None or actor.is_system:
+        raise ApiError(
+            status_code=403,
+            code="PERMISSION_DENIED",
+            message="Project creation requires a user actor.",
+        )

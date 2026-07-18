@@ -15,11 +15,18 @@ class CreationBatchAccessService:
         self._session = session
         self._actor = actor
 
-    def require(self, batch: CreationBatch, action: ProjectAction) -> None:
+    def require(
+        self,
+        batch: CreationBatch,
+        action: ProjectAction,
+        *,
+        for_update: bool = False,
+    ) -> None:
         if batch.source_project_id is not None:
             ProjectAccessService(self._session, self._actor).require(
                 batch.source_project_id,
                 action,
+                for_update=for_update,
             )
             return
         if (

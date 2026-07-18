@@ -17,6 +17,7 @@ from apps.api.creation.schemas import (
     ProjectSourceSaveRequest,
     SaveAdoptionToProjectRequest,
     SaveToProjectOperationRead,
+    StandaloneSourceSaveRequest,
 )
 from apps.api.database import utc_now
 from apps.api.errors import ApiError
@@ -76,6 +77,7 @@ class CreationSaveService:
             CreationBatchAccessService(self._session, self._actor).require(
                 context.batch,
                 ProjectAction.EDIT,
+                for_update=True,
             )
             if context.result.file_asset_version_id is None:
                 raise ApiError(
@@ -160,11 +162,39 @@ class CreationSaveService:
             scope=f"creation_adoptions.save:{adoption_id}",
             key=idempotency_key,
             payload=request_payload,
+            authorize=lambda: self._require_save_access(adoption_id, payload),
             command=command,
         )
         body = dict(result.body)
         body["idempotent_replay"] = result.replayed
         return SaveToProjectOperationRead.model_validate(body)
+
+    def _require_save_access(
+        self,
+        adoption_id: UUID,
+        payload: SaveAdoptionToProjectRequest,
+    ) -> None:
+        context = self._repository.get_adoption_context(adoption_id, for_update=True)
+        if context is None:
+            raise ApiError(
+                status_code=409,
+                code="CANDIDATE_NOT_ADOPTED",
+                message="The candidate is not the active adoption for this item.",
+            )
+        CreationBatchAccessService(self._session, self._actor).require(
+            context.batch,
+            ProjectAction.EDIT,
+            for_update=True,
+        )
+        if isinstance(payload, StandaloneSourceSaveRequest):
+            try:
+                ProjectAccessService(self._session, self._actor).require(
+                    payload.project_id,
+                    ProjectAction.EDIT,
+                    for_update=True,
+                )
+            except ApiError as exc:
+                raise self._target_forbidden() from exc
 
     def resolve_target(
         self,

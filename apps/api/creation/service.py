@@ -133,6 +133,11 @@ class CreationService:
             scope=f"creation_prompt_versions.save:{item_id}",
             key=idempotency_key,
             payload=request_payload,
+            authorize=lambda: self._require_item(
+                item_id,
+                ProjectAction.GENERATE,
+                for_update=True,
+            ),
             command=command,
         )
         return PromptVersionRead.model_validate(result.body)
@@ -240,6 +245,11 @@ class CreationService:
             scope=f"creation_results.adopt:{result_id}",
             key=idempotency_key,
             payload=payload.model_dump(mode="json"),
+            authorize=lambda: self._require_result(
+                result_id,
+                ProjectAction.GENERATE,
+                for_update=True,
+            ),
             command=command,
         )
         return AdoptionRead.model_validate(result.body)
@@ -293,11 +303,21 @@ class CreationService:
                 code="CREATION_ITEM_NOT_FOUND",
                 message="The creation item was not found.",
             )
-        self._authorize_batch(context.batch, action)
+        self._authorize_batch(context.batch, action, for_update=for_update)
         return context
 
-    def _authorize_batch(self, batch: CreationBatch, action: ProjectAction) -> None:
-        CreationBatchAccessService(self._session, self._actor).require(batch, action)
+    def _authorize_batch(
+        self,
+        batch: CreationBatch,
+        action: ProjectAction,
+        *,
+        for_update: bool,
+    ) -> None:
+        CreationBatchAccessService(self._session, self._actor).require(
+            batch,
+            action,
+            for_update=for_update,
+        )
 
     def _require_result(
         self,
@@ -313,7 +333,7 @@ class CreationService:
                 code="GENERATION_RESULT_NOT_FOUND",
                 message="The generation result was not found.",
             )
-        self._authorize_batch(context.batch, action)
+        self._authorize_batch(context.batch, action, for_update=for_update)
         return context
 
     def _validate_reference_assets(self, version_ids: list[UUID]) -> None:

@@ -221,6 +221,15 @@ class ProjectAssetService:
             slot_key=slot_key,
         )
 
+    def require_slot_access(self, slot_id: UUID) -> ProjectAssetSlot:
+        return self._require_slot(slot_id, ProjectAction.EDIT)
+
+    def require_binding_access(self, binding_id: UUID) -> ProjectAssetSlot:
+        binding = self._repository.get_binding(binding_id)
+        if binding is None:
+            raise self._binding_not_found()
+        return self._require_slot(binding.project_asset_slot_id, ProjectAction.EDIT)
+
     def _require_slot(self, slot_id: UUID, action: ProjectAction) -> ProjectAssetSlot:
         visible = self._repository.get_slot(slot_id)
         if visible is None:

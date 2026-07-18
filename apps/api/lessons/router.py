@@ -126,6 +126,11 @@ def update_project_lessons(
             scope=f"lessons.collection.update:{project_id}:{actor.principal_id}",
             key=idempotency_key,
             payload=request_payload,
+            authorize=lambda: ProjectAccessService(session, actor).require(
+                project_id,
+                ProjectAction.EDIT,
+                for_update=True,
+            ),
             command=command,
         )
     data = LessonCollectionData.model_validate(result.body)
@@ -210,11 +215,34 @@ def update_lesson_branches(
             scope=f"lessons.branches.update:{lesson_id}:{actor.principal_id}",
             key=idempotency_key,
             payload=request_payload,
+            authorize=lambda: require_lesson_access(
+                session,
+                actor,
+                lesson_id,
+                ProjectAction.EDIT,
+            ),
             command=command,
         )
     data = LessonRead.model_validate(result.body)
     response.headers["ETag"] = weak_etag(data.lock_version)
     return LessonEnvelope(data=data, request_id=request.state.request_id)
+
+
+def require_lesson_access(
+    session: Session,
+    actor: ActorContext,
+    lesson_id: UUID,
+    action: ProjectAction,
+) -> LessonUnit:
+    lesson = LessonRepository(session, actor).get(lesson_id, for_update=True)
+    if lesson is None:
+        raise lesson_not_found()
+    ProjectAccessService(session, actor).require(
+        lesson.project_id,
+        action,
+        for_update=True,
+    )
+    return lesson
 
 
 def serialize_lesson(repository: LessonRepository, lesson: LessonUnit) -> LessonRead:

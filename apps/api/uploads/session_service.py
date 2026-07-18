@@ -93,11 +93,11 @@ class UploadSessionService:
             ttl_seconds=self._ttl_seconds,
         )
         with self._session.begin():
-            self._require_project(project_id)
             replay = idempotency.lookup(
                 scope="material_uploads.create",
                 key=idempotency_key,
                 payload=idempotency_payload,
+                authorize=lambda: self._require_project(project_id, for_update=True),
             )
         if replay is not None:
             return self._present_result(project_id, replay)
@@ -147,6 +147,7 @@ class UploadSessionService:
                 scope="material_uploads.create",
                 key=idempotency_key,
                 payload=idempotency_payload,
+                authorize=lambda: self._require_project(project_id, for_update=True),
                 command=command,
             )
         return self._present_result(project_id, result)

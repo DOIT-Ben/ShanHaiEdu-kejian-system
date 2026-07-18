@@ -40,12 +40,11 @@ class ArtifactApprovalService:
         quality_evidence: dict[str, Any] | None = None,
         policy_snapshot: dict[str, Any] | None = None,
     ) -> Approval:
-        resolved_action = self._parse_action(action)
-        record = self._repository.get_version(version_id, for_update_artifact=True)
-        if record is None:
-            raise self._not_found()
-        version, artifact = record
-        self._require_project(artifact.project_id)
+        resolved_action, version, artifact = self.require_access(
+            version_id,
+            action=action,
+            for_update=True,
+        )
         if resolved_action is ApprovalAction.APPROVE:
             return self._approve(
                 artifact,
@@ -81,6 +80,26 @@ class ArtifactApprovalService:
             quality_evidence,
             policy_snapshot,
         )
+
+    def require_access(
+        self,
+        version_id: UUID,
+        *,
+        action: str,
+        for_update: bool,
+    ) -> tuple[ApprovalAction, ArtifactVersion, Artifact]:
+        resolved_action = self._parse_action(action)
+        record = self._repository.get_version(
+            version_id,
+            for_update_artifact=for_update,
+        )
+        if record is None:
+            raise self._not_found()
+        version, artifact = record
+        self._require_project(artifact.project_id, for_update=for_update)
+        if resolved_action is ApprovalAction.REVOKE:
+            self._require_owner(artifact.project_id, for_update=for_update)
+        return resolved_action, version, artifact
 
     def _approve(
         self,
@@ -186,7 +205,6 @@ class ArtifactApprovalService:
     ) -> Approval:
         if not comment or not comment.strip():
             raise self._invalid("Revoking an approval requires a reason.")
-        self._require_owner(artifact.project_id)
         if artifact.current_approved_version_id != version.id:
             raise self._state_conflict("Only the current approved version can be revoked.")
         approval = self._record(
@@ -289,31 +307,35 @@ class ArtifactApprovalService:
             request_id=request_id,
         )
 
-    def _require_project(self, project_id: UUID) -> Project:
+    def _require_project(self, project_id: UUID, *, for_update: bool) -> Project:
         if not self._actor.is_system:
             return ProjectAccessService(self._session, self._actor).require(
-                project_id, ProjectAction.REVIEW
+                project_id,
+                ProjectAction.REVIEW,
+                for_update=for_update,
             )
-        project = self._session.scalar(
-            select(Project).where(
-                Project.id == project_id,
-                Project.organization_id == self._actor.organization_id,
-                Project.deleted_at.is_(None),
-            )
+        statement = select(Project).where(
+            Project.id == project_id,
+            Project.organization_id == self._actor.organization_id,
+            Project.deleted_at.is_(None),
         )
+        if for_update:
+            statement = statement.with_for_update()
+        project = self._session.scalar(statement)
         if project is None:
             raise self._not_found()
         return project
 
-    def _require_owner(self, project_id: UUID) -> None:
+    def _require_owner(self, project_id: UUID, *, for_update: bool) -> None:
         if self._actor.is_system:
             return
-        role = self._session.scalar(
-            select(ProjectMember.role).where(
-                ProjectMember.project_id == project_id,
-                ProjectMember.user_id == self._actor.user_id,
-            )
+        statement = select(ProjectMember.role).where(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == self._actor.user_id,
         )
+        if for_update:
+            statement = statement.with_for_update()
+        role = self._session.scalar(statement)
         if role != ProjectRole.OWNER.value:
             raise ApiError(
                 status_code=403,

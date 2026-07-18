@@ -122,6 +122,11 @@ class AutomationPolicyService:
             scope=f"automation_policy.update:{project_id}",
             key=idempotency_key,
             payload=request_payload,
+            authorize=lambda: ProjectAccessService(self._session, self._actor).require(
+                project_id,
+                ProjectAction.EDIT,
+                for_update=True,
+            ),
             command=command,
         )
         return AutomationPolicyRead.model_validate(result.body)
