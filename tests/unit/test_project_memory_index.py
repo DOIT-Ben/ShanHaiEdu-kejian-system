@@ -46,6 +46,8 @@ GENERIC_POLICY_TEXT = """\
 - `Commit`: 不在长期文档中记录
 - PR: 只在 GitHub 实时查看
 - Port: 使用当前进程核验
+- 权威链接: [AGENTS](../../AGENTS.md)
+- 产品/工作流/合同冲突时停止
 """
 
 
@@ -81,11 +83,16 @@ def test_project_memory_index_requires_canonical_sections(tmp_path: Path) -> Non
             "full commit SHA",
         ),
         ("- **当前分支**: feat/123-live", "concrete branch state"),
+        ("| 当前分支 | feat/123-live |", "concrete branch state"),
+        ("任务分支: feat/123-live", "concrete branch state"),
         ("当前提交: 0c636a8", "concrete commit state"),
+        ("| Head SHA | 84e8eaf |", "concrete commit state"),
+        ("Head SHA: 84e8eaf", "concrete commit state"),
         ("当前 PR: #93", "concrete pull request state"),
         ("PR #95 已进入 review", "concrete pull request state"),
         ("当前端口: 8000", "concrete port state"),
         ("服务地址: http://127.0.0.1:8000", "concrete port state"),
+        ("本机目录: /tmp/ShanHaiEdu", "local absolute path"),
     ),
 )
 def test_project_memory_index_rejects_ephemeral_state(

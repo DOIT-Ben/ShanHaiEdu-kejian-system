@@ -93,7 +93,7 @@ PROJECT_MEMORY_FORBIDDEN_PATTERNS = (
         re.compile(
             r"(?im)(?<![a-z0-9_])(?:[a-z]:[\\/]|"
             r"\\\\[^\\\s]+\\[^\\\s]+|"
-            r"/(?:Users|home|root|opt|srv|mnt|var)/[^\s]+)"
+            r"(?<![a-z0-9:/.])/(?!/)(?:[a-z0-9._-]+/)+[a-z0-9._-]+)"
         ),
     ),
     (
@@ -103,7 +103,7 @@ PROJECT_MEMORY_FORBIDDEN_PATTERNS = (
     (
         "concrete branch state",
         re.compile(
-            r"(?im)^\s*(?:[-*]\s*)?(?:当前\s*)?(?:分支|branch)"
+            r"(?im)^\s*(?:当前\s*)?(?:任务\s*)?(?:分支|branch|task branch)"
             r"\s*[:\N{FULLWIDTH COLON}]\s*(?:refs/heads/)?"
             r"[a-z0-9._-]+(?:/[a-z0-9._-]+)*(?=\s|$)"
         ),
@@ -111,7 +111,7 @@ PROJECT_MEMORY_FORBIDDEN_PATTERNS = (
     (
         "concrete commit state",
         re.compile(
-            r"(?im)^\s*(?:[-*]\s*)?(?:当前\s*)?(?:提交|commit)"
+            r"(?im)^\s*(?:当前\s*)?(?:提交|commit|base\s+sha|head\s+sha)"
             r"\s*[:\N{FULLWIDTH COLON}]\s*[0-9a-f]{7,40}(?=\s|$)"
         ),
     ),
@@ -256,7 +256,12 @@ def check_project_memory_index(index: Path, errors: list[str]) -> None:
     for line in text.splitlines():
         normalized = PROJECT_MEMORY_LINE_PREFIX.sub("", line)
         normalized = PROJECT_MEMORY_MARKDOWN_DECORATION.sub("", normalized)
-        normalized_lines.append(normalized.strip())
+        normalized = normalized.strip()
+        if normalized.startswith("|") and normalized.endswith("|"):
+            cells = [cell.strip() for cell in normalized.strip("|").split("|")]
+            if len(cells) >= 2:
+                normalized = f"{cells[0]}: {cells[1]}"
+        normalized_lines.append(normalized)
     normalized_text = "\n".join(normalized_lines)
 
     for label, pattern in PROJECT_MEMORY_FORBIDDEN_PATTERNS:
