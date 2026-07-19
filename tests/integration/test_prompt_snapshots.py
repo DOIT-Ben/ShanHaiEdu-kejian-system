@@ -207,6 +207,8 @@ def test_snapshot_service_is_idempotent_and_never_overwrites_frozen_prompt(
             context=context,
             output_schema={"type": "object"},
             provider_format="PROVIDER_PRIVATE",
+            user_edit_mode="replace_editable_layer",
+            user_edit_max_chars=60_000,
         )
         with pytest.raises(PromptSnapshotError) as caught, session.begin_nested():
             PromptSnapshotService(session, actor).freeze(
@@ -286,12 +288,52 @@ async def test_prompt_preview_endpoint_returns_only_the_safe_projection(
             node_key="prepare",
             status=NodeStatus.READY,
         )
-        context, compiled = compiled_fixture()
-        frozen = PromptSnapshotService(session, actor).freeze(
-            node.id,
-            context=context,
-            prompt=compiled,
+        context_snapshot = ContextSnapshot(
+            id=new_uuid7(),
+            organization_id=actor.organization_id,
+            project_id=project.id,
+            node_run_id=node.id,
+            bindings_json={"bindings": [{"source": "CONTEXT_PRIVATE"}]},
+            content_hash="a" * 64,
+            created_by=actor.principal_id,
         )
+        prompt_snapshot = PromptSnapshot(
+            id=new_uuid7(),
+            organization_id=actor.organization_id,
+            project_id=project.id,
+            node_run_id=node.id,
+            context_snapshot_id=context_snapshot.id,
+            template_refs_json={
+                "template_key": "lesson-plan.prompt",
+                "template_version": "1.0.0",
+            },
+            layers_json={"layers": [{"content": "INTERNAL_METHOD_PRIVATE"}]},
+            editable_prompt="Visible task.",
+            user_diff_json={"mode": "replace_editable_layer"},
+            compiled_prompt="PLATFORM_PRIVATE\nINTERNAL_METHOD_PRIVATE\nPROVIDER_PRIVATE",
+            request_schema_json={"type": "object", "required": ["fixed_structure"]},
+            preview_json={
+                "editable_prompt": "Visible task.",
+                "locked_layers": [
+                    {"layer": "output_schema", "key": "request_schema", "locked": True}
+                ],
+                "context_summary": [
+                    {
+                        "binding_key": "preferences",
+                        "source": "project.teacher_preferences",
+                        "exposure": "hidden",
+                        "item_count": 1,
+                        "content_hash": "c" * 64,
+                    }
+                ],
+                "schema": {"type": "object", "required": ["fixed_structure"]},
+                "output_schema": {"private": True},
+                "internal_prompt": "INTERNAL_METHOD_PRIVATE",
+            },
+            content_hash="b" * 64,
+            created_by=actor.principal_id,
+        )
+        session.add_all((context_snapshot, prompt_snapshot))
 
     transport = httpx.ASGITransport(app=app)
     try:
@@ -301,12 +343,35 @@ async def test_prompt_preview_endpoint_returns_only_the_safe_projection(
         assert response.status_code == 200, response.text
         assert_contract_response(response, operation_id="getPromptPreview", status="200")
         data = response.json()["data"]
-        assert data["prompt_snapshot_id"] == str(frozen.prompt.id)
-        assert data["editable_prompt"] == compiled.preview.editable_prompt
+        assert set(data) == {
+            "prompt_snapshot_id",
+            "content_hash",
+            "editable_prompt",
+            "edit_policy",
+        }
+        assert data["prompt_snapshot_id"] == str(prompt_snapshot.id)
+        assert data["content_hash"] == prompt_snapshot.content_hash
+        assert data["editable_prompt"] == prompt_snapshot.editable_prompt
+        assert data["edit_policy"] == {
+            "mode": "replace_editable_layer",
+            "max_chars": 100_000,
+        }
         rendered = json.dumps(data)
         assert "PLATFORM_PRIVATE" not in rendered
         assert "CONTEXT_PRIVATE" not in rendered
         assert "PROVIDER_PRIVATE" not in rendered
+        assert "INTERNAL_METHOD_PRIVATE" not in rendered
+        assert "fixed_structure" not in rendered
+
+        with factory() as session:
+            persisted = session.get(PromptSnapshot, prompt_snapshot.id)
+            persisted_context = session.get(ContextSnapshot, context_snapshot.id)
+            assert persisted is not None and persisted_context is not None
+            assert persisted.layers_json == prompt_snapshot.layers_json
+            assert persisted.compiled_prompt == prompt_snapshot.compiled_prompt
+            assert persisted.request_schema_json == prompt_snapshot.request_schema_json
+            assert persisted.content_hash == prompt_snapshot.content_hash
+            assert persisted_context.bindings_json == context_snapshot.bindings_json
     finally:
         app.state.database_engine.dispose()
 
@@ -342,5 +407,7 @@ def compiled_fixture():
         context=context,
         output_schema={"type": "object"},
         provider_format="PROVIDER_PRIVATE",
+        user_edit_mode="replace_editable_layer",
+        user_edit_max_chars=60_000,
     )
     return context, compiled

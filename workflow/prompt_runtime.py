@@ -10,6 +10,7 @@ from typing import Any, Literal, cast
 from workflow.content_package import DEFAULT_CONTEXT_SOURCES
 
 ContextExposure = Literal["full", "summary", "hidden"]
+PromptEditMode = Literal["replace_editable_layer"]
 
 
 class PromptRuntimeError(ValueError):
@@ -56,9 +57,7 @@ class PromptSection:
 @dataclass(frozen=True, slots=True)
 class PromptPreview:
     editable_prompt: str
-    locked_layers: tuple[dict[str, Any], ...]
-    context_summary: tuple[dict[str, Any], ...]
-    output_schema: dict[str, Any]
+    edit_policy: dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,6 +135,8 @@ def compile_prompt(
     context: AssembledContext,
     output_schema: dict[str, Any],
     provider_format: str,
+    user_edit_mode: PromptEditMode,
+    user_edit_max_chars: int,
     user_revision: str | None = None,
 ) -> CompiledPrompt:
     """Compile protected and editable layers while exposing only a safe preview."""
@@ -146,6 +147,8 @@ def compile_prompt(
         platform_safety=platform_safety,
         sections=sections,
         provider_format=provider_format,
+        user_edit_mode=user_edit_mode,
+        user_edit_max_chars=user_edit_max_chars,
         user_revision=user_revision,
     )
     user_diff: dict[str, Any] = {}
@@ -192,13 +195,7 @@ def compile_prompt(
     editable_prompt = _teacher_prompt(effective_sections, context)
     preview = PromptPreview(
         editable_prompt=editable_prompt,
-        locked_layers=(
-            _locked_summary("platform_safety", "platform_safety"),
-            _locked_summary("output_schema", "request_schema"),
-            _locked_summary("provider_format", "provider_format"),
-        ),
-        context_summary=_context_summaries(context),
-        output_schema=output_schema,
+        edit_policy={"mode": user_edit_mode, "max_chars": user_edit_max_chars},
     )
     template_refs = {"template_key": template_key, "template_version": template_version}
     snapshot_payload = {
@@ -275,12 +272,16 @@ def _validate_prompt_input(
     platform_safety: str,
     sections: tuple[PromptSection, ...],
     provider_format: str,
+    user_edit_mode: PromptEditMode,
+    user_edit_max_chars: int,
     user_revision: str | None,
 ) -> None:
     if not template_key.strip() or not template_version.strip():
         raise PromptRuntimeError("PROMPT_TEMPLATE_REF_INVALID", "prompt template ref is required")
     if not platform_safety.strip() or not provider_format.strip():
         raise PromptRuntimeError("PROMPT_LOCKED_LAYER_MISSING", "locked prompt layers are required")
+    if user_edit_mode != "replace_editable_layer" or not 1 <= user_edit_max_chars <= 100_000:
+        raise PromptRuntimeError("PROMPT_EDIT_POLICY_INVALID", "prompt edit policy is invalid")
     keys = [section.section_key for section in sections]
     if not sections or len(keys) != len(set(keys)):
         raise PromptRuntimeError(
@@ -291,6 +292,11 @@ def _validate_prompt_input(
         raise PromptRuntimeError("PROMPT_SECTION_INVALID", "prompt section content cannot be empty")
     if user_revision is not None and not user_revision.strip():
         raise PromptRuntimeError("PROMPT_REVISION_INVALID", "prompt revision cannot be empty")
+    if user_revision is not None and len(user_revision) > user_edit_max_chars:
+        raise PromptRuntimeError(
+            "PROMPT_REVISION_TOO_LONG",
+            "prompt revision exceeds the template edit limit",
+        )
     if user_revision is not None and not any(section.editable for section in sections):
         raise PromptRuntimeError(
             "PROMPT_REVISION_FORBIDDEN",
@@ -321,21 +327,13 @@ def _teacher_prompt(
 ) -> str:
     chunks = [content for section, content in sections if section.visible_to_teacher]
     for summary in _context_summaries(context):
-        if summary["exposure"] == "hidden":
+        if summary["exposure"] != "full":
             continue
-        if summary["exposure"] == "full":
-            binding = next(
-                value
-                for value in context.bindings
-                if value["binding_key"] == summary["binding_key"]
-            )
-            chunks.append(_canonical_json_text({"context": binding["items"]}))
-        else:
-            chunks.append(
-                (
-                    "[context:{binding_key}] source={source} items={item_count} hash={content_hash}"
-                ).format(**summary)
-            )
+        binding = next(
+            value for value in context.bindings if value["binding_key"] == summary["binding_key"]
+        )
+        items = cast(list[dict[str, Any]], binding["items"])
+        chunks.append(_canonical_json_text({"context": [item["content"] for item in items]}))
     return "\n\n".join(chunks)
 
 
@@ -354,10 +352,6 @@ def _context_summaries(context: AssembledContext) -> tuple[dict[str, Any], ...]:
 
 def _layer(layer: str, key: str, content: str, *, locked: bool) -> dict[str, Any]:
     return {"layer": layer, "key": key, "content": content, "locked": locked}
-
-
-def _locked_summary(layer: str, key: str) -> dict[str, Any]:
-    return {"layer": layer, "key": key, "locked": True}
 
 
 def _canonical_json(value: object) -> bytes:

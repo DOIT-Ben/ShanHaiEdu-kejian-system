@@ -161,6 +161,8 @@ def test_prompt_compiler_is_deterministic_and_preview_is_privacy_safe() -> None:
         context=context,
         output_schema={"required": ["answer"], "type": "object"},
         provider_format="PROVIDER_PRIVATE",
+        user_edit_mode="replace_editable_layer",
+        user_edit_max_chars=60_000,
     )
     second = compile_prompt(
         template_key="lesson-plan.prompt",
@@ -170,6 +172,8 @@ def test_prompt_compiler_is_deterministic_and_preview_is_privacy_safe() -> None:
         context=context,
         output_schema={"type": "object", "required": ["answer"]},
         provider_format="PROVIDER_PRIVATE",
+        user_edit_mode="replace_editable_layer",
+        user_edit_max_chars=60_000,
     )
 
     assert first == second
@@ -179,16 +183,16 @@ def test_prompt_compiler_is_deterministic_and_preview_is_privacy_safe() -> None:
     assert "PROVIDER_PRIVATE" in first.compiled_prompt
     assert "You are a teacher." in first.preview.editable_prompt
     assert "Use a visual method." in first.preview.editable_prompt
+    assert first.preview.edit_policy == {
+        "mode": "replace_editable_layer",
+        "max_chars": 60_000,
+    }
     rendered_preview = repr(first.preview)
     assert "PLATFORM_PRIVATE" not in rendered_preview
     assert "MATERIAL_PRIVATE" not in rendered_preview
     assert "PREFERENCE_PRIVATE" not in rendered_preview
     assert "PROVIDER_PRIVATE" not in rendered_preview
-    assert {layer["layer"] for layer in first.preview.locked_layers} == {
-        "platform_safety",
-        "output_schema",
-        "provider_format",
-    }
+    assert "required" not in rendered_preview
 
 
 def test_prompt_revision_only_replaces_the_editable_business_layer() -> None:
@@ -201,9 +205,11 @@ def test_prompt_revision_only_replaces_the_editable_business_layer() -> None:
             PromptSection("method", "method", "base editable method", True, True),
         ),
         context=assemble_context((), {}),
-        output_schema={"type": "object"},
+        output_schema={"type": "object", "required": ["fixed_structure"]},
         provider_format="locked provider format",
         user_revision="teacher replacement",
+        user_edit_mode="replace_editable_layer",
+        user_edit_max_chars=1_000,
     )
 
     assert "teacher replacement" in compiled.editable_prompt
@@ -214,4 +220,10 @@ def test_prompt_revision_only_replaces_the_editable_business_layer() -> None:
         "replacement": "teacher replacement",
     }
     assert "locked safety" in compiled.compiled_prompt
+    assert "locked role" in compiled.compiled_prompt
     assert "locked provider format" in compiled.compiled_prompt
+    assert '"required":["fixed_structure"]' in compiled.compiled_prompt
+    assert compiled.request_schema == {
+        "type": "object",
+        "required": ["fixed_structure"],
+    }

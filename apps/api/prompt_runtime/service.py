@@ -12,6 +12,7 @@ from apps.api.identity.permissions import ProjectAccessService
 from apps.api.ids import new_uuid7
 from apps.api.prompt_runtime.models import ContextSnapshot, PromptSnapshot
 from apps.api.prompt_runtime.repository import PromptSnapshotRepository
+from apps.api.prompt_runtime.schemas import PromptEditPolicyRead, PromptPreviewRead
 from apps.api.workflows.models import NodeRun, WorkflowRun
 from apps.api.workflows.repository import WorkflowRuntimeRepository
 from workflow.node_state import NodeStatus
@@ -113,6 +114,25 @@ class PromptSnapshotService:
                 "prompt snapshot was not found",
             )
         return prompt
+
+    def get_public_preview(self, node_run_id: UUID) -> PromptPreviewRead:
+        prompt = self.get_prompt(node_run_id)
+        return PromptPreviewRead(
+            prompt_snapshot_id=prompt.id,
+            content_hash=prompt.content_hash,
+            editable_prompt=prompt.editable_prompt,
+            edit_policy=self._public_edit_policy(prompt.preview_json),
+        )
+
+    @staticmethod
+    def _public_edit_policy(preview_json: dict[str, object]) -> PromptEditPolicyRead:
+        candidate = preview_json.get("edit_policy")
+        if isinstance(candidate, dict):
+            try:
+                return PromptEditPolicyRead.model_validate(candidate)
+            except ValueError:
+                pass
+        return PromptEditPolicyRead(mode="replace_editable_layer", max_chars=100_000)
 
     def _existing(self, node_run_id: UUID) -> FrozenPromptSnapshots | None:
         context = self._repository.context_for_node(node_run_id)

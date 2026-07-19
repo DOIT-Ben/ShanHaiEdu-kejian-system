@@ -2,39 +2,26 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class LockedLayerSummary(BaseModel):
+class PromptEditPolicyRead(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    layer: Literal["platform_safety", "output_schema", "provider_format"]
-    key: str
-    locked: Literal[True]
-
-
-class ContextBindingSummary(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    binding_key: str
-    source: str
-    exposure: Literal["full", "summary", "hidden"]
-    item_count: int = Field(ge=0)
-    content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    mode: Literal["replace_editable_layer"]
+    max_chars: int = Field(ge=1, le=100_000)
 
 
 class PromptPreviewRead(BaseModel):
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    model_config = ConfigDict(extra="forbid")
 
     prompt_snapshot_id: UUID
     content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     editable_prompt: str
-    locked_layers: list[LockedLayerSummary]
-    context_summary: list[ContextBindingSummary]
-    request_schema: dict[str, Any] | None = Field(default=None, alias="schema")
+    edit_policy: PromptEditPolicyRead
 
 
 class PromptPreviewEnvelope(BaseModel):
