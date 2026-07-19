@@ -66,7 +66,7 @@ def validate_content_rules(
                 isinstance(value, int | float)
                 and not isinstance(value, bool)
                 and isinstance(target, list)
-                and value != len(target)
+                and value != len(cast(list[object], target))
             ):
                 errors.append(
                     {
@@ -162,5 +162,5 @@ def _resolve_path(content: object, path: list[str]) -> object:
     for part in path:
         if not isinstance(current, dict) or part not in current:
             return None
-        current = current[part]
+        current = cast(dict[str, object], current)[part]
     return current
