@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 
 from apps.api.cli import run_model_smoke
 from apps.api.model_gateway.contracts import ModelCapability
@@ -23,3 +25,22 @@ async def test_fake_cli_summary_excludes_prompt_and_model_text(capsys) -> None:
     assert "text" not in summary
     assert "prompt" not in summary
     assert "SHANHAIEDU_FAKE_SMOKE_OK" not in json.dumps(summary)
+
+
+def test_text_smoke_cli_rejects_non_text_capability_without_traceback() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "apps.api.cli",
+            "model-smoke",
+            "--capability",
+            ModelCapability.IMAGE_GENERATE_EDUCATION_16X9.value,
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 2
+    assert "invalid choice" in result.stderr
+    assert "Traceback" not in result.stderr
