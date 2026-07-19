@@ -23,6 +23,17 @@ from apps.api.settings import get_settings
 logger = logging.getLogger(__name__)
 
 
+def _run_startup_recovery(coordinator: AttemptRecoveryCoordinator) -> None:
+    result = coordinator.reconcile()
+    logger.info(
+        "generation_attempt_startup_recovery_completed",
+        extra={
+            "cancellation_requests": result.cancellation_requests,
+            "recovered": result.recovered,
+        },
+    )
+
+
 async def check_dependencies() -> bool:
     settings = get_settings()
     report = await build_readiness_service(settings).check()
@@ -72,14 +83,7 @@ def run_worker(*, check_only: bool) -> int:
             process_generation_job.send(str(event.aggregate_id))
 
     worker = Worker(broker, worker_threads=2)
-    startup_recovery = attempt_recovery.reconcile()
-    logger.info(
-        "generation_attempt_startup_recovery_completed",
-        extra={
-            "cancellation_requests": startup_recovery.cancellation_requests,
-            "recovered": startup_recovery.recovered,
-        },
-    )
+    _run_startup_recovery(attempt_recovery)
     worker.start()
     logger.info("worker_booted", extra={"ready": True, "task_processing_enabled": True})
     try:

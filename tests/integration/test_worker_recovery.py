@@ -9,7 +9,7 @@ from apps.api.identity.context import ActorContext, system_actor
 from apps.api.identity.models import SYSTEM_ORGANIZATION_ID
 from apps.api.ids import new_uuid7
 from apps.api.jobs.models import GenerationJob
-from apps.api.jobs.service import GenerationJobService
+from apps.api.jobs.service import GenerationJobCancellationReader, GenerationJobService
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.reliability.events import EventResource, EventWriter
@@ -59,6 +59,22 @@ def seed_queued_job(session) -> tuple[GenerationJob, ActorContext]:
         request_id="req-seed-job",
     )
     return job, actor
+
+
+def test_cancellation_reader_exposes_only_requested_job_ids(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session, session.begin():
+        job, _ = seed_queued_job(session)
+        unrelated_id = new_uuid7()
+        reader = GenerationJobCancellationReader(session)
+        assert reader.requested_ids({job.id, unrelated_id}) == set()
+
+        job.status = "cancel_requested"
+        job.cancel_requested_at = utc_now()
+        session.flush()
+        assert reader.requested_ids({job.id, unrelated_id}) == {job.id}
 
 
 def test_expired_worker_lease_is_recovered_and_duplicate_delivery_is_absorbed(

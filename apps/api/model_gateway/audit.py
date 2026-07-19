@@ -5,19 +5,18 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from enum import StrEnum
 from typing import Protocol
 from uuid import UUID
 
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
-from apps.api.database import utc_now
 from apps.api.ids import new_uuid7
 from apps.api.model_gateway.audit_models import (
     GenerationAttempt,
@@ -30,6 +29,14 @@ from apps.api.model_gateway.contracts import (
     ModelUsage,
 )
 from apps.api.workflows.models import NodeRun, WorkflowRun
+
+
+def database_wall_clock(session: Session) -> datetime:
+    """Return PostgreSQL wall time instead of the transaction-start timestamp."""
+    current_time = session.scalar(select(func.clock_timestamp()))
+    if current_time is None:
+        raise RuntimeError("database wall clock is unavailable")
+    return current_time
 
 
 class AttemptAuditSink(Protocol):
@@ -126,28 +133,10 @@ class SqlAlchemyAttemptAuditSink:
     ) -> AttemptLease:
         try:
             with self._session_factory() as session, session.begin():
-                node = session.scalar(
-                    select(NodeRun)
-                    .join(WorkflowRun, WorkflowRun.id == NodeRun.workflow_run_id)
-                    .where(
-                        NodeRun.id == context.node_run_id,
-                        NodeRun.organization_id == context.organization_id,
-                        WorkflowRun.project_id == context.project_id,
-                    )
-                    .with_for_update(of=NodeRun)
-                )
-                if node is None:
-                    raise RuntimeError("model audit context does not match the target node")
-                duplicate = session.scalar(
-                    select(GenerationAttempt.id).where(
-                        GenerationAttempt.organization_id == context.organization_id,
-                        GenerationAttempt.request_id == request.request_id,
-                    )
-                )
-                if duplicate is not None:
-                    raise DuplicateAttemptDelivery("model request delivery already exists")
+                self._lock_context_node(session, context)
+                self._reject_duplicate_delivery(session, context, request)
                 attempt_no = self._allocate_attempt_no(session, context.node_run_id)
-                now = utc_now()
+                now = database_wall_clock(session)
                 lease_owner = str(new_uuid7())
                 attempt = GenerationAttempt(
                     id=new_uuid7(),
@@ -181,6 +170,36 @@ class SqlAlchemyAttemptAuditSink:
                 raise DuplicateAttemptDelivery("model request delivery already exists") from None
             raise
 
+    @staticmethod
+    def _lock_context_node(session: Session, context: ModelAuditContext) -> None:
+        node = session.scalar(
+            select(NodeRun)
+            .join(WorkflowRun, WorkflowRun.id == NodeRun.workflow_run_id)
+            .where(
+                NodeRun.id == context.node_run_id,
+                NodeRun.organization_id == context.organization_id,
+                WorkflowRun.project_id == context.project_id,
+            )
+            .with_for_update(of=NodeRun)
+        )
+        if node is None:
+            raise RuntimeError("model audit context does not match the target node")
+
+    @staticmethod
+    def _reject_duplicate_delivery(
+        session: Session,
+        context: ModelAuditContext,
+        request: AttemptRequestAudit,
+    ) -> None:
+        duplicate = session.scalar(
+            select(GenerationAttempt.id).where(
+                GenerationAttempt.organization_id == context.organization_id,
+                GenerationAttempt.request_id == request.request_id,
+            )
+        )
+        if duplicate is not None:
+            raise DuplicateAttemptDelivery("model request delivery already exists")
+
     def heartbeat(
         self,
         lease: AttemptLease,
@@ -192,7 +211,7 @@ class SqlAlchemyAttemptAuditSink:
                 return AttemptHeartbeat.LOST
             if attempt.cancel_requested_at is not None:
                 return AttemptHeartbeat.CANCEL_REQUESTED
-            now = utc_now()
+            now = database_wall_clock(session)
             attempt.heartbeat_at = now
             attempt.lease_expires_at = now + timedelta(seconds=self._lease_seconds)
             return AttemptHeartbeat.ACTIVE
@@ -210,7 +229,7 @@ class SqlAlchemyAttemptAuditSink:
             attempt.status = "succeeded"
             attempt.provider_request_id = _bounded(result.provider_request_id, 255)
             attempt.provider_task_id = _bounded(result.provider_task_id, 255)
-            attempt.finished_at = utc_now()
+            attempt.finished_at = database_wall_clock(session)
             attempt.latency_ms = latency_ms
             attempt.lease_owner = None
             attempt.lease_expires_at = None
@@ -241,7 +260,7 @@ class SqlAlchemyAttemptAuditSink:
                 "MODEL_CANCELLED": "cancelled",
                 "MODEL_SUBMISSION_UNKNOWN": "submission_unknown",
             }.get(error.code.value, "failed")
-            attempt.finished_at = utc_now()
+            attempt.finished_at = database_wall_clock(session)
             attempt.error_code = error.code.value
             attempt.error_details_json = {
                 "retryable": error.retryable,
@@ -280,7 +299,7 @@ class SqlAlchemyAttemptAuditSink:
         lease: AttemptLease,
         context: ModelAuditContext,
     ) -> GenerationAttempt | None:
-        return session.scalar(
+        attempt = session.scalar(
             select(GenerationAttempt)
             .where(
                 GenerationAttempt.id == lease.attempt_id,
@@ -289,10 +308,15 @@ class SqlAlchemyAttemptAuditSink:
                 GenerationAttempt.node_run_id == context.node_run_id,
                 GenerationAttempt.status == "running",
                 GenerationAttempt.lease_owner == lease.lease_owner,
-                GenerationAttempt.lease_expires_at >= utc_now(),
             )
             .with_for_update()
         )
+        if attempt is None:
+            return None
+        database_now = database_wall_clock(session)
+        if attempt.lease_expires_at is None or attempt.lease_expires_at < database_now:
+            return None
+        return attempt
 
     @staticmethod
     def _allocate_attempt_no(session: Session, node_run_id: UUID) -> int:

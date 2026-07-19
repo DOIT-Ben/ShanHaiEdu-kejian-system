@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from datetime import timedelta
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from apps.api.database import utc_now
@@ -18,6 +20,28 @@ from apps.api.jobs.schemas import GenerationJobRead
 from apps.api.jobs.state_machine import InvalidJobTransition, require_transition
 from apps.api.reliability.events import EventResource, EventWriter, append_outbox_only
 from apps.api.reliability.idempotency import CommandResult, IdempotencyService
+
+
+class GenerationJobCancellationReader:
+    """Expose cancellation state without leaking the jobs ORM model."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def requested_ids(self, job_ids: Collection[UUID]) -> set[UUID]:
+        if not job_ids:
+            return set()
+        return set(
+            self._session.scalars(
+                select(GenerationJob.id).where(
+                    GenerationJob.id.in_(job_ids),
+                    (
+                        GenerationJob.status.in_(("cancel_requested", "cancelled"))
+                        | GenerationJob.cancel_requested_at.is_not(None)
+                    ),
+                )
+            )
+        )
 
 
 class GenerationJobService:

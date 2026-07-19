@@ -53,7 +53,6 @@
   "oversized_files": [
     {"path": "apps/api/artifacts/router.py", "line_count": 422, "owner": "area:asset", "reason": "Existing artifact routing and presentation responsibilities require a separate split task.", "exit_issue": "#92"},
     {"path": "apps/api/assets/project_service.py", "line_count": 419, "owner": "area:asset", "reason": "Existing project asset validation responsibilities require a separate split task.", "exit_issue": "#92"},
-    {"path": "apps/api/model_gateway/gateway.py", "line_count": 410, "owner": "area:model-gateway", "reason": "Existing multi-modality gateway orchestration requires a separate split task.", "exit_issue": "#92"},
     {"path": "apps/api/uploads/confirmation_service.py", "line_count": 422, "owner": "area:asset", "reason": "Existing upload confirmation transaction requires a separate split task.", "exit_issue": "#92"}
   ],
   "oversized_functions": [
@@ -70,7 +69,6 @@
     {"path": "apps/api/creation/service.py", "qualname": "CreationService.save_prompt_version", "line_count": 66, "owner": "area:workflow", "reason": "Existing prompt version transaction requires a focused split.", "exit_issue": "#92"},
     {"path": "apps/api/lessons/router.py", "qualname": "update_project_lessons", "line_count": 67, "owner": "area:workflow", "reason": "Existing lesson update endpoint requires a focused split.", "exit_issue": "#92"},
     {"path": "apps/api/main.py", "qualname": "create_app", "line_count": 68, "owner": "area:api", "reason": "Existing application assembly requires a focused split.", "exit_issue": "#92"},
-    {"path": "apps/api/model_gateway/gateway.py", "qualname": "ModelGateway._execute", "line_count": 67, "owner": "area:model-gateway", "reason": "Existing provider execution flow requires a focused split.", "exit_issue": "#92"},
     {"path": "apps/api/model_gateway/openai_compatible.py", "qualname": "OpenAICompatibleTextProvider.complete", "line_count": 77, "owner": "area:model-gateway", "reason": "Existing provider request mapping requires a focused split.", "exit_issue": "#92"},
     {"path": "apps/api/projects/policy_service.py", "qualname": "AutomationPolicyService.update", "line_count": 86, "owner": "area:workflow", "reason": "Existing automation policy update transaction requires a focused split.", "exit_issue": "#92"},
     {"path": "apps/api/prompt_runtime/service.py", "qualname": "PromptSnapshotService.freeze", "line_count": 66, "owner": "area:workflow", "reason": "Existing immutable prompt freeze transaction requires a focused split.", "exit_issue": "#92"},

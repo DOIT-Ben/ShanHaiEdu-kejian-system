@@ -31,6 +31,7 @@
 - [Issue #68](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/68)与[PR #71](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/71)已经合并首套内置内容包和黄金Fixture；[Decision #99](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/99)、[Issue #100](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/100)与[PR #101](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/101)随后把三类九套纠正为知识点驱动的单节点生成，#48字段阻塞保持解除。
 - [Issue #88](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/88)与[PR #105](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/105)已经把纠偏后的黄金内容包、111个内容项、22个内容定义投影和47节点目录正式发布到数据库；新项目从追加式默认版本固定Release与工作流，旧项目保持原绑定。
 - [Issue #61](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/61)与[PR #62](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/62)已经完成Provider中立文本、图片和视频合同、Port、路由、确定性Fake、统一错误、异步任务标识和用量审计；真实媒体Adapter与冒烟仍由后续独立任务负责。
+- [Issue #112](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/112)与[PR #120](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/120)已经为#89合并最小应用接口和跨模块ORM、文件/函数增长门禁，没有扩大为#92全量重构。
 - [Issue #90](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/90)已经完成GenerationAttempt租约、心跳、过期恢复、并发安全序号、未知提交与取消协调；失去租约的Worker不能覆盖终态，历史未知提交不会自动重提或重复写入用量。
 - [Issue #85](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/85)与[PR #98](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/98)已经把37个运行时操作与5个规划操作分层，生成客户端只保留真实可调用接口，CI会拒绝静态合同与FastAPI运行时双向漂移。
 - [Issue #44](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/44)的实现已经提供TemplateDraft到结构化内容包的确定性编译入口、CompilationProfile、CLI和合同测试。
@@ -44,15 +45,14 @@
 - [Decision #73](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/73)已经批准：PPT通常推荐10至20页，视频按故事和服务端价格事实推荐60至180秒，教师可以覆盖；TTS延后独立实施。
 - [Issue #48](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/48)：全流程生成节点与可配置模型I/O绑定的父任务保持`status:ready`；黄金内容包已正式发布，通用执行器由#89承接。
 - [Issue #86](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/86)：阶段2下一门禁，统一ArtifactRelation类型、方向与stale影响语义。
-- [Issue #112](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/112)：正在为#89提供最小应用接口和跨模块ORM、文件/函数增长门禁，不扩大为#92全量重构。
-- [Issue #89](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/89)：继续保持`status:blocked`；仅在#51、#86、#90和#112全部合并并从最新`main`复验后，才作为唯一后端主实现启动。
+- [Issue #89](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/89)：继续保持`status:blocked`；#112已经合并，仅在#51、#86和#90全部合并并从最新`main`复验后，才作为唯一后端主实现启动。
 - [Issue #51](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/51)：#85合同分层完成后可以启动教师公共Prompt投影，但不删除服务端完整Prompt/Context/Schema快照。
 - [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)：与生产前端完成真实合同联调；当前因Issue #4没有开放源码PR而等待，不以本地分支、ZIP或Mock代替。
 
 ## 当前阻塞
 
 - 阶段1整体产品出口仍缺少生产前端的真实API联调；后端轨道通过不代表完整阶段1产品完成。
-- #48已有机器合同和黄金数据，但主线尚无读取数据库已发布GenerationTemplate并完成Prompt/Context冻结、模型调用、结构校验和Artifact原子落库的通用执行器；#89仍等待#51、#86、#90和#112全部合并并复验。
+- #48已有机器合同和黄金数据，但主线尚无读取数据库已发布GenerationTemplate并完成Prompt/Context冻结、模型调用、结构校验和Artifact原子落库的通用执行器；#112已经合并，#89仍等待#51、#86和#90全部合并并从最新`main`复验。
 - ShanHaiEdu已经具备Provider中立媒体基础层和Attempt租约恢复，但真实图片/视频Adapter、供应商私有状态映射与受控真实冒烟仍未实现，不能把确定性Fake或恢复基座描述为真实媒体出口。
 - TTS与实时价格计算当前不实现、不冒烟，也不阻塞教材到教案纵向链；PPTX装配、媒体生成和最终交付仍需独立Issue与真实阶段验收。
 
@@ -79,7 +79,7 @@
 - 生产前端工程达到Issue #4的阶段0范围并通过前端门禁，源码通过PR进入`main`。
 - 前端通过#11消费当前OpenAPI、JSON Schema和SSE合同，完成真实API联调；Mock不能作为出口。
 
-进入阶段2“教材到教案纵向链路”时，#88和#90已经完成，当前按[交付路线](docs/governance/DELIVERY_ROADMAP.md)推进#86。任一时刻后端主任务不超过三个，修改同一合同或跨模块事务的任务不得并发。#89通用执行器仅在#51、#86、#90和#112全部合并并从最新`main`复验后单独启动。随后基于已发布黄金输入交付课时/教案与三类九套/选择快照；PPT/图片和视频在阶段2运行时稳定后使用独立短分支并行推进。TTS继续延后，#11等待生产前端达到联调条件。所有新任务默认在阿里云Linux的仓库外短worktree中开发，Windows只作应急回退。
+进入阶段2“教材到教案纵向链路”时，#88和#90已经完成，当前按[交付路线](docs/governance/DELIVERY_ROADMAP.md)推进#86。任一时刻后端主任务不超过三个，修改同一合同或跨模块事务的任务不得并发。#112已经合并，#89通用执行器仅在#51、#86和#90全部合并并从最新`main`复验后单独启动。随后基于已发布黄金输入交付课时/教案与三类九套/选择快照；PPT/图片和视频在阶段2运行时稳定后使用独立短分支并行推进。TTS继续延后，#11等待生产前端达到联调条件。所有新任务默认在阿里云Linux的仓库外短worktree中开发，Windows只作应急回退。
 
 ## 接手提示
 
@@ -91,4 +91,4 @@
 4. 被分配的Issue和PR
 5. 与任务直接相关的模块文档、合同、代码和测试
 
-新对话从最新Linux `main`推进#86关系语义门禁；#90已完成Attempt租约恢复，#89仍须等待#51、#86、#90和#112全部合并并复验。#88已完成正式内容发布，不得回退到Fixture常量或覆盖既有项目Release。当前API客户端只从runtime合同生成，planned合同不可用于联调。不得从外部旧Skill恢复七部分教案、固定50秒视频、视频读取教案/PPT、第二套DTO或把TemplateDraft编译器当成模型执行运行时。
+新对话从最新Linux `main`推进#86关系语义门禁；#112已经合并，#90已完成Attempt租约恢复，#89仍须等待#51、#86和#90全部合并并从最新`main`复验。#88已完成正式内容发布，不得回退到Fixture常量或覆盖既有项目Release。当前API客户端只从runtime合同生成，planned合同不可用于联调。不得从外部旧Skill恢复七部分教案、固定50秒视频、视频读取教案/PPT、第二套DTO或把TemplateDraft编译器当成模型执行运行时。

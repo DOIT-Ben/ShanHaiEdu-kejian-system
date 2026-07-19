@@ -8,9 +8,9 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from apps.api.database import utc_now
 from apps.api.ids import new_uuid7
-from apps.api.jobs.models import GenerationJob
+from apps.api.jobs.service import GenerationJobCancellationReader
+from apps.api.model_gateway.audit import database_wall_clock
 from apps.api.model_gateway.audit_models import GenerationAttempt, UsageRecord
 
 
@@ -55,36 +55,52 @@ class AttemptRecoveryCoordinator:
             )
             if attempt is None:
                 return False
-            attempt.cancel_requested_at = attempt.cancel_requested_at or utc_now()
+            attempt.cancel_requested_at = attempt.cancel_requested_at or database_wall_clock(
+                session
+            )
             return True
 
     @staticmethod
     def _coordinate_job_cancellations(session: Session, *, limit: int) -> int:
-        attempts = list(
-            session.scalars(
-                select(GenerationAttempt)
-                .join(GenerationJob, GenerationJob.id == GenerationAttempt.generation_job_id)
+        candidate_job_ids = {
+            job_id
+            for job_id in session.scalars(
+                select(GenerationAttempt.generation_job_id)
                 .where(
                     GenerationAttempt.status == "running",
                     GenerationAttempt.cancel_requested_at.is_(None),
-                    (
-                        (GenerationJob.status.in_(("cancel_requested", "cancelled")))
-                        | (GenerationJob.cancel_requested_at.is_not(None))
-                    ),
+                    GenerationAttempt.generation_job_id.is_not(None),
+                )
+                .distinct()
+            )
+            if job_id is not None
+        }
+        cancelled_job_ids = GenerationJobCancellationReader(session).requested_ids(
+            candidate_job_ids
+        )
+        if not cancelled_job_ids:
+            return 0
+        attempts = list(
+            session.scalars(
+                select(GenerationAttempt)
+                .where(
+                    GenerationAttempt.status == "running",
+                    GenerationAttempt.cancel_requested_at.is_(None),
+                    GenerationAttempt.generation_job_id.in_(cancelled_job_ids),
                 )
                 .order_by(GenerationAttempt.submitted_at, GenerationAttempt.id)
                 .limit(limit)
-                .with_for_update(skip_locked=True, of=GenerationAttempt)
+                .with_for_update(skip_locked=True)
             )
         )
-        now = utc_now()
+        now = database_wall_clock(session)
         for attempt in attempts:
             attempt.cancel_requested_at = now
         return len(attempts)
 
     @staticmethod
     def _recover_expired(session: Session, *, limit: int) -> list[str]:
-        now = utc_now()
+        now = database_wall_clock(session)
         attempts = list(
             session.scalars(
                 select(GenerationAttempt)

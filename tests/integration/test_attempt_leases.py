@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from datetime import timedelta
-from threading import Barrier
+from threading import Barrier, Event
 from uuid import UUID
 
 import pytest
-from sqlalchemy import func, select, text
+from sqlalchemy import event, func, select, text
 from sqlalchemy.exc import IntegrityError
 
 from apps.api.database import build_engine, build_session_factory, utc_now
 from apps.api.ids import new_uuid7
+from apps.api.jobs.models import GenerationJob
 from apps.api.model_gateway.attempt_recovery import AttemptRecoveryCoordinator
 from apps.api.model_gateway.audit import (
     AttemptHeartbeat,
@@ -23,7 +25,7 @@ from apps.api.model_gateway.contracts import GatewayErrorCode, ModelAuditContext
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.workflows.service import WorkflowRuntimeService
-from tests.fakes.identity import seed_test_actor
+from tests.fakes.identity import TEST_PRINCIPAL_ID, seed_test_actor
 from workflow.node_state import NodeStatus
 
 
@@ -141,6 +143,109 @@ def test_duplicate_delivery_does_not_create_another_attempt(
         assert session.scalar(select(func.count()).select_from(GenerationAttempt)) == 1
 
 
+def test_heartbeat_waiting_on_a_row_lock_cannot_renew_an_expired_lease(
+    migrated_database_url: str,
+) -> None:
+    locking_engine = build_engine(migrated_database_url)
+    worker_engine = build_engine(migrated_database_url)
+    locking_factory = build_session_factory(locking_engine)
+    worker_factory = build_session_factory(worker_engine)
+    context = _seed_context(locking_factory)
+    sink = SqlAlchemyAttemptAuditSink(worker_factory, lease_seconds=30)
+    lease = sink.start(
+        context,
+        _request("req-heartbeat-lock-expiry"),
+        provider_name="provider-test",
+        provider_model="model-test",
+        route_reason="configured_primary",
+    )
+    query_started = Event()
+
+    @event.listens_for(worker_engine, "before_cursor_execute")
+    def signal_locking_query(_conn, _cursor, statement, _parameters, _context, _many):
+        if "FROM generation_attempts" in statement and "FOR UPDATE" in statement:
+            query_started.set()
+
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            with locking_factory() as session, session.begin():
+                attempt = session.get(GenerationAttempt, lease.attempt_id, with_for_update=True)
+                assert attempt is not None
+                database_now = session.scalar(select(func.clock_timestamp()))
+                assert database_now is not None
+                attempt.lease_expires_at = database_now + timedelta(milliseconds=250)
+                session.flush()
+                future = executor.submit(sink.heartbeat, lease, context)
+                assert query_started.wait(timeout=5)
+                session.execute(text("SELECT pg_sleep(0.5)"))
+
+            assert future.result(timeout=5) == AttemptHeartbeat.LOST
+    finally:
+        event.remove(worker_engine, "before_cursor_execute", signal_locking_query)
+        locking_engine.dispose()
+        worker_engine.dispose()
+
+
+def test_terminal_write_waiting_on_a_row_lock_cannot_use_an_expired_lease(
+    migrated_database_url: str,
+) -> None:
+    locking_engine = build_engine(migrated_database_url)
+    worker_engine = build_engine(migrated_database_url)
+    locking_factory = build_session_factory(locking_engine)
+    worker_factory = build_session_factory(worker_engine)
+    context = _seed_context(locking_factory)
+    sink = SqlAlchemyAttemptAuditSink(worker_factory, lease_seconds=30)
+    lease = sink.start(
+        context,
+        _request("req-terminal-lock-expiry"),
+        provider_name="provider-test",
+        provider_model="model-test",
+        route_reason="configured_primary",
+    )
+    query_started = Event()
+
+    @event.listens_for(worker_engine, "before_cursor_execute")
+    def signal_locking_query(_conn, _cursor, statement, _parameters, _context, _many):
+        if "FROM generation_attempts" in statement and "FOR UPDATE" in statement:
+            query_started.set()
+
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            with locking_factory() as session, session.begin():
+                attempt = session.get(GenerationAttempt, lease.attempt_id, with_for_update=True)
+                assert attempt is not None
+                database_now = session.scalar(select(func.clock_timestamp()))
+                assert database_now is not None
+                attempt.lease_expires_at = database_now + timedelta(milliseconds=250)
+                session.flush()
+                future = executor.submit(
+                    sink.fail,
+                    lease,
+                    context,
+                    ModelGatewayError(GatewayErrorCode.CANCELLED, retryable=False),
+                    latency_ms=9,
+                )
+                assert query_started.wait(timeout=5)
+                session.execute(text("SELECT pg_sleep(0.5)"))
+
+            with pytest.raises(RuntimeError):
+                future.result(timeout=5)
+
+        with locking_factory() as session:
+            attempt = session.get(GenerationAttempt, lease.attempt_id)
+            usage_count = session.scalar(
+                select(func.count())
+                .select_from(UsageRecord)
+                .where(UsageRecord.generation_attempt_id == lease.attempt_id)
+            )
+        assert attempt is not None and attempt.status == "running"
+        assert usage_count == 0
+    finally:
+        event.remove(worker_engine, "before_cursor_execute", signal_locking_query)
+        locking_engine.dispose()
+        worker_engine.dispose()
+
+
 def test_persisted_cancel_is_observed_by_heartbeat_and_terminal_audit(
     migrated_database_url: str,
 ) -> None:
@@ -175,6 +280,45 @@ def test_persisted_cancel_is_observed_by_heartbeat_and_terminal_audit(
     assert attempt is not None and attempt.status == "cancelled"
     assert attempt.lease_owner is None and attempt.lease_expires_at is None
     assert usage_count == 1
+
+
+def test_generation_job_cancellation_is_synchronized_through_application_reader(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    context = _seed_context(factory)
+    with factory() as session, session.begin():
+        job = GenerationJob(
+            id=new_uuid7(),
+            organization_id=context.organization_id,
+            project_id=context.project_id,
+            job_type="model.generate",
+            status="running",
+            progress_percent=0,
+            priority=100,
+            created_by=TEST_PRINCIPAL_ID,
+            updated_by=TEST_PRINCIPAL_ID,
+        )
+        session.add(job)
+    context = replace(context, generation_job_id=job.id)
+    sink = SqlAlchemyAttemptAuditSink(factory)
+    lease = sink.start(
+        context,
+        _request("req-job-cancel-attempt"),
+        provider_name="provider-test",
+        provider_model="model-test",
+        route_reason="configured_primary",
+    )
+    with factory() as session, session.begin():
+        persisted_job = session.get(GenerationJob, job.id, with_for_update=True)
+        assert persisted_job is not None
+        persisted_job.status = "cancel_requested"
+        persisted_job.cancel_requested_at = utc_now()
+
+    result = AttemptRecoveryCoordinator(factory).reconcile()
+
+    assert result.cancellation_requests == 1
+    assert sink.heartbeat(lease, context) == AttemptHeartbeat.CANCEL_REQUESTED
 
 
 def test_usage_record_cannot_bind_to_a_running_attempt(
