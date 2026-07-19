@@ -117,6 +117,11 @@ check_tree() {
     printf 'symlink scan failed: %s\n' "$root" >&2
     return 1
   fi
+  if ! specials=$(sudo -u shanhai-dev -- find -P "$root" -xdev \
+    ! \( -type d -o -type f -o -type l \) -print 2>&1); then
+    printf 'special-file scan failed: %s\n' "$root" >&2
+    return 1
+  fi
   if [ -n "$directories" ] || [ -n "$files" ]; then
     printf 'Git path ownership/readability/rwx drift under %s:\n%s\n%s\n' \
       "$root" "$directories" "$files" >&2
@@ -128,6 +133,14 @@ check_tree() {
       sudo -u shanhai-dev -- stat --format='%F %U %a %n' -- "$link" >&2 || return 1
       sudo -u shanhai-dev -- readlink -- "$link" >&2 || return 1
     done <<< "$links"
+    return 1
+  fi
+  if [ -n "$specials" ]; then
+    while IFS= read -r special; do
+      # FIFO、socket、device 或未知类型全部拒绝；stat 只读取元数据，不打开对象。
+      sudo -u shanhai-dev -- stat --format='%F %U %a %n' -- "$special" >&2 || return 1
+    done <<< "$specials"
+    printf 'special Git entry is forbidden: %s\n' "$specials" >&2
     return 1
   fi
 }
