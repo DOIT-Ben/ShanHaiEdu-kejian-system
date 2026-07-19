@@ -56,25 +56,36 @@
 
 ## 后端基座快速开始
 
-需要 Python 3.12、uv 和 Docker Desktop。首次启动：
+阿里云Linux workspace容器是生产级代码的主要开发环境，Windows只保留应急回退；正式生产部署由后续独立任务建设。宿主机只需要Git、Docker Engine和Docker Compose 2.40以上；Python、Node、uv、pnpm、FFmpeg、LibreOffice和项目依赖由版本化镜像提供。
 
-```powershell
-Copy-Item .env.example .env
-uv sync --frozen
-docker compose -f infra\compose.yaml up -d postgres redis minio
-uv run alembic upgrade head
-uv run python scripts\smoke_local_stack.py
-uv run python -m workers.main --check
-uv run uvicorn apps.api.main:app --host 127.0.0.1 --port 8000
+共享ECS只允许使用已验证的rootless Docker；独立ECS必须由基础设施流程写入受控主机标记。每个Shell会话先显式选择一种已满足的隔离模式，未选择时命令默认拒绝运行：
+
+```bash
+export SHANHAI_DOCKER_ISOLATION_MODE=rootless
+# 独立ECS使用：export SHANHAI_DOCKER_ISOLATION_MODE=dedicated-ecs
+```
+
+首次建立环境或环境合同变化时构建一次：
+
+```bash
+bash infra/dev/compose.sh build workspace
+```
+
+日常worktree只启动现有镜像，不重复构建：
+
+```bash
+bash infra/dev/compose.sh up -d
+bash infra/dev/compose.sh exec workspace bash infra/dev/bootstrap.sh
+bash infra/dev/compose.sh exec workspace uv run uvicorn apps.api.main:app --host 0.0.0.0 --port 8000
 ```
 
 容器使用 `GET /health/live` 和 `GET /health/ready`；共享API合同中的兼容路径是 `GET /api/v2/health/live` 和 `GET /api/v2/health/ready`。停止本地依赖但保留数据：
 
-```powershell
-docker compose -f infra\compose.yaml down
+```bash
+bash infra/dev/compose.sh down
 ```
 
-本地 `.env`、数据库、缓存和对象存储数据不得提交。普通测试和CI不连接真实模型Provider。
+包装脚本按worktree目录派生Compose项目名和宿主端口，并把Git公共元数据只读挂载给测试，不让容器写Git仓库。它会拒绝共享rootful daemon和低于30 GiB空闲空间的启动/构建。本地`.env`、数据库、缓存和对象存储数据不得提交。普通测试和CI不连接真实模型Provider。完整拓扑、并行worktree、迁移和回退规则见[Linux开发环境与迁移](docs/governance/Linux开发环境与迁移.md)。
 
 真实文本模型只通过显式冒烟命令调用。先在受控环境中注入密钥变量，不把密钥写入`.env`、命令历史或参数；再配置非敏感路由并运行：
 

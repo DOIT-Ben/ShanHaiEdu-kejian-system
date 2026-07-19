@@ -1,0 +1,110 @@
+services:
+  postgres:
+    cpus: "${SHANHAI_POSTGRES_CPUS:-1.5}"
+    mem_limit: 1g
+
+  redis:
+    cpus: "${SHANHAI_REDIS_CPUS:-0.5}"
+    mem_limit: 512m
+
+  minio:
+    cpus: "${SHANHAI_MINIO_CPUS:-1.0}"
+    mem_limit: 1g
+
+  workspace-init:
+    image: "${SHANHAI_DEV_WORKSPACE_IMAGE:-shanhaiedu-dev-workspace:2026.07-v2}"
+    pull_policy: never
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - >-
+        install -d -o "$${DEV_UID}" -g "$${DEV_GID}"
+        /workspace/.venv
+        /workspace/node_modules
+        /home/developer/.cache/uv
+        /home/developer/.local/share/pnpm/store
+        && chown -R "$${DEV_UID}:$${DEV_GID}"
+        /workspace/.venv
+        /workspace/node_modules
+        /home/developer/.cache/uv
+        /home/developer/.local/share/pnpm/store
+    environment:
+      DEV_UID: ${SHANHAI_WORKSPACE_UID:-1000}
+      DEV_GID: ${SHANHAI_WORKSPACE_GID:-1000}
+    volumes:
+      - ..:/workspace
+      - python_venv:/workspace/.venv
+      - node_modules:/workspace/node_modules
+      - uv_cache:/home/developer/.cache/uv
+      - pnpm_store:/home/developer/.local/share/pnpm/store
+    restart: "no"
+
+  workspace:
+    image: "${SHANHAI_DEV_WORKSPACE_IMAGE:-shanhaiedu-dev-workspace:2026.07-v2}"
+    build:
+      context: ..
+      dockerfile: infra/dev/Dockerfile
+      args:
+        DEV_UID: ${SHANHAI_IMAGE_DEV_UID:-1000}
+        DEV_GID: ${SHANHAI_IMAGE_DEV_GID:-1000}
+    user: "${SHANHAI_WORKSPACE_UID:-1000}:${SHANHAI_WORKSPACE_GID:-1000}"
+    init: true
+    cpus: "${SHANHAI_WORKSPACE_CPUS:-3.0}"
+    mem_limit: 4g
+    pids_limit: 1024
+    environment:
+      HOME: /home/developer
+      SHANHAI_CONTAINER_GIT_DIR: ${SHANHAI_CONTAINER_GIT_DIR:-/git-common}
+      SHANHAI_CONTAINER_GIT_WORK_TREE: /workspace
+      SHANHAI_CONTAINER_ROOTLESS_USERNS: ${SHANHAI_CONTAINER_ROOTLESS_USERNS:-false}
+      SHANHAI_ENVIRONMENT: development
+      SHANHAI_API_HOST: 0.0.0.0
+      SHANHAI_API_PORT: 8000
+      SHANHAI_DATABASE_URL: postgresql://shanhai:shanhai-local-only@postgres:5432/shanhai
+      SHANHAI_REDIS_URL: redis://redis:6379/0
+      SHANHAI_OBJECT_STORAGE_HEALTH_URL: http://minio:9000/minio/health/ready
+      SHANHAI_OBJECT_STORAGE_ENDPOINT: minio:9000
+      SHANHAI_OBJECT_STORAGE_ACCESS_KEY: ${SHANHAI_MINIO_ROOT_USER:-shanhai-local}
+      SHANHAI_OBJECT_STORAGE_SECRET_KEY: ${SHANHAI_MINIO_ROOT_PASSWORD:-shanhai-local-only}
+      SHANHAI_OBJECT_STORAGE_SECURE: "false"
+      SHANHAI_OBJECT_STORAGE_BUCKET: shanhaiedu
+      SHANHAI_DEPENDENCY_TIMEOUT_SECONDS: 5.0
+      UV_LINK_MODE: copy
+      UV_NO_MANAGED_PYTHON: "1"
+      UV_PYTHON_DOWNLOADS: never
+    ports:
+      - "127.0.0.1:${SHANHAI_DEV_API_PORT:-58000}:8000"
+    volumes:
+      - ..:/workspace
+      - type: bind
+        source: ${SHANHAI_GIT_COMMON_DIR:-../.git}
+        target: /git-common
+        read_only: true
+      - python_venv:/workspace/.venv
+      - node_modules:/workspace/node_modules
+      - uv_cache:/home/developer/.cache/uv
+      - pnpm_store:/home/developer/.local/share/pnpm/store
+    depends_on:
+      workspace-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python --version && node --version && uv --version && pnpm --version"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  python_venv:
+  node_modules:
+  uv_cache:
+    name: shanhaiedu-dev-uv-cache-v1
+  pnpm_store:
+    name: shanhaiedu-dev-pnpm-store-v1
