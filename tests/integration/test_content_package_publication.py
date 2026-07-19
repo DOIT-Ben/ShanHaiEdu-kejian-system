@@ -73,19 +73,20 @@ def test_golden_release_is_published_from_validated_fixtures_and_is_idempotent(
         assert workflow.graph_json == source.workflow_catalog
         assert workflow.checksum == source.workflow_checksum
         assert session.scalar(
-            select(func.count()).select_from(ContentPackageItemVersion).where(
-                ContentPackageItemVersion.content_package_version_id == package_version.id
-            )
+            select(func.count())
+            .select_from(ContentPackageItemVersion)
+            .where(ContentPackageItemVersion.content_package_version_id == package_version.id)
         ) == len(source.items)
-        assert session.scalar(
-            select(func.count()).select_from(ContentDefinitionVersion).where(
-                ContentDefinitionVersion.content_package_version_id == package_version.id
-            )
-        ) == source.content_definition_count
-        assert resolve_runtime_defaults(session).content_release_id == release.id
         assert (
-            resolve_runtime_defaults(session).workflow_definition_version_id == workflow.id
+            session.scalar(
+                select(func.count())
+                .select_from(ContentDefinitionVersion)
+                .where(ContentDefinitionVersion.content_package_version_id == package_version.id)
+            )
+            == source.content_definition_count
         )
+        assert resolve_runtime_defaults(session).content_release_id == release.id
+        assert resolve_runtime_defaults(session).workflow_definition_version_id == workflow.id
 
 
 def test_publishing_new_default_only_changes_projects_created_after_activation(
@@ -113,10 +114,7 @@ def test_publishing_new_default_only_changes_projects_created_after_activation(
             == BUILTIN_RUNTIME_DEFAULTS.workflow_definition_version_id
         )
         assert newer.content_release_id == published.content_release_id
-        assert (
-            newer.workflow_definition_version_id
-            == published.workflow_definition_version_id
-        )
+        assert newer.workflow_definition_version_id == published.workflow_definition_version_id
 
 
 def test_failed_publication_rolls_back_every_new_runtime_row(
@@ -129,11 +127,14 @@ def test_failed_publication_rolls_back_every_new_runtime_row(
         with pytest.raises(IntegrityError):
             ContentReleasePublisher(session).publish(source, published_by=uuid4())
 
-        assert session.scalar(
-            select(func.count()).select_from(ContentPackage).where(
-                ContentPackage.package_key == source.package_key
+        assert (
+            session.scalar(
+                select(func.count())
+                .select_from(ContentPackage)
+                .where(ContentPackage.package_key == source.package_key)
             )
-        ) == 0
+            == 0
+        )
         assert resolve_runtime_defaults(session) == BUILTIN_RUNTIME_DEFAULTS
 
 

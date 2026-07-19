@@ -63,8 +63,7 @@ def load_builtin_courseware_release(root: Path) -> BuiltinCoursewareReleaseSourc
         contracts_root=contracts_root,
     )
     catalog = load_workflow_node_catalog(
-        contracts_root
-        / "fixtures/workflow-node-generation-bindings/primary-math-courseware.json",
+        contracts_root / "fixtures/workflow-node-generation-bindings/primary-math-courseware.json",
         schema_path=contracts_root / "workflow-node-generation-binding.schema.json",
     )
     manifest_entries = {
