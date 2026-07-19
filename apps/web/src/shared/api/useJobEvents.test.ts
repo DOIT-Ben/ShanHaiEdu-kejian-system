@@ -4,7 +4,7 @@ import { jobEventQueryKeys, readJobLastSequence, streamJobEvents } from "@/share
 const jobEvent = {
   event_id: "01960000-0000-7000-8000-000000000902",
   sequence_no: 7,
-  event_type: "generation.succeeded",
+  event_type: "generation.job.progress",
   occurred_at: "2026-07-20T00:00:00Z",
   project_id: "01960000-0000-7000-8000-000000000001",
   resource: {
@@ -19,7 +19,7 @@ describe("generation job event transport", () => {
   it("uses the job stream and resumes from its positive sequence", async () => {
     sessionStorage.setItem("shanhaiedu.events.job.job-1.sequence", "6");
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(`id: 7\nevent: generation.succeeded\ndata: ${JSON.stringify(jobEvent)}\n\n`, {
+      new Response(`id: 7\nevent: generation.job.progress\ndata: ${JSON.stringify(jobEvent)}\n\n`, {
         headers: { "Content-Type": "text/event-stream" },
         status: 200,
       }),

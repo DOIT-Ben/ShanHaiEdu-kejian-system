@@ -1,8 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
+import * as materialsApi from "@/features/materials/api/materialsApi";
+import * as projectsApi from "@/features/projects/api/projectsApi";
 import { RuntimeNewProjectPage } from "@/pages/projects/RuntimeNewProjectPage";
 import {
   createRuntimeNewProjectRecovery,
@@ -11,6 +13,7 @@ import {
   writeRuntimeNewProjectRecovery,
   type RuntimeNewProjectForm,
 } from "@/pages/projects/runtimeNewProjectRecovery";
+import { configureCsrfTokenProvider } from "@/shared/api/client";
 
 const savedForm: RuntimeNewProjectForm = {
   executionMode: "guided",
@@ -34,7 +37,15 @@ function renderPage() {
 }
 
 describe("RuntimeNewProjectPage recovery", () => {
-  beforeEach(() => sessionStorage.clear());
+  beforeEach(() => {
+    sessionStorage.clear();
+    configureCsrfTokenProvider(() => "csrf-test-token");
+  });
+
+  afterEach(() => {
+    configureCsrfTokenProvider(null);
+    vi.restoreAllMocks();
+  });
 
   it("hydrates the saved form and explains how a pending upload resumes", () => {
     const file = {
@@ -100,5 +111,38 @@ describe("RuntimeNewProjectPage recovery", () => {
       expect(recovery?.uploadSession).toBeUndefined();
       expect(recovery?.etag).toBeUndefined();
     });
+  });
+
+  it("freezes the active intent while project creation and upload are in flight", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(materialsApi, "sha256File").mockResolvedValue("a".repeat(64));
+    vi.spyOn(projectsApi, "createProject").mockResolvedValue({
+      id: "01960000-0000-7000-8000-000000000111",
+    } as Awaited<ReturnType<typeof projectsApi.createProject>>);
+    vi.spyOn(materialsApi, "createMaterialUploadSession").mockImplementation(
+      () => new Promise(() => undefined),
+    );
+    renderPage();
+
+    await user.type(screen.getByLabelText("项目名称"), "认识百分数");
+    await user.type(screen.getByLabelText("知识点"), "百分数的意义");
+    const fileInput = screen.getByLabelText(/选择 PDF 教材/);
+    await user.upload(
+      fileInput,
+      new File(["textbook"], "百分数.pdf", {
+        lastModified: 1_720_000_000_000,
+        type: "application/pdf",
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: "创建项目并上传教材" }));
+
+    expect(await screen.findByRole("button", { name: "正在上传教材" })).toBeDisabled();
+    expect(screen.getByLabelText("项目名称")).toBeDisabled();
+    expect(screen.getByLabelText("知识点")).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "选择年级" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "选择教材版本" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "选择制作方式" })).toBeDisabled();
+    expect(fileInput).toBeDisabled();
+    expect(screen.getByRole("button", { name: "重新开始" })).toBeDisabled();
   });
 });

@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { useRef, useState } from "react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   SaveToProjectDialog,
   type SaveResultDescriptor,
@@ -10,8 +10,10 @@ import {
 import { resetMockRuntime } from "@/shared/api/mocks/runtime";
 
 function Harness({
+  onSaved = () => undefined,
   result = { id: "result-1", title: "测试作品", type: "image" },
 }: {
+  onSaved?: Parameters<typeof SaveToProjectDialog>[0]["onSaved"];
   result?: SaveResultDescriptor;
 }) {
   const [open, setOpen] = useState(false);
@@ -23,7 +25,7 @@ function Harness({
       </button>
       <SaveToProjectDialog
         onOpenChange={setOpen}
-        onSaved={() => undefined}
+        onSaved={onSaved}
         open={open}
         result={result}
         returnFocusRef={triggerRef}
@@ -66,5 +68,33 @@ describe("SaveToProjectDialog focus", () => {
     expect(
       screen.queryByRole("option", { name: "PPT 第 3 页主视觉（课堂讲解时显示）" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("把已选候选的轮次、序号和画幅一起保存", async () => {
+    const user = userEvent.setup();
+    const onSaved = vi.fn();
+    render(
+      <TooltipProvider>
+        <Harness
+          onSaved={onSaved}
+          result={{
+            id: "creation-image-generation-2-candidate-2",
+            preview: { candidate: 1, generation: 2, ratio: "4:3" },
+            title: "测试作品 · 作品 2",
+            type: "image",
+          }}
+        />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "保存到项目" }));
+    await user.click(screen.getByRole("button", { name: "保存到这个位置" }));
+
+    expect(onSaved).toHaveBeenCalledWith(
+      expect.objectContaining({
+        preview: { candidate: 1, generation: 2, ratio: "4:3" },
+        resultId: "creation-image-generation-2-candidate-2",
+      }),
+    );
   });
 });

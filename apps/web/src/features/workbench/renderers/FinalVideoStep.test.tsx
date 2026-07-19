@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FinalVideoStep } from "@/features/workbench/renderers/FinalVideoStep";
 import {
   createMockTask,
@@ -10,9 +10,19 @@ import {
   updateMockNodeState,
   updateMockTask,
 } from "@/shared/api/mocks/runtime";
+import { downloadRemoteFile } from "@/shared/lib/downloadRemoteFile";
+
+vi.mock("@/shared/lib/downloadRemoteFile", () => ({
+  downloadRemoteFile: vi.fn(),
+}));
+
+const mockDownloadRemoteFile = vi.mocked(downloadRemoteFile);
 
 describe("FinalVideoStep synthesis single flight", () => {
-  beforeEach(() => resetMockRuntime());
+  beforeEach(() => {
+    resetMockRuntime();
+    mockDownloadRemoteFile.mockReset();
+  });
 
   function finalVideoNodeId() {
     const nodeId = getMockRuntimeState().nodeStates["project-a:lesson-a:final-video"]?.id;
@@ -106,7 +116,7 @@ describe("FinalVideoStep synthesis single flight", () => {
     expect(screen.getByText("字幕尚未检查")).toBeInTheDocument();
   });
 
-  it("只有明确的视频地址才开放播放与确认", () => {
+  it("只有画面文件时开放画面确认，但不冒充声音和字幕已检查", () => {
     saveMockDraft(
       "project:project-a:lesson:lesson-a:final-video:media",
       { mimeType: "video/mp4", src: "https://cdn.example.com/final.mp4" },
@@ -124,10 +134,68 @@ describe("FinalVideoStep synthesis single flight", () => {
     );
 
     expect(screen.getByLabelText("果汁标签侦探课堂导入视频").tagName).toBe("VIDEO");
-    expect(screen.getByRole("button", { name: "确认视频" })).toBeEnabled();
-    expect(screen.getByText("画面正常")).toBeInTheDocument();
-    expect(screen.getByText("声音清楚")).toBeInTheDocument();
-    expect(screen.getByText("字幕易读")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认画面文件" })).toBeEnabled();
+    expect(screen.getByText("画面待确认")).toBeInTheDocument();
+    expect(screen.getByText("声音待确认")).toBeInTheDocument();
+    expect(screen.getByText("字幕文件未提供")).toBeInTheDocument();
+    expect(screen.queryByText("声音清楚")).not.toBeInTheDocument();
+    expect(screen.queryByText("字幕易读")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("果汁标签侦探课堂导入视频").querySelector("track")).toBeNull();
+  });
+
+  it("有独立字幕文件时挂载真实字幕轨并提示教师检查", () => {
+    saveMockDraft(
+      "project:project-a:lesson:lesson-a:final-video:media",
+      {
+        mimeType: "video/mp4",
+        src: "https://cdn.example.com/final.mp4",
+        subtitleUrl: "https://cdn.example.com/final.vtt",
+      },
+      { lessonId: "lesson-a", nodeKey: "final-video", projectId: "project-a" },
+    );
+    render(
+      <MemoryRouter initialEntries={["/projects/project-a/lessons/lesson-a/work/final-video"]}>
+        <Routes>
+          <Route
+            element={<FinalVideoStep />}
+            path="/projects/:projectId/lessons/:lessonId/work/final-video"
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const track = screen.getByLabelText("果汁标签侦探课堂导入视频").querySelector("track");
+    expect(track).toHaveAttribute("kind", "subtitles");
+    expect(track).toHaveAttribute("src", "https://cdn.example.com/final.vtt");
+    expect(track).toHaveAttribute("srclang", "zh-CN");
+    expect(screen.getByText("字幕待确认")).toBeInTheDocument();
+  });
+
+  it("跨域视频下载失败后显示原因并保留重试入口", async () => {
+    saveMockDraft(
+      "project:project-a:lesson:lesson-a:final-video:media",
+      { mimeType: "video/mp4", src: "https://cdn.example.com/final.mp4" },
+      { lessonId: "lesson-a", nodeKey: "final-video", projectId: "project-a" },
+    );
+    mockDownloadRemoteFile.mockRejectedValueOnce(new Error("cors"));
+    mockDownloadRemoteFile.mockResolvedValueOnce();
+    render(
+      <MemoryRouter initialEntries={["/projects/project-a/lessons/lesson-a/work/final-video"]}>
+        <Routes>
+          <Route
+            element={<FinalVideoStep />}
+            path="/projects/:projectId/lessons/:lessonId/work/final-video"
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "下载视频" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("视频文件暂时无法下载");
+    fireEvent.click(screen.getByRole("button", { name: "重新下载视频" }));
+    await waitFor(() => expect(mockDownloadRemoteFile).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText("视频文件已开始下载。")).toBeInTheDocument();
   });
 
   it("优先使用当前任务引用，不会被旧的同节点任务覆盖", async () => {

@@ -10,7 +10,7 @@ import { runSseSubscription, SseStreamError } from "@/shared/api/eventStream";
 const projectEvent = {
   event_id: "01960000-0000-7000-8000-000000000901",
   sequence_no: 42,
-  event_type: "task.updated",
+  event_type: "generation.job.progress",
   occurred_at: "2026-07-20T00:00:00Z",
   project_id: "01960000-0000-7000-8000-000000000001",
   resource: {
@@ -25,10 +25,13 @@ describe("project event transport", () => {
   it("restores Last-Event-ID as the positive project sequence", async () => {
     sessionStorage.setItem("shanhaiedu.events.project.project-1.sequence", "41");
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(`id: 42\nevent: task.updated\ndata: ${JSON.stringify(projectEvent)}\n\n`, {
-        headers: { "Content-Type": "text/event-stream" },
-        status: 200,
-      }),
+      new Response(
+        `id: 42\nevent: generation.job.progress\ndata: ${JSON.stringify(projectEvent)}\n\n`,
+        {
+          headers: { "Content-Type": "text/event-stream" },
+          status: 200,
+        },
+      ),
     );
     const onEvent = vi.fn();
 
@@ -55,11 +58,11 @@ describe("project event transport", () => {
       start(controller) {
         for (const chunk of [
           "id: 42\r",
-          "\nevent: task.updated\r",
+          "\nevent: generation.job.progress\r",
           `\ndata: ${JSON.stringify(projectEvent)}\r`,
           "\n\r",
           "\nid: 43\r",
-          "\nevent: task.updated\r",
+          "\nevent: generation.job.progress\r",
           `\ndata: ${JSON.stringify(nextEvent)}\r`,
           "\n\r",
           "\n",

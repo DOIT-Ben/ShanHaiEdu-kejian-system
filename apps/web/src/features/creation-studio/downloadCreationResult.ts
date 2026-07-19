@@ -6,16 +6,10 @@ export type CreationDownloadResult =
 
 const IMAGE_DOWNLOAD_UNAVAILABLE = "当前作品图片暂时无法直接下载，请保存到项目后从成果页下载。";
 
-function currentRenderedImageSource() {
+function currentRenderedImage() {
   if (typeof document === "undefined") return undefined;
-  const image = document.querySelector<HTMLImageElement>(
+  return document.querySelector<HTMLImageElement>(
     '[data-testid="creation-main-visual"] img[data-creation-asset-source]',
-  );
-  return (
-    image?.currentSrc ||
-    image?.dataset.creationAssetSource ||
-    image?.getAttribute("src") ||
-    undefined
   );
 }
 
@@ -57,6 +51,103 @@ function extensionFor(source: string | Blob) {
   return "webp";
 }
 
+function targetDimensions(ratio: string) {
+  if (ratio === "16:9") return { height: 900, width: 1600 };
+  if (ratio === "4:3") return { height: 900, width: 1200 };
+  return { height: 1024, width: 1024 };
+}
+
+function objectPositionPercent(value: string | undefined) {
+  const [x = "50%", y = "50%"] = value?.trim().split(/\s+/) ?? [];
+  const parse = (token: string) => {
+    const parsed = Number.parseFloat(token.replace("%", ""));
+    return Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) / 100 : 0.5;
+  };
+  return { x: parse(x), y: parse(y) };
+}
+
+function waitForImage(image: HTMLImageElement) {
+  if (image.complete && image.naturalWidth > 0 && image.naturalHeight > 0) {
+    return Promise.resolve(true);
+  }
+  return new Promise<boolean>((resolve) => {
+    const timeout = window.setTimeout(() => finish(false), 10_000);
+    const finish = (loaded: boolean) => {
+      window.clearTimeout(timeout);
+      image.removeEventListener("load", onLoad);
+      image.removeEventListener("error", onError);
+      resolve(loaded && image.naturalWidth > 0 && image.naturalHeight > 0);
+    };
+    const onLoad = () => finish(true);
+    const onError = () => finish(false);
+    image.addEventListener("load", onLoad, { once: true });
+    image.addEventListener("error", onError, { once: true });
+  });
+}
+
+async function loadImageSource(source: Blob | string) {
+  if (typeof Image === "undefined") return undefined;
+  let sourceUrl: string;
+  let ownedUrl: string | undefined;
+  if (source instanceof Blob) {
+    ownedUrl = URL.createObjectURL(source);
+    sourceUrl = ownedUrl;
+  } else {
+    sourceUrl = downloadableImageUrl(source) ?? "";
+    if (!sourceUrl) return undefined;
+  }
+  const image = new Image();
+  image.decoding = "async";
+  image.src = sourceUrl;
+  if (!(await waitForImage(image))) {
+    if (ownedUrl) URL.revokeObjectURL(ownedUrl);
+    return undefined;
+  }
+  return { image, ownedUrl };
+}
+
+async function cropImageToBlob(
+  image: HTMLImageElement,
+  ratio: string,
+  position: { x: number; y: number },
+) {
+  const { height, width } = targetDimensions(ratio);
+  const sourceWidth = image.naturalWidth;
+  const sourceHeight = image.naturalHeight;
+  if (!sourceWidth || !sourceHeight || typeof document === "undefined") return undefined;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) return undefined;
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+
+  const sourceRatio = sourceWidth / sourceHeight;
+  const targetRatio = width / height;
+  let cropWidth = sourceWidth;
+  let cropHeight = sourceHeight;
+  let sourceX = 0;
+  let sourceY = 0;
+  if (sourceRatio > targetRatio) {
+    cropWidth = sourceHeight * targetRatio;
+    sourceX = (sourceWidth - cropWidth) * position.x;
+  } else if (sourceRatio < targetRatio) {
+    cropHeight = sourceWidth / targetRatio;
+    sourceY = (sourceHeight - cropHeight) * position.y;
+  }
+  context.drawImage(image, sourceX, sourceY, cropWidth, cropHeight, 0, 0, width, height);
+
+  return new Promise<Blob | undefined>((resolve) => {
+    try {
+      canvas.toBlob((blob) => resolve(blob ?? undefined), "image/webp", 0.92);
+    } catch {
+      resolve(undefined);
+    }
+  });
+}
+
 function startImageDownload(source: string | Blob, filename: string) {
   let objectUrl: string | undefined;
   let href: string;
@@ -83,7 +174,7 @@ function unavailableImageDownload(): CreationDownloadResult {
   return { message: IMAGE_DOWNLOAD_UNAVAILABLE, status: "unavailable" };
 }
 
-export function downloadCreationResult({
+export async function downloadCreationResult({
   imageSource,
   candidate,
   ratio,
@@ -95,19 +186,35 @@ export function downloadCreationResult({
   ratio: string;
   title: string;
   type: StudioType;
-}): CreationDownloadResult {
+}): Promise<CreationDownloadResult> {
   const candidateLabel = String(candidate + 1);
   if (type === "image") {
-    const source = imageSource ?? currentRenderedImageSource();
-    if (!source || typeof document === "undefined") return unavailableImageDownload();
-    if (source instanceof Blob) {
-      if (!source.type.startsWith("image/")) return unavailableImageDownload();
-      startImageDownload(source, `${title}_作品${candidateLabel}.${extensionFor(source)}`);
-      return { status: "started" };
+    if (typeof document === "undefined") return unavailableImageDownload();
+    const renderedImage = currentRenderedImage();
+    let image = renderedImage;
+    let ownedUrl: string | undefined;
+    if (imageSource !== undefined) {
+      if (imageSource instanceof Blob && !imageSource.type.startsWith("image/")) {
+        return unavailableImageDownload();
+      }
+      const loaded = await loadImageSource(imageSource);
+      image = loaded?.image;
+      ownedUrl = loaded?.ownedUrl;
     }
-    const url = downloadableImageUrl(source);
-    if (!url) return unavailableImageDownload();
-    startImageDownload(url, `${title}_作品${candidateLabel}.${extensionFor(url)}`);
+    if (!image || !(await waitForImage(image))) {
+      if (ownedUrl) URL.revokeObjectURL(ownedUrl);
+      return unavailableImageDownload();
+    }
+    const objectPosition =
+      renderedImage && image === renderedImage
+        ? objectPositionPercent(
+            renderedImage.style.objectPosition || getComputedStyle(renderedImage).objectPosition,
+          )
+        : { x: 0.5, y: 0.5 };
+    const cropped = await cropImageToBlob(image, ratio, objectPosition);
+    if (ownedUrl) URL.revokeObjectURL(ownedUrl);
+    if (!cropped) return unavailableImageDownload();
+    startImageDownload(cropped, `${title}_作品${candidateLabel}.${extensionFor(cropped)}`);
     return { status: "started" };
   }
   if (type === "video") {

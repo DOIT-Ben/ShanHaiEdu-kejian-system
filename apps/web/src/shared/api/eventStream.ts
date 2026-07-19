@@ -1,3 +1,7 @@
+import Ajv2020 from "ajv/dist/2020";
+import addFormats from "ajv-formats";
+import sseEventSchema from "../../../../../contracts/sse-event.schema.json";
+
 export type SseEventEnvelope = {
   event_id: string;
   sequence_no: number;
@@ -8,6 +12,10 @@ export type SseEventEnvelope = {
   payload: Record<string, unknown>;
   request_id?: string | null;
 };
+
+const validateSseEventEnvelope = addFormats(
+  new Ajv2020({ strict: false }),
+).compile<SseEventEnvelope>(sseEventSchema);
 
 export class SseStreamError extends Error {
   readonly code?: string;
@@ -53,32 +61,14 @@ function parseEnvelope(block: string): SseEventEnvelope | null {
   } catch {
     throw new SseStreamError(200, "INVALID_SSE_EVENT");
   }
-  if (!parsed || typeof parsed !== "object") {
+  if (!validateSseEventEnvelope(parsed) || !isPositiveSequence(parsed.sequence_no)) {
     throw new SseStreamError(200, "INVALID_SSE_EVENT");
   }
-  const candidate = parsed as Partial<SseEventEnvelope>;
-  const resource = candidate.resource;
-  if (
-    typeof candidate.event_id !== "string" ||
-    !isPositiveSequence(candidate.sequence_no) ||
-    typeof candidate.event_type !== "string" ||
-    !/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(candidate.event_type) ||
-    typeof candidate.occurred_at !== "string" ||
-    !resource ||
-    typeof resource !== "object" ||
-    Array.isArray(resource) ||
-    typeof resource.type !== "string" ||
-    typeof resource.id !== "string" ||
-    !candidate.payload ||
-    typeof candidate.payload !== "object" ||
-    Array.isArray(candidate.payload)
-  ) {
-    throw new SseStreamError(200, "INVALID_SSE_EVENT");
-  }
+  const candidate = parsed;
   if (id !== String(candidate.sequence_no) || eventType !== candidate.event_type) {
     throw new SseStreamError(200, "INVALID_SSE_EVENT");
   }
-  return candidate as SseEventEnvelope;
+  return candidate;
 }
 
 // A trailing CR is kept in the buffer until the next chunk confirms whether it

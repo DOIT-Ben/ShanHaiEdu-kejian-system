@@ -1,17 +1,37 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { createElement } from "react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildDeliveryRequirements,
   createDeliveryFingerprint,
+  DeliveryPage,
 } from "@/pages/projects/DeliveryPage";
-import { createMockRuntimeStore, type MockRuntimeStore } from "@/shared/api/mocks/runtime";
+import {
+  createMockRuntimeStore,
+  getMockRuntimeState,
+  resetMockRuntime,
+  saveMockDraft,
+  type MockRuntimeStore,
+  updateMockNodeState,
+} from "@/shared/api/mocks/runtime";
 import { saveMockResult } from "@/shared/api/mocks/savedResults";
+import { downloadRemoteFile } from "@/shared/lib/downloadRemoteFile";
 import { demoLessonId, demoProjectId, lessons } from "@/shared/data/mockData";
+
+vi.mock("@/shared/lib/downloadRemoteFile", () => ({
+  downloadRemoteFile: vi.fn(),
+}));
+
+const mockDownloadRemoteFile = vi.mocked(downloadRemoteFile);
 
 describe("delivery requirements", () => {
   let store: MockRuntimeStore;
 
   beforeEach(() => {
     localStorage.clear();
+    resetMockRuntime();
+    mockDownloadRemoteFile.mockReset();
     store = createMockRuntimeStore({ storage: localStorage });
   });
 
@@ -89,5 +109,50 @@ describe("delivery requirements", () => {
     const after = createDeliveryFingerprint(store.getState(), demoProjectId);
 
     expect(after).not.toBe(before);
+  });
+
+  it("交付页下载失败后保留同一文件的重试入口", async () => {
+    const secondLesson = lessons[1];
+    expect(secondLesson).toBeDefined();
+    if (!secondLesson) return;
+    updateMockNodeState(demoProjectId, demoLessonId, "lesson-plan", { status: "approved" });
+    updateMockNodeState(demoProjectId, demoLessonId, "ppt-pages", { status: "approved" });
+    updateMockNodeState(demoProjectId, demoLessonId, "final-video", { status: "approved" });
+    updateMockNodeState(demoProjectId, secondLesson.id, "lesson-plan", { status: "approved" });
+    saveMockDraft(
+      `project:${demoProjectId}:lesson:${demoLessonId}:final-video:media`,
+      { mimeType: "video/mp4", src: "https://cdn.example.com/final.mp4" },
+      { lessonId: demoLessonId, nodeKey: "final-video", projectId: demoProjectId },
+    );
+    const fingerprint = createDeliveryFingerprint(getMockRuntimeState(), demoProjectId);
+    saveMockDraft(
+      `project:${demoProjectId}:delivery-package`,
+      { fingerprint, status: "ready" },
+      { projectId: demoProjectId },
+    );
+    mockDownloadRemoteFile.mockRejectedValueOnce(new Error("cors"));
+    mockDownloadRemoteFile.mockResolvedValueOnce();
+
+    render(
+      createElement(
+        MemoryRouter,
+        { initialEntries: [`/projects/${demoProjectId}/delivery`] },
+        createElement(
+          Routes,
+          null,
+          createElement(Route, {
+            element: createElement(DeliveryPage),
+            path: "/projects/:projectId/delivery",
+          }),
+        ),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "下载文件" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("暂时无法下载");
+    fireEvent.click(screen.getByRole("button", { name: "重新下载" }));
+
+    await waitFor(() => expect(mockDownloadRemoteFile).toHaveBeenCalledTimes(2));
+    expect(await screen.findByRole("status")).toHaveTextContent("已开始下载");
   });
 });

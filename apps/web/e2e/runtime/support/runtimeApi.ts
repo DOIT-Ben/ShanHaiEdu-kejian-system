@@ -81,8 +81,9 @@ function sseBody(
   resource: { id: string; type: string },
   payload: Record<string, unknown>,
 ) {
+  const eventIdSuffix = String(9_000 + sequence).padStart(12, "0");
   const event = {
-    event_id: `evt-${String(sequence)}-${resource.id}`,
+    event_id: `01960000-0000-7000-8000-${eventIdSuffix}`,
     sequence_no: sequence,
     event_type: eventType,
     occurred_at: now,
@@ -225,7 +226,7 @@ export async function installRuntimeApi(page: Page, options: RuntimeApiOptions =
       await route.fulfill({
         body: sseBody(
           1,
-          "project.updated",
+          "project.created",
           { id: projectId, type: "project" },
           { status: "active" },
         ),
@@ -311,7 +312,7 @@ export async function installRuntimeApi(page: Page, options: RuntimeApiOptions =
       await route.fulfill({
         body: sseBody(
           1,
-          "generation_job.succeeded",
+          "generation.job.progress",
           { id: jobId, type: "generation_job" },
           { progress_percent: 100, status: "succeeded" },
         ),

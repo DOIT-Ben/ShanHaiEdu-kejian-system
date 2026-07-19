@@ -2,10 +2,11 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "@/app/App";
 import { AppProviders } from "@/app/providers/AppProviders";
+import { apiConfig } from "@/shared/api/config";
 import "@/shared/styles/index.css";
 
 async function enableMocking() {
-  if ((import.meta.env.VITE_API_MODE ?? "mock") !== "mock" || import.meta.env.PROD) {
+  if (apiConfig.mode !== "mock" || import.meta.env.PROD) {
     return;
   }
 
@@ -16,7 +17,7 @@ async function enableMocking() {
 async function enableRuntimeContractTest() {
   if (
     !import.meta.env.DEV ||
-    import.meta.env.VITE_API_MODE !== "real" ||
+    apiConfig.mode !== "real" ||
     import.meta.env.VITE_RUNTIME_CONTRACT_TEST !== "1"
   ) {
     return;

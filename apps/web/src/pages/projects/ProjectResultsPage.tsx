@@ -41,6 +41,7 @@ const seededAssets: Array<{
   slotKey: string;
   version: number;
   source: "seed";
+  preview?: undefined;
 }> = [
   {
     id: "a1",
@@ -135,6 +136,7 @@ export function ProjectResultsPage() {
     const savedAssets = listMockSavedResults(runtime, projectId).map((result) => ({
       id: result.id,
       lesson: result.lessonLabel,
+      preview: result.preview,
       resultId: result.resultId,
       slotKey: result.slotKey,
       title: result.title,
@@ -218,6 +220,7 @@ export function ProjectResultsPage() {
     const baseTitle = selected.title.replace(/（调整版 \d+）$/, "");
     const replacement: SaveMockResultInput = {
       lessonLabel: selected.lesson,
+      ...(selected.preview ? { preview: selected.preview } : {}),
       projectId,
       replaceMode: "replace",
       resultId: `result-revision-${globalThis.crypto.randomUUID()}`,
@@ -228,6 +231,7 @@ export function ProjectResultsPage() {
     };
     const previous: SaveMockResultInput = {
       lessonLabel: selected.lesson,
+      ...(selected.preview ? { preview: selected.preview } : {}),
       projectId,
       replaceMode: "replace",
       resultId: selected.resultId,
@@ -335,7 +339,7 @@ export function ProjectResultsPage() {
                   onClick={() => selectAsset(asset.id)}
                   type="button"
                 >
-                  <Preview />
+                  <Preview preview={asset.preview} />
                   <h3 className="mt-3 truncate text-sm font-semibold text-[var(--sh-ink-strong)]">
                     {asset.title}
                   </h3>
@@ -376,7 +380,7 @@ export function ProjectResultsPage() {
                 </IconButton>
               </div>
               <div className="mt-4 hidden lg:block">
-                <SelectedPreview />
+                <SelectedPreview preview={selected.preview} />
               </div>
               {selected.type === "video" ? (
                 <p className="mt-3 rounded-[var(--sh-radius-sm)] bg-[var(--sh-warning-soft)] px-3 py-2 text-xs font-medium text-[var(--sh-ink-default)]">

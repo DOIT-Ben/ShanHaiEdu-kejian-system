@@ -2,17 +2,38 @@ import { FileText, Music2 } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { CreativeResultVisual } from "@/features/creation-studio/CreativeResultVisual";
 import { PercentSlidePreview } from "@/features/home/components/PercentSlidePreview";
+import type { MockSavedResultPreview } from "@/shared/api/mocks/savedResults";
 
 export type ArtifactType = "image" | "video" | "ppt_page" | "document" | "audio";
 
-function PreviewFrame({ children, ratio }: { children: ReactNode; ratio: "square" | "wide" }) {
+type ArtifactPreviewProps = {
+  preview?: MockSavedResultPreview;
+};
+
+function PreviewFrame({
+  children,
+  preview,
+  ratio,
+}: {
+  children: ReactNode;
+  preview?: MockSavedResultPreview;
+  ratio: string;
+}) {
+  const mediaClass =
+    ratio === "1:1"
+      ? "h-full max-w-full aspect-square"
+      : ratio === "4:3"
+        ? "h-full max-w-full aspect-[4/3]"
+        : "w-full max-w-[284px] aspect-video";
   return (
     <div
       className="flex h-36 items-center justify-center overflow-hidden rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-soft)] sm:h-40"
       data-slot="artifact-preview"
     >
       <div
-        className={ratio === "square" ? "h-full max-w-full aspect-square" : "w-full max-w-[284px]"}
+        className={mediaClass}
+        data-preview-candidate={preview?.candidate}
+        data-preview-generation={preview?.generation}
         data-preview-ratio={ratio}
         data-slot="artifact-preview-media"
       >
@@ -22,19 +43,27 @@ function PreviewFrame({ children, ratio }: { children: ReactNode; ratio: "square
   );
 }
 
-const ImagePreview = () => (
-  <PreviewFrame ratio="square">
-    <CreativeResultVisual loading="lazy" type="image" />
+const visualVariant = (preview?: MockSavedResultPreview) =>
+  preview ? (preview.candidate + preview.generation) % 3 : 0;
+
+const ImagePreview = ({ preview }: ArtifactPreviewProps) => (
+  <PreviewFrame preview={preview} ratio={preview?.ratio ?? "1:1"}>
+    <CreativeResultVisual
+      loading="lazy"
+      ratio={preview?.ratio}
+      type="image"
+      variant={visualVariant(preview)}
+    />
   </PreviewFrame>
 );
-const VideoPreview = () => (
-  <PreviewFrame ratio="wide">
-    <CreativeResultVisual loading="lazy" type="video" />
+const VideoPreview = ({ preview }: ArtifactPreviewProps) => (
+  <PreviewFrame preview={preview} ratio={preview?.ratio ?? "16:9"}>
+    <CreativeResultVisual loading="lazy" type="video" variant={visualVariant(preview)} />
   </PreviewFrame>
 );
-const PptPreview = () => (
-  <PreviewFrame ratio="wide">
-    <PercentSlidePreview compact />
+const PptPreview = ({ preview }: ArtifactPreviewProps) => (
+  <PreviewFrame preview={preview} ratio={preview?.ratio ?? "16:9"}>
+    <PercentSlidePreview compact loading="lazy" variant={visualVariant(preview)} />
   </PreviewFrame>
 );
 const DocumentPreview = () => (
@@ -60,7 +89,7 @@ const AudioPreview = () => (
   </div>
 );
 
-export const artifactPreviewRegistry: Record<ArtifactType, ComponentType> = {
+export const artifactPreviewRegistry: Record<ArtifactType, ComponentType<ArtifactPreviewProps>> = {
   image: ImagePreview,
   video: VideoPreview,
   ppt_page: PptPreview,

@@ -171,6 +171,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
 
   const result: SaveResultDescriptor = {
     id: buildCreationResultId(type, generation, candidate),
+    preview: { candidate, generation, ratio: settings.ratio },
     title: `${config.title} · 作品 ${String(candidate + 1)}`,
     type: type === "presentation" ? "ppt_page" : type,
   };
@@ -216,14 +217,14 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
             hasUnappliedChanges={hasUnappliedChanges}
             onAdvance={advance}
             onCandidateChange={changeCandidate}
-            onDownload={() =>
-              downloadCreationResult({
+            onDownload={() => {
+              void downloadCreationResult({
                 candidate,
                 ratio: settings.ratio,
                 title: config.title,
                 type,
-              })
-            }
+              });
+            }}
             ratio={settings.ratio}
             saveTriggerRef={saveTriggerRef}
             savedTarget={savedTarget}
