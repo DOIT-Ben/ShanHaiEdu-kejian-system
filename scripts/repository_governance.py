@@ -178,7 +178,7 @@ def _find_cross_module_model_imports(
             continue
         source_owner = _source_owner(Path(relative))
         for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module is not None:
+            if isinstance(node, ast.ImportFrom):
                 target = _resolve_import(relative, node)
                 target_owner = _model_owner(target)
                 if target_owner is not None and target_owner != source_owner:
@@ -189,6 +189,22 @@ def _find_cross_module_model_imports(
                             names=tuple(sorted(alias.name for alias in node.names)),
                         )
                     )
+                    continue
+                for alias in node.names:
+                    candidate = f"{target}.{alias.name}" if target else alias.name
+                    candidate_owner = _model_owner(candidate)
+                    if (
+                        candidate_owner is not None
+                        and candidate_owner != source_owner
+                        and _module_exists(root, candidate)
+                    ):
+                        imports.append(
+                            ModelImport(
+                                source=relative,
+                                target=candidate,
+                                names=(alias.name,),
+                            )
+                        )
             elif isinstance(node, ast.Import):
                 for alias in node.names:
                     target_owner = _model_owner(alias.name)
@@ -277,6 +293,11 @@ def _source_owner(path: Path) -> str:
 def _model_owner(module: str) -> str | None:
     match = MODEL_MODULE.fullmatch(module)
     return match.group(1) if match is not None else None
+
+
+def _module_exists(root: Path, module: str) -> bool:
+    path = root.joinpath(*module.split("."))
+    return path.with_suffix(".py").is_file() or path.joinpath("__init__.py").is_file()
 
 
 def _resolve_import(source: str, node: ast.ImportFrom) -> str:

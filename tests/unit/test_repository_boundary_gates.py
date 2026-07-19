@@ -10,7 +10,7 @@ from scripts.check_repository import (
     load_repository_governance_baseline,
     production_python_files,
 )
-from scripts.repository_governance import _parse
+from scripts.repository_governance import _find_cross_module_model_imports, _parse
 
 
 def _baseline(path: Path, **overrides: object):
@@ -106,6 +106,73 @@ def test_cross_module_model_gate_resolves_relative_imports(tmp_path: Path) -> No
         "unauthorized cross-module ORM import: apps/api/artifacts/service.py -> "
         "apps.api.workflows.models [NodeRun]"
     ]
+
+
+def test_cross_module_model_gate_rejects_package_level_model_aliases(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "apps/api/artifacts/service.py"
+    source.parent.mkdir(parents=True)
+    (tmp_path / "apps/api/workflows").mkdir(parents=True)
+    (tmp_path / "apps/api/workflows/models.py").write_text("", encoding="utf-8")
+    (tmp_path / "apps/api/assets").mkdir(parents=True)
+    (tmp_path / "apps/api/assets/project_models.py").write_text("", encoding="utf-8")
+    source.write_text(
+        "from apps.api.workflows import models as workflow_models\n"
+        "from apps.api.assets import project_models\n",
+        encoding="utf-8",
+    )
+    baseline = _baseline(tmp_path / "baseline.json")
+    errors: list[str] = []
+
+    check_cross_module_model_imports([source], tmp_path, baseline, errors)
+
+    assert errors == [
+        "unauthorized cross-module ORM import: apps/api/artifacts/service.py -> "
+        "apps.api.assets.project_models [project_models]",
+        "unauthorized cross-module ORM import: apps/api/artifacts/service.py -> "
+        "apps.api.workflows.models [models]",
+    ]
+
+
+def test_cross_module_model_gate_rejects_relative_package_level_model_alias(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "apps/api/artifacts/internal/service.py"
+    source.parent.mkdir(parents=True)
+    (tmp_path / "apps/api/workflows").mkdir(parents=True)
+    (tmp_path / "apps/api/workflows/models.py").write_text("", encoding="utf-8")
+    source.write_text(
+        "from ...workflows import models as workflow_models\n",
+        encoding="utf-8",
+    )
+    baseline = _baseline(tmp_path / "baseline.json")
+    errors: list[str] = []
+
+    check_cross_module_model_imports([source], tmp_path, baseline, errors)
+
+    assert errors == [
+        "unauthorized cross-module ORM import: apps/api/artifacts/internal/service.py -> "
+        "apps.api.workflows.models [models]"
+    ]
+
+
+def test_package_level_non_orm_and_same_owner_model_imports_are_allowed(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "apps/api/workflows/internal/service.py"
+    source.parent.mkdir(parents=True)
+    (tmp_path / "apps/api/workflows/models.py").write_text("", encoding="utf-8")
+    source.write_text(
+        "from apps.api.workflows import service\nfrom .. import models\n",
+        encoding="utf-8",
+    )
+    baseline = _baseline(tmp_path / "baseline.json")
+    errors: list[str] = []
+
+    check_cross_module_model_imports([source], tmp_path, baseline, errors)
+
+    assert errors == []
 
 
 def test_parser_accepts_pep_695_type_alias_on_supported_or_fallback_python(
@@ -251,3 +318,23 @@ def test_live_size_baseline_is_exactly_four_files_and_twenty_three_functions(
     report = capsys.readouterr().err
     assert report.count("warning: oversized file:") == 4
     assert report.count("warning: long function:") == 23
+
+
+def test_live_orm_baseline_exactly_matches_detected_dependencies() -> None:
+    files = production_python_files(
+        [*ROOT.joinpath("apps/api").rglob("*.py"), *ROOT.joinpath("workers").rglob("*.py")],
+        ROOT,
+    )
+    errors: list[str] = []
+    baseline = load_repository_governance_baseline(
+        ROOT / "scripts/repository-governance-baseline.json", errors
+    )
+    assert baseline is not None
+
+    detected = _find_cross_module_model_imports(files, ROOT, errors)
+
+    assert errors == []
+    actual = {(item.source, item.target, item.names) for item in detected}
+    expected = {(item.source, item.target, item.names) for item in baseline.model_imports}
+    assert len(actual) == 48
+    assert actual == expected
