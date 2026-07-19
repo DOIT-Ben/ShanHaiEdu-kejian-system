@@ -666,6 +666,44 @@ def test_committed_job_cancel_blocks_success_before_reconcile(
     assert usage is not None and usage.actual_cost == Decimal("0.010000")
 
 
+def test_committed_job_cancel_marks_failure_as_cancelled(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    context = _seed_context(factory)
+    with factory() as session, session.begin():
+        job = _add_job(session, context)
+    context = replace(context, generation_job_id=job.id)
+    sink = SqlAlchemyAttemptAuditSink(factory)
+    lease = sink.start(
+        context,
+        _request("req-job-cancel-before-failure"),
+        provider_name="provider-test",
+        provider_model="model-test",
+        route_reason="configured_primary",
+    )
+
+    with factory() as session, session.begin():
+        persisted_job = session.get(GenerationJob, job.id, with_for_update=True)
+        assert persisted_job is not None
+        persisted_job.status = "cancel_requested"
+        persisted_job.cancel_requested_at = utc_now()
+
+    sink.fail(
+        lease,
+        context,
+        ModelGatewayError(GatewayErrorCode.PROVIDER_UNAVAILABLE, retryable=True),
+        latency_ms=19,
+    )
+
+    with factory() as session:
+        attempt = session.get(GenerationAttempt, lease.attempt_id)
+    assert attempt is not None
+    assert attempt.status == "cancelled"
+    assert attempt.error_code == GatewayErrorCode.CANCELLED.value
+    assert attempt.cancel_requested_at is not None
+
+
 def test_recovery_clamps_long_latency_without_starving_same_batch(
     migrated_database_url: str,
 ) -> None:

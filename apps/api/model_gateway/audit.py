@@ -233,6 +233,8 @@ class SqlAlchemyAttemptAuditSink:
         with self._session_factory() as session, session.begin():
             attempt = self._require_owned_running(session, lease, context)
             job_cancelled = self._job_cancel_requested(session, attempt)
+            if job_cancelled and attempt.cancel_requested_at is None:
+                attempt.cancel_requested_at = database_wall_clock(session)
             attempt.status = (
                 "cancelled"
                 if attempt.cancel_requested_at is not None or job_cancelled
