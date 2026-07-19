@@ -102,7 +102,6 @@ def test_catalog_encodes_context_and_reference_asset_boundaries() -> None:
     generate_options = node_by_key(catalog, "intro.generate_options")
     assert generate_options["context_policy"]["mode"] == "declared"
     assert set(generate_options["context_policy"]["allowed_sources"]) == {
-        "project.teacher_preferences",
         "lesson_division.approved_version",
         "material.approved_parse",
     }
@@ -155,7 +154,7 @@ def test_catalog_hash_is_deterministic_for_semantically_identical_objects() -> N
     assert first_validated.canonical_json == second_validated.canonical_json
     assert first_validated.content_hash == second_validated.content_hash
     assert first_validated.content_hash == (
-        "b2e0976f4e77273f95bc92d2c6a287f9c2fd3fd8b564c5d23873238e75633f81"
+        "268f503e9e7e455aab936e885d1c67b1934384d45c2ef0e4d0399683e579e7ea"
     )
 
 

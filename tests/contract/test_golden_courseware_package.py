@@ -352,8 +352,12 @@ def test_golden_planning_chain_reuses_exact_upstream_outputs() -> None:
 
 def test_course_grounded_intro_options_keep_one_current_contract() -> None:
     case = load_json(GOLDEN_CASE)
+    source = load_json(SOURCE)
     option_set = case["intro_option_set"]
     options = option_set["options"]
+    generate_options = next(
+        node for node in source["nodes"] if node["template_key"] == "intro.generate_options"
+    )
     target_lesson = next(
         unit
         for unit in case["lesson_division"]["lesson_units"]
@@ -372,6 +376,14 @@ def test_course_grounded_intro_options_keep_one_current_contract() -> None:
     assert all(option["must_not_preteach"] for option in options)
     scores = [option["recommendation_score"] for option in options]
     assert scores.count(max(scores)) == 1
+    input_fields = {field["field_key"]: field for field in generate_options["input"]["fields"]}
+    assert "general_teacher_preferences" not in input_fields
+    assert {
+        key
+        for key, field in input_fields.items()
+        if field["source"] == "teacher" and key.endswith("preferences")
+    } == {"medium_preferences", "creative_preferences"}
+    assert input_fields["duration_preference_seconds"]["source"] == "teacher"
 
 
 def test_retired_intro_contract_tokens_are_absent_from_current_tree() -> None:
@@ -380,6 +392,11 @@ def test_retired_intro_contract_tokens_are_absent_from_current_tree() -> None:
         "intro." + "anchor",
         "intro_" + "independent_ideas",
         "independent_" + "without_course",
+        "双" + "快照",
+        "锚点" + "节点",
+        "锚点" + "隔离",
+        "独立" + "概念",
+        "即使没有课程" + "回接",
     )
     active_roots = (ROOT / "workflow", CONTRACTS, ROOT / "docs", ROOT / "scripts")
     text_suffixes = {".json", ".md", ".py", ".yaml", ".yml", ".ts"}

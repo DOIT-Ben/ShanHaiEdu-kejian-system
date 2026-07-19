@@ -55,7 +55,6 @@ def build_golden_chain_inputs(case: dict[str, Any]) -> dict[str, dict[str, Any]]
             "audience_age_band": "6-7岁",
             "target_material_evidence": copy.deepcopy(material),
             "duration_preference_seconds": selected_intro["duration_seconds"],
-            "general_teacher_preferences": copy.deepcopy(preferences),
         },
         "ppt.outline.generate": {
             "ppt_analysis_ref": copy.deepcopy(outputs["ppt.content_analyze"]),

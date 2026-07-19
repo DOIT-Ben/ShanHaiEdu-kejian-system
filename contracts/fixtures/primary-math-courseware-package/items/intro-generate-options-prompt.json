@@ -66,14 +66,6 @@
         "exposure": "summary",
         "max_items": 50,
         "max_bytes": 300000
-      },
-      {
-        "binding_key": "teacher_preferences",
-        "source": "project.teacher_preferences",
-        "required": false,
-        "exposure": "summary",
-        "max_items": 1,
-        "max_bytes": 20000
       }
     ],
     "user_edit_policy": {

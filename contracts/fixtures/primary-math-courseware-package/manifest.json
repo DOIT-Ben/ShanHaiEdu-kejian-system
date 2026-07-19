@@ -89,7 +89,7 @@
       "kind": "input_definition",
       "path": "items/intro-generate-options-input.json",
       "schema_id": "https://shanhaiedu.local/contracts/input-definition.schema.json",
-      "sha256": "3b40b6cc34b3952c14cc14038c2e141954990fe145919c06d82a0212c335b571"
+      "sha256": "a6e6d98dd5d350667b9e13121ea8dcfd22c4aa8bd034b2b201f6e853f8b8d5d9"
     },
     {
       "item_key": "intro.generate_options.output",
@@ -103,7 +103,7 @@
       "kind": "prompt_template",
       "path": "items/intro-generate-options-prompt.json",
       "schema_id": "https://shanhaiedu.local/contracts/prompt-template.schema.json",
-      "sha256": "668914c6eca96c07a5a5795a0b911667f59610f51ac35e1163bfd7933fdb8624"
+      "sha256": "ac5e793a14fb0d6e9d769edfded4d2bc3061af29774c4c00fb7e00b73bcb055b"
     },
     {
       "item_key": "intro.generate_options.projection",
@@ -383,7 +383,7 @@
       "kind": "prompt_template",
       "path": "items/video-master-script-generate-prompt.json",
       "schema_id": "https://shanhaiedu.local/contracts/prompt-template.schema.json",
-      "sha256": "04a08e3f24f546ea6b0e89b3a0eeddf707fdcf807e98fd6469f027987e1bb7b7"
+      "sha256": "cf79fb170b1f51c6119275471b9776b27d42a10019751e9b5114720000fd3763"
     },
     {
       "item_key": "video.master_script.generate.projection",

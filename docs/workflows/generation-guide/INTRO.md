@@ -36,13 +36,11 @@
 | 年级 (`grade_level`) | 上游自动带入 | 是 | 按字段合同填写 |
 | 受众年龄段 (`audience_age_band`) | 上游自动带入 | 是 | 按字段合同填写 |
 | 教材证据摘要 (`target_material_evidence`) | 上游自动带入 | 是 | 按字段合同填写 |
-| 教师通用偏好 (`general_teacher_preferences`) | 上游自动带入 | 否 | 按字段合同填写 |
 
 | 上游快照 | 是否必须 | 注入范围 |
 | --- | --- | --- |
 | `lesson_division.approved_version` | 是 | 完整快照 |
 | `material.approved_parse` | 是 | 摘要 |
-| `project.teacher_preferences` | 否 | 摘要 |
 
 ### 实际提示词
 
