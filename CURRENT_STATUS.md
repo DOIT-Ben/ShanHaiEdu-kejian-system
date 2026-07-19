@@ -30,6 +30,7 @@
 - [Issue #58](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/58)与[PR #63](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/63)已经合并：`automatic/guided`策略快照、项目/独立创作来源、不可变创作包、四个独立动作、Outbox/SSE、原子写回和真实依赖stale传播已经进入主线。
 - [Issue #68](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/68)与[PR #71](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/71)已经合并：首套内置内容包、黄金Fixture、三条独立分支入口和内部链校验已经进入主线，#48字段阻塞已经解除。
 - [Issue #61](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/61)与[PR #62](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/62)已经完成Provider中立文本、图片和视频合同、Port、路由、确定性Fake、统一错误、异步任务标识和用量审计；真实媒体Adapter与冒烟仍由后续独立任务负责。
+- [Issue #85](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/85)与[PR #98](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/98)已经把37个运行时操作与5个规划操作分层，生成客户端只保留真实可调用接口，CI会拒绝静态合同与FastAPI运行时双向漂移。
 - [Issue #44](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/44)的实现已经提供TemplateDraft到结构化内容包的确定性编译入口、CompilationProfile、CLI和合同测试。
 - [Issue #74](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/74)的#75至#79已经完成上一阶段复审、后端/数据/合同总审、协作防复发、项目记忆入口和仓库治理；遗留边界均由独立Issue承接，不在主线保留第二口径或任务日志。
 - 当前后端基座使用真实PostgreSQL约束和迁移验证，普通CI继续使用确定性Fake，不访问真实Provider。
@@ -39,8 +40,9 @@
 
 - [Decision #73](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/73)已经批准：PPT通常推荐10至20页，视频按故事和服务端价格事实推荐60至180秒，教师可以覆盖；TTS延后独立实施。
 - [Issue #48](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/48)：全流程生成节点与可配置模型I/O绑定的父任务保持`status:ready`；通用执行器由#89承接，必须先满足#51、#61、#88及关系、恢复和模块边界门禁。
-- [Issue #85](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/85)、[Issue #88](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/88)与[Issue #90](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/90)：分别收口当前/规划OpenAPI分层、黄金内容包正式发布和Attempt恢复租约；#61合并后可在不竞争写入的前提下组成下一依赖波次。
-- [Issue #51](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/51)：教师公共Prompt投影在#85合并后启动，不删除服务端完整Prompt/Context/Schema快照。
+- [Issue #88](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/88)与[Issue #90](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/90)：分别负责黄金内容包正式发布和Attempt恢复租约；二者都可能修改迁移与运行时边界，按顺序推进以避免Alembic竞争。
+- [Issue #51](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/51)：#85合同分层完成后可以启动教师公共Prompt投影，但不删除服务端完整Prompt/Context/Schema快照。
+- [Decision #97](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/97)：后续评估把主要开发环境迁移到Linux服务器，统一命令、权限、依赖和CI环境；当前尚未迁移，不与阶段2业务任务混写。
 - [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)：与生产前端完成真实合同联调；当前因Issue #4没有开放源码PR而等待，不以本地分支、ZIP或Mock代替。
 
 ## 当前阻塞
@@ -73,7 +75,7 @@
 - 生产前端工程达到Issue #4的阶段0范围并通过前端门禁，源码通过PR进入`main`。
 - 前端通过#11消费当前OpenAPI、JSON Schema和SSE合同，完成真实API联调；Mock不能作为出口。
 
-进入阶段2“教材到教案纵向链路”时，按[交付路线](docs/governance/DELIVERY_ROADMAP.md)先推进#85、#88和#90；任一时刻后端主任务不超过三个，修改同一合同或跨模块事务的任务不得并发。#89通用执行器在#51、#61、#86、#88、#90和#92的执行器边界门禁满足后单独启动。随后基于#68黄金输入交付课时/教案与三类九套/选择快照；PPT/图片和视频在阶段2运行时稳定后使用独立短分支并行推进。TTS继续延后，#11等待生产前端达到联调条件。
+进入阶段2“教材到教案纵向链路”时，#85已经关闭OpenAPI真假混用；接下来按[交付路线](docs/governance/DELIVERY_ROADMAP.md)依次推进#88和#90，避免两个迁移任务并发形成Alembic竞争。任一时刻后端主任务不超过三个，修改同一合同或跨模块事务的任务不得并发。#89通用执行器在#51、#61、#86、#88、#90和#92的执行器边界门禁满足后单独启动。随后基于#68黄金输入交付课时/教案与三类九套/选择快照；PPT/图片和视频在阶段2运行时稳定后使用独立短分支并行推进。TTS继续延后，#11等待生产前端达到联调条件；#97的Linux迁移先完成决策和非生产试验，不直接搬迁唯一数据。
 
 ## 接手提示
 
@@ -85,4 +87,4 @@
 4. 被分配的Issue和PR
 5. 与任务直接相关的模块文档、合同、代码和测试
 
-新对话以#68合并后的内容包和黄金Fixture为机器基线；下一候选任务从#85、#88和#90中按实时依赖与竞争写入选择，开工前仍须核对#51、#89和#92状态。不得从外部旧Skill恢复七部分教案、固定50秒视频、视频读取教案/PPT、第二套DTO或把TemplateDraft编译器当成模型执行运行时。
+新对话以#68合并后的内容包和黄金Fixture为机器基线；当前API客户端只从runtime合同生成，planned合同不可用于联调。下一候选任务按顺序从#88和#90选择，开工前仍须核对#51、#89和#92状态。#97只负责Linux迁移决策和试验环境，不得未经备份与回退演练搬迁唯一数据。不得从外部旧Skill恢复七部分教案、固定50秒视频、视频读取教案/PPT、第二套DTO或把TemplateDraft编译器当成模型执行运行时。
