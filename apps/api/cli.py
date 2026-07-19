@@ -14,7 +14,6 @@ from apps.api.database import build_engine, build_session_factory
 from apps.api.identity.models import SYSTEM_PRINCIPAL_ID
 from apps.api.ids import new_uuid7
 from apps.api.logging import configure_logging
-from apps.api.model_registry import register_models
 from apps.api.model_gateway.contracts import (
     ModelCapability,
     ModelGatewayError,
@@ -23,6 +22,7 @@ from apps.api.model_gateway.contracts import (
 from apps.api.model_gateway.factory import build_real_text_gateway
 from apps.api.model_gateway.fake import DeterministicFakeTextProvider
 from apps.api.model_gateway.gateway import ModelGateway
+from apps.api.model_registry import register_models
 from apps.api.settings import get_settings
 
 TEXT_SMOKE_CAPABILITIES = (ModelCapability.TEXT_SMOKE,)
