@@ -16,6 +16,7 @@ from apps.api.model_gateway.contracts import (
     ModelCapability,
     ModelGatewayError,
     ModelUsage,
+    TextModelRequest,
     VideoModelRequest,
     VideoOperationStatus,
     VideoPollRequest,
@@ -23,6 +24,7 @@ from apps.api.model_gateway.contracts import (
 )
 from apps.api.model_gateway.fake import (
     DeterministicFakeImageProvider,
+    DeterministicFakeTextProvider,
     DeterministicFakeVideoProvider,
     FakeVideoScenario,
 )
@@ -36,6 +38,14 @@ def image_request(*, request_id: str = "req-resilient-image") -> ImageModelReque
         prompt="PRIVATE_RESILIENCE_IMAGE_PROMPT",
         width=1280,
         height=720,
+    )
+
+
+def text_request() -> TextModelRequest:
+    return TextModelRequest(
+        capability=ModelCapability.TEXT_SMOKE,
+        request_id="req-resilient-text",
+        prompt="PRIVATE_RESILIENCE_TEXT_PROMPT",
     )
 
 
@@ -195,6 +205,34 @@ async def test_invalid_constructed_provider_result_is_revalidated_before_audit()
 
     assert captured.value.code == GatewayErrorCode.INVALID_RESPONSE
     assert captured.value.retryable is False
+    assert [event[0] for event in sink.events] == ["start", "fail"]
+
+
+@pytest.mark.parametrize("kind", ["text", "image"])
+async def test_sync_generation_audit_outage_is_stable_and_non_retryable(kind: str) -> None:
+    sink = RecordingAuditSink(fail_success=True)
+    if kind == "text":
+        gateway = ModelGateway(
+            {ModelCapability.TEXT_SMOKE: DeterministicFakeTextProvider()},
+            audit_sink=sink,
+        )
+        invoke = gateway.generate_text(text_request(), audit_context=audit_context())
+    else:
+        gateway = ModelGateway(
+            {},
+            image_routes={
+                ModelCapability.IMAGE_GENERATE_EDUCATION_16X9: (DeterministicFakeImageProvider())
+            },
+            audit_sink=sink,
+        )
+        invoke = gateway.generate_image(image_request(), audit_context=audit_context())
+
+    with pytest.raises(ModelGatewayError) as captured:
+        await invoke
+
+    assert captured.value.code == GatewayErrorCode.AUDIT_UNAVAILABLE
+    assert captured.value.retryable is False
+    assert captured.value.__cause__ is None
     assert [event[0] for event in sink.events] == ["start", "fail"]
 
 

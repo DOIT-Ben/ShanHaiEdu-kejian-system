@@ -81,7 +81,15 @@ class ModelGateway:
             cancellation=cancellation,
             audit_context=audit_context,
         )
-        self._succeed_audit(attempt_id, audit_context, result, latency_ms=latency_ms)
+        self._complete_success_audit(
+            request,
+            provider,
+            result,
+            attempt_id,
+            audit_context,
+            latency_ms=latency_ms,
+            failure_code=GatewayErrorCode.AUDIT_UNAVAILABLE,
+        )
         route = self._route(request.capability, provider)
         log_success(request, provider, route, result, latency_ms)
         return TextGatewayResult(
@@ -110,7 +118,15 @@ class ModelGateway:
             cancellation=cancellation,
             audit_context=audit_context,
         )
-        self._succeed_audit(attempt_id, audit_context, result, latency_ms=latency_ms)
+        self._complete_success_audit(
+            request,
+            provider,
+            result,
+            attempt_id,
+            audit_context,
+            latency_ms=latency_ms,
+            failure_code=GatewayErrorCode.AUDIT_UNAVAILABLE,
+        )
         route = self._route(request.capability, provider)
         log_success(request, provider, route, result, latency_ms)
         return ImageGatewayResult(
@@ -190,23 +206,20 @@ class ModelGateway:
             )
             log_error(request, provider, error.code, latency_ms)
             raise error from None
-        try:
-            self._succeed_audit(attempt_id, audit_context, result, latency_ms=latency_ms)
-        except Exception:
-            code = (
-                GatewayErrorCode.SUBMISSION_UNKNOWN
-                if isinstance(request, VideoModelRequest)
-                else GatewayErrorCode.AUDIT_UNAVAILABLE
-            )
-            error = ModelGatewayError(code, retryable=False)
-            self._best_effort_fail_audit(
-                attempt_id,
-                audit_context,
-                error,
-                latency_ms=latency_ms,
-            )
-            log_error(request, provider, error.code, latency_ms)
-            raise error from None
+        failure_code = (
+            GatewayErrorCode.SUBMISSION_UNKNOWN
+            if isinstance(request, VideoModelRequest)
+            else GatewayErrorCode.AUDIT_UNAVAILABLE
+        )
+        self._complete_success_audit(
+            request,
+            provider,
+            result,
+            attempt_id,
+            audit_context,
+            latency_ms=latency_ms,
+            failure_code=failure_code,
+        )
         route = self._route(request.capability, provider)
         log_success(request, provider, route, result, latency_ms)
         return VideoGatewayResult(
@@ -337,6 +350,30 @@ class ModelGateway:
             ),
             latency_ms=latency_ms,
         )
+
+    def _complete_success_audit(
+        self,
+        request: GatewayRequest,
+        provider: ProviderMetadata,
+        result: TextProviderResult | ImageProviderResult | VideoProviderResult,
+        attempt_id: UUID | None,
+        context: ModelAuditContext | None,
+        *,
+        latency_ms: int,
+        failure_code: GatewayErrorCode,
+    ) -> None:
+        try:
+            self._succeed_audit(attempt_id, context, result, latency_ms=latency_ms)
+        except Exception:
+            error = ModelGatewayError(failure_code, retryable=False)
+            self._best_effort_fail_audit(
+                attempt_id,
+                context,
+                error,
+                latency_ms=latency_ms,
+            )
+            log_error(request, provider, error.code, latency_ms)
+            raise error from None
 
     def _fail_audit(
         self,
