@@ -37,6 +37,7 @@ EXPECTED_TABLES = {
     "generation_jobs",
     "generation_results",
     "generation_attempts",
+    "generation_attempt_counters",
     "idempotency_records",
     "lesson_branch_configs",
     "lesson_units",
@@ -132,8 +133,16 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
     generation_attempt_indexes = {
         index["name"] for index in database_inspector.get_indexes("generation_attempts")
     }
-    assert "provider_task_id" in generation_attempt_columns
+    assert {
+        "provider_task_id",
+        "operation_kind",
+        "lease_owner",
+        "lease_expires_at",
+        "heartbeat_at",
+        "cancel_requested_at",
+    }.issubset(generation_attempt_columns)
     assert "ix_generation_attempts_provider_task" in generation_attempt_indexes
+    assert "ix_generation_attempts_status_lease" in generation_attempt_indexes
     with engine.connect() as connection:
         assert (
             connection.scalar(
@@ -144,7 +153,7 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
             )
             == 1
         )
-    assert ScriptDirectory.from_config(config).get_current_head() == "c2d4e6f8a901"
+    assert ScriptDirectory.from_config(config).get_current_head() == "e6b9a2c4d801"
     previous = os.environ.get("SHANHAI_DATABASE_URL")
     os.environ["SHANHAI_DATABASE_URL"] = postgres_database_url
     try:

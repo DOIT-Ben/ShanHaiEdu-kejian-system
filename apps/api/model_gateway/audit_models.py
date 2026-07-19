@@ -28,18 +28,34 @@ class GenerationAttempt(Base):
     __table_args__ = (
         CheckConstraint("attempt_no > 0", name="attempt_no_positive"),
         CheckConstraint(
-            "status IN ('running', 'succeeded', 'failed', 'cancelled')",
+            "status IN ('running', 'succeeded', 'failed', 'cancelled', "
+            "'submission_unknown')",
             name="status_allowed",
+        ),
+        CheckConstraint(
+            "operation_kind IN ('text_generate', 'image_generate', 'video_submit', "
+            "'video_poll', 'video_cancel', 'legacy_unknown')",
+            name="operation_kind_allowed",
         ),
         CheckConstraint("request_hash ~ '^[0-9a-f]{64}$'", name="request_hash_format"),
         CheckConstraint("latency_ms IS NULL OR latency_ms >= 0", name="latency_nonnegative"),
         CheckConstraint(
-            "(status = 'running' AND finished_at IS NULL AND error_code IS NULL) OR "
+            "(status = 'running' AND finished_at IS NULL AND error_code IS NULL "
+            "AND latency_ms IS NULL AND lease_owner IS NOT NULL "
+            "AND lease_expires_at IS NOT NULL AND heartbeat_at IS NOT NULL) OR "
             "(status = 'succeeded' AND finished_at IS NOT NULL AND error_code IS NULL "
-            "AND latency_ms IS NOT NULL) OR "
-            "(status IN ('failed', 'cancelled') AND finished_at IS NOT NULL "
-            "AND error_code IS NOT NULL AND latency_ms IS NOT NULL)",
+            "AND latency_ms IS NOT NULL AND lease_owner IS NULL "
+            "AND lease_expires_at IS NULL) OR "
+            "(status IN ('failed', 'cancelled', 'submission_unknown') "
+            "AND finished_at IS NOT NULL AND error_code IS NOT NULL "
+            "AND latency_ms IS NOT NULL AND lease_owner IS NULL "
+            "AND lease_expires_at IS NULL)",
             name="terminal_fields_consistent",
+        ),
+        CheckConstraint(
+            "lease_expires_at IS NULL OR heartbeat_at IS NULL "
+            "OR lease_expires_at > heartbeat_at",
+            name="lease_window_positive",
         ),
         Index(
             "uq_generation_attempts_node_attempt",
@@ -66,6 +82,7 @@ class GenerationAttempt(Base):
             "provider_task_id",
             postgresql_where="provider_task_id IS NOT NULL",
         ),
+        Index("ix_generation_attempts_status_lease", "status", "lease_expires_at"),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
@@ -84,6 +101,7 @@ class GenerationAttempt(Base):
     attempt_no: Mapped[int] = mapped_column(Integer, nullable=False)
     request_id: Mapped[str] = mapped_column(String(160), nullable=False)
     capability: Mapped[str] = mapped_column(String(160), nullable=False)
+    operation_kind: Mapped[str] = mapped_column(String(40), nullable=False)
     provider_name: Mapped[str | None] = mapped_column(String(80))
     provider_model: Mapped[str | None] = mapped_column(String(160))
     route_reason: Mapped[str] = mapped_column(String(80), nullable=False)
@@ -91,6 +109,10 @@ class GenerationAttempt(Base):
     request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     provider_request_id: Mapped[str | None] = mapped_column(String(255))
     provider_task_id: Mapped[str | None] = mapped_column(String(255))
+    lease_owner: Mapped[str | None] = mapped_column(String(160))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancel_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     submitted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
@@ -98,6 +120,20 @@ class GenerationAttempt(Base):
     error_code: Mapped[str | None] = mapped_column(String(160))
     error_details_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     latency_ms: Mapped[int | None] = mapped_column(Integer)
+
+
+class GenerationAttemptCounter(Base):
+    __tablename__ = "generation_attempt_counters"
+    __table_args__ = (
+        CheckConstraint("next_attempt_no > 0", name="next_attempt_no_positive"),
+    )
+
+    node_run_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("node_runs.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    next_attempt_no: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 class UsageRecord(Base):
