@@ -13,13 +13,14 @@ describe("VideoScenePreview", () => {
     expect(screen.getByText("关键帧示意 · 视频尚未生成")).toBeInTheDocument();
   });
 
-  it("真实课题预览使用已接入的关键帧素材并叠加课题", () => {
+  it("真实课题只把已接入素材标为课堂示例，不冒充当前课题结果", () => {
     render(<VideoScenePreview topic="圆的面积" variant={2} />);
 
     const preview = screen.getByRole("img", {
-      name: "圆的面积课堂导入关键帧示意，视频尚未生成",
+      name: "果汁标签课堂示例，仅作“圆的面积”画面节奏参考；当前课题视频尚未生成",
     });
     expect(preview.querySelector("img")).toHaveAttribute("src", creationVideoShotAssets[2]);
-    expect(screen.getByText(/圆的面积.*关键帧参考/)).toBeInTheDocument();
+    expect(screen.getByText("课堂示例参考 · 当前课题尚未生成")).toBeInTheDocument();
+    expect(screen.getByText("果汁标签课堂示例 · 非“圆的面积”生成结果")).toBeInTheDocument();
   });
 });

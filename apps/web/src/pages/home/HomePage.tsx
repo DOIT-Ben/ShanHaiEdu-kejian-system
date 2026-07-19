@@ -51,8 +51,9 @@ function CreativeEntryCard({
 }: (typeof creativeEntries)[number]) {
   const content = (
     <>
-      <div className="h-full min-h-40 overflow-hidden bg-[var(--sh-surface-soft)] p-2 md:h-[132px] md:min-h-0 xl:h-auto [&>div]:h-full [&>div]:min-h-28 [&>div]:aspect-auto">
+      <div className="h-full min-h-40 overflow-hidden bg-[var(--sh-surface-soft)] p-2 md:h-[132px] md:min-h-0 lg:h-auto [&>div]:h-full [&>div]:min-h-28 [&>div]:aspect-auto">
         <CreativeResultVisual
+          loading="lazy"
           ratio={type === "image" ? "4:3" : undefined}
           type={type}
           variant={variant}
@@ -78,7 +79,7 @@ function CreativeEntryCard({
   );
 
   const className =
-    "group grid min-h-40 grid-cols-[132px_minmax(0,1fr)] overflow-hidden rounded-[var(--sh-radius-lg)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] shadow-[var(--sh-shadow-card)] sm:grid-cols-[42%_minmax(0,1fr)] md:grid-cols-1 md:grid-rows-[132px_auto] xl:grid-cols-[42%_minmax(0,1fr)] xl:grid-rows-none";
+    "group grid min-h-40 grid-cols-[132px_minmax(0,1fr)] overflow-hidden rounded-[var(--sh-radius-lg)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] shadow-[var(--sh-shadow-card)] sm:grid-cols-[42%_minmax(0,1fr)] md:grid-cols-1 md:grid-rows-[132px_auto] lg:grid-cols-[42%_minmax(0,1fr)] lg:grid-rows-none";
 
   return available ? (
     <Link
@@ -101,11 +102,11 @@ export function HomePage({ creationAvailable = true }: { creationAvailable?: boo
   const continueTo = currentProject ? `/app/projects/${currentProject.id}` : "/app/projects";
 
   return (
-    <div className="min-h-[calc(100vh-var(--sh-topbar-height))] bg-[var(--sh-surface-canvas)] px-4 py-4 md:px-5 md:py-5">
+    <div className="min-h-[calc(100vh-var(--sh-topbar-height))] bg-[var(--sh-surface-canvas)] px-4 py-4 md:px-5 md:py-5 lg:py-4">
       <div className="mx-auto max-w-[1360px]">
         <HomeBrandHero continueTo={continueTo} hasProject={Boolean(currentProject)} />
 
-        <section aria-labelledby="continue-title" className="mt-5">
+        <section aria-labelledby="continue-title" className="mt-5 lg:mt-3">
           <div className="mb-3 flex items-center justify-between px-1">
             <h2 className="text-lg font-semibold" id="continue-title">
               {currentProject ? "继续完成这节课" : "从第一份教材开始"}
@@ -183,7 +184,7 @@ export function HomePage({ creationAvailable = true }: { creationAvailable?: boo
           )}
         </section>
 
-        <section aria-labelledby="creative-title" className="mt-5">
+        <section aria-labelledby="creative-title" className="mt-5 lg:mt-3">
           <div className="mb-3 flex items-center justify-between gap-3 px-1">
             <h2 className="text-lg font-semibold" id="creative-title">
               也可以直接创作一件作品

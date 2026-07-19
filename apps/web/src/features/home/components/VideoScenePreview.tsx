@@ -40,7 +40,7 @@ export function VideoScenePreview({
 }) {
   const scene = getDemoScene(variant);
   const label = topic
-    ? `${topic}课堂导入关键帧示意，视频尚未生成`
+    ? `果汁标签课堂示例，仅作“${topic}”画面节奏参考；当前课题视频尚未生成`
     : `果汁标签侦探：${scene.label}，关键帧示意，视频尚未生成`;
 
   return (
@@ -60,11 +60,11 @@ export function VideoScenePreview({
       <span
         className={`absolute left-2 top-2 rounded-full bg-[var(--sh-surface-elevated)]/92 font-semibold text-[var(--sh-brand-700)] shadow-[var(--sh-shadow-card)] backdrop-blur-sm ${compact ? "px-1.5 py-0.5 text-[9px]" : "px-2.5 py-1 text-xs"}`}
       >
-        关键帧示意 · 视频尚未生成
+        {topic ? "课堂示例参考 · 当前课题尚未生成" : "关键帧示意 · 视频尚未生成"}
       </span>
       {!compact ? (
         <p className="absolute bottom-3 left-4 max-w-[calc(100%-2rem)] truncate text-xs font-medium text-white">
-          {topic ? `${topic} · 关键帧参考` : `${scene.label} · 关键帧参考`}
+          {topic ? `果汁标签课堂示例 · 非“${topic}”生成结果` : `${scene.label} · 关键帧参考`}
         </p>
       ) : null}
     </div>

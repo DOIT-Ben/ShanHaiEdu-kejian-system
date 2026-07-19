@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -82,6 +83,20 @@ describe("PptPagesStep delayed regeneration", () => {
     expect(useWorkbenchUi.getState().contextTab).toBe("references");
     fireEvent.click(screen.getByRole("button", { name: "编辑内容要求" }));
     expect(useWorkbenchUi.getState().contextTab).toBe("prompt");
+  });
+
+  it("移动端把三个裸图标收进带文字的检查与编辑菜单", async () => {
+    vi.useRealTimers();
+    renderStep();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "检查与编辑" }));
+    await user.click(screen.getByRole("menuitem", { name: "查看检查结果" }));
+
+    expect(useWorkbenchUi.getState()).toMatchObject({
+      contextDrawerOpen: true,
+      contextTab: "checks",
+    });
   });
 
   it("卸载时取消尚未执行的重做任务", async () => {

@@ -156,6 +156,13 @@ test("390px 保留 PPT 更多操作并提示管理端横向内容", async ({ pag
   const moreBox = await moreActions.boundingBox();
   expect(moreBox).not.toBeNull();
   expect((moreBox?.x ?? 0) + (moreBox?.width ?? 0)).toBeLessThanOrEqual(390);
+  const groupedActions = page.getByRole("button", { name: "检查与编辑" });
+  await expect(groupedActions).toBeInViewport();
+  await groupedActions.click();
+  await expect(page.getByRole("menuitem", { name: "查看检查结果" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "查看参考内容" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "编辑内容要求" })).toBeVisible();
+  await page.keyboard.press("Escape");
   await page.screenshot({
     animations: "disabled",
     path: testInfo.outputPath("ppt-toolbar-390.png"),

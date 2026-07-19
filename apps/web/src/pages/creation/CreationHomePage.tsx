@@ -54,7 +54,12 @@ export function CreationHomePage() {
                   key={config.type}
                   to={`/app/creation/${config.path}`}
                 >
-                  <CreativeResultVisual ratio={ratio} type={config.type} variant={variant} />
+                  <CreativeResultVisual
+                    loading={index === 0 ? "eager" : "lazy"}
+                    ratio={ratio}
+                    type={config.type}
+                    variant={variant}
+                  />
                   <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-[var(--sh-surface-inverse)]/90 via-[var(--sh-surface-inverse)]/42 to-transparent px-4 pb-4 pt-14 text-white">
                     <span className="flex min-w-0 items-center gap-3">
                       <span className="grid size-10 shrink-0 place-items-center rounded-[var(--sh-radius-md)] bg-white/18 backdrop-blur-sm">

@@ -31,8 +31,19 @@ async function waitForStablePage(page: Page, heading: string, readyText: string)
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
   await page.evaluate(async () => {
     await document.fonts.ready;
+    const viewportImages = Array.from(document.images).filter((image) => {
+      const rect = image.getBoundingClientRect();
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        rect.bottom >= 0 &&
+        rect.right >= 0 &&
+        rect.top <= window.innerHeight &&
+        rect.left <= window.innerWidth
+      );
+    });
     await Promise.all(
-      Array.from(document.images, async (image) => {
+      viewportImages.map(async (image) => {
         if (!image.complete) {
           await new Promise<void>((resolve) => {
             image.addEventListener("load", () => resolve(), { once: true });
@@ -194,6 +205,12 @@ test("1024 品牌首页保持单主轴且无横向溢出", async ({ page }, test
   const heroPreview = await page.getByTestId("brand-hero-preview").boundingBox();
   expect(heroPreview?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(560);
   expect(heroPreview?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(300);
+  const verticalFit = await page.evaluate(() => ({
+    clientHeight: document.documentElement.clientHeight,
+    scrollHeight: document.documentElement.scrollHeight,
+  }));
+  expect(verticalFit.scrollHeight).toBeLessThanOrEqual(verticalFit.clientHeight + 1);
+  await expect(page.getByRole("heading", { name: "也可以直接创作一件作品" })).toBeInViewport();
 });
 
 test("390 品牌首页按任务顺序自然下滑", async ({ page }, testInfo) => {
