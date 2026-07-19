@@ -44,7 +44,9 @@ def init_repository(path: Path) -> None:
     assert result.returncode == 0, result.stderr
 
 
-def fake_docker_environment(tmp_path: Path) -> tuple[Path, dict[str, str]]:
+def fake_docker_environment(
+    tmp_path: Path, *, available_kib: int = 99_999_999
+) -> tuple[Path, dict[str, str]]:
     fake_bin = tmp_path / "fake-bin"
     fake_bin.mkdir()
     docker = fake_bin / "docker"
@@ -67,24 +69,13 @@ fi
     docker.chmod(0o755)
     disk_free = fake_bin / "df"
     disk_free.write_text(
-        """#!/usr/bin/env bash
+        f"""#!/usr/bin/env bash
 printf '%s\\n' 'Filesystem 1024-blocks Used Available Capacity Mounted on'
-printf '%s\\n' 'fake 100000000 1 99999999 1% /'
+printf '%s\\n' 'fake 100000000 1 {available_kib} 1% /'
 """,
         encoding="utf-8",
     )
     disk_free.chmod(0o755)
-    identity = fake_bin / "id"
-    identity.write_text(
-        """#!/usr/bin/env bash
-case "${1:-}" in
-  -u|-g) printf '%s\\n' '1000' ;;
-  *) exec /usr/bin/id "$@" ;;
-esac
-""",
-        encoding="utf-8",
-    )
-    identity.chmod(0o755)
 
     env = {key: value for key, value in os.environ.items() if not key.startswith("SHANHAI_")}
     env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
@@ -92,10 +83,15 @@ esac
     return fake_bin, env
 
 
-def run_compose_script(repository: Path, output: Path, env: dict[str, str]) -> dict[str, str]:
+def run_compose_script(
+    repository: Path,
+    output: Path,
+    env: dict[str, str],
+    arguments: list[str] | None = None,
+) -> dict[str, str]:
     command_env = env | {"FAKE_DOCKER_OUTPUT": str(output)}
     result = run(
-        ["bash", str(PROJECT_ROOT / "infra/dev/compose.sh"), "up", "-d"],
+        ["bash", str(PROJECT_ROOT / "infra/dev/compose.sh"), *(arguments or ["up", "-d"])],
         repository,
         env=command_env,
     )
@@ -266,9 +262,7 @@ def test_compose_script_requires_audited_dedicated_host_marker(tmp_path: Path) -
     repository = tmp_path / "main-repo"
     init_repository(repository)
     _, env = fake_docker_environment(tmp_path)
-    marker = tmp_path / "dedicated-development-host"
     env["SHANHAI_DOCKER_ISOLATION_MODE"] = "dedicated-ecs"
-    env["SHANHAI_DEDICATED_HOST_MARKER"] = str(marker)
 
     missing = run(
         ["bash", str(PROJECT_ROOT / "infra/dev/compose.sh"), "up", "-d"],
@@ -277,12 +271,50 @@ def test_compose_script_requires_audited_dedicated_host_marker(tmp_path: Path) -
     )
     assert missing.returncode != 0
     assert "dedicated ECS marker is missing" in missing.stderr
+    compose_script = (PROJECT_ROOT / "infra/dev/compose.sh").read_text(encoding="utf-8")
+    assert 'marker_dir="/etc/shanhaiedu"' in compose_script
+    assert "SHANHAI_DEDICATED_HOST_MARKER" not in compose_script
 
-    marker.write_text("shanhaiedu-dedicated-development-host-v1\n", encoding="utf-8")
-    values = run_compose_script(repository, tmp_path / "dedicated.env", env)
-    assert values["SHANHAI_WORKSPACE_UID"] == "1000"
-    assert values["SHANHAI_WORKSPACE_GID"] == "1000"
-    assert values["SHANHAI_CONTAINER_ROOTLESS_USERNS"] == "false"
+
+@pytest.mark.skipif(os.name != "posix", reason="Compose host routing is verified on Linux")
+@pytest.mark.parametrize("compose_command", ["build", "create", "up"])
+def test_compose_script_rejects_low_space_for_state_creating_commands(
+    tmp_path: Path, compose_command: str
+) -> None:
+    repository = tmp_path / "main-repo"
+    init_repository(repository)
+    _, env = fake_docker_environment(tmp_path, available_kib=1024)
+
+    result = run(
+        ["bash", str(PROJECT_ROOT / "infra/dev/compose.sh"), compose_command],
+        repository,
+        env=env,
+    )
+
+    assert result.returncode != 0
+    assert "at least 30 GiB free space is required" in result.stderr
+
+
+@pytest.mark.skipif(os.name != "posix", reason="Compose host routing is verified on Linux")
+@pytest.mark.parametrize(
+    "arguments",
+    [["--progress", "plain", "build"], ["--profile", "media", "up"]],
+)
+def test_compose_script_rejects_global_options_before_command(
+    tmp_path: Path, arguments: list[str]
+) -> None:
+    repository = tmp_path / "main-repo"
+    init_repository(repository)
+    _, env = fake_docker_environment(tmp_path)
+
+    result = run(
+        ["bash", str(PROJECT_ROOT / "infra/dev/compose.sh"), *arguments],
+        repository,
+        env=env,
+    )
+
+    assert result.returncode != 0
+    assert "global options before the command are not allowed" in result.stderr
 
 
 @pytest.mark.skipif(os.name != "posix", reason="Git wrapper scope is verified in container")

@@ -34,8 +34,15 @@ case "$isolation_mode" in
     rootless_userns=true
     ;;
   dedicated-ecs)
-    marker="${SHANHAI_DEDICATED_HOST_MARKER:-/etc/shanhaiedu/dedicated-development-host}"
+    marker_dir="/etc/shanhaiedu"
+    marker="$marker_dir/dedicated-development-host"
     [[ -f "$marker" ]] || fail "dedicated ECS marker is missing: $marker"
+    [[ "$(stat -c '%u' "$marker_dir")" == "0" ]] || fail "dedicated ECS marker directory must be root-owned"
+    [[ "$(stat -c '%u' "$marker")" == "0" ]] || fail "dedicated ECS marker must be root-owned"
+    marker_dir_mode="$(stat -c '%a' "$marker_dir")"
+    marker_mode="$(stat -c '%a' "$marker")"
+    (( (8#$marker_dir_mode & 0022) == 0 )) || fail "dedicated ECS marker directory is writable by non-root users"
+    (( (8#$marker_mode & 0022) == 0 )) || fail "dedicated ECS marker is writable by non-root users"
     grep -qx 'shanhaiedu-dedicated-development-host-v1' "$marker" || \
       fail "dedicated ECS marker is invalid: $marker"
     [[ "$(id -u)" == "1000" && "$(id -g)" == "1000" ]] || \
@@ -49,7 +56,9 @@ case "$isolation_mode" in
     ;;
 esac
 
-case "${1:-}" in
+compose_command="${1:-}"
+[[ "$compose_command" != -* ]] || fail "Compose global options before the command are not allowed"
+case "$compose_command" in
   build|create|up)
     available_kib="$(df -Pk "$project_root" | awk 'NR == 2 { print $4 }')"
     [[ "$available_kib" =~ ^[0-9]+$ ]] || fail "unable to determine available disk space"
