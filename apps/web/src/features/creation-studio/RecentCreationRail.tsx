@@ -60,7 +60,7 @@ export function RecentCreationRail({
           className="relative block overflow-hidden rounded-[var(--sh-radius-md)] border-[5px] border-[var(--sh-surface-elevated)] bg-[var(--sh-surface-elevated)] shadow-[var(--sh-shadow-card)] transition-transform duration-[var(--sh-duration-normal)] group-hover:-translate-y-0.5"
           data-testid="recent-primary-preview"
         >
-          <CreativeResultVisual type="image" variant={0} />
+          <CreativeResultVisual loading="lazy" type="image" variant={0} />
         </span>
       </Link>
       <div className={cn("mt-2 flex items-start justify-between gap-3", layout.details)}>
@@ -88,7 +88,7 @@ export function RecentCreationRail({
       >
         <Link className="group" to="/app/creation/presentations">
           <div className="overflow-hidden rounded-[var(--sh-radius-sm)] border-2 border-[var(--sh-surface-elevated)] shadow-[var(--sh-shadow-card)] transition-transform group-hover:-translate-y-0.5">
-            <CreativeResultVisual page={2} type="presentation" variant={0} />
+            <CreativeResultVisual loading="lazy" page={2} type="presentation" variant={0} />
           </div>
           <p className="mt-2 truncate text-xs font-medium text-[var(--sh-ink-strong)]">
             百分数百格图
@@ -96,7 +96,7 @@ export function RecentCreationRail({
         </Link>
         <Link className="group" to="/app/creation/videos">
           <div className="overflow-hidden rounded-[var(--sh-radius-sm)] border-2 border-[var(--sh-surface-elevated)] shadow-[var(--sh-shadow-card)] transition-transform group-hover:-translate-y-0.5">
-            <CreativeResultVisual type="video" variant={1} />
+            <CreativeResultVisual loading="lazy" type="video" variant={1} />
           </div>
           <p className="mt-2 truncate text-xs font-medium text-[var(--sh-ink-strong)]">
             课堂首问关键帧

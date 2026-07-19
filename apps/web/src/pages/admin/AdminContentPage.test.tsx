@@ -21,7 +21,10 @@ describe("AdminContentPage tabs", () => {
     fireEvent.change(screen.getByLabelText("选择内容包文件"), {
       target: { files: [new File(["{}"], "invalid.json", { type: "application/json" })] },
     });
-    expect(await screen.findByRole("alert")).toHaveTextContent(/schema 必须为/);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "JSON 的 schema 与当前内容包格式不匹配",
+    );
+    expect(screen.getByRole("alert")).not.toHaveTextContent("shanhaiedu.content-package.mock");
     expect(screen.getByRole("button", { name: "继续" })).toBeDisabled();
   });
 

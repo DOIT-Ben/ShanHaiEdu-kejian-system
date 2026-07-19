@@ -19,13 +19,20 @@ import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { requiredItem } from "@/shared/lib/requiredItem";
 import { demoProjectId } from "@/shared/data/mockData";
 
-function StyleVisual({ style }: { style: VideoStyle }) {
+function StyleVisual({
+  loading = "eager",
+  style,
+}: {
+  loading?: "eager" | "lazy";
+  style: VideoStyle;
+}) {
   return (
     <div className="relative aspect-video overflow-hidden rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-soft)]">
       <img
         alt={`${style.name}视觉参考`}
         className="size-full object-cover"
         decoding="async"
+        loading={loading}
         src={style.image}
       />
     </div>
@@ -148,7 +155,7 @@ export function VideoStyleStep() {
                 }}
                 type="button"
               >
-                <StyleVisual style={style} />
+                <StyleVisual loading="lazy" style={style} />
                 <span className="mt-2 block px-1 text-sm font-semibold text-[var(--sh-ink-strong)]">
                   {style.name}
                 </span>

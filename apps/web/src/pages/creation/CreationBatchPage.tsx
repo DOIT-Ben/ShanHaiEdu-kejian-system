@@ -370,7 +370,7 @@ export function CreationBatchPage() {
                       }}
                       type="button"
                     >
-                      <CreativeResultVisual type="image" variant={candidate} />
+                      <CreativeResultVisual loading="lazy" type="image" variant={candidate} />
                       <span className="mt-1 block text-xs font-semibold">作品 {candidate + 1}</span>
                     </button>
                   ))}

@@ -61,7 +61,7 @@ function at<T>(items: T[], index: number) {
   return items[safeIndex] as T;
 }
 
-function DemoCover({ slide }: { slide: DemoSlide }) {
+function DemoCover({ loading, slide }: { loading: "eager" | "lazy"; slide: DemoSlide }) {
   return (
     <div className="relative size-full bg-[var(--sh-artifact-paper)]">
       <img
@@ -69,6 +69,7 @@ function DemoCover({ slide }: { slide: DemoSlide }) {
         aria-hidden="true"
         className="absolute inset-0 size-full object-cover"
         decoding="async"
+        loading={loading}
         src={slide.source}
       />
       <div className="absolute inset-0 bg-gradient-to-r from-[var(--sh-artifact-paper)] via-[var(--sh-artifact-paper)]/90 to-transparent" />
@@ -87,7 +88,7 @@ function DemoCover({ slide }: { slide: DemoSlide }) {
   );
 }
 
-function DemoContent({ slide }: { slide: DemoSlide }) {
+function DemoContent({ loading, slide }: { loading: "eager" | "lazy"; slide: DemoSlide }) {
   return (
     <div className="relative size-full bg-[var(--sh-artifact-paper)] text-[var(--sh-artifact-ink)]">
       <div className="relative z-10 flex h-full w-[38%] flex-col justify-center pl-[6%] pr-[3%]">
@@ -108,6 +109,7 @@ function DemoContent({ slide }: { slide: DemoSlide }) {
           aria-hidden="true"
           className="size-full object-cover"
           decoding="async"
+          loading={loading}
           src={slide.source}
         />
       </div>
@@ -117,11 +119,13 @@ function DemoContent({ slide }: { slide: DemoSlide }) {
 
 export function PercentSlidePreview({
   compact = false,
+  loading = "eager",
   page,
   topic,
   variant = 0,
 }: {
   compact?: boolean;
+  loading?: "eager" | "lazy";
   page?: number;
   topic?: string;
   variant?: number;
@@ -153,9 +157,9 @@ export function PercentSlidePreview({
           </div>
         </div>
       ) : isCover ? (
-        <DemoCover slide={slide} />
+        <DemoCover loading={loading} slide={slide} />
       ) : (
-        <DemoContent slide={slide} />
+        <DemoContent loading={loading} slide={slide} />
       )}
     </div>
   );

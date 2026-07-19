@@ -1,4 +1,5 @@
-import { NavLink, useParams } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { NavLink, useLocation, useParams } from "react-router-dom";
 import type { WorkflowStatus } from "@/entities/workflow/model";
 import { getWorkbenchStepStatus } from "@/features/workbench/lib/stepAccess";
 import { useMockRuntime } from "@/shared/api/mocks/runtime";
@@ -29,7 +30,15 @@ export function ProjectStepNavigation({
   onNavigate,
 }: ProjectStepNavigationProps) {
   const { lessonId = "", projectId = "" } = useParams();
+  const location = useLocation();
+  const activeStepRef = useRef<HTMLAnchorElement>(null);
   const runtime = useMockRuntime();
+  const currentPath = location.pathname.replace(/\/$/, "");
+
+  useEffect(() => {
+    activeStepRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [currentPath]);
+
   return (
     <nav aria-label="课时制作流程" className="px-2 pb-6">
       {projectSteps.map((group) => (
@@ -41,6 +50,7 @@ export function ProjectStepNavigation({
           ) : null}
           {group.items.map((item) => {
             const status = getWorkbenchStepStatus(runtime, projectId, lessonId, item.key);
+            const stepPath = `${base}/${item.key}`;
             return (
               <NavLink
                 className={({ isActive }) =>
@@ -53,8 +63,9 @@ export function ProjectStepNavigation({
                 }
                 key={item.key}
                 onClick={onNavigate}
+                ref={currentPath === stepPath ? activeStepRef : undefined}
                 title={collapsed ? item.label : undefined}
-                to={`${base}/${item.key}`}
+                to={stepPath}
               >
                 {({ isActive }) => (
                   <>

@@ -165,6 +165,10 @@ test("新项目可以只通过页面操作走到真实视频生成门槛", async
   });
   await expect(page.getByText(/关键帧示意/).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "确认视频" })).toHaveCount(0);
+  const flowNavigation = page.getByRole("navigation", { name: "课时制作流程" });
+  await expect(
+    flowNavigation.getByRole("link", { name: /生成课堂导入视频.*当前/ }),
+  ).toBeInViewport();
   await page.screenshot({
     animations: "disabled",
     path: testInfo.outputPath("final-video-keyframe-1280.png"),

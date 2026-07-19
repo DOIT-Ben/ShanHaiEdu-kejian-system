@@ -30,4 +30,12 @@ describe("PercentSlidePreview", () => {
     expect(screen.getByText("圆的面积").className).toContain("cqw");
     expect(screen.getByText("圆的面积").className).not.toContain("vw");
   });
+
+  it("支持给 PPT 缩略图传入懒加载策略", () => {
+    render(<PercentSlidePreview loading="lazy" page={2} />);
+
+    expect(
+      screen.getByRole("img", { name: /百格图中涂出百分之三十七/ }).querySelector("img"),
+    ).toHaveAttribute("loading", "lazy");
+  });
 });

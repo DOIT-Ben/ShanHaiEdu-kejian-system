@@ -92,7 +92,7 @@ export function CreationSetupPanel({
               onClick={() => setSelectedInspiration(variant)}
               type="button"
             >
-              <CreativeResultVisual ratio="4:3" type={type} variant={variant} />
+              <CreativeResultVisual loading="lazy" ratio="4:3" type={type} variant={variant} />
             </button>
           ))}
         </div>

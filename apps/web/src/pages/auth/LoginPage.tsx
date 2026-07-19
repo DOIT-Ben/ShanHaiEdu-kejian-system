@@ -25,7 +25,7 @@ export function LoginPage() {
         <ThemeSwitcher showLabel />
       </div>
       <LoginVisualPanel />
-      <main className="flex items-center justify-center px-4 py-20 sm:px-6 lg:py-24">
+      <main className="flex items-center justify-center px-4 py-20 sm:px-6 lg:py-16 xl:py-24">
         <form
           className="w-full max-w-md rounded-[var(--sh-radius-lg)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-6 shadow-[var(--sh-shadow-floating)] sm:p-8"
           onSubmit={(event) => {

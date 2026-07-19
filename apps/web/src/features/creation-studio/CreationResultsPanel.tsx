@@ -144,6 +144,7 @@ export function CreationResultsPanel({
               type="button"
             >
               <CreativeResultVisual
+                loading="lazy"
                 ratio={ratio}
                 type={type}
                 variant={(item + renderedGeneration) % 3}

@@ -238,7 +238,7 @@ test("390px 下输入台固定可用并能展开画面细节", async ({ page }) 
   await expect(page.getByRole("textbox", { name: "创作要求" })).toBeVisible();
 });
 
-test("图片比例同步应用到预览和下载文件", async ({ page }) => {
+test("图片比例同步应用到预览并下载当前真实素材", async ({ page }) => {
   await loginAsTeacher(page);
   await page.goto("/app/creation/images");
   await chooseSelect(page, "比例", "16:9");
@@ -256,8 +256,11 @@ test("图片比例同步应用到预览和下载文件", async ({ page }) => {
   const download = await downloadPromise;
   const downloadPath = await download.path();
   if (!downloadPath) throw new Error("下载文件路径不可用");
-  const content = await readFile(downloadPath, "utf8");
-  expect(content).toContain('width="1600" height="900"');
+  const content = await readFile(downloadPath);
+  expect(download.suggestedFilename()).toMatch(/\.webp$/);
+  expect(content.subarray(0, 4).toString("ascii")).toBe("RIFF");
+  expect(content.subarray(8, 12).toString("ascii")).toBe("WEBP");
+  expect(content.byteLength).toBeGreaterThan(50_000);
 });
 
 test("PPT 候选会同步切换当前课件预览", async ({ page }) => {

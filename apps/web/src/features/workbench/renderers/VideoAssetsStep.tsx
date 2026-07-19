@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Image, RefreshCw } from "lucide-react";
+import { ArrowRight, CheckCircle2, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getDemoVideoSceneSource } from "@/features/home/components/VideoScenePreview";
@@ -87,22 +87,26 @@ export function VideoAssetsStep() {
             key={asset.id}
           >
             <div className="relative aspect-video overflow-hidden rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-soft)]">
-              {demo && (approved || asset.status === "ready") ? (
-                <img
-                  alt={`${asset.title}参考画面`}
-                  className="size-full object-cover"
-                  decoding="async"
-                  src={getDemoVideoSceneSource(index)}
-                />
-              ) : (
-                <span className="grid size-full place-items-center text-[var(--sh-brand-600)]">
-                  <Image aria-hidden="true" className="size-6" />
+              <img
+                alt={
+                  demo
+                    ? `${asset.title}参考画面`
+                    : `果汁标签课堂示例，作为“${asset.title}”的构图参考，不是当前课题生成结果`
+                }
+                className="size-full object-cover"
+                decoding="async"
+                loading="lazy"
+                src={getDemoVideoSceneSource(index)}
+              />
+              {!demo ? (
+                <span className="absolute bottom-2 left-2 rounded-full bg-[var(--sh-surface-elevated)]/92 px-2 py-1 text-[10px] font-semibold text-[var(--sh-brand-700)] shadow-[var(--sh-shadow-card)] backdrop-blur-sm">
+                  示例构图 · 等待当前课题素材
                 </span>
-              )}
+              ) : null}
               {approved || asset.status === "ready" ? (
                 <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-[var(--sh-surface-elevated)]/92 px-2 py-1 text-xs font-semibold text-[var(--sh-success)] shadow-[var(--sh-shadow-card)] backdrop-blur-sm">
                   <CheckCircle2 aria-hidden="true" className="size-4" />
-                  已准备
+                  {demo ? "已准备" : "清单已准备"}
                 </span>
               ) : (
                 <span className="absolute right-2 top-2">

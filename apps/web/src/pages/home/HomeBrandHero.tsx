@@ -14,9 +14,9 @@ export function HomeBrandHero({
   return (
     <section
       aria-labelledby="home-brand-title"
-      className="relative isolate grid min-h-[276px] overflow-hidden rounded-[var(--sh-radius-lg)] bg-[image:var(--sh-hero-gradient)] lg:grid-cols-[minmax(0,0.92fr)_minmax(440px,1.08fr)]"
+      className="relative isolate grid min-h-[276px] overflow-hidden rounded-[var(--sh-radius-lg)] bg-[image:var(--sh-hero-gradient)] lg:min-h-[260px] lg:grid-cols-[minmax(0,0.92fr)_minmax(440px,1.08fr)]"
     >
-      <div className="relative z-10 flex flex-col justify-center px-6 py-7 md:px-8 lg:px-10">
+      <div className="relative z-10 flex flex-col justify-center px-6 py-7 md:px-8 lg:px-10 lg:py-5">
         <p className="flex items-center gap-2 text-sm font-semibold text-[var(--sh-brand-600)]">
           <span className="grid size-7 place-items-center rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-elevated)]/90 p-0.5 shadow-[var(--sh-shadow-card)]">
             <img alt="" aria-hidden="true" className="size-full" src={brandMark} />
@@ -69,7 +69,7 @@ export function HomeBrandHero({
 
       <div
         aria-label="课堂作品组合预览"
-        className="relative min-h-[240px] overflow-hidden lg:min-h-[276px]"
+        className="relative min-h-[240px] overflow-hidden lg:min-h-[260px]"
         data-testid="brand-hero-preview"
       >
         <div className="absolute inset-y-5 right-[5%] w-[82%] rotate-[1deg] overflow-hidden rounded-[var(--sh-radius-md)] border-[6px] border-[var(--sh-surface-elevated)] bg-[var(--sh-surface-elevated)] shadow-[var(--sh-shadow-floating)]">

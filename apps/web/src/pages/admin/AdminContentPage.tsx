@@ -71,7 +71,7 @@ function readFileText(file: File) {
 function parseJsonPackage(value: unknown, fileName: string): PendingPackage {
   if (!value || typeof value !== "object") throw new Error("JSON 顶层必须是对象");
   const metadata = value as Record<string, unknown>;
-  if (metadata.schema !== CONTENT_SCHEMA) throw new Error(`schema 必须为 ${CONTENT_SCHEMA}`);
+  if (metadata.schema !== CONTENT_SCHEMA) throw new Error("JSON 的 schema 与当前内容包格式不匹配");
   if (typeof metadata.title !== "string" || !metadata.title.trim()) throw new Error("缺少 title");
   if (!packageKinds.includes(metadata.kind as (typeof packageKinds)[number]))
     throw new Error("kind 不在允许范围内");

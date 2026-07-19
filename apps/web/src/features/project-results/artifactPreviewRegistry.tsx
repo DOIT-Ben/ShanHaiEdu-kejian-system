@@ -24,12 +24,12 @@ function PreviewFrame({ children, ratio }: { children: ReactNode; ratio: "square
 
 const ImagePreview = () => (
   <PreviewFrame ratio="square">
-    <CreativeResultVisual type="image" />
+    <CreativeResultVisual loading="lazy" type="image" />
   </PreviewFrame>
 );
 const VideoPreview = () => (
   <PreviewFrame ratio="wide">
-    <CreativeResultVisual type="video" />
+    <CreativeResultVisual loading="lazy" type="video" />
   </PreviewFrame>
 );
 const PptPreview = () => (

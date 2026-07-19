@@ -42,10 +42,15 @@ for (const viewport of viewports) {
     }
 
     const dimensions = await page.evaluate(() => ({
+      clientHeight: document.documentElement.clientHeight,
       clientWidth: document.documentElement.clientWidth,
+      scrollHeight: document.documentElement.scrollHeight,
       scrollWidth: document.documentElement.scrollWidth,
     }));
     expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+    if (viewport.width >= 1024) {
+      expect(dimensions.scrollHeight).toBeLessThanOrEqual(dimensions.clientHeight + 1);
+    }
 
     await page.screenshot({
       animations: "disabled",
