@@ -15,7 +15,7 @@ async def test_fake_gateway_audit_excludes_prompt_and_response(
     def capture(_message: str, *, extra: dict[str, object]) -> None:
         captured.update(extra)
 
-    monkeypatch.setattr("apps.api.model_gateway.gateway.logger.info", capture)
+    monkeypatch.setattr("apps.api.model_gateway.telemetry.logger.info", capture)
     prompt = "private-smoke-prompt-marker"
     gateway = ModelGateway({ModelCapability.TEXT_SMOKE: DeterministicFakeTextProvider()})
 
