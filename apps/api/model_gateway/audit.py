@@ -118,6 +118,7 @@ class SqlAlchemyAttemptAuditSink:
                 status="running",
                 request_hash=request.request_hash,
                 provider_request_id=None,
+                provider_task_id=None,
                 error_details_json={},
             )
             session.add(attempt)
@@ -136,17 +137,15 @@ class SqlAlchemyAttemptAuditSink:
             attempt = self._require_running(session, attempt_id, context)
             attempt.status = "succeeded"
             attempt.provider_request_id = _bounded(result.provider_request_id, 255)
+            attempt.provider_task_id = _bounded(result.provider_task_id, 255)
             attempt.finished_at = utc_now()
             attempt.latency_ms = latency_ms
             session.add(
                 self._usage_record(
                     attempt,
                     context,
-                    input_units={"prompt_tokens": result.usage.prompt_tokens},
-                    output_units={
-                        "completion_tokens": result.usage.completion_tokens,
-                        "total_tokens": result.usage.total_tokens,
-                    },
+                    input_units=_input_units(result.usage),
+                    output_units=_output_units(result.usage),
                     actual_cost=result.usage.cost,
                     currency=result.usage.currency,
                     latency_ms=latency_ms,
@@ -250,3 +249,16 @@ def model_request_hash(request: BaseModel) -> str:
 
 def _bounded(value: str | None, limit: int) -> str | None:
     return value[:limit] if value is not None else None
+
+
+def _input_units(usage: ModelUsage) -> dict[str, int]:
+    units = dict(usage.input_units)
+    units["prompt_tokens"] = usage.prompt_tokens
+    return units
+
+
+def _output_units(usage: ModelUsage) -> dict[str, int]:
+    units = dict(usage.output_units)
+    units["completion_tokens"] = usage.completion_tokens
+    units["total_tokens"] = usage.total_tokens
+    return units

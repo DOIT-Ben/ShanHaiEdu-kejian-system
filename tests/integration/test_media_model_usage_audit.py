@@ -1,20 +1,24 @@
 from __future__ import annotations
 
+import pytest
 from sqlalchemy import select
 
 from apps.api.database import build_engine, build_session_factory
 from apps.api.model_gateway.audit import SqlAlchemyAttemptAuditSink
 from apps.api.model_gateway.audit_models import GenerationAttempt, UsageRecord
 from apps.api.model_gateway.contracts import (
+    GatewayErrorCode,
     ImageModelRequest,
     ModelAuditContext,
     ModelCapability,
+    ModelGatewayError,
     VideoModelRequest,
     VideoPollRequest,
 )
 from apps.api.model_gateway.fake import (
     DeterministicFakeImageProvider,
     DeterministicFakeVideoProvider,
+    FakeVideoScenario,
 )
 from apps.api.model_gateway.gateway import ModelGateway
 from apps.api.projects.repository import ProjectRepository
@@ -102,6 +106,27 @@ async def test_media_attempts_persist_task_identity_and_provider_neutral_usage(
             audit_context=audit_context,
         )
 
+    unknown_provider = DeterministicFakeVideoProvider(FakeVideoScenario.SUBMISSION_UNKNOWN)
+    unknown_gateway = ModelGateway(
+        {},
+        video_routes={ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S: unknown_provider},
+        audit_sink=SqlAlchemyAttemptAuditSink(factory),
+    )
+    with pytest.raises(ModelGatewayError) as unknown:
+        await unknown_gateway.submit_video(
+            VideoModelRequest(
+                capability=ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S,
+                request_id="req-audit-video-unknown",
+                prompt="PRIVATE_UNKNOWN_SUBMISSION_PROMPT",
+                duration_seconds=8,
+                references=[],
+            ),
+            audit_context=audit_context,
+        )
+    assert unknown.value.code == GatewayErrorCode.SUBMISSION_UNKNOWN
+    assert unknown.value.retryable is False
+    assert unknown_provider.submit_calls == 1
+
     with factory() as session:
         attempts = list(
             session.scalars(
@@ -118,12 +143,13 @@ async def test_media_attempts_persist_task_identity_and_provider_neutral_usage(
             )
         )
 
-    assert [attempt.attempt_no for attempt in attempts] == [1, 2, 3, 4]
+    assert [attempt.attempt_no for attempt in attempts] == [1, 2, 3, 4, 5]
     assert [attempt.provider_task_id for attempt in attempts] == [
         None,
         submitted.provider_task_id,
         submitted.provider_task_id,
         submitted.provider_task_id,
+        None,
     ]
     assert usage[0].input_units_json == {"prompt_tokens": 0}
     assert usage[0].output_units_json == {
@@ -131,10 +157,16 @@ async def test_media_attempts_persist_task_identity_and_provider_neutral_usage(
         "images": 1,
         "total_tokens": 0,
     }
-    assert usage[-1].output_units_json == {
+    assert usage[-2].output_units_json == {
         "completion_tokens": 0,
         "total_tokens": 0,
         "video_seconds": 8,
+    }
+    assert attempts[-1].status == "failed"
+    assert attempts[-1].error_code == "MODEL_SUBMISSION_UNKNOWN"
+    assert attempts[-1].error_details_json == {
+        "retryable": False,
+        "retry_after_seconds": None,
     }
     persisted = repr(
         [
@@ -144,3 +176,4 @@ async def test_media_attempts_persist_task_identity_and_provider_neutral_usage(
     )
     assert "PRIVATE_IMAGE_PROMPT" not in persisted
     assert "PRIVATE_VIDEO_PROMPT" not in persisted
+    assert "PRIVATE_UNKNOWN_SUBMISSION_PROMPT" not in persisted

@@ -60,6 +60,12 @@ class GenerationAttempt(Base):
             unique=True,
             postgresql_where="provider_request_id IS NOT NULL",
         ),
+        Index(
+            "ix_generation_attempts_provider_task",
+            "provider_name",
+            "provider_task_id",
+            postgresql_where="provider_task_id IS NOT NULL",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
@@ -84,6 +90,7 @@ class GenerationAttempt(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False)
     request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     provider_request_id: Mapped[str | None] = mapped_column(String(255))
+    provider_task_id: Mapped[str | None] = mapped_column(String(255))
     submitted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
