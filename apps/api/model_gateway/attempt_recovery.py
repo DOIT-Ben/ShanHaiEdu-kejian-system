@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
+from threading import Lock
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.ids import new_uuid7
@@ -28,22 +30,36 @@ class AttemptRecoveryResult:
         return self.cancelled + self.failed + self.submission_unknown
 
 
+@dataclass(frozen=True, slots=True)
+class _CancellationCursor:
+    submitted_at: datetime
+    attempt_id: UUID
+
+
 class AttemptRecoveryCoordinator:
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
+        self._cancellation_cursor: _CancellationCursor | None = None
+        self._reconcile_lock = Lock()
 
     def reconcile(self, *, limit: int = 100) -> AttemptRecoveryResult:
         if limit < 1:
             raise ValueError("attempt recovery limit must be positive")
-        with self._session_factory() as session, session.begin():
-            cancellation_requests = self._coordinate_job_cancellations(session, limit=limit)
-            recovered = self._recover_expired(session, limit=limit)
-        return AttemptRecoveryResult(
-            cancellation_requests=cancellation_requests,
-            cancelled=recovered.count("cancelled"),
-            failed=recovered.count("failed"),
-            submission_unknown=recovered.count("submission_unknown"),
-        )
+        with self._reconcile_lock:
+            with self._session_factory() as session, session.begin():
+                cancellation_requests, next_cursor = self._coordinate_job_cancellations(
+                    session,
+                    limit=limit,
+                    cursor=self._cancellation_cursor,
+                )
+                recovered = self._recover_expired(session, limit=limit)
+            self._cancellation_cursor = next_cursor
+            return AttemptRecoveryResult(
+                cancellation_requests=cancellation_requests,
+                cancelled=recovered.count("cancelled"),
+                failed=recovered.count("failed"),
+                submission_unknown=recovered.count("submission_unknown"),
+            )
 
     def request_cancel(self, attempt_id: UUID) -> bool:
         with self._session_factory() as session, session.begin():
@@ -62,21 +78,19 @@ class AttemptRecoveryCoordinator:
             )
             return True
 
-    @staticmethod
-    def _coordinate_job_cancellations(session: Session, *, limit: int) -> int:
-        attempts = list(
-            session.scalars(
-                select(GenerationAttempt)
-                .where(
-                    GenerationAttempt.status == "running",
-                    GenerationAttempt.cancel_requested_at.is_(None),
-                    GenerationAttempt.generation_job_id.is_not(None),
-                )
-                .order_by(GenerationAttempt.submitted_at, GenerationAttempt.id)
-                .limit(limit)
-                .with_for_update(skip_locked=True)
-            )
-        )
+    @classmethod
+    def _coordinate_job_cancellations(
+        cls,
+        session: Session,
+        *,
+        limit: int,
+        cursor: _CancellationCursor | None,
+    ) -> tuple[int, _CancellationCursor | None]:
+        attempts = cls._load_cancellation_candidates(session, limit=limit, cursor=cursor)
+        if not attempts and cursor is not None:
+            attempts = cls._load_cancellation_candidates(session, limit=limit, cursor=None)
+        if not attempts:
+            return 0, None
         bindings_by_attempt = {
             attempt.id: GenerationJobBinding(
                 generation_job_id=generation_job_id,
@@ -90,14 +104,44 @@ class AttemptRecoveryCoordinator:
             set(bindings_by_attempt.values())
         )
         if not cancelled_bindings:
-            return 0
+            return 0, _CancellationCursor(attempts[-1].submitted_at, attempts[-1].id)
         now = database_wall_clock(session)
         coordinated = 0
         for attempt in attempts:
             if bindings_by_attempt.get(attempt.id) in cancelled_bindings:
                 attempt.cancel_requested_at = now
                 coordinated += 1
-        return coordinated
+        return coordinated, _CancellationCursor(attempts[-1].submitted_at, attempts[-1].id)
+
+    @staticmethod
+    def _load_cancellation_candidates(
+        session: Session,
+        *,
+        limit: int,
+        cursor: _CancellationCursor | None,
+    ) -> list[GenerationAttempt]:
+        statement = select(GenerationAttempt).where(
+            GenerationAttempt.status == "running",
+            GenerationAttempt.cancel_requested_at.is_(None),
+            GenerationAttempt.generation_job_id.is_not(None),
+        )
+        if cursor is not None:
+            statement = statement.where(
+                or_(
+                    GenerationAttempt.submitted_at > cursor.submitted_at,
+                    and_(
+                        GenerationAttempt.submitted_at == cursor.submitted_at,
+                        GenerationAttempt.id > cursor.attempt_id,
+                    ),
+                )
+            )
+        return list(
+            session.scalars(
+                statement.order_by(GenerationAttempt.submitted_at, GenerationAttempt.id)
+                .limit(limit)
+                .with_for_update(skip_locked=True)
+            )
+        )
 
     @staticmethod
     def _recover_expired(session: Session, *, limit: int) -> list[str]:

@@ -11,6 +11,7 @@ from uuid import UUID
 import pytest
 from sqlalchemy import event, func, select, text
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from apps.api.database import build_engine, build_session_factory, utc_now
 from apps.api.identity.context import ActorContext
@@ -795,14 +796,223 @@ def test_cancellation_candidate_query_applies_limit_before_job_lookup(
             candidate_statements.append(normalized)
 
     try:
-        result = AttemptRecoveryCoordinator(factory).reconcile(limit=2)
+        coordinator = AttemptRecoveryCoordinator(factory)
+        first = coordinator.reconcile(limit=2)
+        second = coordinator.reconcile(limit=2)
     finally:
         event.remove(engine, "before_cursor_execute", capture_candidate_query)
 
-    assert result.cancellation_requests == 2
+    assert first.cancellation_requests == 2
+    assert second.cancellation_requests == 1
     assert candidate_statements
-    assert " LIMIT " in candidate_statements[0].upper()
-    assert reader_input_sizes == [2]
+    assert all(" LIMIT " in statement.upper() for statement in candidate_statements)
+    assert reader_input_sizes == [2, 1]
+
+
+def test_cancellation_scan_advances_past_uncancelled_prefix(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    context = _seed_context(factory)
+    with factory() as session, session.begin():
+        for attempt_no, minutes_ago in enumerate((4, 3, 2), start=1):
+            job = _add_job(session, context)
+            _add_running_attempt(
+                session,
+                context,
+                attempt_no=attempt_no,
+                request_id=f"req-cancel-fair-prefix-{attempt_no}",
+                generation_job_id=job.id,
+                submitted_ago=timedelta(minutes=minutes_ago),
+            )
+        cancelled_job = _add_job(session, context, status="cancel_requested")
+        cancelled_attempt = _add_running_attempt(
+            session,
+            context,
+            attempt_no=4,
+            request_id="req-cancel-fair-tail",
+            generation_job_id=cancelled_job.id,
+            submitted_ago=timedelta(minutes=1),
+        )
+
+    coordinator = AttemptRecoveryCoordinator(factory)
+    assert coordinator.reconcile(limit=2).cancellation_requests == 0
+    assert coordinator.reconcile(limit=2).cancellation_requests == 1
+
+    with factory() as session:
+        persisted = session.get(GenerationAttempt, cancelled_attempt.id)
+    assert persisted is not None and persisted.cancel_requested_at is not None
+
+    with factory() as session, session.begin():
+        wrapped_job = _add_job(session, context, status="cancel_requested")
+        wrapped_attempt = _add_running_attempt(
+            session,
+            context,
+            attempt_no=5,
+            request_id="req-cancel-fair-wrap",
+            generation_job_id=wrapped_job.id,
+            submitted_ago=timedelta(minutes=5),
+        )
+
+    assert coordinator.reconcile(limit=2).cancellation_requests == 1
+    with factory() as session:
+        wrapped = session.get(GenerationAttempt, wrapped_attempt.id)
+    assert wrapped is not None and wrapped.cancel_requested_at is not None
+
+
+def test_cancellation_cursor_advances_only_after_transaction_commits(
+    migrated_database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    context = _seed_context(factory)
+    with factory() as session, session.begin():
+        attempt_ids = []
+        for attempt_no in range(1, 4):
+            job = _add_job(session, context, status="cancel_requested")
+            attempt = _add_running_attempt(
+                session,
+                context,
+                attempt_no=attempt_no,
+                request_id=f"req-cancel-rollback-{attempt_no}",
+                generation_job_id=job.id,
+            )
+            attempt_ids.append(attempt.id)
+
+    coordinator = AttemptRecoveryCoordinator(factory)
+
+    def fail_after_coordination(_session: Session, *, limit: int) -> list[str]:
+        raise RuntimeError(f"forced rollback after coordinating limit {limit}")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            AttemptRecoveryCoordinator,
+            "_recover_expired",
+            staticmethod(fail_after_coordination),
+        )
+        with pytest.raises(RuntimeError, match="forced rollback"):
+            coordinator.reconcile(limit=2)
+
+    with factory() as session:
+        rolled_back = list(
+            session.scalars(
+                select(GenerationAttempt)
+                .where(GenerationAttempt.id.in_(attempt_ids))
+                .order_by(GenerationAttempt.attempt_no)
+            )
+        )
+    assert all(attempt.cancel_requested_at is None for attempt in rolled_back)
+    assert coordinator.reconcile(limit=2).cancellation_requests == 2
+
+
+def test_restarted_coordinator_rescans_before_advancing_to_cancelled_tail(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    context = _seed_context(factory)
+    with factory() as session, session.begin():
+        for attempt_no, minutes_ago in enumerate((3, 2), start=1):
+            job = _add_job(session, context)
+            _add_running_attempt(
+                session,
+                context,
+                attempt_no=attempt_no,
+                request_id=f"req-cancel-restart-prefix-{attempt_no}",
+                generation_job_id=job.id,
+                submitted_ago=timedelta(minutes=minutes_ago),
+            )
+        cancelled_job = _add_job(session, context, status="cancel_requested")
+        cancelled_attempt = _add_running_attempt(
+            session,
+            context,
+            attempt_no=3,
+            request_id="req-cancel-restart-tail",
+            generation_job_id=cancelled_job.id,
+            submitted_ago=timedelta(minutes=1),
+        )
+
+    assert AttemptRecoveryCoordinator(factory).reconcile(limit=2).cancellation_requests == 0
+
+    restarted = AttemptRecoveryCoordinator(factory)
+    assert restarted.reconcile(limit=2).cancellation_requests == 0
+    assert restarted.reconcile(limit=2).cancellation_requests == 1
+    with factory() as session:
+        persisted = session.get(GenerationAttempt, cancelled_attempt.id)
+    assert persisted is not None and persisted.cancel_requested_at is not None
+
+
+def test_shared_coordinator_serializes_cancellation_cursor(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    context = _seed_context(factory)
+    with factory() as session, session.begin():
+        for attempt_no, minutes_ago in enumerate((4, 3, 2), start=1):
+            job = _add_job(session, context)
+            _add_running_attempt(
+                session,
+                context,
+                attempt_no=attempt_no,
+                request_id=f"req-cancel-shared-prefix-{attempt_no}",
+                generation_job_id=job.id,
+                submitted_ago=timedelta(minutes=minutes_ago),
+            )
+        cancelled_job = _add_job(session, context, status="cancel_requested")
+        _add_running_attempt(
+            session,
+            context,
+            attempt_no=4,
+            request_id="req-cancel-shared-tail",
+            generation_job_id=cancelled_job.id,
+            submitted_ago=timedelta(minutes=1),
+        )
+
+    coordinator = AttemptRecoveryCoordinator(factory)
+    barrier = Barrier(2)
+
+    def reconcile(_index: int):
+        barrier.wait()
+        return coordinator.reconcile(limit=2)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(reconcile, (1, 2)))
+
+    assert sum(result.cancellation_requests for result in results) == 1
+
+
+def test_independent_coordinators_apply_disjoint_cancellation_batches(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    context = _seed_context(factory)
+    with factory() as session, session.begin():
+        attempt_ids = []
+        for attempt_no in range(1, 5):
+            job = _add_job(session, context, status="cancel_requested")
+            attempt = _add_running_attempt(
+                session,
+                context,
+                attempt_no=attempt_no,
+                request_id=f"req-cancel-independent-{attempt_no}",
+                generation_job_id=job.id,
+            )
+            attempt_ids.append(attempt.id)
+
+    barrier = Barrier(2)
+
+    def reconcile(_index: int):
+        barrier.wait()
+        return AttemptRecoveryCoordinator(factory).reconcile(limit=2)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(reconcile, (1, 2)))
+
+    with factory() as session:
+        persisted = list(
+            session.scalars(select(GenerationAttempt).where(GenerationAttempt.id.in_(attempt_ids)))
+        )
+    assert sum(result.cancellation_requests for result in results) == 4
+    assert all(attempt.cancel_requested_at is not None for attempt in persisted)
 
 
 def test_usage_record_cannot_bind_to_a_running_attempt(
@@ -818,9 +1028,10 @@ def test_usage_record_cannot_bind_to_a_running_attempt(
         route_reason="configured_primary",
     )
 
-    with pytest.raises(IntegrityError), factory() as session, session.begin():
+    with pytest.raises(IntegrityError) as captured, factory() as session, session.begin():
         session.add(_usage_record(lease.attempt_id, context))
         session.flush()
+    assert getattr(captured.value.orig, "sqlstate", None) == "23514"
 
 
 def test_two_recovery_workers_terminalize_expired_attempts_once(
