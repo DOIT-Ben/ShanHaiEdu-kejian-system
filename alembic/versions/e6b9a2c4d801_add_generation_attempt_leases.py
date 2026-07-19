@@ -40,6 +40,7 @@ def upgrade() -> None:
         "generation_attempts",
         sa.Column("cancel_requested_at", sa.DateTime(timezone=True), nullable=True),
     )
+    _drop_attempt_identity_trigger()
     op.execute(
         "UPDATE generation_attempts SET operation_kind = 'legacy_unknown', "
         "lease_owner = CASE WHEN status = 'running' THEN 'migration:expired' END, "
@@ -118,11 +119,12 @@ def upgrade() -> None:
         "SELECT node_run_id, max(attempt_no) + 1 FROM generation_attempts GROUP BY node_run_id"
     )
     _replace_attempt_identity_trigger(include_operation_kind=True)
+    _create_attempt_identity_trigger()
     _create_usage_terminal_trigger()
 
 
 def downgrade() -> None:
-    op.execute("DROP TRIGGER IF EXISTS trg_generation_attempt_identity ON generation_attempts")
+    _drop_attempt_identity_trigger()
     op.execute(
         "UPDATE generation_attempts SET status = 'failed' WHERE status = 'submission_unknown'"
     )
@@ -172,6 +174,14 @@ def downgrade() -> None:
     op.drop_column("generation_attempts", "lease_owner")
     op.drop_column("generation_attempts", "operation_kind")
     _replace_attempt_identity_trigger(include_operation_kind=False)
+    _create_attempt_identity_trigger()
+
+
+def _drop_attempt_identity_trigger() -> None:
+    op.execute("DROP TRIGGER IF EXISTS trg_generation_attempt_identity ON generation_attempts")
+
+
+def _create_attempt_identity_trigger() -> None:
     op.execute(
         """
         CREATE TRIGGER trg_generation_attempt_identity
@@ -192,7 +202,8 @@ def _replace_attempt_identity_trigger(*, include_operation_kind: bool) -> None:
         CREATE OR REPLACE FUNCTION protect_generation_attempt_identity() RETURNS trigger AS $$
         BEGIN
           IF OLD.status <> 'running' THEN
-            RAISE EXCEPTION 'terminal generation attempts are immutable';
+            RAISE EXCEPTION 'terminal generation attempts are immutable'
+              USING ERRCODE = '23514';
           END IF;
           IF NEW.id IS DISTINCT FROM OLD.id
              OR NEW.organization_id IS DISTINCT FROM OLD.organization_id
@@ -208,7 +219,8 @@ def _replace_attempt_identity_trigger(*, include_operation_kind: bool) -> None:
              OR NEW.route_reason IS DISTINCT FROM OLD.route_reason
              OR NEW.request_hash IS DISTINCT FROM OLD.request_hash
              OR NEW.submitted_at IS DISTINCT FROM OLD.submitted_at THEN
-            RAISE EXCEPTION 'generation attempt identity is immutable';
+            RAISE EXCEPTION 'generation attempt identity is immutable'
+              USING ERRCODE = '23514';
           END IF;
           RETURN NEW;
         END;

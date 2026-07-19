@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Collection
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import timedelta
+from decimal import Decimal
 from threading import Barrier, Event
 from uuid import UUID
 
@@ -11,17 +13,26 @@ from sqlalchemy import event, func, select, text
 from sqlalchemy.exc import IntegrityError
 
 from apps.api.database import build_engine, build_session_factory, utc_now
+from apps.api.identity.context import ActorContext
+from apps.api.identity.models import Organization
 from apps.api.ids import new_uuid7
 from apps.api.jobs.models import GenerationJob
+from apps.api.jobs.service import GenerationJobBinding, GenerationJobCancellationReader
 from apps.api.model_gateway.attempt_recovery import AttemptRecoveryCoordinator
 from apps.api.model_gateway.audit import (
     AttemptHeartbeat,
     AttemptRequestAudit,
+    AttemptSuccessAudit,
     DuplicateAttemptDelivery,
     SqlAlchemyAttemptAuditSink,
 )
 from apps.api.model_gateway.audit_models import GenerationAttempt, UsageRecord
-from apps.api.model_gateway.contracts import GatewayErrorCode, ModelAuditContext, ModelGatewayError
+from apps.api.model_gateway.contracts import (
+    GatewayErrorCode,
+    ModelAuditContext,
+    ModelGatewayError,
+    ModelUsage,
+)
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.workflows.service import WorkflowRuntimeService
@@ -57,6 +68,87 @@ def _request(request_id: str, *, operation_kind: str = "text_generate") -> Attem
         request_hash=request_id.encode().hex().ljust(64, "0")[:64],
         operation_kind=operation_kind,
     )
+
+
+def _actor_for(context: ModelAuditContext) -> ActorContext:
+    return ActorContext(
+        organization_id=context.organization_id,
+        principal_id=TEST_PRINCIPAL_ID,
+        user_id=context.user_id,
+        actor_type="user",
+        organization_role="member",
+    )
+
+
+def _add_job(
+    session,
+    context: ModelAuditContext,
+    *,
+    organization_id: UUID | None = None,
+    project_id: UUID | None = None,
+    job_type: str = "creation.item",
+    status: str = "running",
+) -> GenerationJob:
+    job = GenerationJob(
+        id=new_uuid7(),
+        organization_id=organization_id or context.organization_id,
+        project_id=project_id or context.project_id,
+        job_type=job_type,
+        status=status,
+        progress_percent=0,
+        priority=100,
+        cancel_requested_at=utc_now() if status == "cancel_requested" else None,
+        created_by=TEST_PRINCIPAL_ID,
+        updated_by=TEST_PRINCIPAL_ID,
+    )
+    session.add(job)
+    session.flush()
+    return job
+
+
+def _add_running_attempt(
+    session,
+    context: ModelAuditContext,
+    *,
+    attempt_no: int,
+    request_id: str,
+    generation_job_id: UUID | None = None,
+    submitted_ago: timedelta = timedelta(minutes=1),
+    lease_expired: bool = False,
+) -> GenerationAttempt:
+    now = utc_now()
+    heartbeat_at = now - timedelta(seconds=2) if lease_expired else now
+    lease_expires_at = now - timedelta(seconds=1) if lease_expired else now + timedelta(minutes=5)
+    attempt = GenerationAttempt(
+        id=new_uuid7(),
+        organization_id=context.organization_id,
+        project_id=context.project_id,
+        node_run_id=context.node_run_id,
+        generation_job_id=generation_job_id,
+        attempt_no=attempt_no,
+        request_id=request_id,
+        capability="text.smoke",
+        operation_kind="text_generate",
+        provider_name="provider-test",
+        provider_model="model-test",
+        route_reason="configured_primary",
+        status="running",
+        request_hash=request_id.encode().hex().ljust(64, "0")[:64],
+        provider_request_id=None,
+        provider_task_id=None,
+        lease_owner=f"owner:{request_id}",
+        heartbeat_at=heartbeat_at,
+        lease_expires_at=lease_expires_at,
+        cancel_requested_at=None,
+        submitted_at=now - submitted_ago,
+        finished_at=None,
+        error_code=None,
+        error_details_json={},
+        latency_ms=None,
+    )
+    session.add(attempt)
+    session.flush()
+    return attempt
 
 
 def test_start_persists_an_owned_attempt_lease(migrated_database_url: str) -> None:
@@ -292,7 +384,7 @@ def test_generation_job_cancellation_is_synchronized_through_application_reader(
             id=new_uuid7(),
             organization_id=context.organization_id,
             project_id=context.project_id,
-            job_type="model.generate",
+            job_type="creation.item",
             status="running",
             progress_percent=0,
             priority=100,
@@ -319,6 +411,360 @@ def test_generation_job_cancellation_is_synchronized_through_application_reader(
 
     assert result.cancellation_requests == 1
     assert sink.heartbeat(lease, context) == AttemptHeartbeat.CANCEL_REQUESTED
+
+
+def test_attempt_start_rejects_cross_resource_and_disallowed_jobs(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    context = _seed_context(factory)
+    other_organization_id = new_uuid7()
+    with factory() as session, session.begin():
+        other_project = ProjectRepository(session, _actor_for(context)).create(
+            CreateProjectRequest(title="Other project", knowledge_point="One third")
+        )
+        session.add(
+            Organization(
+                id=other_organization_id,
+                slug=f"other-{other_organization_id.hex[:12]}",
+                name="Other organization",
+                status="active",
+                created_at=utc_now(),
+            )
+        )
+        session.flush()
+        jobs = (
+            _add_job(session, context, project_id=other_project.id),
+            _add_job(session, context, organization_id=other_organization_id),
+            _add_job(session, context, job_type="material.parse"),
+            _add_job(session, context, status="cancel_requested"),
+            _add_job(session, context, status="succeeded"),
+        )
+
+    sink = SqlAlchemyAttemptAuditSink(factory)
+    for index, job in enumerate(jobs):
+        with pytest.raises(RuntimeError, match="generation job"):
+            sink.start(
+                replace(context, generation_job_id=job.id),
+                _request(f"req-invalid-job-binding-{index}"),
+                provider_name="provider-test",
+                provider_model="model-test",
+                route_reason="configured_primary",
+            )
+
+    with factory() as session:
+        assert session.scalar(select(func.count()).select_from(GenerationAttempt)) == 0
+
+
+def test_historical_mismatched_jobs_cannot_cancel_attempts(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    context = _seed_context(factory)
+    other_organization_id = new_uuid7()
+    with factory() as session, session.begin():
+        other_project = ProjectRepository(session, _actor_for(context)).create(
+            CreateProjectRequest(title="Wrong project", knowledge_point="One quarter")
+        )
+        session.add(
+            Organization(
+                id=other_organization_id,
+                slug=f"wrong-{other_organization_id.hex[:12]}",
+                name="Wrong organization",
+                status="active",
+                created_at=utc_now(),
+            )
+        )
+        session.flush()
+        wrong_project_job = _add_job(
+            session,
+            context,
+            project_id=other_project.id,
+            status="cancel_requested",
+        )
+        wrong_organization_job = _add_job(
+            session,
+            context,
+            organization_id=other_organization_id,
+            status="cancel_requested",
+        )
+        disallowed_job = _add_job(
+            session,
+            context,
+            job_type="material.parse",
+            status="cancel_requested",
+        )
+        attempts = (
+            _add_running_attempt(
+                session,
+                context,
+                attempt_no=1,
+                request_id="req-history-wrong-project",
+                generation_job_id=wrong_project_job.id,
+            ),
+            _add_running_attempt(
+                session,
+                context,
+                attempt_no=2,
+                request_id="req-history-wrong-organization",
+                generation_job_id=wrong_organization_job.id,
+            ),
+            _add_running_attempt(
+                session,
+                context,
+                attempt_no=3,
+                request_id="req-history-disallowed-job",
+                generation_job_id=disallowed_job.id,
+            ),
+        )
+        attempt_ids = tuple(attempt.id for attempt in attempts)
+
+    result = AttemptRecoveryCoordinator(factory).reconcile(limit=10)
+
+    with factory() as session:
+        persisted = list(
+            session.scalars(
+                select(GenerationAttempt)
+                .where(GenerationAttempt.id.in_(attempt_ids))
+                .order_by(GenerationAttempt.attempt_no)
+            )
+        )
+    assert result.cancellation_requests == 0
+    assert all(attempt.cancel_requested_at is None for attempt in persisted)
+
+
+def test_attempt_recovery_does_not_deadlock_with_job_cancel_lock(
+    migrated_database_url: str,
+) -> None:
+    engine = build_engine(migrated_database_url)
+    factory = build_session_factory(engine)
+    context = _seed_context(factory)
+    with factory() as session, session.begin():
+        job = _add_job(session, context)
+    context = replace(context, generation_job_id=job.id)
+    lease = SqlAlchemyAttemptAuditSink(factory).start(
+        context,
+        _request("req-cancel-lock-order"),
+        provider_name="provider-test",
+        provider_model="model-test",
+        route_reason="configured_primary",
+    )
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        with factory() as session, session.begin():
+            locked_job = session.get(GenerationJob, job.id, with_for_update=True)
+            assert locked_job is not None
+            locked_job.status = "cancel_requested"
+            locked_job.cancel_requested_at = utc_now()
+            session.flush()
+            pending = executor.submit(AttemptRecoveryCoordinator(factory).reconcile, limit=1)
+            assert pending.result(timeout=2).cancellation_requests == 0
+
+    assert AttemptRecoveryCoordinator(factory).reconcile(limit=1).cancellation_requests == 1
+    assert SqlAlchemyAttemptAuditSink(factory).heartbeat(lease, context) == (
+        AttemptHeartbeat.CANCEL_REQUESTED
+    )
+
+
+def test_success_after_cancel_persists_real_usage_as_cancelled(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    context = _seed_context(factory)
+    sink = SqlAlchemyAttemptAuditSink(factory)
+    lease = sink.start(
+        context,
+        _request("req-success-after-cancel"),
+        provider_name="provider-test",
+        provider_model="model-test",
+        route_reason="configured_primary",
+    )
+    assert AttemptRecoveryCoordinator(factory).request_cancel(lease.attempt_id) is True
+
+    outcome = sink.succeed(
+        lease,
+        context,
+        AttemptSuccessAudit(
+            provider_request_id="provider-completed-after-cancel",
+            actual_model="model-actual",
+            finish_reason="stop",
+            usage=ModelUsage(
+                prompt_tokens=11,
+                completion_tokens=7,
+                total_tokens=18,
+                cost=Decimal("0.123456"),
+                currency="USD",
+            ),
+        ),
+        latency_ms=41,
+    )
+
+    with factory() as session:
+        attempt = session.get(GenerationAttempt, lease.attempt_id)
+        usage = session.scalar(
+            select(UsageRecord).where(UsageRecord.generation_attempt_id == lease.attempt_id)
+        )
+    assert outcome.value == "cancelled"
+    assert attempt is not None and attempt.status == "cancelled"
+    assert attempt.error_code == GatewayErrorCode.CANCELLED.value
+    assert attempt.provider_request_id == "provider-completed-after-cancel"
+    assert usage is not None and usage.actual_cost == Decimal("0.123456")
+    assert usage.input_units_json["prompt_tokens"] == 11
+    assert usage.output_units_json["completion_tokens"] == 7
+
+
+def test_committed_job_cancel_blocks_success_before_reconcile(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    context = _seed_context(factory)
+    with factory() as session, session.begin():
+        job = _add_job(session, context)
+    context = replace(context, generation_job_id=job.id)
+    sink = SqlAlchemyAttemptAuditSink(factory)
+    lease = sink.start(
+        context,
+        _request("req-job-cancel-before-success"),
+        provider_name="provider-test",
+        provider_model="model-test",
+        route_reason="configured_primary",
+    )
+
+    with factory() as session, session.begin():
+        persisted_job = session.get(GenerationJob, job.id, with_for_update=True)
+        assert persisted_job is not None
+        persisted_job.status = "cancel_requested"
+        persisted_job.cancel_requested_at = utc_now()
+
+    outcome = sink.succeed(
+        lease,
+        context,
+        AttemptSuccessAudit(
+            provider_request_id="provider-completed-after-job-cancel",
+            actual_model="model-actual",
+            finish_reason="stop",
+            usage=ModelUsage(
+                prompt_tokens=5,
+                completion_tokens=3,
+                total_tokens=8,
+                cost=Decimal("0.010000"),
+                currency="USD",
+            ),
+        ),
+        latency_ms=17,
+    )
+
+    with factory() as session:
+        attempt = session.get(GenerationAttempt, lease.attempt_id)
+        usage = session.scalar(
+            select(UsageRecord).where(UsageRecord.generation_attempt_id == lease.attempt_id)
+        )
+    assert outcome.value == "cancelled"
+    assert attempt is not None and attempt.status == "cancelled"
+    assert attempt.error_code == GatewayErrorCode.CANCELLED.value
+    assert attempt.provider_request_id == "provider-completed-after-job-cancel"
+    assert usage is not None and usage.actual_cost == Decimal("0.010000")
+
+
+def test_recovery_clamps_long_latency_without_starving_same_batch(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    context = _seed_context(factory)
+    with factory() as session, session.begin():
+        old_attempt = _add_running_attempt(
+            session,
+            context,
+            attempt_no=1,
+            request_id="req-expired-thirty-days",
+            submitted_ago=timedelta(days=30),
+            lease_expired=True,
+        )
+        recent_attempt = _add_running_attempt(
+            session,
+            context,
+            attempt_no=2,
+            request_id="req-expired-recent",
+            submitted_ago=timedelta(minutes=1),
+            lease_expired=True,
+        )
+        attempt_ids = (old_attempt.id, recent_attempt.id)
+
+    result = AttemptRecoveryCoordinator(factory).reconcile(limit=2)
+
+    with factory() as session:
+        attempts = list(
+            session.scalars(
+                select(GenerationAttempt)
+                .where(GenerationAttempt.id.in_(attempt_ids))
+                .order_by(GenerationAttempt.attempt_no)
+            )
+        )
+        usage_count = session.scalar(
+            select(func.count())
+            .select_from(UsageRecord)
+            .where(UsageRecord.generation_attempt_id.in_(attempt_ids))
+        )
+    assert result.failed == 2
+    assert [attempt.status for attempt in attempts] == ["failed", "failed"]
+    assert attempts[0].latency_ms == 2_147_483_647
+    assert attempts[1].latency_ms is not None and attempts[1].latency_ms < 2_147_483_647
+    assert usage_count == 2
+
+
+def test_cancellation_candidate_query_applies_limit_before_job_lookup(
+    migrated_database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine = build_engine(migrated_database_url)
+    factory = build_session_factory(engine)
+    context = _seed_context(factory)
+    with factory() as session, session.begin():
+        for attempt_no in range(1, 4):
+            job = _add_job(session, context, status="cancel_requested")
+            _add_running_attempt(
+                session,
+                context,
+                attempt_no=attempt_no,
+                request_id=f"req-bounded-cancel-{attempt_no}",
+                generation_job_id=job.id,
+            )
+
+    candidate_statements: list[str] = []
+    reader_input_sizes: list[int] = []
+    requested_bindings = GenerationJobCancellationReader.requested_bindings
+
+    def capture_reader_input(
+        self: GenerationJobCancellationReader,
+        bindings: Collection[GenerationJobBinding],
+    ) -> set[GenerationJobBinding]:
+        reader_input_sizes.append(len(bindings))
+        return requested_bindings(self, bindings)
+
+    monkeypatch.setattr(
+        GenerationJobCancellationReader,
+        "requested_bindings",
+        capture_reader_input,
+    )
+
+    @event.listens_for(engine, "before_cursor_execute")
+    def capture_candidate_query(_conn, _cursor, statement, _parameters, _context, _many):
+        normalized = " ".join(statement.split())
+        if (
+            "generation_attempts.generation_job_id" in normalized
+            and "generation_attempts.cancel_requested_at IS NULL" in normalized
+        ):
+            candidate_statements.append(normalized)
+
+    try:
+        result = AttemptRecoveryCoordinator(factory).reconcile(limit=2)
+    finally:
+        event.remove(engine, "before_cursor_execute", capture_candidate_query)
+
+    assert result.cancellation_requests == 2
+    assert candidate_statements
+    assert " LIMIT " in candidate_statements[0].upper()
+    assert reader_input_sizes == [2]
 
 
 def test_usage_record_cannot_bind_to_a_running_attempt(

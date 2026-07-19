@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
-from enum import StrEnum
-from typing import Protocol
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -18,12 +15,26 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.ids import new_uuid7
+from apps.api.jobs.service import (
+    GenerationJobAttemptBindingReader,
+    GenerationJobBinding,
+    GenerationJobCancellationReader,
+)
+from apps.api.model_gateway.audit_contracts import (
+    AttemptCompletion,
+    AttemptHeartbeat,
+    AttemptLease,
+    AttemptRequestAudit,
+    AttemptSuccessAudit,
+    DuplicateAttemptDelivery,
+)
 from apps.api.model_gateway.audit_models import (
     GenerationAttempt,
     GenerationAttemptCounter,
     UsageRecord,
 )
 from apps.api.model_gateway.contracts import (
+    GatewayErrorCode,
     ModelAuditContext,
     ModelGatewayError,
     ModelUsage,
@@ -37,75 +48,6 @@ def database_wall_clock(session: Session) -> datetime:
     if current_time is None:
         raise RuntimeError("database wall clock is unavailable")
     return current_time
-
-
-class AttemptAuditSink(Protocol):
-    def start(
-        self,
-        context: ModelAuditContext,
-        request: AttemptRequestAudit,
-        *,
-        provider_name: str | None,
-        provider_model: str | None,
-        route_reason: str,
-    ) -> AttemptLease: ...
-
-    def heartbeat(
-        self,
-        lease: AttemptLease,
-        context: ModelAuditContext,
-    ) -> AttemptHeartbeat: ...
-
-    def succeed(
-        self,
-        lease: AttemptLease,
-        context: ModelAuditContext,
-        result: AttemptSuccessAudit,
-        *,
-        latency_ms: int,
-    ) -> None: ...
-
-    def fail(
-        self,
-        lease: AttemptLease,
-        context: ModelAuditContext,
-        error: ModelGatewayError,
-        *,
-        latency_ms: int,
-    ) -> None: ...
-
-
-@dataclass(frozen=True, slots=True)
-class AttemptRequestAudit:
-    request_id: str
-    capability: str
-    request_hash: str
-    operation_kind: str
-
-
-@dataclass(frozen=True, slots=True)
-class AttemptLease:
-    attempt_id: UUID
-    lease_owner: str
-
-
-class AttemptHeartbeat(StrEnum):
-    ACTIVE = "active"
-    CANCEL_REQUESTED = "cancel_requested"
-    LOST = "lost"
-
-
-class DuplicateAttemptDelivery(RuntimeError):
-    """The same organization request has already created an attempt."""
-
-
-@dataclass(frozen=True, slots=True)
-class AttemptSuccessAudit:
-    provider_request_id: str | None
-    actual_model: str
-    finish_reason: str | None
-    usage: ModelUsage
-    provider_task_id: str | None = None
 
 
 class SqlAlchemyAttemptAuditSink:
@@ -134,6 +76,7 @@ class SqlAlchemyAttemptAuditSink:
         try:
             with self._session_factory() as session, session.begin():
                 self._lock_context_node(session, context)
+                self._require_generation_job_binding(session, context)
                 self._reject_duplicate_delivery(session, context, request)
                 attempt_no = self._allocate_attempt_no(session, context.node_run_id)
                 now = database_wall_clock(session)
@@ -186,6 +129,18 @@ class SqlAlchemyAttemptAuditSink:
             raise RuntimeError("model audit context does not match the target node")
 
     @staticmethod
+    def _require_generation_job_binding(session: Session, context: ModelAuditContext) -> None:
+        if context.generation_job_id is None:
+            return
+        GenerationJobAttemptBindingReader(session).require_bindable(
+            GenerationJobBinding(
+                generation_job_id=context.generation_job_id,
+                organization_id=context.organization_id,
+                project_id=context.project_id,
+            )
+        )
+
+    @staticmethod
     def _reject_duplicate_delivery(
         session: Session,
         context: ModelAuditContext,
@@ -209,7 +164,12 @@ class SqlAlchemyAttemptAuditSink:
             attempt = self._find_owned_running(session, lease, context)
             if attempt is None:
                 return AttemptHeartbeat.LOST
-            if attempt.cancel_requested_at is not None:
+            if attempt.cancel_requested_at is not None or self._job_cancel_requested(
+                session, attempt
+            ):
+                attempt.cancel_requested_at = attempt.cancel_requested_at or database_wall_clock(
+                    session
+                )
                 return AttemptHeartbeat.CANCEL_REQUESTED
             now = database_wall_clock(session)
             attempt.heartbeat_at = now
@@ -223,16 +183,31 @@ class SqlAlchemyAttemptAuditSink:
         result: AttemptSuccessAudit,
         *,
         latency_ms: int,
-    ) -> None:
+    ) -> AttemptCompletion:
         with self._session_factory() as session, session.begin():
             attempt = self._require_owned_running(session, lease, context)
-            attempt.status = "succeeded"
+            now = database_wall_clock(session)
+            outcome = (
+                AttemptCompletion.CANCELLED
+                if attempt.cancel_requested_at is not None
+                or self._job_cancel_requested(session, attempt)
+                else AttemptCompletion.SUCCEEDED
+            )
+            if outcome == AttemptCompletion.CANCELLED:
+                attempt.cancel_requested_at = attempt.cancel_requested_at or now
+            attempt.status = outcome.value
             attempt.provider_request_id = _bounded(result.provider_request_id, 255)
             attempt.provider_task_id = _bounded(result.provider_task_id, 255)
-            attempt.finished_at = database_wall_clock(session)
+            attempt.finished_at = now
             attempt.latency_ms = latency_ms
             attempt.lease_owner = None
             attempt.lease_expires_at = None
+            if outcome == AttemptCompletion.CANCELLED:
+                attempt.error_code = GatewayErrorCode.CANCELLED.value
+                attempt.error_details_json = {
+                    "retryable": False,
+                    "retry_after_seconds": None,
+                }
             session.add(
                 self._usage_record(
                     attempt,
@@ -245,6 +220,7 @@ class SqlAlchemyAttemptAuditSink:
                     provider_model=_bounded(result.actual_model, 160),
                 )
             )
+            return outcome
 
     def fail(
         self,
@@ -256,15 +232,26 @@ class SqlAlchemyAttemptAuditSink:
     ) -> None:
         with self._session_factory() as session, session.begin():
             attempt = self._require_owned_running(session, lease, context)
-            attempt.status = {
-                "MODEL_CANCELLED": "cancelled",
-                "MODEL_SUBMISSION_UNKNOWN": "submission_unknown",
-            }.get(error.code.value, "failed")
+            job_cancelled = self._job_cancel_requested(session, attempt)
+            attempt.status = (
+                "cancelled"
+                if attempt.cancel_requested_at is not None or job_cancelled
+                else {
+                    "MODEL_CANCELLED": "cancelled",
+                    "MODEL_SUBMISSION_UNKNOWN": "submission_unknown",
+                }.get(error.code.value, "failed")
+            )
             attempt.finished_at = database_wall_clock(session)
-            attempt.error_code = error.code.value
+            attempt.error_code = (
+                GatewayErrorCode.CANCELLED.value
+                if attempt.status == "cancelled"
+                else error.code.value
+            )
             attempt.error_details_json = {
-                "retryable": error.retryable,
-                "retry_after_seconds": error.retry_after_seconds,
+                "retryable": False if attempt.status == "cancelled" else error.retryable,
+                "retry_after_seconds": (
+                    None if attempt.status == "cancelled" else error.retry_after_seconds
+                ),
             }
             attempt.latency_ms = latency_ms
             attempt.lease_owner = None
@@ -317,6 +304,17 @@ class SqlAlchemyAttemptAuditSink:
         if attempt.lease_expires_at is None or attempt.lease_expires_at < database_now:
             return None
         return attempt
+
+    @staticmethod
+    def _job_cancel_requested(session: Session, attempt: GenerationAttempt) -> bool:
+        if attempt.generation_job_id is None:
+            return False
+        binding = GenerationJobBinding(
+            generation_job_id=attempt.generation_job_id,
+            organization_id=attempt.organization_id,
+            project_id=attempt.project_id,
+        )
+        return binding in GenerationJobCancellationReader(session).requested_bindings({binding})
 
     @staticmethod
     def _allocate_attempt_no(session: Session, node_run_id: UUID) -> int:

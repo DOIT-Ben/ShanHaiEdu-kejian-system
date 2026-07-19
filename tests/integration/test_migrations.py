@@ -3,9 +3,11 @@ from __future__ import annotations
 import os
 from uuid import UUID
 
+import pytest
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect, select, text
+from sqlalchemy.exc import IntegrityError
 
 from alembic import command
 from apps.api.database import build_session_factory, sqlalchemy_url, utc_now
@@ -264,6 +266,173 @@ def test_running_attempt_is_backfilled_and_recovered_after_lease_migration(
         assert "operation_kind" not in {
             column["name"] for column in inspect(engine).get_columns("generation_attempts")
         }
+
+
+def test_populated_attempt_migration_round_trip_restores_identity_trigger(
+    postgres_database_url: str,
+) -> None:
+    run_migration(postgres_database_url, "c2d4e6f8a901")
+    engine = create_engine(sqlalchemy_url(postgres_database_url))
+    factory = build_session_factory(engine)
+    statuses = ("running", "succeeded", "failed", "cancelled")
+    attempt_ids = {status: new_uuid7() for status in statuses}
+    with factory() as session, session.begin():
+        actor = seed_test_actor(session)
+        project = ProjectRepository(session, actor).create(
+            CreateProjectRequest(title="Populated lease migration", knowledge_point="One half")
+        )
+        run = WorkflowRuntimeService(session, actor).start_project_run(project.id)
+        node = WorkflowRuntimeService(session, actor).create_project_node_run(
+            run.id,
+            node_key="prepare",
+            status=NodeStatus.READY,
+        )
+        for attempt_no, status in enumerate(statuses, start=1):
+            is_running = status == "running"
+            error_code = None if status in {"running", "succeeded"} else f"MODEL_{status.upper()}"
+            session.execute(
+                text(
+                    """
+                    INSERT INTO generation_attempts (
+                        id, organization_id, project_id, node_run_id, generation_job_id,
+                        attempt_no, request_id, capability, provider_name, provider_model,
+                        route_reason, status, request_hash, provider_request_id,
+                        provider_task_id, submitted_at, finished_at, error_code,
+                        error_details_json, latency_ms
+                    ) VALUES (
+                        :id, :organization_id, :project_id, :node_run_id, NULL,
+                        :attempt_no, :request_id, 'text.smoke', 'provider-test', 'model-test',
+                        'configured_primary', :status, :request_hash, NULL, NULL,
+                        now() - interval '10 minutes',
+                        CASE WHEN :is_running THEN NULL ELSE now() END,
+                        :error_code, '{}'::jsonb,
+                        CASE WHEN :is_running THEN NULL ELSE 10 END
+                    )
+                    """
+                ),
+                {
+                    "id": attempt_ids[status],
+                    "organization_id": actor.organization_id,
+                    "project_id": project.id,
+                    "node_run_id": node.id,
+                    "attempt_no": attempt_no,
+                    "request_id": f"req-populated-{status}",
+                    "status": status,
+                    "request_hash": f"{attempt_no:x}" * 64,
+                    "is_running": is_running,
+                    "error_code": error_code,
+                },
+            )
+            if not is_running:
+                session.execute(
+                    text(
+                        """
+                        INSERT INTO usage_records (
+                            id, organization_id, user_id, project_id, node_run_id,
+                            generation_attempt_id, capability, provider_name, provider_model,
+                            input_units_json, output_units_json, pricing_version,
+                            estimated_cost, actual_cost, currency, latency_ms, created_at
+                        ) VALUES (
+                            :id, :organization_id, :user_id, :project_id, :node_run_id,
+                            :attempt_id, 'text.smoke', 'provider-test', 'model-test',
+                            '{"prompt_tokens": 1}'::jsonb,
+                            '{"completion_tokens": 1, "total_tokens": 2}'::jsonb,
+                            NULL, NULL, 0.010000, 'USD', 10, now()
+                        )
+                        """
+                    ),
+                    {
+                        "id": new_uuid7(),
+                        "organization_id": actor.organization_id,
+                        "user_id": actor.user_id,
+                        "project_id": project.id,
+                        "node_run_id": node.id,
+                        "attempt_id": attempt_ids[status],
+                    },
+                )
+
+    run_migration(postgres_database_url, "head")
+    with engine.connect() as connection:
+        migrated = dict(
+            connection.execute(
+                text("SELECT id, status FROM generation_attempts WHERE node_run_id = :node_id"),
+                {"node_id": node.id},
+            )
+            .tuples()
+            .all()
+        )
+        assert migrated == {attempt_ids[status]: status for status in statuses}
+        assert connection.scalar(text("SELECT count(*) FROM usage_records")) == 3
+        assert _attempt_identity_trigger_count(connection) == 1
+    _assert_attempt_identity_check_violation(engine, attempt_ids["succeeded"])
+
+    recovered = AttemptRecoveryCoordinator(factory).reconcile()
+    assert recovered.submission_unknown == 1
+    with engine.connect() as connection:
+        assert connection.scalar(text("SELECT count(*) FROM usage_records")) == 4
+
+    previous = os.environ.get("SHANHAI_DATABASE_URL")
+    os.environ["SHANHAI_DATABASE_URL"] = postgres_database_url
+    try:
+        command.downgrade(Config("alembic.ini"), "c2d4e6f8a901")
+    finally:
+        if previous is None:
+            os.environ.pop("SHANHAI_DATABASE_URL", None)
+        else:
+            os.environ["SHANHAI_DATABASE_URL"] = previous
+    with engine.connect() as connection:
+        assert (
+            connection.scalar(
+                text("SELECT status FROM generation_attempts WHERE id = :id"),
+                {"id": attempt_ids["running"]},
+            )
+            == "failed"
+        )
+        assert connection.scalar(text("SELECT count(*) FROM usage_records")) == 4
+        assert _attempt_identity_trigger_count(connection) == 1
+    _assert_attempt_identity_check_violation(engine, attempt_ids["succeeded"])
+
+    run_migration(postgres_database_url, "head")
+    with engine.connect() as connection:
+        rows = list(
+            connection.execute(
+                text(
+                    "SELECT status, operation_kind FROM generation_attempts "
+                    "WHERE node_run_id = :node_id ORDER BY attempt_no"
+                ),
+                {"node_id": node.id},
+            )
+        )
+        assert rows == [
+            ("failed", "legacy_unknown"),
+            ("succeeded", "legacy_unknown"),
+            ("failed", "legacy_unknown"),
+            ("cancelled", "legacy_unknown"),
+        ]
+        assert connection.scalar(text("SELECT count(*) FROM usage_records")) == 4
+        assert _attempt_identity_trigger_count(connection) == 1
+    _assert_attempt_identity_check_violation(engine, attempt_ids["succeeded"])
+
+
+def _attempt_identity_trigger_count(connection) -> int:
+    value = connection.scalar(
+        text(
+            "SELECT count(*) FROM pg_trigger "
+            "WHERE tgname = 'trg_generation_attempt_identity' AND NOT tgisinternal"
+        )
+    )
+    assert isinstance(value, int)
+    return value
+
+
+def _assert_attempt_identity_check_violation(engine, attempt_id: UUID) -> None:
+    with pytest.raises(IntegrityError) as captured:
+        with engine.begin() as connection:
+            connection.execute(
+                text("UPDATE generation_attempts SET route_reason = 'tampered' WHERE id = :id"),
+                {"id": attempt_id},
+            )
+    assert getattr(captured.value.orig, "sqlstate", None) == "23514"
 
 
 def test_stage0_project_data_survives_identity_migration(postgres_database_url: str) -> None:

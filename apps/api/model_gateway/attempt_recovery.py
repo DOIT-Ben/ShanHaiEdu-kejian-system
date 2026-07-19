@@ -9,9 +9,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.ids import new_uuid7
-from apps.api.jobs.service import GenerationJobCancellationReader
+from apps.api.jobs.service import GenerationJobBinding, GenerationJobCancellationReader
 from apps.api.model_gateway.audit import database_wall_clock
 from apps.api.model_gateway.audit_models import GenerationAttempt, UsageRecord
+
+_MAX_POSTGRES_INTEGER = 2_147_483_647
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,41 +64,40 @@ class AttemptRecoveryCoordinator:
 
     @staticmethod
     def _coordinate_job_cancellations(session: Session, *, limit: int) -> int:
-        candidate_job_ids = {
-            job_id
-            for job_id in session.scalars(
-                select(GenerationAttempt.generation_job_id)
-                .where(
-                    GenerationAttempt.status == "running",
-                    GenerationAttempt.cancel_requested_at.is_(None),
-                    GenerationAttempt.generation_job_id.is_not(None),
-                )
-                .distinct()
-            )
-            if job_id is not None
-        }
-        cancelled_job_ids = GenerationJobCancellationReader(session).requested_ids(
-            candidate_job_ids
-        )
-        if not cancelled_job_ids:
-            return 0
         attempts = list(
             session.scalars(
                 select(GenerationAttempt)
                 .where(
                     GenerationAttempt.status == "running",
                     GenerationAttempt.cancel_requested_at.is_(None),
-                    GenerationAttempt.generation_job_id.in_(cancelled_job_ids),
+                    GenerationAttempt.generation_job_id.is_not(None),
                 )
                 .order_by(GenerationAttempt.submitted_at, GenerationAttempt.id)
                 .limit(limit)
                 .with_for_update(skip_locked=True)
             )
         )
+        bindings_by_attempt = {
+            attempt.id: GenerationJobBinding(
+                generation_job_id=generation_job_id,
+                organization_id=attempt.organization_id,
+                project_id=attempt.project_id,
+            )
+            for attempt in attempts
+            if (generation_job_id := attempt.generation_job_id) is not None
+        }
+        cancelled_bindings = GenerationJobCancellationReader(session).requested_bindings(
+            set(bindings_by_attempt.values())
+        )
+        if not cancelled_bindings:
+            return 0
         now = database_wall_clock(session)
+        coordinated = 0
         for attempt in attempts:
-            attempt.cancel_requested_at = now
-        return len(attempts)
+            if bindings_by_attempt.get(attempt.id) in cancelled_bindings:
+                attempt.cancel_requested_at = now
+                coordinated += 1
+        return coordinated
 
     @staticmethod
     def _recover_expired(session: Session, *, limit: int) -> list[str]:
@@ -135,7 +136,10 @@ class AttemptRecoveryCoordinator:
                 "retryable": retryable,
                 "retry_after_seconds": None,
             }
-            attempt.latency_ms = max(round((now - attempt.submitted_at).total_seconds() * 1_000), 0)
+            attempt.latency_ms = min(
+                max(round((now - attempt.submitted_at).total_seconds() * 1_000), 0),
+                _MAX_POSTGRES_INTEGER,
+            )
             attempt.lease_owner = None
             attempt.lease_expires_at = None
             if attempt.id not in existing_usage_attempt_ids:

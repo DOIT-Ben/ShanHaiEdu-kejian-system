@@ -9,14 +9,15 @@ from typing import TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from apps.api.model_gateway.audit import (
+from apps.api.model_gateway.audit import model_request_hash
+from apps.api.model_gateway.audit_contracts import (
     AttemptAuditSink,
+    AttemptCompletion,
     AttemptHeartbeat,
     AttemptLease,
     AttemptRequestAudit,
     AttemptSuccessAudit,
     DuplicateAttemptDelivery,
-    model_request_hash,
 )
 from apps.api.model_gateway.contracts import (
     GatewayErrorCode,
@@ -96,10 +97,14 @@ class AttemptExecutionCoordinator:
         failure_code: GatewayErrorCode,
     ) -> None:
         try:
-            self._succeed(lease, context, result, latency_ms=latency_ms)
+            outcome = self._succeed(lease, context, result, latency_ms=latency_ms)
         except Exception:
             error = ModelGatewayError(failure_code, retryable=False)
             self.best_effort_fail(lease, context, error, latency_ms=latency_ms)
+            log_error(request, provider, error.code, latency_ms)
+            raise error from None
+        if outcome == AttemptCompletion.CANCELLED:
+            error = ModelGatewayError(GatewayErrorCode.CANCELLED, retryable=False)
             log_error(request, provider, error.code, latency_ms)
             raise error from None
 
@@ -218,10 +223,10 @@ class AttemptExecutionCoordinator:
         result: TextProviderResult | ImageProviderResult | VideoProviderResult,
         *,
         latency_ms: int,
-    ) -> None:
+    ) -> AttemptCompletion:
         if lease is None or context is None or self._audit_sink is None:
-            return
-        self._audit_sink.succeed(
+            return AttemptCompletion.SUCCEEDED
+        return self._audit_sink.succeed(
             lease,
             context,
             AttemptSuccessAudit(

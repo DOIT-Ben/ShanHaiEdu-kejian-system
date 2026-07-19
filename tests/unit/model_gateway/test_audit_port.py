@@ -7,6 +7,7 @@ import httpx
 from pydantic import SecretStr
 
 from apps.api.model_gateway.audit import (
+    AttemptCompletion,
     AttemptHeartbeat,
     AttemptLease,
     AttemptRequestAudit,
@@ -66,8 +67,9 @@ class RecordingAuditSink:
         result: AttemptSuccessAudit,
         *,
         latency_ms: int,
-    ) -> None:
+    ) -> AttemptCompletion:
         self.events.append((lease, context, result.usage, latency_ms))
+        return AttemptCompletion.SUCCEEDED
 
     def fail(
         self,

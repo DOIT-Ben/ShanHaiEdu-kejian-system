@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 
 from apps.api.model_gateway.attempt_lifecycle import AttemptExecutionCoordinator
-from apps.api.model_gateway.audit import AttemptAuditSink
+from apps.api.model_gateway.audit_contracts import AttemptAuditSink
 from apps.api.model_gateway.contracts import (
     GatewayErrorCode,
     ImageGatewayResult,

@@ -8,6 +8,7 @@ from uuid import UUID
 import pytest
 
 from apps.api.model_gateway.audit import (
+    AttemptCompletion,
     AttemptHeartbeat,
     AttemptLease,
     AttemptRequestAudit,
@@ -84,12 +85,14 @@ class RecordingAuditSink:
         fail_failure: bool = False,
         fail_heartbeat: bool = False,
         heartbeat: AttemptHeartbeat = AttemptHeartbeat.ACTIVE,
+        success_outcome: AttemptCompletion = AttemptCompletion.SUCCEEDED,
     ) -> None:
         self.events: list[object] = []
         self._fail_success = fail_success
         self._fail_failure = fail_failure
         self._fail_heartbeat = fail_heartbeat
         self._heartbeat = heartbeat
+        self._success_outcome = success_outcome
 
     def start(
         self,
@@ -129,10 +132,11 @@ class RecordingAuditSink:
         result: AttemptSuccessAudit,
         *,
         latency_ms: int,
-    ) -> None:
+    ) -> AttemptCompletion:
         if self._fail_success:
             raise RuntimeError("private audit persistence failure")
         self.events.append(("succeed", lease, context, result, latency_ms))
+        return self._success_outcome
 
     def fail(
         self,
@@ -300,6 +304,21 @@ async def test_video_audit_failure_becomes_non_retryable_unknown_submission() ->
     assert captured.value.__cause__ is None
     assert provider.submit_calls == 1
     assert [event[0] for event in sink.events] == ["start", "fail"]
+
+
+async def test_cancelled_success_audit_never_delivers_provider_result() -> None:
+    sink = RecordingAuditSink(success_outcome=AttemptCompletion.CANCELLED)
+    gateway = ModelGateway(
+        {ModelCapability.TEXT_SMOKE: DeterministicFakeTextProvider()},
+        audit_sink=sink,
+    )
+
+    with pytest.raises(ModelGatewayError) as captured:
+        await gateway.generate_text(text_request(), audit_context=audit_context())
+
+    assert captured.value.code == GatewayErrorCode.CANCELLED
+    assert captured.value.retryable is False
+    assert [event[0] for event in sink.events] == ["start", "succeed"]
 
 
 async def test_unknown_submission_survives_failure_audit_outage() -> None:
