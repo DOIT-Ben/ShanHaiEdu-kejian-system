@@ -38,8 +38,8 @@
         "deletable": false
       },
       {
-        "field_key": "independent_creative_score",
-        "label": "独立创意完整度",
+        "field_key": "course_grounded_creative_score",
+        "label": "课程驱动创意完整度",
         "type": "number",
         "required": true,
         "editable": false,

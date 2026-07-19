@@ -16,9 +16,9 @@
     },
     "output_format": "markdown",
     "renderer_id": "shanhai.video_classroom_quality.markdown.v1",
-    "template": "# 视频课堂质量报告\n\n独立创意：{{independent_creative_score}}\n\n课堂交接：{{handoff_accuracy_score}}\n\n未提前讲授：{{no_preteach_score}}\n\n连续性：{{continuity_score}}\n\n课堂可用性：{{classroom_usability_score}}\n\n## 发现\n{{classroom_quality_findings}}\n\n通过：{{classroom_quality_passed}}\n\n{{classroom_quality_summary}}",
+    "template": "# 视频课堂质量报告\n\n课程驱动创意：{{course_grounded_creative_score}}\n\n课堂交接：{{handoff_accuracy_score}}\n\n未提前讲授：{{no_preteach_score}}\n\n连续性：{{continuity_score}}\n\n课堂可用性：{{classroom_usability_score}}\n\n## 发现\n{{classroom_quality_findings}}\n\n通过：{{classroom_quality_passed}}\n\n{{classroom_quality_summary}}",
     "allowed_variables": [
-      "independent_creative_score",
+      "course_grounded_creative_score",
       "handoff_accuracy_score",
       "no_preteach_score",
       "continuity_score",

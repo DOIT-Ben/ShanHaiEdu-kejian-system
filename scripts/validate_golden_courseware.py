@@ -134,10 +134,10 @@ def _validate_package_refs(
     package = validate_content_package(package_root, contracts_root=contracts_root)
     entrypoints = set(cast(list[str], package.manifest["entrypoints"]))
     declared = set(cast(list[str], case["generation_templates"]))
-    if declared != entrypoints or len(entrypoints) != 23:
+    if declared != entrypoints or len(entrypoints) != 22:
         _fail(
             "GOLDEN_TEMPLATE_SET_MISMATCH",
-            "golden case must declare exactly the package's 23 generation entrypoints",
+            "golden case must declare exactly the package's 22 generation entrypoints",
         )
     planning = set(GOLDEN_PLANNING_NODE_KEYS)
     provider_media = set(PROVIDER_MEDIA_NODE_KEYS)
@@ -231,16 +231,24 @@ def _validate_intro(case: dict[str, Any]) -> None:
     option_set = cast(dict[str, Any], case["intro_option_set"])
     options = cast(list[dict[str, Any]], option_set["options"])
     lesson_units = cast(list[dict[str, Any]], case["lesson_division"]["lesson_units"])
-    if option_set["lesson_unit_key"] not in {unit["lesson_unit_key"] for unit in lesson_units}:
+    target_lesson = next(
+        (unit for unit in lesson_units if unit["lesson_unit_key"] == option_set["lesson_unit_key"]),
+        None,
+    )
+    if target_lesson is None:
         _fail("GOLDEN_INTRO_LESSON_SOURCE_INVALID", "intro options reference a missing lesson")
-    counts = Counter(option["category"] for option in options)
+    if option_set["knowledge_point"] != target_lesson["teaching_focus"]:
+        _fail("GOLDEN_INTRO_KNOWLEDGE_SOURCE_INVALID", "intro knowledge point differs from lesson")
+    counts = Counter(option["primary_tendency"] for option in options)
     generation_mode = cast(str, option_set["generation_mode"])
     if generation_mode == "default_nine":
         if counts != Counter({"science": 3, "application": 3, "story": 3}):
-            _fail("GOLDEN_INTRO_CATEGORY_COUNT_INVALID", "intro categories must be three each")
+            _fail("GOLDEN_INTRO_TENDENCY_COUNT_INVALID", "primary tendencies must be three each")
+        if not any(len(option["secondary_tendencies"]) >= 2 for option in options):
+            _fail("GOLDEN_INTRO_TENDENCY_CROSS_MISSING", "golden options need crossed tendencies")
     elif generation_mode == "refine_existing":
         if len(options) != 1:
-            _fail("GOLDEN_INTRO_CATEGORY_COUNT_INVALID", "refine_existing must keep one option")
+            _fail("GOLDEN_INTRO_TENDENCY_COUNT_INVALID", "refine_existing must keep one option")
     else:
         _fail("GOLDEN_INTRO_MODE_INVALID", "unsupported intro generation mode")
     _require_unique(
@@ -252,22 +260,17 @@ def _validate_intro(case: dict[str, Any]) -> None:
     if scores.count(max(scores)) != 1:
         _fail("GOLDEN_INTRO_RECOMMENDATION_INVALID", "highest recommendation must be unique")
     forbidden = set(cast(list[str], case["knowledge_boundary"]["must_not_preteach"]))
-    process_keys = {
-        item["section_key"]
-        for item in cast(list[dict[str, Any]], case["lesson_plan"]["sections"]["teaching_process"])
-    }
-    valid_replacement_keys = {f"teaching_process.{key}" for key in process_keys}
     for option in options:
+        if option["lesson_unit_key"] != target_lesson["lesson_unit_key"]:
+            _fail("GOLDEN_INTRO_LESSON_SOURCE_INVALID", "intro option lesson trace differs")
+        if option["knowledge_point"] != target_lesson["teaching_focus"]:
+            _fail("GOLDEN_INTRO_KNOWLEDGE_SOURCE_INVALID", "intro option knowledge trace differs")
+        if option["primary_tendency"] in option["secondary_tendencies"]:
+            _fail("GOLDEN_INTRO_TENDENCY_OVERLAP", "primary tendency cannot repeat as secondary")
         if not forbidden.issubset(set(cast(list[str], option["must_not_preteach"]))):
             _fail(
                 "GOLDEN_INTRO_KNOWLEDGE_BOUNDARY_INVALID",
                 "intro option omits forbidden preteach items",
-            )
-        replacement = option.get("replacement_field_key")
-        if replacement is not None and replacement not in valid_replacement_keys:
-            _fail(
-                "GOLDEN_INTRO_REPLACEMENT_INVALID",
-                "intro option references a missing teaching process section",
             )
     selection = cast(dict[str, Any], case["intro_selection"])
     selected = next(

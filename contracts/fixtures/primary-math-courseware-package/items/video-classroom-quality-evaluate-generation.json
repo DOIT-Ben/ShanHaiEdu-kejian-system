@@ -10,7 +10,7 @@
   "spec": {
     "template_key": "video.classroom_quality.evaluate",
     "title": "视频课堂质量评估",
-    "description": "以最终视频和已选导入快照评估独立创意、交接、不得提前讲授、连续性和课堂可用性。",
+    "description": "以最终视频和已选导入快照评估课程驱动创意、交接、不得提前讲授、连续性和课堂可用性。",
     "model_capability": "vision.evaluate.classroom_video",
     "input_definition_ref": {
       "item_key": "video.classroom_quality.evaluate.input",

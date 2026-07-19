@@ -17,8 +17,7 @@ BRANCH_START_NODE_KEYS = (
 GOLDEN_PLANNING_NODE_KEYS = (
     "lesson.division.generate",
     "lesson_plan.generate",
-    "intro.ideate",
-    "intro.anchor",
+    "intro.generate_options",
     "ppt.content_analyze",
     "ppt.outline.generate",
     "ppt.pages.generate",
@@ -191,76 +190,27 @@ def _lesson_plan_output(case: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _intro_anchor_output(case: dict[str, Any]) -> dict[str, Any]:
+def _intro_generate_options_output(case: dict[str, Any]) -> dict[str, Any]:
     option_set = cast(dict[str, Any], case["intro_option_set"])
-    options = []
-    for item in cast(list[dict[str, Any]], option_set["options"]):
-        option = _rename(
-            item,
-            {
-                "option_key": "option_key",
-                "option_category": "category",
-                "option_title": "title",
-                "anchored_independent_concept": "independent_concept",
-                "anchored_hook": "hook",
-                "anchored_viewer_value": "viewer_value",
-                "anchored_medium": "suggested_medium",
-                "suggested_duration_seconds": "duration_seconds",
-                "course_anchor": "course_anchor",
-                "classroom_first_question": "classroom_first_question",
-                "handoff_moment": "handoff_moment",
-                "option_must_not_preteach": "must_not_preteach",
-                "fit_reason": "fit_reason",
-                "recommendation_score": "recommendation_score",
-                "option_risks": "risks",
-            },
-        )
-        option["source_idea_key"] = item["option_key"].replace("INTRO-", "IDEA-", 1)
-        options.append(option)
+    options = copy.deepcopy(cast(list[dict[str, Any]], option_set["options"]))
     recommended = max(
         cast(list[dict[str, Any]], option_set["options"]),
         key=lambda item: cast(int, item["recommendation_score"]),
     )
+    target_lesson = next(
+        unit
+        for unit in cast(list[dict[str, Any]], case["lesson_division"]["lesson_units"])
+        if unit["lesson_unit_key"] == option_set["lesson_unit_key"]
+    )
     return {
         "option_set_key": option_set["option_set_key"],
         "source_lesson_unit_key": option_set["lesson_unit_key"],
+        "source_knowledge_point": option_set["knowledge_point"],
+        "source_material_evidence_keys": copy.deepcopy(target_lesson["evidence_refs"]),
         "options": options,
         "recommendation_summary": {
             "recommended_option_key": recommended["option_key"],
-            "recommendation_reason": recommended["recommendation_reason"],
             "single_highest_score": True,
-        },
-    }
-
-
-def _intro_ideate_output(case: dict[str, Any]) -> dict[str, Any]:
-    option_set = cast(dict[str, Any], case["intro_option_set"])
-    options = cast(list[dict[str, Any]], option_set["options"])
-    ideas = [
-        {
-            "idea_key": item["option_key"].replace("INTRO-", "IDEA-", 1),
-            "idea_category": item["category"],
-            "idea_title": item["title"],
-            "independent_concept": item["independent_concept"],
-            "creative_hook": item["hook"],
-            "viewer_value": item["viewer_value"],
-            "suggested_medium": item["suggested_medium"],
-            "safety_notes": copy.deepcopy(item["risks"]),
-        }
-        for item in options
-    ]
-    counts = {
-        category: sum(item["category"] == category for item in options)
-        for category in ("science", "application", "story")
-    }
-    return {
-        "idea_set_key": option_set["option_set_key"].replace("INTRO-SET", "IDEA-SET"),
-        "independent_ideas": ideas,
-        "diversity_check": {
-            "category_counts": counts,
-            "distinct_hooks": len({item["hook"] for item in options}) == len(options),
-            "independent_without_course": True,
-            "diversity_notes": "三类各三套，九个创意钩子互异，锚定前均可脱离课程独立成立。",  # noqa: RUF001
         },
     }
 
@@ -271,8 +221,7 @@ def build_golden_branch_source_outputs(case: dict[str, Any]) -> dict[str, dict[s
     outputs = {
         "lesson.division.generate": _lesson_division_output(case),
         "lesson_plan.generate": _lesson_plan_output(case),
-        "intro.ideate": _intro_ideate_output(case),
-        "intro.anchor": _intro_anchor_output(case),
+        "intro.generate_options": _intro_generate_options_output(case),
     }
     outputs.update(build_golden_ppt_stage_outputs(case))
     outputs.update(build_golden_video_stage_outputs(case))
@@ -293,7 +242,6 @@ def build_golden_branch_start_inputs(case: dict[str, Any]) -> dict[str, dict[str
     source_outputs = build_golden_branch_source_outputs(case)
     division = source_outputs["lesson.division.generate"]
     lesson_plan = source_outputs["lesson_plan.generate"]
-    anchor = source_outputs["intro.anchor"]
     units = cast(list[dict[str, Any]], division["lesson_units"])
     source_lesson_unit_key = cast(str, lesson_plan["teaching_content"]["source_lesson_unit_key"])
     lesson_unit = next(unit for unit in units if unit["lesson_unit_key"] == source_lesson_unit_key)
@@ -317,13 +265,7 @@ def build_golden_branch_start_inputs(case: dict[str, Any]) -> dict[str, dict[str
             "approved_material_evidence": copy.deepcopy(material),
         },
         "video.master_script.generate": {
-            "selected_intro_snapshot_ref": copy.deepcopy(
-                next(
-                    option
-                    for option in anchor["options"]
-                    if option["option_key"] == case["intro_selection"]["option_key"]
-                )
-            ),
+            "selected_intro_snapshot_ref": copy.deepcopy(case["intro_selection"]["snapshot"]),
             "video_duration_mode": preferences["video_duration_mode"],
             "video_cost_preference": preferences["video_cost_preference"],
             "video_aspect_ratio": preferences["video_aspect_ratio"],

@@ -10,7 +10,7 @@
   "spec": {
     "template_key": "video.master_script.generate",
     "title": "视频母版剧本生成",
-    "description": "只从已选导入方案不可变快照扩写完整独立短片剧本，并准确停在课堂交接时刻。",
+    "description": "只从已选课程驱动导入方案的不可变快照扩写完整短片剧本，并准确停在课堂交接时刻。",
     "model_capability": "text.structured.creative_video",
     "input_definition_ref": {
       "item_key": "video.master_script.generate.input",

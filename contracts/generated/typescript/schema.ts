@@ -611,6 +611,7 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        IntroOptionSet: components["schemas"]["intro-option-set.schema"];
         /**
          * @deprecated
          * @description Legacy project field. manual maps to guided with automatic node actions disabled; assisted maps to guided while preserving node rules; automatic remains automatic.
@@ -1450,6 +1451,77 @@ export interface components {
          * @enum {string}
          */
         "workflow-node-status.schema": "disabled" | "not_ready" | "ready" | "draft" | "queued" | "running" | "review_required" | "approved" | "partially_completed" | "failed" | "paused" | "cancel_requested" | "cancelled" | "stale" | "skipped";
+        /** @enum {unknown} */
+        tendency: "science" | "application" | "story";
+        option: {
+            option_key: string;
+            lesson_unit_key: string;
+            knowledge_point: string;
+            primary_tendency: components["schemas"]["tendency"];
+            secondary_tendencies: components["schemas"]["tendency"][];
+            title: string;
+            creative_concept: string;
+            hook: string;
+            viewer_value: string;
+            /** @enum {unknown} */
+            suggested_medium: "video" | "image" | "physical_object" | "question" | "performance" | "mixed";
+            duration_seconds: number;
+            course_anchor: string;
+            classroom_first_question: string;
+            handoff_moment: string;
+            must_not_preteach: string[];
+            fit_reason: string;
+            risks: string[];
+            recommendation_score: number;
+            recommendation_reason: string;
+        };
+        /**
+         * IntroOptionSet
+         * @description 由最小课程种子直接生成的一套或三类九套课堂导入方案。业务校验器额外保证主要倾向分布、课程追溯、辅助倾向交叉和最高推荐分唯一。
+         */
+        "intro-option-set.schema": {
+            /** Format: uuid */
+            option_set_id: string;
+            /** Format: uuid */
+            lesson_unit_id: string;
+            /** @enum {unknown} */
+            generation_mode: "default_nine" | "refine_existing";
+            source_lesson_unit_key: string;
+            knowledge_point: string;
+            /** @enum {unknown} */
+            status: "draft" | "review_required" | "approved" | "stale";
+            /** Format: uuid */
+            generation_context_snapshot_id: string;
+            options: components["schemas"]["option"][];
+            /** Format: date-time */
+            created_at: string;
+            $defs: {
+                /** @enum {unknown} */
+                tendency: "science" | "application" | "story";
+                option: {
+                    option_key: string;
+                    lesson_unit_key: string;
+                    knowledge_point: string;
+                    primary_tendency: components["schemas"]["tendency"];
+                    secondary_tendencies: components["schemas"]["tendency"][];
+                    title: string;
+                    creative_concept: string;
+                    hook: string;
+                    viewer_value: string;
+                    /** @enum {unknown} */
+                    suggested_medium: "video" | "image" | "physical_object" | "question" | "performance" | "mixed";
+                    duration_seconds: number;
+                    course_anchor: string;
+                    classroom_first_question: string;
+                    handoff_moment: string;
+                    must_not_preteach: string[];
+                    fit_reason: string;
+                    risks: string[];
+                    recommendation_score: number;
+                    recommendation_reason: string;
+                };
+            };
+        } & unknown;
     };
     responses: {
         /** @description Error envelope */

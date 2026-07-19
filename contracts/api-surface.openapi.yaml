@@ -866,6 +866,8 @@ components:
           schema:
             $ref: '#/components/schemas/AcceptedJobEnvelope'
   schemas:
+    IntroOptionSet:
+      $ref: './intro-option-set.schema.json'
     AutomationMode:
       type: string
       enum: [manual, assisted, automatic]

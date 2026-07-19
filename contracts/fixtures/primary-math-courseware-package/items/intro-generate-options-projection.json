@@ -1,0 +1,27 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "projection_template",
+  "metadata": {
+    "key": "intro.generate_options.projection",
+    "name": "课程驱动导入方案教师投影",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "projection_key": "intro.generate_options.projection",
+    "title": "课程驱动导入方案教师投影",
+    "source_definition_ref": {
+      "item_key": "intro.generate_options.output",
+      "kind": "content_definition"
+    },
+    "output_format": "markdown",
+    "renderer_id": "shanhai.intro_option_set.markdown.v1",
+    "template": "# 课程驱动课堂导入设计\n\n知识点：{{source_knowledge_point}}\n\n{{options}}\n\n## 推荐结论\n{{recommendation_summary}}",
+    "allowed_variables": [
+      "source_knowledge_point",
+      "options",
+      "recommendation_summary"
+    ],
+    "teacher_visible": true
+  }
+}

@@ -31,7 +31,7 @@
 | `GET` | `/lessons/{lesson_id}` | 查询课时详情和四个分支配置 |
 | `PATCH` | `/lessons/{lesson_id}/branches` | 开关导入设计、PPT和视频分支 |
 | `GET` | `/lessons/{lesson_id}/intro-options` | 读取三类九套、打分和当前选择 |
-| `POST` | `/lessons/{lesson_id}/intro-options/generate` | 启动独立创意与锚定两阶段生成 |
+| `POST` | `/lessons/{lesson_id}/intro-options/generate` | 启动课程驱动的单节点导入方案生成 |
 | `POST` | `/lessons/{lesson_id}/intro-selections` | 选择一个已批准导入方案 |
 
 上传流程：API 创建会话 → 浏览器直传 S3 → 客户端带 ETag/大小确认 → 后端从私有对象流式核对 MIME、大小与 SHA-256 并入队扫描解析。短期预签名 URL 不持久化，确认前文件不得进入模型上下文。
@@ -206,7 +206,7 @@ SSE 只用于提示状态变化。任何关键操作完成后，前端以资源 
 ### 模型和提示词
 
 - 教材、教案和用户提示词都视为不可信数据，不能覆盖平台安全层或工具权限。
-- 上下文按白名单装配，锚点节点执行禁止上下文检查。
+- 课程驱动生成节点按白名单装配课时与教材上下文并执行禁止来源检查；视频只读取不可变选择快照。
 - 模型不直接调用数据库、对象存储或任意 URL；工具调用走受限应用服务。
 - 密钥保存在 Secret Manager，数据库只保存引用；日志和错误响应必须脱敏。
 - 记录供应商的数据保留政策和区域，路由前进行租户政策检查。

@@ -2,26 +2,26 @@
   "api_version": "shanhai.edu/v1",
   "kind": "generation_template",
   "metadata": {
-    "key": "intro.anchor",
-    "name": "最小课程锚定",
+    "key": "intro.generate_options",
+    "name": "课程驱动导入方案",
     "domain": "primary_math",
     "locale": "zh-CN"
   },
   "spec": {
-    "template_key": "intro.anchor",
-    "title": "最小课程锚定",
-    "description": "只为一套或九套独立创意补充唯一最小课程锚点、首问、交接和推荐度，不改写独立创意。",
-    "model_capability": "text.structured.zh_primary_math",
+    "template_key": "intro.generate_options",
+    "title": "课程驱动导入方案",
+    "description": "以已批准课时、知识边界、最小教材证据和教师偏好，在一次生成中产出一套或三类九套最终课堂导入方案。",
+    "model_capability": "text.structured.creative_education",
     "input_definition_ref": {
-      "item_key": "intro.anchor.input",
+      "item_key": "intro.generate_options.input",
       "kind": "input_definition"
     },
     "prompt_template_ref": {
-      "item_key": "intro.anchor.prompt",
+      "item_key": "intro.generate_options.prompt",
       "kind": "prompt_template"
     },
     "output_definition_ref": {
-      "item_key": "intro.anchor.output",
+      "item_key": "intro.generate_options.output",
       "kind": "content_definition"
     },
     "style_preset_refs": [],
@@ -29,14 +29,14 @@
       {
         "role": "teacher_view",
         "template_ref": {
-          "item_key": "intro.anchor.projection",
+          "item_key": "intro.generate_options.projection",
           "kind": "projection_template"
         }
       },
       {
         "role": "export",
         "template_ref": {
-          "item_key": "intro.anchor.projection",
+          "item_key": "intro.generate_options.projection",
           "kind": "projection_template"
         }
       }

@@ -42,7 +42,7 @@ def test_generation_guide_covers_all_model_nodes_once() -> None:
     source_keys = {node["template_key"] for node in source["nodes"]}
     chapter_keys = [key for keys in CHAPTER_NODE_KEYS.values() for key in keys]
 
-    assert len(source_keys) == 23
+    assert len(source_keys) == 22
     assert set(chapter_keys) == source_keys
     assert len(chapter_keys) == len(set(chapter_keys))
 

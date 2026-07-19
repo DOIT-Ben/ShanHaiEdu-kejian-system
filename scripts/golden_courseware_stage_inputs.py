@@ -11,7 +11,7 @@ from scripts.golden_courseware_branch_inputs import (
 )
 
 GOLDEN_CHAIN_INPUT_NODE_KEYS = (
-    "intro.anchor",
+    "intro.generate_options",
     "ppt.outline.generate",
     "ppt.pages.generate",
     "ppt.cover.prompt.generate",
@@ -44,11 +44,17 @@ def build_golden_chain_inputs(case: dict[str, Any]) -> dict[str, dict[str, Any]]
     cover_page = next(page for page in pages["page_specs"] if page["page_type"] == "cover")
 
     return {
-        "intro.anchor": {
-            "independent_idea_set": copy.deepcopy(outputs["intro.ideate"]),
+        "intro.generate_options": {
+            "generation_mode": case["intro_option_set"]["generation_mode"],
             "target_lesson_unit": copy.deepcopy(lesson_unit),
+            "knowledge_point": lesson_unit["teaching_focus"],
+            "learning_objective_summary": lesson_unit["core_learning_outcome"],
+            "teaching_content_boundary": lesson_unit["content_boundary"],
+            "must_not_preteach": copy.deepcopy(lesson_unit["must_not_preteach"]),
+            "grade_level": case["project"]["grade"],
+            "audience_age_band": "6-7岁",
             "target_material_evidence": copy.deepcopy(material),
-            "duration_preference_seconds": selected_intro["suggested_duration_seconds"],
+            "duration_preference_seconds": selected_intro["duration_seconds"],
         },
         "ppt.outline.generate": {
             "ppt_analysis_ref": copy.deepcopy(outputs["ppt.content_analyze"]),

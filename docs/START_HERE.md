@@ -19,7 +19,7 @@
 - `docs/product/REQUIREMENTS_ANALYSIS.md`：用户问题、范围和业务规则。
 - `docs/product/PRODUCT_SPEC.md`：现行产品能力和验收口径。
 - `docs/workflows/END_TO_END_WORKFLOW.md`：整个项目链路。
-- `docs/workflows/INTRO_ANCHORS.md`：三类九套与锚定隔离。
+- `docs/workflows/INTRO_ANCHORS.md`：知识点驱动的三类九套与选择快照隔离。
 - `docs/workflows/PPT_PRODUCTION.md`：PPT生产。
 - `docs/workflows/VIDEO_PRODUCTION.md`：视频生产。
 - `docs/workflows/generation-guide/README.md`：逐节点查看教师输入、系统Context、完整提示词、输出字段和黄金示例。

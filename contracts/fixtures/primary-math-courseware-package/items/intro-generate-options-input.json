@@ -1,0 +1,152 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "input_definition",
+  "metadata": {
+    "key": "intro.generate_options.input",
+    "name": "课程驱动导入方案输入",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "intro.generate_options.input",
+    "title": "课程驱动导入方案输入",
+    "description": "输入生成方式和最小课程种子；不接收完整教案、PPT或视频产物。",
+    "fields": [
+      {
+        "field_key": "generation_mode",
+        "label": "生成方式",
+        "value_type": "enum",
+        "required": true,
+        "source": "teacher",
+        "visibility": "primary",
+        "widget": "select",
+        "default_value": "default_nine",
+        "options": [
+          {
+            "value": "default_nine",
+            "label": "三类九套"
+          },
+          {
+            "value": "refine_existing",
+            "label": "完善已有创意"
+          }
+        ]
+      },
+      {
+        "field_key": "existing_idea_ref",
+        "label": "已有创意",
+        "value_type": "reference",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "target_lesson_unit",
+        "label": "目标课时",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "knowledge_point",
+        "label": "知识点",
+        "value_type": "text",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "text"
+      },
+      {
+        "field_key": "learning_objective_summary",
+        "label": "一句话学习目标",
+        "value_type": "rich_text",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "teaching_content_boundary",
+        "label": "教学内容边界",
+        "value_type": "rich_text",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "must_not_preteach",
+        "label": "不得提前讲授",
+        "value_type": "list",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "grade_level",
+        "label": "年级",
+        "value_type": "text",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "text"
+      },
+      {
+        "field_key": "audience_age_band",
+        "label": "受众年龄段",
+        "value_type": "text",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "text"
+      },
+      {
+        "field_key": "target_material_evidence",
+        "label": "教材证据摘要",
+        "value_type": "reference",
+        "required": true,
+        "source": "context",
+        "visibility": "hidden",
+        "widget": "textarea"
+      },
+      {
+        "field_key": "medium_preferences",
+        "label": "媒介偏好",
+        "value_type": "list",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "multiselect"
+      },
+      {
+        "field_key": "duration_preference_seconds",
+        "label": "建议导入时长",
+        "value_type": "number",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "number",
+        "validation": {
+          "minimum": 60,
+          "maximum": 180
+        }
+      },
+      {
+        "field_key": "creative_preferences",
+        "label": "创意偏好",
+        "value_type": "rich_text",
+        "required": false,
+        "source": "teacher",
+        "visibility": "secondary",
+        "widget": "textarea",
+        "validation": {
+          "max_length": 4000
+        }
+      }
+    ]
+  }
+}

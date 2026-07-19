@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+from collections import Counter
 from pathlib import Path
 from typing import Any, cast
 
@@ -70,7 +71,7 @@ def test_every_model_node_resolves_a_generation_template() -> None:
     model_nodes = [
         node for node in catalog["nodes"] if node["execution_kind"] == "model_generation"
     ]
-    assert len(model_nodes) == 23
+    assert len(model_nodes) == 22
     assert {node["generation_template_ref"]["item_key"] for node in model_nodes} <= available
 
 
@@ -155,7 +156,7 @@ def test_golden_case_matches_schema_and_business_invariants() -> None:
     assert {"比较大小", "第几", "分与合", "加法", "减法", "0的认识"} <= forbidden
 
 
-def test_lesson_plan_has_twelve_sections_and_intro_is_independent() -> None:
+def test_lesson_plan_has_twelve_sections_and_intro_is_a_separate_artifact() -> None:
     case = load_json(GOLDEN_CASE)
     assert list(case["lesson_plan"]["sections"]) == [
         "teaching_content",
@@ -176,8 +177,8 @@ def test_lesson_plan_has_twelve_sections_and_intro_is_independent() -> None:
     options = case["intro_option_set"]["options"]
     assert len(options) == 9
     assert {
-        category: sum(option["category"] == category for option in options)
-        for category in (
+        tendency: sum(option["primary_tendency"] == tendency for option in options)
+        for tendency in (
             "science",
             "application",
             "story",
@@ -210,7 +211,7 @@ def test_teacher_selection_may_override_the_unique_recommendation() -> None:
     assert caught.value.code == "GOLDEN_INTRO_SELECTION_INVALID"
 
 
-def test_lesson_ppt_and_video_can_start_from_fixed_independent_inputs() -> None:
+def test_lesson_ppt_and_video_can_start_from_fixed_branch_inputs() -> None:
     case = load_json(GOLDEN_CASE)
     source = load_json(SOURCE)
     nodes = {node["template_key"]: node for node in source["nodes"]}
@@ -249,14 +250,8 @@ def test_lesson_ppt_and_video_can_start_from_fixed_independent_inputs() -> None:
     )
 
     video_input = branch_inputs["video.master_script.generate"]
-    anchored_options = source_outputs["intro.anchor"]["options"]
-    assert video_input["selected_intro_snapshot_ref"] == next(
-        option
-        for option in anchored_options
-        if option["option_key"] == case["intro_selection"]["option_key"]
-    )
-    assert "anchored_independent_concept" in video_input["selected_intro_snapshot_ref"]
-    assert "independent_concept" not in video_input["selected_intro_snapshot_ref"]
+    assert video_input["selected_intro_snapshot_ref"] == case["intro_selection"]["snapshot"]
+    assert "creative_concept" in video_input["selected_intro_snapshot_ref"]
     serialized_video_input = json.dumps(video_input, ensure_ascii=False)
     assert "lesson_plan" not in serialized_video_input
     assert "material_evidence" not in serialized_video_input
@@ -314,7 +309,15 @@ def test_golden_planning_chain_reuses_exact_upstream_outputs() -> None:
 
     assert tuple(chain_inputs) == GOLDEN_CHAIN_INPUT_NODE_KEYS
     assert set(chain_inputs).isdisjoint(MEDIA_BOUNDARY_OUTPUT_ONLY_NODE_KEYS)
-    assert chain_inputs["intro.anchor"]["independent_idea_set"] == outputs["intro.ideate"]
+    assert "intro.generate_options" in outputs
+    assert (
+        chain_inputs["intro.generate_options"]["target_lesson_unit"]["lesson_unit_key"]
+        == (case["intro_option_set"]["lesson_unit_key"])
+    )
+    assert (
+        chain_inputs["intro.generate_options"]["target_material_evidence"]["knowledge_boundary"]
+        == (case["knowledge_boundary"])
+    )
     assert (
         chain_inputs["ppt.outline.generate"]["ppt_analysis_ref"] == outputs["ppt.content_analyze"]
     )
@@ -345,6 +348,69 @@ def test_golden_planning_chain_reuses_exact_upstream_outputs() -> None:
         chain_inputs["video.asset_prompts.generate"]["current_video_asset_inventory"]
         == outputs["video.asset_inventory.generate"]
     )
+
+
+def test_course_grounded_intro_options_keep_one_current_contract() -> None:
+    case = load_json(GOLDEN_CASE)
+    source = load_json(SOURCE)
+    option_set = case["intro_option_set"]
+    options = option_set["options"]
+    generate_options = next(
+        node for node in source["nodes"] if node["template_key"] == "intro.generate_options"
+    )
+    target_lesson = next(
+        unit
+        for unit in case["lesson_division"]["lesson_units"]
+        if unit["lesson_unit_key"] == option_set["lesson_unit_key"]
+    )
+
+    assert option_set["knowledge_point"] == target_lesson["teaching_focus"]
+    assert Counter(option["primary_tendency"] for option in options) == Counter(
+        {"science": 3, "application": 3, "story": 3}
+    )
+    assert any(len(option["secondary_tendencies"]) >= 2 for option in options)
+    assert all(option["creative_concept"] for option in options)
+    assert all(option["lesson_unit_key"] == target_lesson["lesson_unit_key"] for option in options)
+    assert all(option["knowledge_point"] == target_lesson["teaching_focus"] for option in options)
+    assert all(option["course_anchor"] for option in options)
+    assert all(option["must_not_preteach"] for option in options)
+    scores = [option["recommendation_score"] for option in options]
+    assert scores.count(max(scores)) == 1
+    input_fields = {field["field_key"]: field for field in generate_options["input"]["fields"]}
+    assert "general_teacher_preferences" not in input_fields
+    assert {
+        key
+        for key, field in input_fields.items()
+        if field["source"] == "teacher" and key.endswith("preferences")
+    } == {"medium_preferences", "creative_preferences"}
+    assert input_fields["duration_preference_seconds"]["source"] == "teacher"
+
+
+def test_retired_intro_contract_tokens_are_absent_from_current_tree() -> None:
+    retired_tokens = (
+        "intro." + "ideate",
+        "intro." + "anchor",
+        "intro_" + "independent_ideas",
+        "independent_" + "without_course",
+        "双" + "快照",
+        "锚点" + "节点",
+        "锚点" + "隔离",
+        "独立" + "概念",
+        "即使没有课程" + "回接",
+    )
+    active_roots = (ROOT / "workflow", CONTRACTS, ROOT / "docs", ROOT / "scripts")
+    text_suffixes = {".json", ".md", ".py", ".yaml", ".yml", ".ts"}
+    offenders: dict[str, list[str]] = {}
+    for active_root in active_roots:
+        for path in active_root.rglob("*"):
+            if not path.is_file() or path.suffix not in text_suffixes:
+                continue
+            text = path.read_text(encoding="utf-8")
+            matches = [token for token in retired_tokens if token in text]
+            if matches:
+                offenders[path.relative_to(ROOT).as_posix()] = matches
+
+    assert offenders == {}
 
 
 @pytest.mark.parametrize(
