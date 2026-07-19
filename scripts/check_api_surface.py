@@ -98,6 +98,20 @@ def find_surface_errors(
             )
     for operation_id in sorted(set(current_operations) & set(planned_operations)):
         errors.append(f"operation appears in current and planned contracts: {operation_id}")
+    current_routes = {
+        (path, method): operation_id
+        for operation_id, (path, method, _operation) in current_operations.items()
+    }
+    planned_routes = {
+        (path, method): operation_id
+        for operation_id, (path, method, _operation) in planned_operations.items()
+    }
+    for path, method in sorted(set(current_routes) & set(planned_routes)):
+        errors.append(
+            "path/method appears in current and planned contracts: "
+            f"{method.upper()} {path} "
+            f"({current_routes[(path, method)]}, {planned_routes[(path, method)]})"
+        )
     for operation_id, (_path, _method, operation) in sorted(planned_operations.items()):
         if operation.get("x-shanhai-availability") != "planned":
             errors.append(f"planned operation lacks availability marker: {operation_id}")

@@ -66,6 +66,25 @@ def test_planned_operations_must_be_disjoint_and_marked() -> None:
     assert "planned operation lacks availability marker: updateProject" in errors
 
 
+def test_planned_operation_cannot_reuse_current_path_and_method() -> None:
+    runtime = contract("runtime", ("getProject",))
+    current = deepcopy(runtime)
+    planned = contract("planned", ("futureGetProject",))
+    planned["paths"]["/getProject"] = planned["paths"].pop("/futureGetProject")
+
+    errors = find_surface_errors(runtime, current, planned)
+
+    assert (
+        "path/method appears in current and planned contracts: "
+        "GET /getProject (getProject, futureGetProject)"
+    ) in errors
+
+    planned_operation = planned["paths"]["/getProject"].pop("get")
+    planned["paths"]["/getProject"]["patch"] = planned_operation
+    errors = find_surface_errors(runtime, current, planned)
+    assert not any("path/method appears" in error for error in errors)
+
+
 def test_contract_kind_markers_are_required() -> None:
     runtime = contract("runtime", ("getProject",))
     current = deepcopy(runtime)
