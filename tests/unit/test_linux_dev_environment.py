@@ -135,6 +135,7 @@ def test_bootstrap_sync_uses_pinned_system_python() -> None:
     bootstrap = (project_root / "infra/dev/bootstrap.sh").read_text(encoding="utf-8")
 
     assert "uv sync --frozen --python /usr/local/bin/python" in bootstrap
+    assert 'pnpm install --frozen-lockfile --store-dir "$PNPM_HOME/store"' in bootstrap
     assert "git config --global --replace-all safe.directory /workspace" in bootstrap
     assert "git config --global core.autocrlf input" in bootstrap
 
@@ -189,7 +190,7 @@ def test_compose_uses_versioned_workspace_image() -> None:
     project_root = Path(__file__).resolve().parents[2]
     compose = yaml.safe_load((project_root / "infra/dev.compose.yaml").read_text(encoding="utf-8"))
 
-    expected = "${SHANHAI_DEV_WORKSPACE_IMAGE:-shanhaiedu-dev-workspace:2026.07-v1}"
+    expected = "${SHANHAI_DEV_WORKSPACE_IMAGE:-shanhaiedu-dev-workspace:2026.07-v2}"
     assert compose["services"]["workspace-init"]["image"] == expected
     assert compose["services"]["workspace"]["image"] == expected
     environment = compose["services"]["workspace"]["environment"]
@@ -214,6 +215,8 @@ def test_workspace_image_exposes_pnpm_through_dedicated_corepack_shim() -> None:
     dockerfile = (project_root / "infra/dev/Dockerfile").read_text(encoding="utf-8")
 
     assert "corepack enable pnpm --install-directory /opt/corepack" in dockerfile
+    assert "COREPACK_HOME=/opt/corepack/home" in dockerfile
+    assert "USER developer\nRUN pnpm --version" in dockerfile
     assert "PATH=/workspace/.venv/bin:/opt/corepack:" in dockerfile
 
 

@@ -14,6 +14,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never \
+    COREPACK_HOME=/opt/corepack/home \
     PNPM_HOME=/home/developer/.local/share/pnpm \
     PATH=/workspace/.venv/bin:/opt/corepack:/home/developer/.local/share/pnpm:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin
 
@@ -48,7 +49,7 @@ RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.l
 
 COPY --chmod=0755 infra/dev/git-wrapper.sh /usr/local/bin/git
 
-RUN install -d /opt/corepack \
+RUN install -d /opt/corepack /opt/corepack/home \
     && corepack enable pnpm --install-directory /opt/corepack \
     && corepack prepare pnpm@10.30.2 --activate \
     && groupadd --gid "${DEV_GID}" developer \
@@ -61,5 +62,6 @@ RUN install -d /opt/corepack \
 
 WORKDIR /workspace
 USER developer
+RUN pnpm --version
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["sleep", "infinity"]

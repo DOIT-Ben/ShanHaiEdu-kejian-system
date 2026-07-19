@@ -12,7 +12,7 @@ services:
     mem_limit: 1g
 
   workspace-init:
-    image: "${SHANHAI_DEV_WORKSPACE_IMAGE:-shanhaiedu-dev-workspace:2026.07-v1}"
+    image: "${SHANHAI_DEV_WORKSPACE_IMAGE:-shanhaiedu-dev-workspace:2026.07-v2}"
     pull_policy: never
     user: "0:0"
     entrypoint: ["/bin/sh", "-ec"]
@@ -40,7 +40,7 @@ services:
     restart: "no"
 
   workspace:
-    image: "${SHANHAI_DEV_WORKSPACE_IMAGE:-shanhaiedu-dev-workspace:2026.07-v1}"
+    image: "${SHANHAI_DEV_WORKSPACE_IMAGE:-shanhaiedu-dev-workspace:2026.07-v2}"
     build:
       context: ..
       dockerfile: infra/dev/Dockerfile

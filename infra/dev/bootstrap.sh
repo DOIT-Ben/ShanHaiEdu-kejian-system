@@ -14,6 +14,6 @@ if [[ ! -f .venv/pyvenv.cfg ]]; then
 fi
 
 uv sync --frozen --python /usr/local/bin/python
-pnpm install --frozen-lockfile
+pnpm install --frozen-lockfile --store-dir "$PNPM_HOME/store"
 uv run alembic upgrade head
 uv run python scripts/check_linux_dev_environment.py
