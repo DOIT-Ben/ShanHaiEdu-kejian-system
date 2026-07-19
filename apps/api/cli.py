@@ -51,9 +51,7 @@ def run_publish_golden_content(*, database_url: str | None = None, root: Path = 
                     "package_checksum": result.package_checksum,
                     "workflow_checksum": result.workflow_checksum,
                     "content_release_id": str(result.content_release_id),
-                    "workflow_definition_version_id": str(
-                        result.workflow_definition_version_id
-                    ),
+                    "workflow_definition_version_id": str(result.workflow_definition_version_id),
                     "runtime_default_version_no": result.runtime_default_version_no,
                 },
                 ensure_ascii=True,
