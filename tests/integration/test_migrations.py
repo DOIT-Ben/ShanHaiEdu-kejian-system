@@ -124,6 +124,14 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
     assert "owner_user_id" in creation_batch_columns
     assert "ix_creation_batches_organization_owner_created" in creation_batch_indexes
     assert "fk_creation_batches_owner_user_id_users" in creation_batch_foreign_keys
+    generation_attempt_columns = {
+        column["name"] for column in database_inspector.get_columns("generation_attempts")
+    }
+    generation_attempt_indexes = {
+        index["name"] for index in database_inspector.get_indexes("generation_attempts")
+    }
+    assert "provider_task_id" in generation_attempt_columns
+    assert "ix_generation_attempts_provider_task" in generation_attempt_indexes
     with engine.connect() as connection:
         assert (
             connection.scalar(
@@ -134,7 +142,7 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
             )
             == 1
         )
-    assert ScriptDirectory.from_config(config).get_current_head() == "e4f6a8c0b702"
+    assert ScriptDirectory.from_config(config).get_current_head() == "f1a6c3e9b205"
     previous = os.environ.get("SHANHAI_DATABASE_URL")
     os.environ["SHANHAI_DATABASE_URL"] = postgres_database_url
     try:
