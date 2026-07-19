@@ -73,6 +73,31 @@ set -eu -o pipefail
 repo=/srv/shanhaiedu/repository
 git_common_dir=$(sudo -u shanhai-dev -- git -C "$repo" rev-parse --path-format=absolute --git-common-dir) || exit 1
 worktree_root=/srv/shanhaiedu/worktrees
+repo_git_entry="$repo/.git"
+
+# 主仓必须使用本地普通 .git 目录；不能接受 symlink、gitdir 指针文件或
+# 解析到仓库外的公共目录。rev-parse 的结果必须与固定 .git 目录完全相等。
+repo_git_kind=$(sudo -u shanhai-dev -- stat --format='%F' -- "$repo_git_entry") || exit 1
+case "$repo_git_kind" in
+  directory) ;;
+  symbolic\ link)
+    sudo -u shanhai-dev -- readlink -- "$repo_git_entry" >&2 || exit 1
+    printf 'repository .git must not be a symbolic link: %s\n' "$repo_git_entry" >&2
+    exit 1
+    ;;
+  *)
+    printf 'repository .git must be a directory, got %s: %s\n' "$repo_git_kind" "$repo_git_entry" >&2
+    exit 1
+    ;;
+esac
+expected_common_dir=$(sudo -u shanhai-dev -- realpath -e -- "$repo_git_entry") || exit 1
+resolved_common_dir=$(sudo -u shanhai-dev -- realpath -e -- "$git_common_dir") || exit 1
+if [ "$resolved_common_dir" != "$expected_common_dir" ]; then
+  printf 'rev-parse common Git directory does not match repository .git: %s != %s\n' \
+    "$resolved_common_dir" "$expected_common_dir" >&2
+  exit 1
+fi
+git_common_dir=$expected_common_dir
 
 # 仅由 shanhai-dev 执行；公共 Git 目录和每个登记 worktree 内的目录必须
 # 由该账号拥有且可读、可写、可搜索，普通文件必须由该账号拥有且可读。
@@ -107,9 +132,9 @@ check_tree() {
   fi
 }
 
-# 对 repo、worktree 根、公共 Git 目录及其逐级父目录只核对 shanhai-dev
-# 的读取和搜索（execute）权限；系统级父目录不要求归该账号所有。
-check_parents() {
+# 对系统级父目录只核对 shanhai-dev 的读取和搜索（execute）权限；
+# 例如 /srv 或 /srv/shanhaiedu 不要求归该账号所有。
+check_search_parents() {
   path=$1
   while [ "$path" != "/" ]; do
     if ! parent_errors=$(sudo -u shanhai-dev -- find -P "$path" -maxdepth 0 \
@@ -127,6 +152,39 @@ check_parents() {
   done
 }
 
+check_writable_root() {
+  path=$1
+  kind=$(sudo -u shanhai-dev -- stat --format='%F' -- "$path") || return 1
+  case "$kind" in
+    directory) ;;
+    symbolic\ link)
+      sudo -u shanhai-dev -- readlink -- "$path" >&2 || return 1
+      printf 'writable root must not be a symbolic link: %s\n' "$path" >&2
+      return 1
+      ;;
+    *)
+      printf 'writable root is not a directory: %s (%s)\n' "$path" "$kind" >&2
+      return 1
+      ;;
+  esac
+  resolved=$(sudo -u shanhai-dev -- realpath -e -- "$path") || return 1
+  if [ "$resolved" != "$path" ]; then
+    printf 'writable root resolves outside its declared path: %s -> %s\n' \
+      "$path" "$resolved" >&2
+    return 1
+  fi
+  if ! writable_errors=$(sudo -u shanhai-dev -- find -P "$path" -maxdepth 0 -type d \
+    \( ! -user shanhai-dev -o ! -readable -o ! -writable -o ! -executable \) -print 2>&1); then
+    printf 'writable root scan failed: %s\n' "$path" >&2
+    return 1
+  fi
+  if [ -n "$writable_errors" ]; then
+    printf 'Writable Git parent is not owned/readable/writable/searchable by shanhai-dev: %s\n' \
+      "$writable_errors" >&2
+    return 1
+  fi
+}
+
 assert_common_path() {
   target=$1
   case "$target" in
@@ -136,7 +194,7 @@ assert_common_path() {
       return 1
       ;;
   esac
-  check_parents "$target"
+  check_search_parents "$target"
 }
 
 check_git_pointer() {
@@ -203,14 +261,31 @@ registered_worktrees=$(sudo -u shanhai-dev -- git -C "$repo" worktree list --por
   exit 1
 }
 while IFS= read -r worktree; do
+  case "$worktree" in
+    "$repo"|"$worktree_root"/*) ;;
+    *)
+      printf 'registered worktree escapes allowed roots: %s\n' "$worktree" >&2
+      exit 1
+      ;;
+  esac
   check_tree "$worktree"
+  check_writable_root "$worktree"
   check_git_pointer "$worktree"
-  check_parents "$worktree"
+  check_search_parents "$worktree"
 done <<< "$registered_worktrees"
 
-check_parents "$repo"
-check_parents "$worktree_root"
-check_parents "$git_common_dir"
+# 新建 worktree 需要写入 worktree 根；Git 还需要写入公共目录及其
+# worktrees 登记目录。它们必须由 shanhai-dev 拥有并具备 rwx；其系统级
+# 祖先目录只需可读/可搜索。
+check_writable_root "$repo"
+check_writable_root "$worktree_root"
+check_writable_root "$git_common_dir"
+if [ -d "$git_common_dir/worktrees" ]; then
+  check_writable_root "$git_common_dir/worktrees"
+fi
+check_search_parents "$repo"
+check_search_parents "$worktree_root"
+check_search_parents "$git_common_dir"
 
 # 任一 find 非零、异常输出、lstat/readlink 异常、父目录不可搜索或 .git 指针越界，
 # 都必须停止；不得用 root 重跑、静默过滤或只看单个成功命令。
