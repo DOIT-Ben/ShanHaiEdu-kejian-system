@@ -5,41 +5,49 @@
 规范路径：`apps/web/docs/ROUTES_AND_API.md`
 替换规则：现行路由或合同变化时原位更新
 
-## 教师端路由
+## 应用入口
 
-| 路由                                                       | 页面/布局                               | 主要能力                             |
-| ---------------------------------------------------------- | --------------------------------------- | ------------------------------------ |
-| `/login`                                                   | `LoginPage`                             | 登录入口                             |
-| `/app`                                                     | `HomePage`                              | 品牌首屏、继续创作、快捷创作、待处理 |
-| `/app/projects`                                            | `ProjectsPage`                          | 项目查询、错误回退、新建入口         |
-| `/app/projects/new`                                        | `NewProjectPage`                        | PDF 选择、项目表单、创建请求         |
-| `/app/projects/:projectId`                                 | `ProjectOverviewPage`                   | 课时、分支、预算暂停、继续工作       |
-| `/app/projects/:projectId/materials`                       | `ProjectMaterialsPage`                  | 教材状态、课时增删排序和批准         |
-| `/app/projects/:projectId/lessons`                         | `LessonsPage`                           | 课时卡与分支状态                     |
-| `/app/projects/:projectId/lessons/:lessonId`               | 重定向                                  | 恢复到当前教案步骤                   |
-| `/app/projects/:projectId/lessons/:lessonId/work/:stepKey` | `ProjectWorkbenchLayout` + 注册表渲染器 | 教案、导入、PPT、视频和交付步骤      |
-| `/app/projects/:projectId/results`                         | `ProjectResultsPage`                    | 当前成果、素材筛选、版本与替换       |
-| `/app/projects/:projectId/tasks`                           | `ProjectTasksPage`                      | 项目任务                             |
-| `/app/projects/:projectId/delivery`                        | `DeliveryPage`                          | 最终文件与交付包                     |
-| `/app/creation`                                            | `CreationHomePage`                      | 三类创作入口、项目批次、最近作品     |
-| `/app/creation/images`                                     | `CreationStudioPage`                    | 独立图片创作                         |
-| `/app/creation/videos`                                     | `CreationStudioPage`                    | 独立视频创作                         |
-| `/app/creation/presentations`                              | `CreationStudioPage`                    | 独立 PPT 创作                        |
-| `/app/creation/batches/:batchId`                           | `CreationBatchPage`                     | 项目包批量创作与原子保存             |
-| `/app/tasks`                                               | `TasksPage`                             | 全局长任务、状态筛选、失败内容重做   |
+`src/app/App.tsx` 是唯一入口选择器：
 
-## 管理端路由
+- Vite 开发环境且 `VITE_API_MODE=mock` 时加载 `MockApp`；
+- 生产构建、预览构建或 `VITE_API_MODE=real` 时加载 `RuntimeApp`；
+- `RuntimeApp` 不导入开发 Mock 路由，也不会在真实请求失败时回退到浏览器本地业务状态。
 
-| 路由               | 页面                 | 主要能力                             |
-| ------------------ | -------------------- | ------------------------------------ |
-| `/admin/content`   | `AdminContentPage`   | 上传、检查、预览、试运行、发布内容包 |
-| `/admin/workflows` | `AdminWorkflowsPage` | 步骤、上下文、门禁、预算和发布检查   |
-| `/admin/models`    | `AdminModelsPage`    | 逻辑能力、主备服务和连接测试         |
-| `/admin/usage`     | `AdminUsagePage`     | 积压、失败、费用与异常操作           |
-| `/admin/users`     | `AdminUsersPage`     | 角色与资源范围                       |
-| `/admin/audit`     | `AdminAuditPage`     | 发布、批准、保存、替换和下载记录     |
+## RuntimeApp 路由
 
-## 注册表
+下表是生产构建当前真正开放的路由。未列出的业务页面即使在 `MockApp` 中已有视觉实现，也不能视为真实页面已接入。
+
+| 路由                                       | 页面/布局                      | 当前真实能力                                     |
+| ------------------------------------------ | ------------------------------ | ------------------------------------------------ |
+| `/login`                                   | `RuntimeLoginPage`             | 认证说明页；无登录提交接口                       |
+| `/app`                                     | `RuntimeAppShell` + `HomePage` | 品牌首页、真实项目摘要；创作入口禁用             |
+| `/app/projects`                            | `ProjectsPage`                 | 分页查询项目、前端搜索、新建入口                 |
+| `/app/projects/new`                        | `RuntimeNewProjectPage`        | 创建项目和教材三段式上传                         |
+| `/app/projects/:projectId/setup?jobId=...` | `RuntimeProjectSetupPage`      | Job 查询/取消、Job SSE、轮询恢复、成功后读取课时 |
+| `/app/projects/:projectId`                 | `RuntimeProjectOverviewPage`   | 项目、课时、AutomationPolicy 和项目 SSE          |
+| `/app/projects/:projectId/*`               | `RuntimeUnavailablePage`       | 后续项目页面的安全不可用态                       |
+| `/app/creation/*`                          | `RuntimeUnavailablePage`       | 创作中心尚未接入真实页面                         |
+| `/app/tasks`                               | `RuntimeUnavailablePage`       | 全局任务页尚未接入真实页面                       |
+| `/admin/*`                                 | `RuntimeUnavailablePage`       | 管理端尚未接入真实页面                           |
+
+`RuntimeAppShell` 不创建浏览器会话或伪造用户身份。它假定服务端已经通过 HttpOnly Cookie 建立会话；当前 runtime 合同没有登录、当前用户或退出端点，因此认证 bootstrap 仍是显式缺口。
+
+## 开发 MockApp 路由
+
+以下页面只在开发 Mock 模式用于视觉、交互和自动化测试：
+
+| 路由范围                                                           | 页面范围                                 |
+| ------------------------------------------------------------------ | ---------------------------------------- |
+| `/login`、`/app`、`/app/projects*`                                 | 演示登录、首页、项目、教材、课时与工作台 |
+| `/app/projects/:projectId/lessons/:lessonId/work/:stepKey`         | 教案、导入、PPT、视频和交付步骤渲染器    |
+| `/app/projects/:projectId/results`、`tasks`、`delivery`            | 成果、项目任务和交付演示                 |
+| `/app/creation*`                                                   | 图片、视频、PPT 独立创作与项目批次演示   |
+| `/app/tasks`                                                       | 全局任务演示                             |
+| `/admin/content`、`workflows`、`models`、`usage`、`users`、`audit` | 管理端演示                               |
+
+这些路由中的本地生成状态、演示账号、保存冲突和媒体预览都不是生产数据或真实 Provider 结果。
+
+## 注册表与基础控件
 
 | 注册表                    | 路径                                                        | 扩展对象                        |
 | ------------------------- | ----------------------------------------------------------- | ------------------------------- |
@@ -48,38 +56,57 @@
 | `artifactPreviewRegistry` | `features/project-results/artifactPreviewRegistry.tsx`      | 图片、视频、PPT、文档、音频预览 |
 | `studioRegistry`          | `features/creation-studio/registry.ts`                      | 图片、视频、PPT 创作能力        |
 
-## 基础控件边界
+- 页面主操作统一使用 `shared/ui/Button.tsx`，尺寸只允许 `sm`、`md`、`lg` 三档；
+- 图标操作统一使用 `shared/ui/IconButton.tsx`；
+- 下拉选择统一使用基于 Radix Select 的 `shared/ui/Select.tsx`；
+- 标准表单控件为 40px，高密度工具栏为 36px，重要操作上限为 44px。
 
-- 页面主操作统一使用 `shared/ui/Button.tsx`，尺寸只允许 `sm`、`md`、`lg` 三档；业务页面不得用额外纵向内边距放大按钮。
-- 图标操作统一使用 `shared/ui/IconButton.tsx`。
-- 所有下拉选择统一使用基于 Radix Select 的 `shared/ui/Select.tsx`；业务页面不得直接渲染原生 `select` 或自行绘制下拉箭头、弹层和选中态。
-- 标准表单控件为 40px，高密度工具栏为 36px，重要但不夸张的操作上限为 44px。
+## 类型化 API 客户端
 
-## 核心 API 映射
+所有合同路径都相对于 `VITE_API_BASE_URL`，默认前缀为 `/api/v2`。前端类型来自 `contracts/generated/typescript/schema.ts`；`apps/web/src/generated/api-schema.ts` 只做类型导出，不维护第二套 DTO。
 
-| 操作          | 合同端点                                               | 前端入口                               | 当前状态                     |
-| ------------- | ------------------------------------------------------ | -------------------------------------- | ---------------------------- |
-| 查询项目      | `GET /projects`                                        | `features/projects/api/projectsApi.ts` | 客户端已接入，认证待联调     |
-| 获取/更新项目 | `GET/PATCH /projects/{project_id}`                     | `features/projects/api/projectsApi.ts` | 客户端已就绪，页面待接入     |
-| 创建项目      | `POST /projects`                                       | `NewProjectPage`                       | 客户端已就绪，受上传合同阻断 |
-| 项目工作台    | `GET /projects/{project_id}/workflow`                  | MSW/后端联调面                         | Mock 已闭环，真实接口待接入  |
-| 三类九套      | `GET /lessons/{lesson_id}/intro-options`               | 导入方案步骤                           | Mock 已闭环，真实接口待接入  |
-| 选择导入方案  | `POST /lessons/{lesson_id}/intro-selections`           | 导入方案主操作                         | Mock 已闭环，真实接口待接入  |
-| 生成指令预览  | `GET /node-runs/{node_run_id}/prompt-preview`          | `ContextDrawer`                        | Mock 已闭环，真实接口待接入  |
-| 启动长任务    | `POST /node-runs/{node_run_id}/start`                  | 工作台主操作                           | Mock 已闭环，真实接口待接入  |
-| 创建创作包    | `POST /node-runs/{node_run_id}/creation-packages`      | 项目到创作中心                         | Mock 已闭环，真实接口待接入  |
-| 创建创作批次  | `POST /creation-batches`                               | 独立/项目创作                          | Mock 已闭环，真实接口待接入  |
-| 批量生成      | `POST /creation-batches/{batch_id}/generate`           | 候选生成                               | Mock 已闭环，真实接口待接入  |
-| 保存回项目    | `POST /generation-results/{result_id}/save-to-project` | `SaveToProjectDialog`                  | Mock 已闭环，真实接口待接入  |
-| 项目事件      | `GET /projects/{project_id}/events/stream`             | `useProjectEvents`                     | 已订阅，真实查询源待接入     |
+| 领域           | runtime 合同端点                                                                                                                                                                               | 前端入口                                            | 页面接入状态                                     |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------ |
+| 项目           | `GET/POST /projects`；`GET /projects/{project_id}`                                                                                                                                             | `features/projects/api/projectsApi.ts`              | 列表、创建、详情已接入 Runtime 页面              |
+| 制作方式       | `GET/PATCH /projects/{project_id}/automation-policy`                                                                                                                                           | `features/projects/api/automationPolicyApi.ts`      | 项目概览已接入，写入使用 ETag/`If-Match`         |
+| 教材           | `POST /projects/{project_id}/materials/uploads`；对象存储直传；`POST /projects/{project_id}/materials/{material_id}/confirm`                                                                   | `features/materials/api/materialsApi.ts`            | 上传三段式链已接入新建项目页                     |
+| 教材读取       | `GET .../file-asset`；`GET .../parse-versions`                                                                                                                                                 | `features/materials/api/materialsApi.ts`            | 客户端已实现，Runtime 页面待接入                 |
+| 课时           | `GET/PATCH /projects/{project_id}/lessons`；`GET /lessons/{lesson_id}`；`PATCH /lessons/{lesson_id}/branches`                                                                                  | `features/lessons/api/lessonsApi.ts`                | 课时列表已接入；编辑集合、单课时和分支页面待接入 |
+| Workflow       | `GET /projects/{project_id}/workflow`                                                                                                                                                          | `features/workflow/api/workflowApi.ts`              | 客户端已实现，Runtime 工作台待接入               |
+| Artifact       | `POST /projects/{project_id}/artifacts`；`GET /artifacts/{artifact_id}`；`PUT .../drafts/{draft_branch}`；`POST .../versions`；`POST /artifact-versions/{artifact_version_id}/approvals`       | `features/artifacts/api/artifactsApi.ts`            | 客户端已实现，Runtime 成果与审核页面待接入       |
+| 素材槽位       | `GET /projects/{project_id}/asset-slots`；`GET .../asset-package`；`POST /asset-slots/{slot_id}/bindings`；`POST /asset-bindings/{binding_id}/unbind`                                          | `features/assets/api/assetsApi.ts`                  | 客户端已实现，Runtime 素材页面待接入             |
+| 创作           | `POST /creation-batches`                                                                                                                                                                       | `features/creation-studio/api/creationApi.ts`       | 批次客户端已实现，Runtime 创作页待接入           |
+| 创作四动作     | `POST /creation-items/{item_id}/prompt-versions`；`POST /creation-items/{item_id}/generate`；`POST /generation-results/{result_id}/adoptions`；`POST /adoptions/{adoption_id}/save-to-project` | `features/creation-studio/api/creationApi.ts`       | 四个独立客户端已实现，Runtime 页面待接入         |
+| Generation Job | `GET /generation-jobs/{job_id}`；`POST /generation-jobs/{job_id}/cancel`                                                                                                                       | `features/jobs/api/jobsApi.ts`                      | 教材任务进度页已接入                             |
+| SSE            | `GET /projects/{project_id}/events/stream`；`GET /generation-jobs/{job_id}/events/stream`                                                                                                      | `shared/api/useProjectEvents.ts`、`useJobEvents.ts` | 项目概览和教材任务进度页已接入                   |
 
-教材上传流程要求“创建上传会话 → 直传对象存储 → 确认”，但当前 OpenAPI 尚未声明上传会话和确认端点。真实模式不得把本地文件选择视为上传完成；补齐合同后再接入该闭环。
+`shared/api/client.ts` 统一使用 `credentials: include`、标准成功/错误信封和网络错误映射。写操作由各 feature 客户端显式携带 `Idempotency-Key`；并发编辑读取响应 ETag，并在修改时发送 `If-Match`。CSRF header 的注入点已经预留，但必须由尚未实现的真实认证 bootstrap 提供 token。
 
-## Mock 与真实模式边界
+## 教材上传纵向链
 
-- `mock` 只用于本地演示、组件状态和自动化测试；生产构建不注册 MSW，Mock session 也不能作为真实权限来源。
-- `real` 当前只启用查询项目等客户端已接入的合同能力；创建项目仍受上传合同阻断。登录、上传、工作流、生成与保存回项目在合同补齐前必须显示不可用状态，不回退到 Mock 假成功。
-- Cookie 写请求由真实认证 bootstrap 通过 `configureCsrfTokenProvider` 注入服务端签发的 `X-CSRF-Token`。客户端不保存令牌、不推测获取端点；服务端必须在认证合同中提供安全的签发/刷新方式。
-- 项目 SSE 使用 Fetch 流传输，以便按 OpenAPI 发送 `Last-Event-ID` 请求头；连接错误只触发节流后的 REST 快照刷新。
+`RuntimeNewProjectPage` 与 `RuntimeProjectSetupPage` 当前按以下顺序调用真实合同，不使用前端计时器伪造进度：
 
-组件不拼接 URL；请求通过 `shared/api/client.ts`，DTO 经 feature mapper 转为视图模型。
+1. 校验 PDF，并在浏览器计算文件 SHA-256；
+2. `POST /projects` 创建项目；
+3. `POST /projects/{project_id}/materials/uploads` 创建上传会话；
+4. 按会话返回的 method、URL 和 required headers 将文件直传对象存储，并读取 ETag；
+5. `POST /projects/{project_id}/materials/{material_id}/confirm` 确认文件，取得 Generation Job；
+6. 进入 setup 页面，通过 Job REST 快照、Job SSE 和 5 秒轮询读取服务端进度，可取消非终态任务；
+7. Job 成功后读取项目课时，并进入项目概览读取项目、课时和制作方式。
+
+这条链已经完成前端实现和确定性测试，但尚未在真实认证、反向代理、对象存储和后端部署组合环境中完成浏览器端到端验收，不能据此宣布阶段1联调或生产闭环完成。
+
+## SSE 恢复语义
+
+- 使用 Fetch 流并携带 Cookie，允许发送正整数 `Last-Event-ID`；最近 sequence 只保存在当前标签页的 `sessionStorage`；
+- 严格校验 SSE `id`、事件名和 JSON 信封中的 `sequence_no`、`event_type`、资源及 payload，丢弃不递增的重复事件；
+- 收到事件后只使相关 TanStack Query 失效，再从 REST 读取业务快照；
+- 服务端返回 409/`EVENT_HISTORY_EXPIRED` 时清除游标并刷新 REST 快照；
+- 普通断线按 1 秒到 15 秒指数退避重连，组件卸载时通过 AbortController 清理连接。
+
+## 尚未完成的生产边界
+
+- runtime OpenAPI 尚无真实登录、当前用户、刷新和退出合同，CSRF token provider 也尚未安装；
+- Workflow、Artifact、素材槽位、创作四动作、完整 Job 中心、交付和管理端仍缺生产页面编排与浏览器验收；
+- 后端目前只有 Provider 中立媒体合同和确定性 Fake，真实图片/视频 Adapter 与受控冒烟不属于当前前端已完成能力；
+- Mock 媒体、静态素材和视觉预览只能验证版式，不能作为真实生成、下载或原子写回的验收证据。

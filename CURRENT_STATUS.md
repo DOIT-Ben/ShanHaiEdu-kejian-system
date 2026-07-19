@@ -15,8 +15,10 @@
 - OpenAPI、JSON Schema、生成TypeScript客户端、确定性Mock/Fake和后端CI已经进入自动门禁；文本模型网关已经完成受控真实冒烟。
 - 首套小学数学业务内容包已经为22个模型节点固定输入、Prompt、输出、投影和逻辑能力；三类九套由课程驱动单节点直接生成最终方案集。“1～5的认识”黄金Fixture可以分别启动教案、PPT和视频合同测试，但不代表真实模型或媒体生产完成。
 - 已审核的Markdown TemplateDraft可以通过显式CompilationProfile确定性编译为同一套结构化内容包合同；该能力不替代内容发布服务或模型节点执行运行时。
-- 当前可以通过自动化测试和API/CLI验证后端链路，但尚未完成浏览器到真实API的阶段1纵向演示，不得描述为阶段1产品完成。
-- 生产前端仍由[Issue #4](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)独立负责；先前的PR #33已经关闭且未合并，当前没有可供#11联调的开放前端PR，任何本地前端分支或交付ZIP都不能替代远端源码交接。
+- 当前可以通过自动化测试和API/CLI验证后端链路；生产前端已经在Open Draft [PR #111](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/111)恢复远端源码与审查载体，但尚未完成浏览器到部署后端的阶段1真实联调，不得描述为阶段1产品完成。
+- PR #111已经把生产`RuntimeApp`与开发`MockApp`隔离；生产入口实现项目创建、教材SHA-256、上传会话、对象存储直传、上传确认、Generation Job REST/SSE、课时读取和项目概览的前端纵向链，生产构建不以Mock Runtime或演示凭据兜底。
+- 项目、上传、课时、Workflow、Artifact、素材槽位、创作四动作、Generation Job和项目/Job SSE均已有runtime OpenAPI类型化客户端；当前只有项目、上传、Job、课时、AutomationPolicy与SSE进入生产页面，其余客户端仍待页面编排和真实环境验收。
+- 真实认证bootstrap、当前用户与退出合同仍缺失；后端真实图片/视频Provider Adapter与受控冒烟也尚未完成。开发Mock页面、静态素材和确定性Fake都不能作为真实认证、媒体生成或完整业务闭环证据。
 
 ## 已完成
 
@@ -49,18 +51,18 @@
 - [Issue #123](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/123)：在#86合并后串行退役Prompt领域从未实现的`append`教师修订模式；当前仍为`status:blocked`，不代表合同已收窄。
 - [Issue #130](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/130)：在#123合并后串行补齐模型输出的Artifact/CreationPackage持久化投影；当前仍为`status:blocked`，不代表投影合同已存在。
 - [Issue #89](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/89)：继续保持`status:blocked`；#51、#90与#112已经完成，只有#86、#123与#130也全部合并并在最新`main`上对六项门禁完成新鲜复验后，才作为唯一后端主实现启动。
-- [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)：与生产前端完成真实合同联调；当前因Issue #4没有开放源码PR而等待，不以本地分支、ZIP或Mock代替。
+- [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)：与生产前端完成真实合同联调；PR #111已经提供开放源码载体和教材上传纵向链，但仍为Draft，真实认证、目标部署环境和后续Runtime页面未达到完整联调出口，不以开发Mock或静态素材代替。
 
 ## 当前阻塞
 
-- 阶段1整体产品出口仍缺少生产前端的真实API联调；后端轨道通过不代表完整阶段1产品完成。
+- 阶段1整体产品出口仍缺少生产前端在真实认证和目标部署环境中的API联调；PR #111中的前端实现与确定性测试不等于完整阶段1产品完成。
 - #48已有机器合同和黄金数据，但主线尚无读取数据库已发布GenerationTemplate并完成Prompt/Context冻结、模型调用、结构校验和Artifact原子落库的通用执行器；#51、#90与#112已经完成，#89仍等待#86、#123与#130串行收口，然后在最新`main`上对六项门禁完成新鲜复验。
 - ShanHaiEdu已经具备Provider中立媒体基础层和Attempt租约恢复，但真实图片/视频Adapter、供应商私有状态映射与受控真实冒烟仍未实现，不能把确定性Fake或恢复基座描述为真实媒体出口。
 - TTS与实时价格计算当前不实现、不冒烟，也不阻塞教材到教案纵向链；PPTX装配、媒体生成和最终交付仍需独立Issue与真实阶段验收。
 
 ## 下一个阶段出口
 
-通用口径校准、首套业务内容合同、#100课程驱动纠偏、#88黄金内容发布、阶段1后端轨道、#51 Prompt公共投影和#90 Attempt恢复门禁已经关闭；当前按#86关系语义、#123 Prompt合同收窄、#130输出持久化投影的顺序收口#89剩余门禁。阶段0前端联调出口继续独立等待生产前端源码交接。
+通用口径校准、首套业务内容合同、#100课程驱动纠偏、#88黄金内容发布、阶段1后端轨道、#51 Prompt公共投影和#90 Attempt恢复门禁已经关闭；当前按#86关系语义、#123 Prompt合同收窄、#130输出持久化投影的顺序收口#89剩余门禁。阶段0前端已经有Open Draft PR #111作为源码交接与审查载体，下一出口是完成真实认证条件、剩余Runtime页面、前端门禁和目标环境联调，而不是重新等待源码。
 
 口径校准门禁必须按顺序满足：
 
