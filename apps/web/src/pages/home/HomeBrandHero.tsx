@@ -1,16 +1,15 @@
-import { ArrowRight, Upload } from "lucide-react";
+import { ArrowRight, Check, Upload } from "lucide-react";
 import { Link } from "react-router-dom";
+import brandMark from "@/assets/brand/brand-mark.svg";
 import { CreativeResultVisual } from "@/features/creation-studio/CreativeResultVisual";
 import { Button } from "@/shared/ui/Button";
 
 export function HomeBrandHero({
   continueTo,
   hasProject,
-  role,
 }: {
   continueTo: string;
   hasProject: boolean;
-  role?: "admin" | "teacher";
 }) {
   return (
     <section
@@ -18,8 +17,11 @@ export function HomeBrandHero({
       className="relative isolate grid min-h-[276px] overflow-hidden rounded-[var(--sh-radius-lg)] bg-[image:var(--sh-hero-gradient)] lg:grid-cols-[minmax(0,0.92fr)_minmax(440px,1.08fr)]"
     >
       <div className="relative z-10 flex flex-col justify-center px-6 py-7 md:px-8 lg:px-10">
-        <p className="text-sm font-semibold text-[var(--sh-brand-600)]">
-          {role === "admin" ? "管理员" : "老师"}，欢迎回到山海教育
+        <p className="flex items-center gap-2 text-sm font-semibold text-[var(--sh-brand-600)]">
+          <span className="grid size-7 place-items-center rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-elevated)]/90 p-0.5 shadow-[var(--sh-shadow-card)]">
+            <img alt="" aria-hidden="true" className="size-full" src={brandMark} />
+          </span>
+          山海教育 · 课堂创作空间
         </p>
         <h1
           className="mt-2 max-w-[560px] text-[clamp(2rem,3.2vw,2.9rem)] font-semibold leading-[1.16] text-[var(--sh-ink-strong)]"
@@ -39,7 +41,7 @@ export function HomeBrandHero({
           </Button>
           <Button asChild variant="secondary">
             <Link to={hasProject ? continueTo : "/app/projects"}>
-              {hasProject ? "继续当前课件" : "查看示例项目"}
+              {hasProject ? "继续当前课件" : "浏览项目空间"}
               <ArrowRight aria-hidden="true" />
             </Link>
           </Button>
@@ -59,9 +61,9 @@ export function HomeBrandHero({
         </div>
         <div className="absolute bottom-4 left-[4%] hidden items-center gap-2 rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)]/92 px-3 py-2 text-xs font-semibold text-[var(--sh-ink-strong)] shadow-[var(--sh-shadow-card)] backdrop-blur-sm sm:flex">
           <span className="grid size-7 place-items-center rounded-[var(--sh-radius-sm)] bg-[var(--sh-brand-50)] text-[var(--sh-brand-700)]">
-            62%
+            <Check aria-hidden="true" className="size-4" />
           </span>
-          一套课堂作品正在完成
+          教案、课件和课堂素材，一起准备
         </div>
       </div>
     </section>

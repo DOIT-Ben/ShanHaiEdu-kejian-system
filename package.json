@@ -26,11 +26,5 @@
     "ajv-formats": "3.0.1",
     "openapi-typescript": "7.8.0",
     "typescript": "5.8.3"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "msw"
-    ]
   }
 }

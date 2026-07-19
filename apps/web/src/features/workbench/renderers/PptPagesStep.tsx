@@ -12,6 +12,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { PercentSlidePreview } from "@/features/home/components/PercentSlidePreview";
+import { PptCoverArtwork } from "@/features/workbench/components/PptCoverArtwork";
 import { WorkbenchPageFrame } from "@/features/workbench/components/WorkbenchPageFrame";
 import { StaleContentNotice } from "@/features/workbench/components/StaleContentNotice";
 import { getApprovedDraftValue } from "@/features/workbench/lib/approvedDraft";
@@ -386,16 +387,13 @@ export function PptPagesStep() {
               data-testid="ppt-slide-frame"
             >
               {currentPage.pageType === "cover" ? (
-                <div
-                  className={`aspect-video rounded-[var(--sh-radius-sm)] p-[8%] text-white shadow-[var(--sh-shadow-floating)] ${coverVariant === 2 ? "bg-[var(--sh-brand-900)]" : coverVariant === 3 ? "bg-[var(--sh-art-green)]" : "bg-[var(--sh-art-navy)]"}`}
-                  data-cover-variant={coverVariant}
-                >
-                  <p className="text-sm [color:var(--sh-artifact-on-dark-muted)]">六年级数学</p>
+                <PptCoverArtwork demo={demo} variant={coverVariant}>
+                  <p className="text-sm font-semibold opacity-70">六年级数学</p>
                   <h2
                     aria-label="封面标题"
                     contentEditable={!approved}
                     suppressContentEditableWarning
-                    className="mt-3 text-[clamp(1.4rem,3vw,2.5rem)] font-bold [color:var(--sh-artifact-on-dark)] outline-none focus:bg-white/10"
+                    className="mt-3 text-[clamp(1.4rem,3vw,2.5rem)] font-bold [color:inherit] outline-none focus:bg-white/20"
                     onBlur={(event) =>
                       saveContent(`page-${currentPage.id}-title`, event.currentTarget.textContent)
                     }
@@ -407,7 +405,7 @@ export function PptPagesStep() {
                     aria-label="封面副标题"
                     contentEditable={!approved}
                     suppressContentEditableWarning
-                    className="mt-4 text-base [color:var(--sh-artifact-on-dark-muted)] outline-none focus:bg-white/10"
+                    className="mt-4 text-base [color:inherit] opacity-70 outline-none focus:bg-white/20"
                     onBlur={(event) =>
                       saveContent(
                         `page-${currentPage.id}-subtitle`,
@@ -418,10 +416,10 @@ export function PptPagesStep() {
                   >
                     {readPageContent(content, currentPage.id, page, "subtitle")}
                   </p>
-                </div>
+                </PptCoverArtwork>
               ) : demo && (currentPage.id === "2" || currentPage.id === "grid") ? (
                 <div className="relative aspect-video">
-                  <PercentSlidePreview variant={1} />
+                  <PercentSlidePreview page={2} />
                   {pageRevision > 0 ? (
                     <p
                       className="absolute bottom-[8%] left-[49%] max-w-[40%] rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-elevated)]/94 px-[2.5%] py-[1.5%] text-[clamp(0.55rem,1.2vw,0.9rem)] font-semibold text-[var(--sh-artifact-ink)] shadow-[var(--sh-shadow-card)]"

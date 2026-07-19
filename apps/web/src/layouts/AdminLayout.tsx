@@ -1,6 +1,7 @@
-import { ArrowLeft, Boxes, FileClock, Gauge, KeyRound, Network, Users, Waves } from "lucide-react";
+import { ArrowLeft, Boxes, FileClock, Gauge, KeyRound, Network, Users } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
+import brandMark from "@/assets/brand/brand-mark.svg";
 import { cn } from "@/shared/lib/cn";
 import { ThemeSwitcher } from "@/shared/theme/ThemeSwitcher";
 import { HorizontalScrollArea } from "@/shared/ui/HorizontalScrollArea";
@@ -27,8 +28,8 @@ export function AdminLayout() {
   return (
     <div className="min-h-screen bg-[var(--sh-surface-canvas)]">
       <header className="sticky top-0 z-30 flex h-[var(--sh-topbar-height)] items-center gap-3 border-b border-[var(--sh-line-default)] bg-[var(--sh-surface-canvas)]/92 px-4 backdrop-blur-[10px] md:px-6">
-        <span className="grid size-9 place-items-center rounded-[var(--sh-radius-md)] bg-[image:var(--sh-action-gradient)] text-white">
-          <Waves aria-hidden="true" className="size-5" />
+        <span className="grid size-9 place-items-center rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-1.5 shadow-[var(--sh-shadow-card)]">
+          <img alt="" aria-hidden="true" className="size-full" src={brandMark} />
         </span>
         <div>
           <p className="text-xs text-[var(--sh-ink-muted)]">山海教育</p>

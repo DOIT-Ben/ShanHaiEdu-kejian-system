@@ -1,6 +1,6 @@
 import { Check, Download, PencilLine, Presentation } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
-import { PercentSlidePreview } from "@/features/home/components/PercentSlidePreview";
+import { PptCoverArtwork } from "@/features/workbench/components/PptCoverArtwork";
 import { WorkbenchPageFrame } from "@/features/workbench/components/WorkbenchPageFrame";
 import { StaleContentNotice } from "@/features/workbench/components/StaleContentNotice";
 import { getApprovedDraftValue } from "@/features/workbench/lib/approvedDraft";
@@ -188,20 +188,11 @@ export function PptExportStep() {
           <div className="absolute inset-x-[13%] bottom-[7%] top-[15%] rotate-[3deg] rounded-[var(--sh-radius-md)] bg-[var(--sh-accent-rose-soft)] shadow-[var(--sh-shadow-card)]" />
           <div className="absolute inset-x-[10%] bottom-[10%] top-[10%] -rotate-[2deg] rounded-[var(--sh-radius-md)] bg-[var(--sh-brand-100)] shadow-[var(--sh-shadow-card)]" />
           <div className="relative mx-auto max-w-3xl overflow-hidden rounded-[var(--sh-radius-md)] border-[7px] border-[var(--sh-artifact-paper)] bg-[var(--sh-artifact-paper)] shadow-[var(--sh-shadow-modal)]">
-            {demo ? (
-              <PercentSlidePreview variant={coverVariant - 1} />
-            ) : (
-              <div
-                className={`flex aspect-video flex-col justify-center px-[10%] text-white ${coverVariant === 2 ? "bg-[var(--sh-brand-900)]" : coverVariant === 3 ? "bg-[var(--sh-art-green)]" : "bg-[var(--sh-art-navy)]"}`}
-                data-cover-variant={coverVariant}
-              >
-                <p className="text-sm text-[var(--sh-artifact-on-dark-muted)]">小学数学课堂</p>
-                <h2 className="mt-3 text-[clamp(1.4rem,3vw,2.5rem)] font-bold">{coverTitle}</h2>
-                <p className="mt-3 text-sm text-[var(--sh-artifact-on-dark-muted)]">
-                  {coverSubtitle}
-                </p>
-              </div>
-            )}
+            <PptCoverArtwork demo={demo} variant={coverVariant}>
+              <p className="text-sm font-semibold opacity-70">小学数学课堂</p>
+              <h2 className="mt-3 text-[clamp(1.4rem,3vw,2.5rem)] font-bold">{coverTitle}</h2>
+              <p className="mt-3 text-sm opacity-70">{coverSubtitle}</p>
+            </PptCoverArtwork>
           </div>
           <div className="relative mx-auto mt-3 flex max-w-3xl items-center justify-between gap-3 rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-elevated)]/94 px-3 py-2 shadow-[var(--sh-shadow-card)] backdrop-blur-sm">
             <span className="flex items-center gap-2 text-sm font-medium text-[var(--sh-ink-strong)]">

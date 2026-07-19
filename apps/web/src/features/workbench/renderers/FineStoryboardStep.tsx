@@ -231,11 +231,15 @@ export function FineStoryboardStep() {
         </aside>
         <section className="min-w-0">
           <div className="rounded-[var(--sh-radius-md)] bg-[var(--sh-surface-player)] p-3">
-            <VideoScenePreview topic={demo ? undefined : topic} variant={previewVariant} />
+            <VideoScenePreview
+              topic={demo ? undefined : topic}
+              variant={demo ? selected : previewVariant}
+            />
           </div>
           <div className="mt-3 flex gap-2 overflow-x-auto">
             {[1, 2, 3].map((candidate) => (
               <button
+                aria-label={`备选片段 ${String(candidate)}`}
                 aria-pressed={selectedCandidate === candidate}
                 className={`w-32 shrink-0 rounded-[var(--sh-radius-sm)] border bg-[var(--sh-surface-elevated)] p-2 text-left ${selectedCandidate === candidate ? "border-[var(--sh-brand-500)]" : "border-[var(--sh-line-subtle)]"}`}
                 key={candidate}
@@ -250,7 +254,11 @@ export function FineStoryboardStep() {
                 }
                 type="button"
               >
-                <div className="aspect-video rounded bg-[var(--sh-art-blue)]" />
+                <VideoScenePreview
+                  compact
+                  topic={demo ? undefined : topic}
+                  variant={demo ? selected + candidate - 1 : previewVariant + candidate - 1}
+                />
                 <span className="mt-1 block text-xs font-semibold">备选片段 {candidate}</span>
               </button>
             ))}

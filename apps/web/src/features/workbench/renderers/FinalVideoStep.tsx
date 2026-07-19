@@ -208,7 +208,10 @@ export function FinalVideoStep() {
             className="w-full max-w-[min(960px,max(280px,calc((100dvh-302px)*1.7778)))]"
             data-testid="final-video-preview"
           >
-            <VideoScenePreview topic={demo ? undefined : videoTitle} variant={previewVariant} />
+            <VideoScenePreview
+              topic={demo ? undefined : videoTitle}
+              variant={demo ? 3 : previewVariant}
+            />
           </div>
         </section>
         <aside className="grid content-start gap-2 sm:grid-cols-2 lg:grid-cols-1">

@@ -1,6 +1,7 @@
 import { ArrowRight, CheckCircle2, Image, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { getDemoVideoSceneSource } from "@/features/home/components/VideoScenePreview";
 import { useWorkbenchUi } from "@/features/workbench/model/workbenchUi";
 import { StaleContentNotice } from "@/features/workbench/components/StaleContentNotice";
 import { WorkbenchPageFrame } from "@/features/workbench/components/WorkbenchPageFrame";
@@ -82,23 +83,34 @@ export function VideoAssetsStep() {
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {assets.map((asset, index) => (
           <article
-            className="rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-4"
+            className="overflow-hidden rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-3"
             key={asset.id}
           >
-            <div className="flex items-center justify-between">
-              <span className="grid size-10 place-items-center rounded-[var(--sh-radius-sm)] bg-[var(--sh-brand-50)] text-[var(--sh-brand-600)]">
-                <Image aria-hidden="true" className="size-5" />
-              </span>
+            <div className="relative aspect-video overflow-hidden rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-soft)]">
+              {demo && (approved || asset.status === "ready") ? (
+                <img
+                  alt={`${asset.title}参考画面`}
+                  className="size-full object-cover"
+                  decoding="async"
+                  src={getDemoVideoSceneSource(index)}
+                />
+              ) : (
+                <span className="grid size-full place-items-center text-[var(--sh-brand-600)]">
+                  <Image aria-hidden="true" className="size-6" />
+                </span>
+              )}
               {approved || asset.status === "ready" ? (
-                <span className="flex items-center gap-1 text-xs font-semibold text-[var(--sh-success)]">
+                <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-[var(--sh-surface-elevated)]/92 px-2 py-1 text-xs font-semibold text-[var(--sh-success)] shadow-[var(--sh-shadow-card)] backdrop-blur-sm">
                   <CheckCircle2 aria-hidden="true" className="size-4" />
                   已准备
                 </span>
               ) : (
-                <StatusBadge status="not_ready" />
+                <span className="absolute right-2 top-2">
+                  <StatusBadge status="not_ready" />
+                </span>
               )}
             </div>
-            <p className="mt-4 text-xs font-semibold text-[var(--sh-brand-600)]">{asset.type}</p>
+            <p className="mt-3 text-xs font-semibold text-[var(--sh-brand-600)]">{asset.type}</p>
             <h2 className="mt-1 font-semibold text-[var(--sh-ink-strong)]">{asset.title}</h2>
             <p className="mt-2 text-sm text-[var(--sh-ink-muted)]">
               来源：故事节拍 {Math.min(index + 1, 5)} · {approvedStyleLabel}

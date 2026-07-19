@@ -88,7 +88,7 @@ export function RecentCreationRail({
       >
         <Link className="group" to="/app/creation/presentations">
           <div className="overflow-hidden rounded-[var(--sh-radius-sm)] border-2 border-[var(--sh-surface-elevated)] shadow-[var(--sh-shadow-card)] transition-transform group-hover:-translate-y-0.5">
-            <CreativeResultVisual type="presentation" variant={1} />
+            <CreativeResultVisual page={2} type="presentation" variant={0} />
           </div>
           <p className="mt-2 truncate text-xs font-medium text-[var(--sh-ink-strong)]">
             百分数百格图
