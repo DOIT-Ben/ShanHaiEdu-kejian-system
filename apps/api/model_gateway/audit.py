@@ -14,6 +14,7 @@ from uuid import UUID
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.database import utc_now
@@ -123,57 +124,62 @@ class SqlAlchemyAttemptAuditSink:
         provider_model: str | None,
         route_reason: str,
     ) -> AttemptLease:
-        with self._session_factory() as session, session.begin():
-            node = session.scalar(
-                select(NodeRun)
-                .join(WorkflowRun, WorkflowRun.id == NodeRun.workflow_run_id)
-                .where(
-                    NodeRun.id == context.node_run_id,
-                    NodeRun.organization_id == context.organization_id,
-                    WorkflowRun.project_id == context.project_id,
+        try:
+            with self._session_factory() as session, session.begin():
+                node = session.scalar(
+                    select(NodeRun)
+                    .join(WorkflowRun, WorkflowRun.id == NodeRun.workflow_run_id)
+                    .where(
+                        NodeRun.id == context.node_run_id,
+                        NodeRun.organization_id == context.organization_id,
+                        WorkflowRun.project_id == context.project_id,
+                    )
+                    .with_for_update(of=NodeRun)
                 )
-                .with_for_update(of=NodeRun)
-            )
-            if node is None:
-                raise RuntimeError("model audit context does not match the target node")
-            duplicate = session.scalar(
-                select(GenerationAttempt.id).where(
-                    GenerationAttempt.organization_id == context.organization_id,
-                    GenerationAttempt.request_id == request.request_id,
+                if node is None:
+                    raise RuntimeError("model audit context does not match the target node")
+                duplicate = session.scalar(
+                    select(GenerationAttempt.id).where(
+                        GenerationAttempt.organization_id == context.organization_id,
+                        GenerationAttempt.request_id == request.request_id,
+                    )
                 )
-            )
-            if duplicate is not None:
-                raise DuplicateAttemptDelivery("model request delivery already exists")
-            attempt_no = self._allocate_attempt_no(session, context.node_run_id)
-            now = utc_now()
-            lease_owner = str(new_uuid7())
-            attempt = GenerationAttempt(
-                id=new_uuid7(),
-                organization_id=context.organization_id,
-                project_id=context.project_id,
-                node_run_id=context.node_run_id,
-                generation_job_id=context.generation_job_id,
-                attempt_no=attempt_no,
-                request_id=request.request_id,
-                capability=request.capability,
-                operation_kind=request.operation_kind,
-                provider_name=provider_name,
-                provider_model=provider_model,
-                route_reason=route_reason,
-                status="running",
-                request_hash=request.request_hash,
-                provider_request_id=None,
-                provider_task_id=None,
-                lease_owner=lease_owner,
-                lease_expires_at=now + timedelta(seconds=self._lease_seconds),
-                heartbeat_at=now,
-                cancel_requested_at=None,
-                submitted_at=now,
-                error_details_json={},
-            )
-            session.add(attempt)
-            session.flush()
-            return AttemptLease(attempt_id=attempt.id, lease_owner=lease_owner)
+                if duplicate is not None:
+                    raise DuplicateAttemptDelivery("model request delivery already exists")
+                attempt_no = self._allocate_attempt_no(session, context.node_run_id)
+                now = utc_now()
+                lease_owner = str(new_uuid7())
+                attempt = GenerationAttempt(
+                    id=new_uuid7(),
+                    organization_id=context.organization_id,
+                    project_id=context.project_id,
+                    node_run_id=context.node_run_id,
+                    generation_job_id=context.generation_job_id,
+                    attempt_no=attempt_no,
+                    request_id=request.request_id,
+                    capability=request.capability,
+                    operation_kind=request.operation_kind,
+                    provider_name=provider_name,
+                    provider_model=provider_model,
+                    route_reason=route_reason,
+                    status="running",
+                    request_hash=request.request_hash,
+                    provider_request_id=None,
+                    provider_task_id=None,
+                    lease_owner=lease_owner,
+                    lease_expires_at=now + timedelta(seconds=self._lease_seconds),
+                    heartbeat_at=now,
+                    cancel_requested_at=None,
+                    submitted_at=now,
+                    error_details_json={},
+                )
+                session.add(attempt)
+                session.flush()
+                return AttemptLease(attempt_id=attempt.id, lease_owner=lease_owner)
+        except IntegrityError as exc:
+            if _constraint_name(exc) == "uq_generation_attempts_organization_request":
+                raise DuplicateAttemptDelivery("model request delivery already exists") from None
+            raise
 
     def heartbeat(
         self,
@@ -283,6 +289,7 @@ class SqlAlchemyAttemptAuditSink:
                 GenerationAttempt.node_run_id == context.node_run_id,
                 GenerationAttempt.status == "running",
                 GenerationAttempt.lease_owner == lease.lease_owner,
+                GenerationAttempt.lease_expires_at >= utc_now(),
             )
             .with_for_update()
         )
@@ -362,3 +369,8 @@ def _output_units(usage: ModelUsage) -> dict[str, int]:
     units["completion_tokens"] = usage.completion_tokens
     units["total_tokens"] = usage.total_tokens
     return units
+
+
+def _constraint_name(error: IntegrityError) -> str | None:
+    diagnostic = getattr(error.orig, "diag", None)
+    return getattr(diagnostic, "constraint_name", None)

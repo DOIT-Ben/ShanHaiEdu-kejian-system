@@ -6,7 +6,12 @@ from uuid import UUID
 import httpx
 from pydantic import SecretStr
 
-from apps.api.model_gateway.audit import AttemptRequestAudit, AttemptSuccessAudit
+from apps.api.model_gateway.audit import (
+    AttemptHeartbeat,
+    AttemptLease,
+    AttemptRequestAudit,
+    AttemptSuccessAudit,
+)
 from apps.api.model_gateway.contracts import (
     ModelAuditContext,
     ModelCapability,
@@ -34,7 +39,7 @@ class RecordingAuditSink:
         provider_name: str | None,
         provider_model: str | None,
         route_reason: str,
-    ) -> UUID:
+    ) -> AttemptLease:
         self.events.append(
             {
                 "context": context,
@@ -44,27 +49,35 @@ class RecordingAuditSink:
                 "reason": route_reason,
             }
         )
-        return self.attempt_id
+        return AttemptLease(attempt_id=self.attempt_id, lease_owner="recording-owner")
+
+    def heartbeat(
+        self,
+        lease: AttemptLease,
+        context: ModelAuditContext,
+    ) -> AttemptHeartbeat:
+        self.events.append((lease, context, AttemptHeartbeat.ACTIVE))
+        return AttemptHeartbeat.ACTIVE
 
     def succeed(
         self,
-        attempt_id: UUID,
+        lease: AttemptLease,
         context: ModelAuditContext,
         result: AttemptSuccessAudit,
         *,
         latency_ms: int,
     ) -> None:
-        self.events.append((attempt_id, context, result.usage, latency_ms))
+        self.events.append((lease, context, result.usage, latency_ms))
 
     def fail(
         self,
-        attempt_id: UUID,
+        lease: AttemptLease,
         context: ModelAuditContext,
         error: ModelGatewayError,
         *,
         latency_ms: int,
     ) -> None:
-        self.events.append((attempt_id, context, error.code, latency_ms))
+        self.events.append((lease, context, error.code, latency_ms))
 
 
 async def test_openai_compatible_provider_uses_prompt_safe_gateway_audit_port() -> None:

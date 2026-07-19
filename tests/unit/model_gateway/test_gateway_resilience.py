@@ -7,7 +7,12 @@ from uuid import UUID
 
 import pytest
 
-from apps.api.model_gateway.audit import AttemptRequestAudit, AttemptSuccessAudit
+from apps.api.model_gateway.audit import (
+    AttemptHeartbeat,
+    AttemptLease,
+    AttemptRequestAudit,
+    AttemptSuccessAudit,
+)
 from apps.api.model_gateway.contracts import (
     GatewayErrorCode,
     ImageModelRequest,
@@ -72,10 +77,19 @@ def audit_context() -> ModelAuditContext:
 class RecordingAuditSink:
     attempt_id = UUID("01980000-0000-7000-8000-000000000001")
 
-    def __init__(self, *, fail_success: bool = False, fail_failure: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        fail_success: bool = False,
+        fail_failure: bool = False,
+        fail_heartbeat: bool = False,
+        heartbeat: AttemptHeartbeat = AttemptHeartbeat.ACTIVE,
+    ) -> None:
         self.events: list[object] = []
         self._fail_success = fail_success
         self._fail_failure = fail_failure
+        self._fail_heartbeat = fail_heartbeat
+        self._heartbeat = heartbeat
 
     def start(
         self,
@@ -85,7 +99,7 @@ class RecordingAuditSink:
         provider_name: str | None,
         provider_model: str | None,
         route_reason: str,
-    ) -> UUID:
+    ) -> AttemptLease:
         self.events.append(
             (
                 "start",
@@ -96,11 +110,21 @@ class RecordingAuditSink:
                 route_reason,
             )
         )
-        return self.attempt_id
+        return AttemptLease(attempt_id=self.attempt_id, lease_owner="recording-owner")
+
+    def heartbeat(
+        self,
+        lease: AttemptLease,
+        context: ModelAuditContext,
+    ) -> AttemptHeartbeat:
+        if self._fail_heartbeat:
+            raise RuntimeError("private heartbeat persistence failure")
+        self.events.append(("heartbeat", lease, context))
+        return self._heartbeat
 
     def succeed(
         self,
-        attempt_id: UUID,
+        lease: AttemptLease,
         context: ModelAuditContext,
         result: AttemptSuccessAudit,
         *,
@@ -108,11 +132,11 @@ class RecordingAuditSink:
     ) -> None:
         if self._fail_success:
             raise RuntimeError("private audit persistence failure")
-        self.events.append(("succeed", attempt_id, context, result, latency_ms))
+        self.events.append(("succeed", lease, context, result, latency_ms))
 
     def fail(
         self,
-        attempt_id: UUID,
+        lease: AttemptLease,
         context: ModelAuditContext,
         error: ModelGatewayError,
         *,
@@ -120,7 +144,7 @@ class RecordingAuditSink:
     ) -> None:
         if self._fail_failure:
             raise RuntimeError("private audit failure persistence failure")
-        self.events.append(("fail", attempt_id, context, error.code, latency_ms))
+        self.events.append(("fail", lease, context, error.code, latency_ms))
 
 
 class InvalidImageProvider:
@@ -152,11 +176,16 @@ class CancellableImageProvider:
 
     def __init__(self) -> None:
         self.started = asyncio.Event()
+        self.cancelled = asyncio.Event()
 
     async def generate(self, request: ImageModelRequest) -> ImageProviderResult:
         del request
         self.started.set()
-        await asyncio.Future[None]()
+        try:
+            await asyncio.Future[None]()
+        except asyncio.CancelledError:
+            self.cancelled.set()
+            raise
         raise AssertionError("unreachable")
 
 
@@ -355,7 +384,59 @@ async def test_asyncio_task_cancellation_uses_stable_error_and_closes_attempt() 
 
     assert captured.value.code == GatewayErrorCode.CANCELLED
     assert captured.value.retryable is False
+    assert provider.cancelled.is_set()
     assert [event[0] for event in sink.events] == ["start", "fail"]
+
+
+async def test_persisted_cancel_request_stops_provider_and_closes_attempt() -> None:
+    provider = CancellableImageProvider()
+    sink = RecordingAuditSink(heartbeat=AttemptHeartbeat.CANCEL_REQUESTED)
+    gateway = ModelGateway(
+        {},
+        image_routes={ModelCapability.IMAGE_GENERATE_EDUCATION_16X9: provider},
+        audit_sink=sink,
+        audit_heartbeat_seconds=0.01,
+    )
+
+    with pytest.raises(ModelGatewayError) as captured:
+        await gateway.generate_image(image_request(), audit_context=audit_context())
+
+    assert provider.started.is_set()
+    assert captured.value.code == GatewayErrorCode.CANCELLED
+    assert captured.value.retryable is False
+    assert provider.cancelled.is_set()
+    assert [event[0] for event in sink.events] == ["start", "heartbeat", "fail"]
+
+
+@pytest.mark.parametrize(
+    ("sink", "expected_events"),
+    [
+        (
+            RecordingAuditSink(heartbeat=AttemptHeartbeat.LOST),
+            ["start", "heartbeat", "fail"],
+        ),
+        (RecordingAuditSink(fail_heartbeat=True), ["start", "fail"]),
+    ],
+)
+async def test_lost_or_failed_heartbeat_stops_provider_task(
+    sink: RecordingAuditSink,
+    expected_events: list[str],
+) -> None:
+    provider = CancellableImageProvider()
+    gateway = ModelGateway(
+        {},
+        image_routes={ModelCapability.IMAGE_GENERATE_EDUCATION_16X9: provider},
+        audit_sink=sink,
+        audit_heartbeat_seconds=0.01,
+    )
+
+    with pytest.raises(ModelGatewayError) as captured:
+        await gateway.generate_image(image_request(), audit_context=audit_context())
+
+    assert captured.value.code == GatewayErrorCode.AUDIT_UNAVAILABLE
+    assert captured.value.retryable is False
+    assert provider.cancelled.is_set()
+    assert [event[0] for event in sink.events] == expected_events
 
 
 async def test_fake_storage_keys_are_safe_for_every_valid_request_id() -> None:

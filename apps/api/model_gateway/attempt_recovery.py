@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import select
@@ -98,6 +97,18 @@ class AttemptRecoveryCoordinator:
                 .with_for_update(skip_locked=True)
             )
         )
+        attempt_ids = [attempt.id for attempt in attempts]
+        existing_usage_attempt_ids: set[UUID] = (
+            set(
+                session.scalars(
+                    select(UsageRecord.generation_attempt_id).where(
+                        UsageRecord.generation_attempt_id.in_(attempt_ids)
+                    )
+                )
+            )
+            if attempt_ids
+            else set()
+        )
         terminal_statuses: list[str] = []
         for attempt in attempts:
             status, error_code, retryable = _recovery_disposition(attempt)
@@ -111,7 +122,8 @@ class AttemptRecoveryCoordinator:
             attempt.latency_ms = max(round((now - attempt.submitted_at).total_seconds() * 1_000), 0)
             attempt.lease_owner = None
             attempt.lease_expires_at = None
-            session.add(_zero_usage_record(attempt))
+            if attempt.id not in existing_usage_attempt_ids:
+                session.add(_zero_usage_record(attempt))
             terminal_statuses.append(status)
         return terminal_statuses
 

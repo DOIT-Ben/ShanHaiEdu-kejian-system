@@ -28,8 +28,7 @@ class GenerationAttempt(Base):
     __table_args__ = (
         CheckConstraint("attempt_no > 0", name="attempt_no_positive"),
         CheckConstraint(
-            "status IN ('running', 'succeeded', 'failed', 'cancelled', "
-            "'submission_unknown')",
+            "status IN ('running', 'succeeded', 'failed', 'cancelled', 'submission_unknown')",
             name="status_allowed",
         ),
         CheckConstraint(
@@ -53,8 +52,7 @@ class GenerationAttempt(Base):
             name="terminal_fields_consistent",
         ),
         CheckConstraint(
-            "lease_expires_at IS NULL OR heartbeat_at IS NULL "
-            "OR lease_expires_at > heartbeat_at",
+            "lease_expires_at IS NULL OR heartbeat_at IS NULL OR lease_expires_at > heartbeat_at",
             name="lease_window_positive",
         ),
         Index(
@@ -124,9 +122,7 @@ class GenerationAttempt(Base):
 
 class GenerationAttemptCounter(Base):
     __tablename__ = "generation_attempt_counters"
-    __table_args__ = (
-        CheckConstraint("next_attempt_no > 0", name="next_attempt_no_positive"),
-    )
+    __table_args__ = (CheckConstraint("next_attempt_no > 0", name="next_attempt_no_positive"),)
 
     node_run_id: Mapped[UUID] = mapped_column(
         Uuid,

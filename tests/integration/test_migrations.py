@@ -5,11 +5,23 @@ from uuid import UUID
 
 from alembic.config import Config
 from alembic.script import ScriptDirectory
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, inspect, select, text
 
 from alembic import command
-from apps.api.database import sqlalchemy_url
+from apps.api.database import build_session_factory, sqlalchemy_url, utc_now
+from apps.api.ids import new_uuid7
+from apps.api.model_gateway.attempt_recovery import AttemptRecoveryCoordinator
+from apps.api.model_gateway.audit_models import (
+    GenerationAttempt,
+    GenerationAttemptCounter,
+    UsageRecord,
+)
+from apps.api.projects.repository import ProjectRepository
+from apps.api.projects.schemas import CreateProjectRequest
+from apps.api.workflows.service import WorkflowRuntimeService
 from tests.conftest import run_migration
+from tests.fakes.identity import seed_test_actor
+from workflow.node_state import NodeStatus
 
 EXPECTED_TABLES = {
     "alembic_version",
@@ -163,6 +175,95 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
             os.environ.pop("SHANHAI_DATABASE_URL", None)
         else:
             os.environ["SHANHAI_DATABASE_URL"] = previous
+
+
+def test_running_attempt_is_backfilled_and_recovered_after_lease_migration(
+    postgres_database_url: str,
+) -> None:
+    run_migration(postgres_database_url, "c2d4e6f8a901")
+    engine = create_engine(sqlalchemy_url(postgres_database_url))
+    factory = build_session_factory(engine)
+    attempt_id = new_uuid7()
+    with factory() as session, session.begin():
+        actor = seed_test_actor(session)
+        project = ProjectRepository(session, actor).create(
+            CreateProjectRequest(title="Lease migration", knowledge_point="One half")
+        )
+        run = WorkflowRuntimeService(session, actor).start_project_run(project.id)
+        node = WorkflowRuntimeService(session, actor).create_project_node_run(
+            run.id,
+            node_key="prepare",
+            status=NodeStatus.READY,
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO generation_attempts (
+                    id, organization_id, project_id, node_run_id, generation_job_id,
+                    attempt_no, request_id, capability, provider_name, provider_model,
+                    route_reason, status, request_hash, provider_request_id,
+                    provider_task_id, submitted_at, finished_at, error_code,
+                    error_details_json, latency_ms
+                ) VALUES (
+                    :id, :organization_id, :project_id, :node_run_id, NULL,
+                    1, 'req-legacy-running', 'video.image_to_video.6s_30s',
+                    'provider-test', 'model-test', 'configured_primary', 'running',
+                    :request_hash, NULL, NULL, now() - interval '10 minutes',
+                    NULL, NULL, '{}'::jsonb, NULL
+                )
+                """
+            ),
+            {
+                "id": attempt_id,
+                "organization_id": actor.organization_id,
+                "project_id": project.id,
+                "node_run_id": node.id,
+                "request_hash": "a" * 64,
+            },
+        )
+
+    run_migration(postgres_database_url, "head")
+    with factory() as session:
+        attempt = session.get(GenerationAttempt, attempt_id)
+        counter = session.get(GenerationAttemptCounter, node.id)
+    assert attempt is not None
+    assert attempt.operation_kind == "legacy_unknown"
+    assert attempt.heartbeat_at is not None
+    assert attempt.lease_expires_at is not None
+    assert attempt.heartbeat_at < attempt.lease_expires_at < utc_now()
+    assert counter is not None and counter.next_attempt_no == 2
+
+    result = AttemptRecoveryCoordinator(factory).reconcile()
+
+    with factory() as session:
+        attempt = session.get(GenerationAttempt, attempt_id)
+        usage = session.scalar(
+            select(UsageRecord).where(UsageRecord.generation_attempt_id == attempt_id)
+        )
+    assert result.submission_unknown == 1
+    assert attempt is not None and attempt.status == "submission_unknown"
+    assert usage is not None and usage.actual_cost is None
+
+    previous = os.environ.get("SHANHAI_DATABASE_URL")
+    os.environ["SHANHAI_DATABASE_URL"] = postgres_database_url
+    try:
+        command.downgrade(Config("alembic.ini"), "c2d4e6f8a901")
+    finally:
+        if previous is None:
+            os.environ.pop("SHANHAI_DATABASE_URL", None)
+        else:
+            os.environ["SHANHAI_DATABASE_URL"] = previous
+    with engine.connect() as connection:
+        assert (
+            connection.scalar(
+                text("SELECT status FROM generation_attempts WHERE id = :id"),
+                {"id": attempt_id},
+            )
+            == "failed"
+        )
+        assert "operation_kind" not in {
+            column["name"] for column in inspect(engine).get_columns("generation_attempts")
+        }
 
 
 def test_stage0_project_data_survives_identity_migration(postgres_database_url: str) -> None:

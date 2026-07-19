@@ -89,8 +89,7 @@ def upgrade() -> None:
     op.create_check_constraint(
         "ck_generation_attempts_lease_window_positive",
         "generation_attempts",
-        "lease_expires_at IS NULL OR heartbeat_at IS NULL "
-        "OR lease_expires_at > heartbeat_at",
+        "lease_expires_at IS NULL OR heartbeat_at IS NULL OR lease_expires_at > heartbeat_at",
     )
     op.create_index(
         "ix_generation_attempts_status_lease",
@@ -123,15 +122,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.execute("DROP TRIGGER IF EXISTS trg_generation_attempt_identity ON generation_attempts")
     op.execute(
-        "UPDATE generation_attempts SET status = 'failed' "
-        "WHERE status = 'submission_unknown'"
+        "UPDATE generation_attempts SET status = 'failed' WHERE status = 'submission_unknown'"
     )
     op.execute(
         "DROP TRIGGER IF EXISTS trg_usage_record_terminal_attempt ON usage_records; "
         "DROP FUNCTION IF EXISTS require_terminal_generation_attempt();"
     )
-    _replace_attempt_identity_trigger(include_operation_kind=False)
     op.drop_table("generation_attempt_counters")
     op.drop_index("ix_generation_attempts_status_lease", table_name="generation_attempts")
     op.drop_constraint(
@@ -173,11 +171,21 @@ def downgrade() -> None:
     op.drop_column("generation_attempts", "lease_expires_at")
     op.drop_column("generation_attempts", "lease_owner")
     op.drop_column("generation_attempts", "operation_kind")
+    _replace_attempt_identity_trigger(include_operation_kind=False)
+    op.execute(
+        """
+        CREATE TRIGGER trg_generation_attempt_identity
+        BEFORE UPDATE OR DELETE ON generation_attempts
+        FOR EACH ROW EXECUTE FUNCTION protect_generation_attempt_identity()
+        """
+    )
 
 
 def _replace_attempt_identity_trigger(*, include_operation_kind: bool) -> None:
     operation_check = (
-        "OR NEW.operation_kind IS DISTINCT FROM OLD.operation_kind" if include_operation_kind else ""
+        "OR NEW.operation_kind IS DISTINCT FROM OLD.operation_kind"
+        if include_operation_kind
+        else ""
     )
     op.execute(
         f"""
@@ -222,7 +230,8 @@ def _create_usage_terminal_trigger() -> None:
               AND node_run_id = NEW.node_run_id
               AND status IN ('succeeded', 'failed', 'cancelled', 'submission_unknown')
           ) THEN
-            RAISE EXCEPTION 'usage records require a matching terminal generation attempt';
+            RAISE EXCEPTION 'usage records require a matching terminal generation attempt'
+              USING ERRCODE = '23514';
           END IF;
           RETURN NEW;
         END;

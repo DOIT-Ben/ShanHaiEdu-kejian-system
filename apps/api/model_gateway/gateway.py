@@ -6,14 +6,13 @@ import asyncio
 import time
 from collections.abc import Awaitable, Callable, Mapping
 from typing import TypeVar
-from uuid import UUID
 
 from pydantic import BaseModel, ValidationError
 
 from apps.api.model_gateway.audit import (
+    AttemptAuditSink,
     AttemptHeartbeat,
     AttemptLease,
-    AttemptAuditSink,
     AttemptRequestAudit,
     AttemptSuccessAudit,
     DuplicateAttemptDelivery,
@@ -340,23 +339,34 @@ class ModelGateway:
         task = asyncio.ensure_future(invocation)
         if lease is None or context is None or self._audit_sink is None:
             return await task
-        while True:
-            done, _ = await asyncio.wait(
-                {task},
-                timeout=self._audit_heartbeat_seconds,
-            )
-            if done:
-                return await task
-            if cancellation is not None and cancellation.cancelled:
+        try:
+            while True:
+                done, _ = await asyncio.wait(
+                    {task},
+                    timeout=self._audit_heartbeat_seconds,
+                )
+                if done:
+                    return await task
+                if cancellation is not None and cancellation.cancelled:
+                    await _cancel_invocation(task)
+                    raise ModelGatewayError(GatewayErrorCode.CANCELLED, retryable=False)
+                try:
+                    heartbeat = await asyncio.to_thread(self._audit_sink.heartbeat, lease, context)
+                except Exception:
+                    await _cancel_invocation(task)
+                    raise ModelGatewayError(
+                        GatewayErrorCode.AUDIT_UNAVAILABLE,
+                        retryable=False,
+                    ) from None
+                if heartbeat == AttemptHeartbeat.ACTIVE:
+                    continue
                 await _cancel_invocation(task)
-                raise ModelGatewayError(GatewayErrorCode.CANCELLED, retryable=False)
-            heartbeat = await asyncio.to_thread(self._audit_sink.heartbeat, lease, context)
-            if heartbeat == AttemptHeartbeat.ACTIVE:
-                continue
+                if heartbeat == AttemptHeartbeat.CANCEL_REQUESTED:
+                    raise ModelGatewayError(GatewayErrorCode.CANCELLED, retryable=False)
+                raise ModelGatewayError(GatewayErrorCode.AUDIT_UNAVAILABLE, retryable=False)
+        except asyncio.CancelledError:
             await _cancel_invocation(task)
-            if heartbeat == AttemptHeartbeat.CANCEL_REQUESTED:
-                raise ModelGatewayError(GatewayErrorCode.CANCELLED, retryable=False)
-            raise ModelGatewayError(GatewayErrorCode.AUDIT_UNAVAILABLE, retryable=False)
+            raise
 
     def _start_audit(
         self,
@@ -469,9 +479,11 @@ class ModelGateway:
         )
 
 
-async def _cancel_invocation(task: asyncio.Future[object]) -> None:
+async def _cancel_invocation[T](task: asyncio.Future[T]) -> None:
     task.cancel()
     try:
         await task
     except asyncio.CancelledError:
+        pass
+    except Exception:
         pass
