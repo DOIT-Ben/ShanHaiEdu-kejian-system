@@ -4,7 +4,15 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from apps.api.model_gateway.contracts import TextModelRequest, TextProviderResult
+from apps.api.model_gateway.contracts import (
+    ImageModelRequest,
+    ImageProviderResult,
+    TextModelRequest,
+    TextProviderResult,
+    VideoModelRequest,
+    VideoPollRequest,
+    VideoProviderResult,
+)
 
 
 class CancellationToken(Protocol):
@@ -12,11 +20,25 @@ class CancellationToken(Protocol):
     def cancelled(self) -> bool: ...
 
 
-class TextProvider(Protocol):
+class ProviderMetadata(Protocol):
     @property
     def provider_name(self) -> str: ...
 
     @property
     def model_name(self) -> str: ...
 
+
+class TextProvider(ProviderMetadata, Protocol):
     async def complete(self, request: TextModelRequest) -> TextProviderResult: ...
+
+
+class ImageProvider(ProviderMetadata, Protocol):
+    async def generate(self, request: ImageModelRequest) -> ImageProviderResult: ...
+
+
+class VideoProvider(ProviderMetadata, Protocol):
+    async def submit(self, request: VideoModelRequest) -> VideoProviderResult: ...
+
+    async def poll(self, request: VideoPollRequest) -> VideoProviderResult: ...
+
+    async def cancel(self, request: VideoPollRequest) -> VideoProviderResult: ...

@@ -10,10 +10,23 @@ from typing import Any, cast
 import pytest
 from jsonschema import Draft202012Validator
 
+from apps.api.model_gateway.contracts import ModelCapability
 from workflow.node_generation_binding import (
+    REGISTERED_MODEL_CAPABILITIES,
     NodeGenerationBindingError,
     validate_workflow_node_catalog,
 )
+
+
+def test_workflow_and_gateway_share_one_model_capability_registry() -> None:
+    workflow_capabilities = {
+        capability.value
+        for capability in ModelCapability
+        if capability not in {ModelCapability.TEXT_SMOKE}
+    }
+
+    assert REGISTERED_MODEL_CAPABILITIES == workflow_capabilities
+
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACTS = ROOT / "contracts"

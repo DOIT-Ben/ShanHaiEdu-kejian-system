@@ -19,6 +19,8 @@ from apps.api.model_gateway.fake import DeterministicFakeTextProvider
 from apps.api.model_gateway.gateway import ModelGateway
 from apps.api.settings import get_settings
 
+TEXT_SMOKE_CAPABILITIES = (ModelCapability.TEXT_SMOKE,)
+
 
 async def run_model_smoke(*, capability: ModelCapability, real: bool) -> int:
     settings = get_settings()
@@ -113,7 +115,7 @@ def main() -> int:
     smoke = subparsers.add_parser("model-smoke", help="run an explicit text model smoke")
     smoke.add_argument(
         "--capability",
-        choices=[capability.value for capability in ModelCapability],
+        choices=[capability.value for capability in TEXT_SMOKE_CAPABILITIES],
         required=True,
     )
     smoke.add_argument("--real", action="store_true")
