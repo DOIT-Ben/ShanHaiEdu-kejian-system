@@ -14,6 +14,7 @@ from apps.api.database import build_engine, build_session_factory
 from apps.api.identity.models import SYSTEM_PRINCIPAL_ID
 from apps.api.ids import new_uuid7
 from apps.api.logging import configure_logging
+from apps.api.model_registry import register_models
 from apps.api.model_gateway.contracts import (
     ModelCapability,
     ModelGatewayError,
@@ -39,6 +40,7 @@ def run_publish_golden_content(*, database_url: str | None = None, root: Path = 
     else:
         resolved_database_url = database_url
     source = load_builtin_courseware_release(root)
+    register_models()
     engine = build_engine(resolved_database_url)
     try:
         factory = build_session_factory(engine)
