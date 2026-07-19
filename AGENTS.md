@@ -8,13 +8,14 @@ Use each source for one purpose only:
 
 1. `README.md`: stable project introduction and start commands.
 2. `AGENTS.md`: stable repository-wide rules.
-3. `CURRENT_STATUS.md`: current milestone, active work and next gate only.
-4. GitHub Issues: task scope, acceptance criteria, decisions and task status.
-5. GitHub Pull Requests: changed code, verification evidence and handoff.
-6. `docs/product/` and `docs/workflows/`: current product intent and business semantics.
-7. `contracts/`: current machine-readable boundaries.
-8. Current code, migrations and tests: implemented runtime behavior.
-9. Git history: superseded versions and historical context.
+3. `docs/governance/项目记忆与接手索引.md`: stable fact routing, verification entry points and recurring takeover pitfalls only.
+4. `CURRENT_STATUS.md`: current milestone, active work and next gate only.
+5. GitHub Issues: task scope, acceptance criteria, decisions and task status.
+6. GitHub Pull Requests: changed code, verification evidence and handoff.
+7. `docs/product/` and `docs/workflows/`: current product intent and business semantics.
+8. `contracts/`: current machine-readable boundaries.
+9. Current code, migrations and tests: implemented runtime behavior.
+10. Git history: superseded versions and historical context.
 
 If intent, contract and implementation disagree, stop and open or update an Issue. Do not silently choose one, support contradictory behavior, or add a patch note.
 
@@ -22,7 +23,7 @@ If intent, contract and implementation disagree, stop and open or update an Issu
 
 Before changing files:
 
-1. Read `README.md`, this file and `CURRENT_STATUS.md`.
+1. Read `README.md`, this file, `docs/governance/项目记忆与接手索引.md` and `CURRENT_STATUS.md`.
 2. Run `git fetch origin --prune` and inspect branch, HEAD, upstream and dirty files.
 3. Read the assigned Issue and linked Pull Request.
 4. Read only the module documents, contracts, code and tests relevant to the task.
@@ -76,6 +77,7 @@ Uncommitted local files are not a handoff. Never claim work is saved without a v
 - A document has one responsibility. At more than 300 lines, split it or explain the exception in review.
 - New documents must have an owner, audience, canonical path and deletion or replacement rule.
 - Durable architectural or product changes require a Decision Issue before canonical documents are changed.
+- External memory may point to this repository and its project memory index, but must not replace live project facts or store task branches, commits, ports or Pull Request state.
 
 See `docs/governance/DOCUMENT_POLICY.md` for placement and lifecycle rules.
 
@@ -131,3 +133,4 @@ A task is done only after acceptance criteria pass, implementation and canonical
 
 Detailed placement rules are in `docs/governance/DOCUMENT_POLICY.md`; current delivery gates are in `docs/governance/DELIVERY_ROADMAP.md`.
 Recurring collaboration failure mechanisms and their current prevention controls are in `docs/governance/协作机制复盘与防复发.md`.
+Stable takeover routing and project-specific memory boundaries are in `docs/governance/项目记忆与接手索引.md`.

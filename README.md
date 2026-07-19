@@ -9,6 +9,7 @@
 不同文件只承担一种职责：
 
 - [AGENTS.md](AGENTS.md)：所有开发者、外包和智能体必须遵守的仓库总则。
+- [项目记忆与接手索引](docs/governance/项目记忆与接手索引.md)：稳定原则、事实路由、验证入口和接手陷阱；不保存实时状态。
 - [CURRENT_STATUS.md](CURRENT_STATUS.md)：当前里程碑、活跃任务、阻塞和下一阶段出口。
 - [docs/START_HERE.md](docs/START_HERE.md)：按产品、前端、后端和测试角色提供最短阅读路径。
 - GitHub Issues：任务范围、验收、决策和交接的唯一事实源。

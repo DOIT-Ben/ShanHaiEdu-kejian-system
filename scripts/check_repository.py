@@ -27,6 +27,7 @@ REQUIRED = {
     "docs/governance/TEAM_WORKFLOW.md",
     "docs/governance/DOCUMENT_POLICY.md",
     "docs/governance/DELIVERY_ROADMAP.md",
+    "docs/governance/项目记忆与接手索引.md",
     "contracts/api-surface.openapi.yaml",
     "contracts/generated/openapi.bundle.yaml",
     "contracts/generated/typescript/schema.ts",
@@ -73,6 +74,64 @@ STALE_BACKEND_CLAIMS = (
 BACKEND_STAGE_ACKNOWLEDGEMENT = re.compile(
     rf"^当前阶段{FULLWIDTH_COLON}.*阶段1",
     re.MULTILINE,
+)
+PROJECT_MEMORY_SECTIONS = (
+    "# 项目记忆与接手索引",
+    "## 职责和权威",
+    "## 接手读取顺序",
+    "## 稳定产品原则",
+    "## 模块与事实入口",
+    "## 验证入口",
+    "## 记忆边界",
+    "## 维护责任",
+)
+PROJECT_MEMORY_MARKDOWN_DECORATION = re.compile(r"[*_`]")
+PROJECT_MEMORY_LINE_PREFIX = re.compile(r"^\s*(?:>\s*)?(?:[-+*]\s+)?")
+PROJECT_MEMORY_FORBIDDEN_PATTERNS = (
+    (
+        "local absolute path",
+        re.compile(
+            r"(?im)(?<![a-z0-9_])(?:[a-z]:[\\/]|"
+            r"\\\\[^\\\s]+\\[^\\\s]+|"
+            r"(?<![a-z0-9:/.])/(?!/)(?:[a-z0-9._-]+/)+[a-z0-9._-]+)"
+        ),
+    ),
+    (
+        "full commit SHA",
+        re.compile(r"(?i)(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])"),
+    ),
+    (
+        "concrete branch state",
+        re.compile(
+            r"(?im)^\s*(?:当前\s*)?(?:任务\s*)?(?:分支|branch|task branch)"
+            r"\s*[:\N{FULLWIDTH COLON}]\s*(?:refs/heads/)?"
+            r"[a-z0-9._-]+(?:/[a-z0-9._-]+)*(?=\s|$)"
+        ),
+    ),
+    (
+        "concrete commit state",
+        re.compile(
+            r"(?im)^\s*(?:当前\s*)?(?:提交|commit|base\s+sha|head\s+sha)"
+            r"\s*[:\N{FULLWIDTH COLON}]\s*[0-9a-f]{7,40}(?=\s|$)"
+        ),
+    ),
+    (
+        "concrete pull request state",
+        re.compile(
+            r"(?im)(?<![a-z0-9])(?:当前\s*)?(?:PR|Pull Request)"
+            r"\s*(?:[:\N{FULLWIDTH COLON}]\s*)?#?\d+\b|"
+            r"https://github\.com/[^\s)]+/pull/\d+"
+        ),
+    ),
+    (
+        "concrete port state",
+        re.compile(
+            r"(?im)^\s*(?:[-*]\s*)?(?:当前\s*)?(?:端口|port)"
+            r"\s*[:\N{FULLWIDTH COLON}]\s*\d{2,5}\b|"
+            r"https?://(?:localhost|127(?:\.\d+){3}|\[::1\])(?::\d{2,5})?|"
+            r"(?<![a-z0-9.-])(?:localhost|127\.0\.0\.1|\[::1\]):\d{2,5}\b"
+        ),
+    ),
 )
 
 
@@ -181,6 +240,35 @@ def check_current_status(status: Path, root: Path, errors: list[str]) -> None:
             errors.append(f"CURRENT_STATUS.md contains a stale backend claim: {claim}")
 
 
+def check_project_memory_index(index: Path, errors: list[str]) -> None:
+    try:
+        text = index.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        errors.append(f"cannot read project memory index: {exc}")
+        return
+
+    lines = set(text.splitlines())
+    for section in PROJECT_MEMORY_SECTIONS:
+        if section not in lines:
+            errors.append(f"project memory index missing required section: {section}")
+
+    normalized_lines: list[str] = []
+    for line in text.splitlines():
+        normalized = PROJECT_MEMORY_LINE_PREFIX.sub("", line)
+        normalized = PROJECT_MEMORY_MARKDOWN_DECORATION.sub("", normalized)
+        normalized = normalized.strip()
+        if normalized.startswith("|") and normalized.endswith("|"):
+            cells = [cell.strip() for cell in normalized.strip("|").split("|")]
+            if len(cells) >= 2:
+                normalized = f"{cells[0]}: {cells[1]}"
+        normalized_lines.append(normalized)
+    normalized_text = "\n".join(normalized_lines)
+
+    for label, pattern in PROJECT_MEMORY_FORBIDDEN_PATTERNS:
+        if pattern.search(normalized_text) is not None:
+            errors.append(f"project memory index contains {label}")
+
+
 def check_checksum_manifest(manifest: Path, errors: list[str]) -> None:
     try:
         lines = manifest.read_text(encoding="utf-8").splitlines()
@@ -239,6 +327,7 @@ def main() -> int:
     check_yaml(files, errors)
     check_markdown_links(files, errors)
     check_current_status(ROOT / "CURRENT_STATUS.md", ROOT, errors)
+    check_project_memory_index(ROOT / "docs/governance/项目记忆与接手索引.md", errors)
     check_checksum_manifest(FRONTEND_CHECKSUMS, errors)
     report_size_triggers(files)
 
