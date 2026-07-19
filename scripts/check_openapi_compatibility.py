@@ -14,6 +14,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = Path("contracts/api-surface.openapi.yaml")
+PLANNED_CONTRACT_PATH = Path("contracts/planned-api-surface.openapi.yaml")
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 
 
@@ -349,6 +350,7 @@ def compare_operations(
     base_document: Mapping[str, Any],
     current_document: Mapping[str, Any],
     errors: list[str],
+    allowed_removed_operations: frozenset[tuple[str, str]],
 ) -> None:
     base_operations = operation_map(base_document)
     current_operations = operation_map(current_document)
@@ -357,7 +359,8 @@ def compare_operations(
         label = f"{method.upper()} {path}"
         current_operation = current_operations.get(key)
         if current_operation is None:
-            errors.append(f"{label}: operation removed")
+            if key not in allowed_removed_operations:
+                errors.append(f"{label}: operation removed")
             continue
         if base_operation.get("operationId") != current_operation.get("operationId"):
             errors.append(f"{label}: operationId changed")
@@ -392,16 +395,25 @@ def compare_operations(
 def find_breaking_changes(
     base_document: Mapping[str, Any],
     current_document: Mapping[str, Any],
+    *,
+    allowed_removed_operations: frozenset[tuple[str, str]] = frozenset(),
+    allowed_removed_schemas: frozenset[str] = frozenset(),
 ) -> list[str]:
     errors: list[str] = []
-    compare_operations(base_document, current_document, errors)
+    compare_operations(
+        base_document,
+        current_document,
+        errors,
+        allowed_removed_operations,
+    )
 
     base_schemas = base_document.get("components", {}).get("schemas", {})
     current_schemas = current_document.get("components", {}).get("schemas", {})
     if isinstance(base_schemas, Mapping) and isinstance(current_schemas, Mapping):
         for name, base_schema in base_schemas.items():
             if name not in current_schemas:
-                errors.append(f"component schema removed: {name}")
+                if name not in allowed_removed_schemas:
+                    errors.append(f"component schema removed: {name}")
                 continue
             compare_schema(
                 base_document,
@@ -414,6 +426,67 @@ def find_breaking_changes(
     return sorted(set(errors))
 
 
+def find_partition_aware_breaking_changes(
+    base_document: Mapping[str, Any],
+    current_document: Mapping[str, Any],
+    planned_document: Mapping[str, Any],
+) -> list[str]:
+    allowed_operations: set[tuple[str, str]] = set()
+    allowed_schemas: set[str] = set()
+    is_initial_partition = (
+        base_document.get("x-shanhai-contract-kind") is None
+        and current_document.get("x-shanhai-contract-kind") == "runtime"
+        and planned_document.get("x-shanhai-contract-kind") == "planned"
+    )
+    if is_initial_partition:
+        base_operations = operation_map(base_document)
+        current_operations = operation_map(current_document)
+        planned_operations = operation_map(planned_document)
+        for key, base_operation in base_operations.items():
+            planned_operation = planned_operations.get(key)
+            if key in current_operations or planned_operation is None:
+                continue
+            if planned_operation.get(
+                "x-shanhai-availability"
+            ) == "planned" and normalize_partition_value(
+                base_operation
+            ) == normalize_partition_value(planned_operation):
+                allowed_operations.add(key)
+
+        base_schemas = base_document.get("components", {}).get("schemas", {})
+        current_schemas = current_document.get("components", {}).get("schemas", {})
+        planned_schemas = planned_document.get("components", {}).get("schemas", {})
+        if all(
+            isinstance(schemas, Mapping)
+            for schemas in (base_schemas, current_schemas, planned_schemas)
+        ):
+            for name, base_schema in base_schemas.items():
+                if name not in current_schemas and planned_schemas.get(name) == base_schema:
+                    allowed_schemas.add(name)
+
+    return find_breaking_changes(
+        base_document,
+        current_document,
+        allowed_removed_operations=frozenset(allowed_operations),
+        allowed_removed_schemas=frozenset(allowed_schemas),
+    )
+
+
+def normalize_partition_value(value: Any) -> Any:
+    if isinstance(value, list):
+        return [normalize_partition_value(item) for item in value]
+    if not isinstance(value, Mapping):
+        return value
+    normalized: dict[str, Any] = {}
+    for key, item in value.items():
+        if key == "x-shanhai-availability":
+            continue
+        if key == "$ref" and isinstance(item, str):
+            item = item.removeprefix("./api-surface.openapi.yaml")
+        normalized[str(key)] = normalize_partition_value(item)
+    return normalized
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-ref", default="origin/main")
@@ -421,11 +494,18 @@ def main() -> int:
     try:
         base_document = load_base_contract(args.base_ref)
         current_document = load_yaml_text((ROOT / CONTRACT_PATH).read_text(encoding="utf-8"))
+        planned_document = load_yaml_text(
+            (ROOT / PLANNED_CONTRACT_PATH).read_text(encoding="utf-8")
+        )
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:
         print(f"cannot load OpenAPI contracts: {type(exc).__name__}", file=sys.stderr)
         return 2
 
-    errors = find_breaking_changes(base_document, current_document)
+    errors = find_partition_aware_breaking_changes(
+        base_document,
+        current_document,
+        planned_document,
+    )
     if errors:
         for error in errors:
             print(f"breaking OpenAPI change: {error}", file=sys.stderr)

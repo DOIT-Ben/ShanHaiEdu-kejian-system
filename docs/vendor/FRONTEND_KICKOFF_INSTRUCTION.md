@@ -16,7 +16,7 @@
 >
 > 固定技术栈：React 19、TypeScript严格模式、Vite、React Router、Tailwind CSS、Radix UI/shadcn、TanStack Query、Zustand仅管理UI状态、React Hook Form、Zod、Framer Motion、Vitest、Testing Library、Playwright和Storybook。不得改成Next.js、低代码平台或另一套框架。
 >
-> 前期按根目录`contracts/`和`mock-scenarios.json`开发。真实联调以后端生成OpenAPI为准。遇到合同缺口，在Issue #4提交复现、影响和建议，等待后端统一修改；不得手写重复DTO、私自增加字段或偷偷改变语义。
+> 前期只按`contracts/api-surface.openapi.yaml`和`mock-scenarios.json`开发，类型也只从该当前合同生成。`contracts/planned-api-surface.openapi.yaml`仅用于查看后续方向，不得生成客户端、Mock接口或冒充已可联调。当前合同由CI与后端运行时OpenAPI双向校验；遇到合同缺口，在Issue #4提交复现、影响和建议，等待后端统一修改，不得手写重复DTO、私自增加字段或偷偷改变语义。
 >
 > 所有生成节点必须展示：当前输入与选择、系统组装后的可编辑业务提示词、模型输出面板、编辑/审核/返修、确认进入下一步。刷新和失败不能丢失已编辑内容。高级参数默认收起，一个工作区域只保留一个主操作。
 >

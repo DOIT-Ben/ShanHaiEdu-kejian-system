@@ -29,6 +29,7 @@ REQUIRED = {
     "docs/governance/DELIVERY_ROADMAP.md",
     "docs/governance/项目记忆与接手索引.md",
     "contracts/api-surface.openapi.yaml",
+    "contracts/planned-api-surface.openapi.yaml",
     "contracts/generated/openapi.bundle.yaml",
     "contracts/generated/typescript/schema.ts",
     "contracts/mock-scenarios.schema.json",

@@ -35,6 +35,7 @@ TEXT_SUFFIXES = {
 REQUIRED_FILES = ROOT_FILES | {
     "contracts/README.md",
     "contracts/api-surface.openapi.yaml",
+    "contracts/planned-api-surface.openapi.yaml",
     "contracts/fixtures/primary-math-courseware-package/manifest.json",
     "contracts/generated/openapi.bundle.yaml",
     "contracts/generated/typescript/schema.ts",

@@ -5,7 +5,10 @@ from pathlib import Path
 
 import yaml
 
-from scripts.check_openapi_compatibility import find_breaking_changes
+from scripts.check_openapi_compatibility import (
+    find_breaking_changes,
+    find_partition_aware_breaking_changes,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -34,6 +37,68 @@ def test_removed_operation_is_breaking() -> None:
     assert "POST /projects: operation removed" in errors
 
 
+def test_initial_mixed_surface_partition_tracks_never_runtime_contracts() -> None:
+    base = load_current_contract()
+    base.pop("x-shanhai-contract-kind")
+    operation = {
+        "operationId": "futureOperation",
+        "responses": {"204": {"description": "Planned"}},
+    }
+    schema = {"type": "object", "properties": {"id": {"type": "string"}}}
+    base["paths"]["/future"] = {"post": deepcopy(operation)}
+    base["components"]["schemas"]["FutureEnvelope"] = deepcopy(schema)
+    current = deepcopy(base)
+    current["x-shanhai-contract-kind"] = "runtime"
+    del current["paths"]["/future"]
+    del current["components"]["schemas"]["FutureEnvelope"]
+    planned = {
+        "x-shanhai-contract-kind": "planned",
+        "paths": {
+            "/future": {
+                "post": {
+                    **deepcopy(operation),
+                    "x-shanhai-availability": "planned",
+                }
+            }
+        },
+        "components": {"schemas": {"FutureEnvelope": deepcopy(schema)}},
+    }
+
+    assert find_partition_aware_breaking_changes(base, current, planned) == []
+
+    planned["paths"]["/future"]["post"]["responses"]["204"]["description"] = (
+        "Changed during partition"
+    )
+    errors = find_partition_aware_breaking_changes(base, current, planned)
+    assert "POST /future: operation removed" in errors
+
+
+def test_runtime_contract_cannot_later_move_back_to_planned() -> None:
+    base = load_current_contract()
+    operation = {
+        "operationId": "futureOperation",
+        "responses": {"204": {"description": "Planned"}},
+    }
+    base["paths"]["/future"] = {"post": deepcopy(operation)}
+    current = deepcopy(base)
+    del current["paths"]["/future"]
+    planned = {
+        "x-shanhai-contract-kind": "planned",
+        "paths": {
+            "/future": {
+                "post": {
+                    **deepcopy(operation),
+                    "x-shanhai-availability": "planned",
+                }
+            }
+        },
+    }
+
+    errors = find_partition_aware_breaking_changes(base, current, planned)
+
+    assert "POST /future: operation removed" in errors
+
+
 def test_required_property_and_changed_enum_values_are_breaking() -> None:
     base = load_current_contract()
     current = deepcopy(base)
@@ -51,7 +116,7 @@ def test_path_parameter_removal_and_new_required_parameter_are_breaking() -> Non
     base = load_current_contract()
     project_path = base["paths"]["/projects/{project_id}"]
     project_path["parameters"] = [{"$ref": "#/components/parameters/ProjectId"}]
-    for method in ("get", "patch"):
+    for method in ("get",):
         project_path[method]["parameters"] = [
             parameter
             for parameter in project_path[method]["parameters"]

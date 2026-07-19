@@ -1,13 +1,14 @@
 openapi: 3.1.0
 info:
   title: ShanHaiEdu Core Integration Surface
-  version: 2.6.0
+  version: 3.0.0
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
   description: >-
-    当前核心联调合同。后端运行时生成的 OpenAPI 可以增加资源和字段，
-    但不得改变本文件已定义的语义、错误包、并发和幂等约定。
+    当前可调用的核心联调合同。operationId 必须与后端运行时 OpenAPI 双向一致；
+    尚未实现的接口只允许进入 planned-api-surface.openapi.yaml。
+x-shanhai-contract-kind: runtime
 servers:
   - url: /api/v2
 security:
@@ -95,41 +96,6 @@ paths:
           headers:
             ETag:
               schema: {type: string}
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProjectEnvelope'
-        '4XX':
-          $ref: '#/components/responses/Error'
-    patch:
-      summary: 更新项目设置
-      operationId: updateProject
-      parameters:
-        - $ref: '#/components/parameters/ProjectId'
-        - $ref: '#/components/parameters/IfMatch'
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              properties:
-                title: {type: string, minLength: 1, maxLength: 255}
-                execution_mode:
-                  $ref: '#/components/schemas/AutomationPolicyMode'
-                automation_mode:
-                  $ref: '#/components/schemas/AutomationMode'
-              not:
-                type: object
-                properties:
-                  automation_mode: {}
-                  execution_mode: {}
-                required: [automation_mode, execution_mode]
-      responses:
-        '200':
-          description: Updated project
           content:
             application/json:
               schema:
@@ -534,52 +500,6 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/ApprovalEnvelope'}
         '4XX': {$ref: '#/components/responses/Error'}
-  /lessons/{lesson_id}/intro-options:
-    get:
-      summary: 获取课时三类九套导入设计
-      operationId: getLessonIntroOptions
-      parameters:
-        - $ref: '#/components/parameters/LessonId'
-      responses:
-        '200':
-          description: Three categories and nine approved or draft introduction options
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [data, request_id]
-                properties:
-                  data: {$ref: './intro-option-set.schema.json'}
-                  request_id: {type: string}
-        '4XX':
-          $ref: '#/components/responses/Error'
-  /lessons/{lesson_id}/intro-selections:
-    post:
-      summary: 选择一个课堂导入方案
-      operationId: selectLessonIntroOption
-      parameters:
-        - $ref: '#/components/parameters/LessonId'
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [intro_option_set_version_id, option_key]
-              properties:
-                intro_option_set_version_id: {type: string, format: uuid}
-                option_key: {type: string}
-      responses:
-        '201':
-          description: Immutable active selection created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/IntroSelectionEnvelope'
-        '4XX':
-          $ref: '#/components/responses/Error'
   /node-runs/{node_run_id}/prompt-preview:
     get:
       summary: 获取节点最终业务提示词预览
@@ -593,47 +513,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PromptPreviewEnvelope'
-        '4XX':
-          $ref: '#/components/responses/Error'
-  /node-runs/{node_run_id}/start:
-    post:
-      summary: 启动节点运行
-      operationId: startNodeRun
-      parameters:
-        - $ref: '#/components/parameters/NodeRunId'
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                prompt_revision_id: {type: string, format: uuid}
-      responses:
-        '202':
-          $ref: '#/components/responses/AcceptedJob'
-        '4XX':
-          $ref: '#/components/responses/Error'
-  /node-runs/{node_run_id}/creation-packages:
-    post:
-      summary: 从项目节点创建不可变创作包
-      operationId: createCreationPackage
-      parameters:
-        - $ref: '#/components/parameters/NodeRunId'
-        - $ref: '#/components/parameters/IdempotencyKey'
-      responses:
-        '201':
-          description: Immutable package created
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [data, request_id]
-                properties:
-                  data:
-                    $ref: './creation-package.schema.json'
-                  request_id: {type: string}
         '4XX':
           $ref: '#/components/responses/Error'
   /creation-batches:
@@ -1610,20 +1489,6 @@ components:
         exposure: {type: string, enum: [full, summary, hidden]}
         item_count: {type: integer, minimum: 0}
         content_hash: {type: string, pattern: '^[0-9a-f]{64}$'}
-    IntroSelectionEnvelope:
-      type: object
-      required: [data, request_id]
-      properties:
-        data:
-          type: object
-          required: [selection_id, option_set_version_id, option_key, choice_mode, selected_at]
-          properties:
-            selection_id: {type: string, format: uuid}
-            option_set_version_id: {type: string, format: uuid}
-            option_key: {type: string}
-            choice_mode: {enum: [teacher_selected, policy_default]}
-            selected_at: {type: string, format: date-time}
-        request_id: {type: string}
     AcceptedJobEnvelope:
       type: object
       required: [data, request_id]
