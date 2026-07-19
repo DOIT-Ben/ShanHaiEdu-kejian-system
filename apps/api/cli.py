@@ -31,7 +31,13 @@ ROOT = Path(__file__).resolve().parents[2]
 def run_publish_golden_content(*, database_url: str | None = None, root: Path = ROOT) -> int:
     """Publish the validated built-in package and print a non-sensitive result summary."""
 
-    resolved_database_url = database_url or get_settings().database_url
+    if database_url is None:
+        configured_database_url = get_settings().database_url
+        if configured_database_url is None:
+            raise RuntimeError("SHANHAI_DATABASE_URL is required for content publication")
+        resolved_database_url = configured_database_url.get_secret_value()
+    else:
+        resolved_database_url = database_url
     source = load_builtin_courseware_release(root)
     engine = build_engine(resolved_database_url)
     try:
