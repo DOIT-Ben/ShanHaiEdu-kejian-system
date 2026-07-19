@@ -20,7 +20,7 @@ describe("FinalVideoStep synthesis single flight", () => {
     return nodeId;
   }
 
-  it("连续点击重新合成只创建一个运行中的任务", () => {
+  it("连续点击生成只创建一个运行中的任务", () => {
     render(
       <MemoryRouter initialEntries={["/projects/project-a/lessons/lesson-a/work/final-video"]}>
         <Routes>
@@ -32,7 +32,7 @@ describe("FinalVideoStep synthesis single flight", () => {
       </MemoryRouter>,
     );
 
-    const button = screen.getByRole("button", { name: "重新合成" });
+    const button = screen.getByRole("button", { name: "开始生成视频" });
     fireEvent.click(button);
     fireEvent.click(button);
 
@@ -41,16 +41,16 @@ describe("FinalVideoStep synthesis single flight", () => {
     );
     expect(tasks).toHaveLength(1);
     expect(tasks[0]?.status).toBe("running");
-    expect(screen.getByRole("button", { name: "成片合成中" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "正在合成" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "视频生成中" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "正在生成" })).toBeDisabled();
   });
 
   it.each([
-    { action: "重新合成", badge: "需要处理", status: "failed" },
-    { action: "重新合成", badge: "已取消", status: "cancelled" },
-    { action: "继续合成", badge: "已暂停", status: "paused" },
-    { action: "重新合成", badge: "部分完成", status: "partially_completed" },
-  ] as const)("任务为 $status 时禁止确认成片并提供恢复入口", async ({ action, badge, status }) => {
+    { action: "重新生成视频", badge: "需要处理", status: "failed" },
+    { action: "重新生成视频", badge: "已取消", status: "cancelled" },
+    { action: "继续生成视频", badge: "已暂停", status: "paused" },
+    { action: "重新生成视频", badge: "部分完成", status: "partially_completed" },
+  ] as const)("任务为 $status 时禁止确认视频并提供恢复入口", async ({ action, badge, status }) => {
     render(
       <MemoryRouter initialEntries={["/projects/project-a/lessons/lesson-a/work/final-video"]}>
         <Routes>
@@ -62,7 +62,7 @@ describe("FinalVideoStep synthesis single flight", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "重新合成" }));
+    fireEvent.click(screen.getByRole("button", { name: "开始生成视频" }));
     const task = getMockRuntimeState().tasks.find(
       (item) => item.node_run_id === finalVideoNodeId(),
     );
@@ -76,13 +76,58 @@ describe("FinalVideoStep synthesis single flight", () => {
       ),
     );
     expect(screen.getByText(badge)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "确认成片" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "确认视频" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: action })).not.toHaveLength(0);
     expect(
       screen
         .getAllByRole("button", { name: action })
         .every((button) => !(button as HTMLButtonElement).disabled),
     ).toBe(true);
+  });
+
+  it("没有真实视频地址时只显示关键帧并禁止确认", () => {
+    render(
+      <MemoryRouter initialEntries={["/projects/project-a/lessons/lesson-a/work/final-video"]}>
+        <Routes>
+          <Route
+            element={<FinalVideoStep />}
+            path="/projects/:projectId/lessons/:lessonId/work/final-video"
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("button", { name: "视频尚未生成" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "确认视频" })).not.toBeInTheDocument();
+    expect(screen.getAllByText(/关键帧示意/).length).toBeGreaterThan(0);
+    expect(screen.queryByText("技术检查")).not.toBeInTheDocument();
+    expect(screen.getByText("画面尚未检查")).toBeInTheDocument();
+    expect(screen.getByText("声音尚未检查")).toBeInTheDocument();
+    expect(screen.getByText("字幕尚未检查")).toBeInTheDocument();
+  });
+
+  it("只有明确的视频地址才开放播放与确认", () => {
+    saveMockDraft(
+      "project:project-a:lesson:lesson-a:final-video:media",
+      { mimeType: "video/mp4", src: "https://cdn.example.com/final.mp4" },
+      { lessonId: "lesson-a", nodeKey: "final-video", projectId: "project-a" },
+    );
+    render(
+      <MemoryRouter initialEntries={["/projects/project-a/lessons/lesson-a/work/final-video"]}>
+        <Routes>
+          <Route
+            element={<FinalVideoStep />}
+            path="/projects/:projectId/lessons/:lessonId/work/final-video"
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByLabelText("果汁标签侦探课堂导入视频").tagName).toBe("VIDEO");
+    expect(screen.getByRole("button", { name: "确认视频" })).toBeEnabled();
+    expect(screen.getByText("画面正常")).toBeInTheDocument();
+    expect(screen.getByText("声音清楚")).toBeInTheDocument();
+    expect(screen.getByText("字幕易读")).toBeInTheDocument();
   });
 
   it("优先使用当前任务引用，不会被旧的同节点任务覆盖", async () => {

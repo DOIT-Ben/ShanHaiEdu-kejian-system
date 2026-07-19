@@ -19,8 +19,8 @@ const videoPipelineDependents = [
   ["rough-storyboard", "安排故事镜头"],
   ["video-style", "确定画面风格"],
   ["video-assets", "制作镜头图片"],
-  ["fine-storyboard", "制作视频片段"],
-  ["final-video", "合成完整视频"],
+  ["fine-storyboard", "选择关键帧参考"],
+  ["final-video", "生成课堂导入视频"],
 ] as const;
 
 const lessonDivisionDependents = [
@@ -31,8 +31,8 @@ const lessonDivisionDependents = [
   ["rough-storyboard", "安排故事镜头"],
   ["video-style", "确定画面风格"],
   ["video-assets", "制作镜头图片"],
-  ["fine-storyboard", "制作视频片段"],
-  ["final-video", "合成完整视频"],
+  ["fine-storyboard", "选择关键帧参考"],
+  ["final-video", "生成课堂导入视频"],
 ] as const;
 
 /** Mark only existing downstream drafts/nodes stale after a new input version is approved. */
@@ -199,7 +199,7 @@ export function markVideoAssetsDependentsStale(
     projectId,
     lessonId,
     3,
-    "镜头图片已批准新版本，请更新视频片段与成片",
+    "镜头图片已批准新版本，请更新关键帧参考并重新生成视频",
     store,
   );
 }
@@ -215,7 +215,7 @@ export function markFineStoryboardDependentsStale(
     projectId,
     lessonId,
     4,
-    "视频片段已批准新版本，请重新合成完整视频",
+    "关键帧参考已批准新版本，请重新生成课堂导入视频",
     store,
   );
 }

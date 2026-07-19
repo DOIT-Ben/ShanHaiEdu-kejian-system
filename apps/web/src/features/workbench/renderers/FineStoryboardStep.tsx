@@ -1,13 +1,4 @@
-import {
-  ArrowRight,
-  Check,
-  Clock3,
-  Image,
-  PencilLine,
-  Play,
-  RefreshCw,
-  Volume2,
-} from "lucide-react";
+import { ArrowRight, Check, Clock3, Image, PencilLine, RefreshCw, Volume2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { VideoScenePreview } from "@/features/home/components/VideoScenePreview";
@@ -121,7 +112,7 @@ export function FineStoryboardStep() {
       updateMockNodeState(projectId, lessonId, "fine-storyboard", {
         stale_reason: null,
         status: nextApproved ? "approved" : "review_required",
-        title: "制作视频片段",
+        title: "选择关键帧参考",
       });
     }
   };
@@ -135,13 +126,13 @@ export function FineStoryboardStep() {
                 updateMockNodeState(projectId, lessonId, "fine-storyboard", {
                   stale_reason: null,
                   status: "approved",
-                  title: "制作视频片段",
+                  title: "选择关键帧参考",
                 });
               }}
               size="md"
             >
               <Check aria-hidden="true" />
-              重新确认全部片段
+              重新确认全部关键帧
             </Button>
           ) : approved ? (
             <>
@@ -155,11 +146,11 @@ export function FineStoryboardStep() {
                 variant="secondary"
               >
                 <PencilLine aria-hidden="true" />
-                重新选择当前片段
+                重新选择当前关键帧
               </Button>
               <Button asChild size="md">
                 <Link to={`/app/projects/${projectId}/lessons/${lessonId}/work/final-video`}>
-                  合成完整视频
+                  查看视频生成状态
                   <ArrowRight aria-hidden="true" />
                 </Link>
               </Button>
@@ -175,7 +166,7 @@ export function FineStoryboardStep() {
               variant="secondary"
             >
               <PencilLine aria-hidden="true" />
-              重新选择片段
+              重新选择关键帧
             </Button>
           ) : (
             <Button
@@ -188,16 +179,16 @@ export function FineStoryboardStep() {
               size="md"
             >
               <Check aria-hidden="true" />
-              {canAdopt ? "采用这个结果" : "片段尚未准备好"}
+              {canAdopt ? "选择这个关键帧参考" : "关键帧尚未准备好"}
             </Button>
           )
         }
-        eyebrow="当前要做：检查并采用视频片段"
+        eyebrow="当前要做：选择关键帧参考"
         hideEyebrow
         status={
           <StatusBadge status={stale ? "stale" : approved ? "approved" : effectiveShotStatus} />
         }
-        title={`${demo ? demoVideoTitle : topic} · 已采用 ${String(saved?.adoptedShots?.length ?? 0)}/${String(shots.length)} 个片段`}
+        title={`${demo ? demoVideoTitle : topic} · 已选择 ${String(saved?.adoptedShots?.length ?? 0)}/${String(shots.length)} 个关键帧`}
       />
       {stale ? <StaleContentNotice reason={nodeState.stale_reason?.summary} /> : null}
       <div className="mt-4 grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)_240px]">
@@ -239,7 +230,7 @@ export function FineStoryboardStep() {
           <div className="mt-3 flex gap-2 overflow-x-auto">
             {[1, 2, 3].map((candidate) => (
               <button
-                aria-label={`备选片段 ${String(candidate)}`}
+                aria-label={`关键帧参考 ${String(candidate)}`}
                 aria-pressed={selectedCandidate === candidate}
                 className={`w-32 shrink-0 rounded-[var(--sh-radius-sm)] border bg-[var(--sh-surface-elevated)] p-2 text-left ${selectedCandidate === candidate ? "border-[var(--sh-brand-500)]" : "border-[var(--sh-line-subtle)]"}`}
                 key={candidate}
@@ -259,17 +250,17 @@ export function FineStoryboardStep() {
                   topic={demo ? undefined : topic}
                   variant={demo ? selected + candidate - 1 : previewVariant + candidate - 1}
                 />
-                <span className="mt-1 block text-xs font-semibold">备选片段 {candidate}</span>
+                <span className="mt-1 block text-xs font-semibold">关键帧参考 {candidate}</span>
               </button>
             ))}
           </div>
         </section>
         <aside className="h-fit rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-4">
-          <h2 className="font-semibold text-[var(--sh-ink-strong)]">镜头内容</h2>
+          <h2 className="font-semibold text-[var(--sh-ink-strong)]">关键帧说明</h2>
           <div className="mt-4 space-y-4 text-sm">
             <div>
               <p className="flex items-center gap-1.5 text-xs font-semibold text-[var(--sh-ink-muted)]">
-                <Play aria-hidden="true" className="size-3.5" />
+                <Image aria-hidden="true" className="size-3.5" />
                 主要画面
               </p>
               <textarea
@@ -289,7 +280,7 @@ export function FineStoryboardStep() {
             </p>
             <p className="flex items-start gap-2">
               <Volume2 aria-hidden="true" className="mt-0.5 size-4 text-[var(--sh-brand-600)]" />
-              旁白稍后独立制作
+              当前仅为关键帧示意，视频与旁白尚未生成
             </p>
           </div>
           <Button
@@ -303,12 +294,12 @@ export function FineStoryboardStep() {
                 },
                 preparedShots: [...new Set([...(saved?.preparedShots ?? []), shot.id])],
               });
-              setMessage(`${shot.id} 已重新制作完成，其他镜头保持不变。`);
+              setMessage(`${shot.id} 的关键帧示意已更新，其他镜头保持不变。`);
             }}
             variant="secondary"
           >
             <RefreshCw aria-hidden="true" />
-            只重做这个镜头
+            只重做这个关键帧
           </Button>
           {message ? (
             <p className="mt-3 text-xs font-medium text-[var(--sh-success)]" role="status">

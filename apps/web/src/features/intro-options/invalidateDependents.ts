@@ -7,8 +7,8 @@ const dependentNodes = [
   ["rough-storyboard", "安排故事镜头"],
   ["video-style", "确定画面风格"],
   ["video-assets", "制作镜头图片"],
-  ["fine-storyboard", "制作视频片段"],
-  ["final-video", "合成完整视频"],
+  ["fine-storyboard", "选择关键帧参考"],
+  ["final-video", "生成课堂导入视频"],
 ] as const;
 
 export function markIntroDependentsStale(

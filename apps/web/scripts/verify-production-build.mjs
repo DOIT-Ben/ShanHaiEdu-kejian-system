@@ -14,6 +14,10 @@ const forbiddenTexts = [
     label: "开发演示凭据",
     pattern: /(?:teacher-demo|admin-demo|lin\.teacher@example\.edu|admin@example\.edu)/,
   },
+  {
+    label: "Runtime 合同测试入口",
+    pattern: /(?:runtime-contract-test|VITE_RUNTIME_CONTRACT_TEST)/,
+  },
 ];
 
 if (!existsSync(distDirectory)) {

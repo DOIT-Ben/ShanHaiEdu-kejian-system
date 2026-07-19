@@ -67,6 +67,32 @@ describe("HomePage", () => {
     );
   });
 
+  it("生产摘要缺少工作流聚合字段时只展示真实知识点", () => {
+    mockUseProjectsQuery.mockReturnValue({
+      data: [
+        {
+          archived: false,
+          grade: "六年级",
+          id: "project-runtime",
+          knowledgePoint: "百分数的意义",
+          progressLabel: "草稿",
+          status: "draft",
+          textbookEdition: "人教版",
+          title: "认识百分数",
+          updatedAt: "7月20日",
+        },
+      ],
+      isError: false,
+      isLoading: false,
+    } as unknown as ReturnType<typeof useProjectsQuery>);
+
+    renderHome();
+
+    expect(screen.getByText("百分数的意义")).toBeInTheDocument();
+    expect(screen.queryByText(/下一步/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/第 1 课时/)).not.toBeInTheDocument();
+  });
+
   it("没有项目时明确引导创建，PPT 入口只说明后续开放", () => {
     mockUseProjectsQuery.mockReturnValue({
       data: [],

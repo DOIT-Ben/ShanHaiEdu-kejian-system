@@ -98,9 +98,9 @@ const stepRequirements: Record<string, StepRequirement> = {
     toStep: "video-assets",
   },
   "final-video": {
-    actionLabel: "去确认视频片段",
+    actionLabel: "去选择关键帧参考",
     dependencyKey: "fine-storyboard",
-    title: "先确认视频片段",
+    title: "先选择关键帧参考",
     toStep: "fine-storyboard",
   },
 };

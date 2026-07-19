@@ -34,8 +34,8 @@ export const projects: ProjectSummary[] = [
     grade: "六年级",
     textbookEdition: "北师大版",
     currentLesson: "第 1 课时 · 圆的特征",
-    nextAction: "检查课堂导入视频成片",
-    progressLabel: "视频待确认",
+    nextAction: "查看课堂导入视频生成状态",
+    progressLabel: "视频生成中",
     updatedAt: "7 月 15 日",
   },
 ];
@@ -98,8 +98,8 @@ export const projectSteps: Array<{
       { key: "rough-storyboard", label: "安排故事镜头", status: "not_ready" },
       { key: "video-style", label: "确定画面风格", status: "not_ready" },
       { key: "video-assets", label: "制作镜头图片", status: "not_ready" },
-      { key: "fine-storyboard", label: "制作视频片段", status: "not_ready" },
-      { key: "final-video", label: "合成完整视频", status: "not_ready" },
+      { key: "fine-storyboard", label: "选择关键帧参考", status: "not_ready" },
+      { key: "final-video", label: "生成课堂导入视频", status: "not_ready" },
     ],
   },
 ];
@@ -124,8 +124,8 @@ export const taskItems = [
   {
     id: "task-3",
     title: "圆的认识 · 课堂导入视频",
-    detail: "正在合成旁白、字幕和 6 个已采用片段",
-    stage: "合成声音与字幕",
+    detail: "正在根据 6 个已选择关键帧生成画面、旁白和字幕",
+    stage: "生成声音与字幕",
     status: "running" as const,
     time: "进行中",
   },

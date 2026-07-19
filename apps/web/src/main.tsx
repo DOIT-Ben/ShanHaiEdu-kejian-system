@@ -13,7 +13,21 @@ async function enableMocking() {
   await worker.start({ onUnhandledRequest: "bypass" });
 }
 
+async function enableRuntimeContractTest() {
+  if (
+    !import.meta.env.DEV ||
+    import.meta.env.VITE_API_MODE !== "real" ||
+    import.meta.env.VITE_RUNTIME_CONTRACT_TEST !== "1"
+  ) {
+    return;
+  }
+  const { enableRuntimeContractTestCsrf } =
+    await import("@/shared/api/runtimeContractTestBootstrap.development");
+  enableRuntimeContractTestCsrf();
+}
+
 await enableMocking();
+await enableRuntimeContractTest();
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {

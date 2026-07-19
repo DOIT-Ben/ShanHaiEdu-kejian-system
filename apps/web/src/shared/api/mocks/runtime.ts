@@ -271,7 +271,7 @@ export function createMockRuntimeStore(options: MockRuntimeStoreOptions = {}): M
         if (currentTask?.status !== "running") return;
         updateTask(task.id, {
           progress: 100,
-          stage: "等待确认成片",
+          stage: "等待接收视频文件",
           status: "review_required",
         });
       },

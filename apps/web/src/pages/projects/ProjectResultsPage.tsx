@@ -13,6 +13,8 @@ import {
   artifactPreviewRegistry,
   type ArtifactType,
 } from "@/features/project-results/artifactPreviewRegistry";
+import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
+import { getPlayableFinalVideo } from "@/features/workbench/lib/videoMedia";
 import { saveMockDraft, useMockRuntime } from "@/shared/api/mocks/runtime";
 import {
   listMockSavedResultHistory,
@@ -66,8 +68,8 @@ const seededAssets: Array<{
     id: "a3",
     resultId: "a3",
     type: "video",
-    title: "镜头 1 · 果汁落桌",
-    use: "导入视频已采用片段",
+    title: "镜头 1 · 果汁落桌关键帧",
+    use: "导入视频关键帧参考",
     lesson: "第 1 课时",
     slotKey: "video.shot-1",
     version: 1,
@@ -112,7 +114,7 @@ const filters: Array<{ value: "all" | ArtifactType; label: string }> = [
   { value: "all", label: "全部" },
   { value: "image", label: "教学图片" },
   { value: "ppt_page", label: "PPT 页面" },
-  { value: "video", label: "视频镜头" },
+  { value: "video", label: "关键帧参考" },
   { value: "audio", label: "音频字幕" },
   { value: "document", label: "文档" },
 ];
@@ -183,6 +185,9 @@ export function ProjectResultsPage() {
     Object.values(runtime.nodeStates).find(
       (node) => node.project_id === projectId && keys.includes(node.node_key),
     )?.status ?? "not_ready";
+  const hasPlayableVideo = getApprovedProjectLessons(runtime, projectId).some((item) =>
+    Boolean(getPlayableFinalVideo(runtime, projectId, item.id)),
+  );
   const resultCards = [
     {
       title: "教案",
@@ -198,9 +203,9 @@ export function ProjectResultsPage() {
     },
     {
       title: "课堂导入视频",
-      detail: "已采用片段与最终成片",
+      detail: hasPlayableVideo ? "可播放视频与关键帧参考" : "关键帧参考已保存，视频尚未生成",
       icon: Video,
-      status: nodeStatus(["final-video", "fine-storyboard"]),
+      status: hasPlayableVideo ? nodeStatus(["final-video"]) : ("not_ready" as const),
     },
   ];
   const selectAsset = (assetId: string) => {
@@ -355,7 +360,9 @@ export function ProjectResultsPage() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold text-[var(--sh-brand-600)]">当前采用版本</p>
+                  <p className="text-xs font-semibold text-[var(--sh-brand-600)]">
+                    {selected.type === "video" ? "当前关键帧参考" : "当前采用版本"}
+                  </p>
                   <h2 className="mt-1 font-semibold text-[var(--sh-ink-strong)]">
                     {selected.title}
                   </h2>
@@ -371,6 +378,11 @@ export function ProjectResultsPage() {
               <div className="mt-4 hidden lg:block">
                 <SelectedPreview />
               </div>
+              {selected.type === "video" ? (
+                <p className="mt-3 rounded-[var(--sh-radius-sm)] bg-[var(--sh-warning-soft)] px-3 py-2 text-xs font-medium text-[var(--sh-ink-default)]">
+                  当前仅为关键帧示意，视频尚未生成。
+                </p>
+              ) : null}
               <dl className="mt-5 hidden space-y-3 text-sm lg:block">
                 <div>
                   <dt className="text-xs text-[var(--sh-ink-muted)]">使用位置</dt>
@@ -395,21 +407,27 @@ export function ProjectResultsPage() {
                   <span className="hidden lg:inline">替换当前版本</span>
                 </Button>
                 <Button
-                  aria-label="下载作品说明"
+                  aria-label={selected.type === "video" ? "下载关键帧说明" : "下载作品说明"}
                   className="min-w-0 flex-1 px-2 lg:w-full"
                   onClick={() => {
+                    const keyframeNotice =
+                      selected.type === "video" ? "\n当前仅为关键帧示意，视频尚未生成。" : "";
                     downloadExampleFile(
-                      `${selected.title}_成果说明.txt`,
-                      `山海教育项目成果\n作品：${selected.title}\n使用位置：${selected.use}\n来源：${selected.lesson}\n此文件记录当前作品信息。`,
+                      `${selected.title}_${selected.type === "video" ? "关键帧" : "成果"}说明.txt`,
+                      `山海教育项目成果\n作品：${selected.title}\n使用位置：${selected.use}\n来源：${selected.lesson}\n此文件记录当前作品信息。${keyframeNotice}`,
                     );
-                    setMessage(`已下载“${selected.title}”的成果说明`);
+                    setMessage(
+                      `已下载“${selected.title}”的${selected.type === "video" ? "关键帧" : "成果"}说明`,
+                    );
                   }}
                   size="sm"
                   variant="secondary"
                 >
                   <Download aria-hidden="true" />
                   <span className="lg:hidden">下载</span>
-                  <span className="hidden lg:inline">下载作品说明</span>
+                  <span className="hidden lg:inline">
+                    {selected.type === "video" ? "下载关键帧说明" : "下载作品说明"}
+                  </span>
                 </Button>
                 <Button
                   aria-label="查看历史版本"

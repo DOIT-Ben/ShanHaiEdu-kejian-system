@@ -18,7 +18,8 @@
     "storybook": "storybook dev -p 6006",
     "build:storybook": "storybook build",
     "test:e2e": "playwright test --workers=2",
-    "release:check": "corepack pnpm generate:api && corepack pnpm format && corepack pnpm lint && corepack pnpm typecheck && corepack pnpm test && corepack pnpm build:storybook && corepack pnpm build && corepack pnpm test:e2e --project=chromium"
+    "test:e2e:runtime": "playwright test --config=playwright.runtime.config.ts",
+    "release:check": "corepack pnpm generate:api && corepack pnpm format && corepack pnpm lint && corepack pnpm typecheck && corepack pnpm test && corepack pnpm build:storybook && corepack pnpm build && corepack pnpm test:e2e --project=chromium && corepack pnpm test:e2e:runtime --project=runtime-chromium"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",

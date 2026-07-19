@@ -47,7 +47,7 @@ function ThemeRadioItems({ current }: { current: ThemeMode }) {
     >
       {themeOptions.map(({ icon: Icon, label, mode }) => (
         <DropdownMenu.RadioItem
-          className="flex min-h-10 cursor-pointer items-center gap-2 rounded-[var(--sh-radius-sm)] px-3 text-sm font-medium outline-none data-[highlighted]:bg-[var(--sh-surface-soft)] data-[highlighted]:text-[var(--sh-brand-700)]"
+          className="flex min-h-11 cursor-pointer items-center gap-2 rounded-[var(--sh-radius-sm)] px-3 text-sm font-medium outline-none data-[highlighted]:bg-[var(--sh-surface-soft)] data-[highlighted]:text-[var(--sh-brand-700)]"
           key={mode}
           value={mode}
         >
@@ -79,7 +79,7 @@ export function ThemeSwitcher({
         <button
           aria-label={`切换主题，当前${currentOption.label}模式`}
           className={cn(
-            "inline-flex h-10 min-w-10 shrink-0 items-center justify-center rounded-[var(--sh-radius-sm)] text-[var(--sh-ink-muted)] transition-colors hover:bg-[var(--sh-surface-soft)] hover:text-[var(--sh-brand-700)] focus-visible:text-[var(--sh-brand-700)]",
+            "inline-flex h-11 min-w-11 shrink-0 items-center justify-center rounded-[var(--sh-radius-sm)] text-[var(--sh-ink-muted)] transition-colors hover:bg-[var(--sh-surface-soft)] hover:text-[var(--sh-brand-700)] focus-visible:text-[var(--sh-brand-700)]",
             showLabel && "gap-2 px-3",
             className,
           )}

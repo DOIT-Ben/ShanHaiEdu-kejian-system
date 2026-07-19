@@ -8,6 +8,7 @@ import {
 import { getProject } from "@/features/projects/api/projectsApi";
 import { projectKeys } from "@/features/projects/hooks/useProjectsQuery";
 import { listProjectLessons } from "@/features/lessons/api/lessonsApi";
+import { isCsrfTokenAvailable } from "@/shared/api/client";
 import { useProjectEvents } from "@/shared/api/useProjectEvents";
 import { buttonVariants } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
@@ -48,6 +49,7 @@ export function RuntimeProjectOverviewPage() {
       });
     },
   });
+  const writeReady = isCsrfTokenAvailable();
 
   if (!projectId) return null;
   if (projectQuery.isLoading) {
@@ -166,7 +168,7 @@ export function RuntimeProjectOverviewPage() {
           <Select
             ariaLabel="选择制作方式"
             className="mt-4 w-full"
-            disabled={!policyQuery.data?.etag || policyMutation.isPending}
+            disabled={!writeReady || !policyQuery.data?.etag || policyMutation.isPending}
             onValueChange={(mode) => {
               if (!policyQuery.data?.etag || (mode !== "guided" && mode !== "automatic")) return;
               policyMutation.mutate({
@@ -182,6 +184,11 @@ export function RuntimeProjectOverviewPage() {
             ]}
             value={policyQuery.data?.policy.mode}
           />
+          {!writeReady ? (
+            <p className="mt-3 text-xs leading-5 text-[var(--sh-warning)]" role="status">
+              安全会话尚未就绪，暂时不能修改制作方式。
+            </p>
+          ) : null}
           {policyMutation.isError ? (
             <p className="mt-3 text-xs leading-5 text-[var(--sh-danger)]">
               制作方式没有保存，请刷新后再试。

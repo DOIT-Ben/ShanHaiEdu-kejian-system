@@ -33,18 +33,37 @@ export function HomeBrandHero({
           教案、课件、课堂图片和导入视频在同一条创作路径中自然完成。你只需要关注课堂。
         </p>
         <div className="mt-5 flex flex-wrap gap-2.5">
-          <Button asChild>
-            <Link to="/app/projects/new">
-              <Upload aria-hidden="true" />
-              上传教材开始制作
-            </Link>
-          </Button>
-          <Button asChild variant="secondary">
-            <Link to={hasProject ? continueTo : "/app/projects"}>
-              {hasProject ? "继续当前课件" : "浏览项目空间"}
-              <ArrowRight aria-hidden="true" />
-            </Link>
-          </Button>
+          {hasProject ? (
+            <>
+              <Button asChild>
+                <Link to={continueTo}>
+                  继续当前课件
+                  <ArrowRight aria-hidden="true" />
+                </Link>
+              </Button>
+              <Button asChild variant="secondary">
+                <Link to="/app/projects/new">
+                  <Upload aria-hidden="true" />
+                  新建课件
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button asChild>
+                <Link to="/app/projects/new">
+                  <Upload aria-hidden="true" />
+                  上传教材开始制作
+                </Link>
+              </Button>
+              <Button asChild variant="secondary">
+                <Link to="/app/projects">
+                  浏览项目空间
+                  <ArrowRight aria-hidden="true" />
+                </Link>
+              </Button>
+            </>
+          )}
         </div>
       </div>
 

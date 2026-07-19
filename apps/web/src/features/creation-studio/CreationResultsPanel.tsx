@@ -43,10 +43,14 @@ export function CreationResultsPanel({
   const workspaceWidth = type === "image" ? "max-w-[720px]" : "max-w-[1040px]";
   const candidates = Array.from({ length: candidateCount }, (_, index) => index);
   const downloadLabel =
-    type === "image" ? "下载这张图片" : type === "video" ? "下载视频说明" : "下载课件预览";
-  const itemLabel = type === "image" ? "张" : type === "video" ? "段" : "套";
+    type === "image" ? "下载这张图片" : type === "video" ? "下载关键帧说明" : "下载课件预览";
+  const itemLabel = type === "image" ? "张" : type === "video" ? "张关键帧" : "套";
+  const resultLabel = type === "video" ? "关键帧" : "作品";
+  const candidateAriaLabel = type === "video" ? "关键帧参考" : "备选作品";
+  const candidateDisplayLabel = type === "video" ? "关键帧" : "作品";
+  const resultReadyLabel = type === "video" ? "已准备" : "已完成";
   const nextAction = running
-    ? `正在准备 ${String(candidateCount)} ${itemLabel}作品，完成后会自动显示。`
+    ? `正在准备 ${String(candidateCount)} ${itemLabel}，完成后会自动显示。`
     : hasUnappliedChanges
       ? "下方要求已有修改，重新创作后再选择作品。"
       : stage === "ready"
@@ -82,8 +86,8 @@ export function CreationResultsPanel({
               {running
                 ? "正在创作新作品"
                 : generation > 1
-                  ? `第 ${String(generation)} 轮作品已完成`
-                  : "本轮作品已完成"}
+                  ? `第 ${String(generation)} 轮${resultLabel}${resultReadyLabel}`
+                  : `本轮${resultLabel}${resultReadyLabel}`}
             </p>
             <p className="text-xs text-[var(--sh-ink-muted)]">{nextAction}</p>
           </div>
@@ -91,7 +95,9 @@ export function CreationResultsPanel({
         <span className="text-xs font-medium text-[var(--sh-ink-muted)]">
           {running
             ? `正在生成 ${String(candidateCount)} ${itemLabel}`
-            : `${String(candidateCount)} 个作品`}
+            : type === "video"
+              ? `${String(candidateCount)} 张关键帧`
+              : `${String(candidateCount)} 个作品`}
         </span>
       </div>
 
@@ -101,7 +107,7 @@ export function CreationResultsPanel({
       >
         <div className="mb-1.5 flex items-center justify-between gap-3 px-1">
           <p className="text-sm font-semibold text-[var(--sh-ink-strong)]">
-            当前作品 {String(candidate + 1)}
+            {type === "video" ? "当前关键帧" : "当前作品"} {String(candidate + 1)}
           </p>
           <span className="rounded-full border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] px-2.5 py-1 text-xs text-[var(--sh-ink-muted)]">
             {ratio}
@@ -123,10 +129,13 @@ export function CreationResultsPanel({
       </div>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <div aria-label="备选作品" className="flex min-w-0 gap-2 overflow-x-auto pb-1">
+        <div
+          aria-label={type === "video" ? "关键帧参考" : "备选作品"}
+          className="flex min-w-0 gap-2 overflow-x-auto pb-1"
+        >
           {candidates.map((item) => (
             <button
-              aria-label={`备选作品 ${String(item + 1)}`}
+              aria-label={`${candidateAriaLabel} ${String(item + 1)}`}
               aria-pressed={candidate === item}
               className={`w-[76px] shrink-0 rounded-[var(--sh-radius-sm)] border bg-[var(--sh-surface-elevated)] p-1 text-left transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 disabled:translate-y-0 disabled:cursor-wait disabled:opacity-55 ${candidate === item ? "border-[var(--sh-brand-500)] ring-2 ring-[var(--sh-brand-100)]" : "border-[var(--sh-line-default)]"}`}
               disabled={running}
@@ -140,7 +149,7 @@ export function CreationResultsPanel({
                 variant={(item + renderedGeneration) % 3}
               />
               <span className="mt-1 block text-center text-[11px] font-semibold text-[var(--sh-ink-strong)]">
-                作品 {item + 1}
+                {candidateDisplayLabel} {item + 1}
               </span>
             </button>
           ))}

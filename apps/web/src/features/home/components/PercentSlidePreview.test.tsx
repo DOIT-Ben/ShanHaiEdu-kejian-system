@@ -21,4 +21,13 @@ describe("PercentSlidePreview", () => {
     expect(preview.querySelector("img")).toBeNull();
     expect(screen.getByText("圆的面积")).toBeInTheDocument();
   });
+
+  it("缩略图文字跟随组件宽度而不是浏览器宽度", () => {
+    render(<PercentSlidePreview page={2} topic="圆的面积" />);
+
+    const preview = screen.getByRole("img", { name: "圆的面积课堂课件页面预览" });
+    expect(preview.className).toContain("[container-type:inline-size]");
+    expect(screen.getByText("圆的面积").className).toContain("cqw");
+    expect(screen.getByText("圆的面积").className).not.toContain("vw");
+  });
 });

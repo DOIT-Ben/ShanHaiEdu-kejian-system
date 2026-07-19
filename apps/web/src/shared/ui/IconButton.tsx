@@ -13,7 +13,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         <button
           aria-label={label}
           className={cn(
-            "inline-grid size-10 shrink-0 place-items-center rounded-[var(--sh-radius-md)] text-[var(--sh-ink-muted)] transition-[background-color,color,transform] duration-[var(--sh-duration-fast)] hover:-translate-y-px hover:bg-[var(--sh-surface-soft)] hover:text-[var(--sh-brand-700)] disabled:pointer-events-none disabled:opacity-45 [&_svg]:size-5",
+            "inline-grid size-11 shrink-0 place-items-center rounded-[var(--sh-radius-md)] text-[var(--sh-ink-muted)] transition-[background-color,color,transform] duration-[var(--sh-duration-fast)] hover:-translate-y-px hover:bg-[var(--sh-surface-soft)] hover:text-[var(--sh-brand-700)] disabled:pointer-events-none disabled:opacity-45 [&_svg]:size-5",
             className,
           )}
           ref={ref}

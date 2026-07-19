@@ -44,6 +44,46 @@ describe("project event transport", () => {
     expect(onEvent).toHaveBeenCalledWith(projectEvent);
   });
 
+  it("parses CRLF event frames when a carriage return and line feed arrive in separate chunks", async () => {
+    const encoder = new TextEncoder();
+    const nextEvent = {
+      ...projectEvent,
+      event_id: "01960000-0000-7000-8000-000000000902",
+      sequence_no: 43,
+    };
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const chunk of [
+          "id: 42\r",
+          "\nevent: task.updated\r",
+          `\ndata: ${JSON.stringify(projectEvent)}\r`,
+          "\n\r",
+          "\nid: 43\r",
+          "\nevent: task.updated\r",
+          `\ndata: ${JSON.stringify(nextEvent)}\r`,
+          "\n\r",
+          "\n",
+        ]) {
+          controller.enqueue(encoder.encode(chunk));
+        }
+        controller.close();
+      },
+    });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(body, {
+        headers: { "Content-Type": "text/event-stream" },
+        status: 200,
+      }),
+    );
+    const onEvent = vi.fn();
+
+    await streamProjectEvents({ fetchImpl: fetchMock, onEvent, projectId: "project-1" });
+
+    expect(onEvent).toHaveBeenCalledTimes(2);
+    expect(onEvent).toHaveBeenNthCalledWith(1, projectEvent);
+    expect(onEvent).toHaveBeenNthCalledWith(2, nextEvent);
+  });
+
   it("does not reuse legacy UUID event ids as sequence cursors", () => {
     sessionStorage.setItem("shanhaiedu.events.project.project-1.sequence", "event-41");
 
@@ -116,6 +156,61 @@ describe("project event transport", () => {
     expect(order).toEqual(["connect:41", "clear", "refresh", "connect:undefined"]);
   });
 
+  it("backs off and retries the REST snapshot before reconnecting after history expires", async () => {
+    const order: string[] = [];
+    const controller = new AbortController();
+    const connect = vi
+      .fn()
+      .mockImplementationOnce((cursor: number | undefined) => {
+        order.push(`connect:${String(cursor)}`);
+        return Promise.reject(new SseStreamError(409, "EVENT_HISTORY_EXPIRED"));
+      })
+      .mockImplementationOnce((cursor: number | undefined) => {
+        order.push(`connect:${String(cursor)}`);
+        controller.abort();
+        return Promise.reject(new DOMException("aborted", "AbortError"));
+      });
+    const refreshSnapshot = vi
+      .fn()
+      .mockImplementationOnce(() => {
+        order.push("refresh:failed-1");
+        return Promise.reject(new Error("snapshot unavailable"));
+      })
+      .mockImplementationOnce(() => {
+        order.push("refresh:failed-2");
+        return Promise.reject(new Error("snapshot still unavailable"));
+      })
+      .mockImplementationOnce(() => {
+        order.push("refresh:ready");
+        return Promise.resolve();
+      });
+
+    await runSseSubscription({
+      clearCursor: () => order.push("clear"),
+      connect,
+      initialCursor: 41,
+      onEvent: vi.fn(),
+      refreshSnapshot,
+      signal: controller.signal,
+      wait: (delay) => {
+        order.push(`wait:${String(delay)}`);
+        return Promise.resolve(true);
+      },
+      writeCursor: vi.fn(),
+    });
+
+    expect(order).toEqual([
+      "connect:41",
+      "clear",
+      "refresh:failed-1",
+      "wait:1000",
+      "refresh:failed-2",
+      "wait:2000",
+      "refresh:ready",
+      "connect:undefined",
+    ]);
+  });
+
   it("backs off repeated failures and stops cleanly when aborted", async () => {
     const controller = new AbortController();
     const delays: number[] = [];
@@ -149,6 +244,45 @@ describe("project event transport", () => {
     expect(projectEventQueryKeys("project-1", projectEvent)).toEqual([
       ["generation-jobs", projectEvent.resource.id],
       ["tasks", "project-1"],
+    ]);
+
+    const keysFor = (type: string, id = `${type}-1`) =>
+      projectEventQueryKeys("project-1", {
+        ...projectEvent,
+        resource: { id, type },
+      });
+    expect(keysFor("automation_policy")).toEqual([["projects", "project-1", "automation-policy"]]);
+    expect(keysFor("lesson_collection")).toEqual([
+      ["projects", "project-1", "lessons"],
+      ["projects", "project-1"],
+      ["projects"],
+      ["projects", "project-1", "workflow"],
+    ]);
+    expect(keysFor("lesson", "lesson-1")).toEqual([
+      ["projects", "project-1", "lessons"],
+      ["lessons", "lesson-1"],
+      ["projects", "project-1", "workflow"],
+    ]);
+    expect(keysFor("source_material", "material-1")).toEqual([
+      ["projects", "project-1", "materials"],
+      ["projects", "project-1", "materials", "material-1", "file-asset"],
+      ["projects", "project-1", "materials", "material-1", "parse-versions"],
+      ["projects", "project-1", "workflow"],
+    ]);
+    expect(keysFor("artifact", "artifact-1")).toEqual([
+      ["artifacts", "artifact-1"],
+      ["projects", "project-1", "artifacts"],
+      ["projects", "project-1", "workflow"],
+    ]);
+    expect(keysFor("asset_binding", "binding-1")).toEqual([
+      ["projects", "project-1", "asset-slots"],
+      ["projects", "project-1", "asset-package"],
+      ["projects", "project-1", "workflow"],
+    ]);
+    expect(keysFor("future_resource", "future-1")).toEqual([
+      ["projects", "project-1"],
+      ["projects"],
+      ["projects", "project-1", "workflow"],
     ]);
   });
 

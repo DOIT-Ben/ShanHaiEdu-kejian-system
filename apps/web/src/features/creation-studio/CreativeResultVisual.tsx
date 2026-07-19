@@ -1,4 +1,3 @@
-import { Play } from "lucide-react";
 import { creationImageAssets, creationVideoShotAssets } from "@/assets/creation/catalog";
 import type { StudioType } from "@/features/creation-studio/model";
 import { PercentSlidePreview } from "@/features/home/components/PercentSlidePreview";
@@ -17,19 +16,22 @@ export function CreativeResultVisual({
   if (type === "presentation") return <PercentSlidePreview page={page} variant={variant} />;
   if (type === "video")
     return (
-      <div className="group relative aspect-video overflow-hidden rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-player)]">
+      <div
+        aria-label="课堂导入关键帧示意，视频尚未生成"
+        className="group relative aspect-video overflow-hidden rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-player)]"
+        role="img"
+      >
         <img
-          alt="课堂导入视频作品画面"
+          alt=""
+          aria-hidden="true"
           className="size-full object-cover transition-transform duration-[var(--sh-duration-slow)] group-hover:scale-[1.015]"
           decoding="async"
           src={creationVideoShotAssets[variant % creationVideoShotAssets.length]}
         />
-        <div className="absolute inset-0 bg-[var(--sh-surface-inverse)]/10" />
-        <div className="absolute inset-0 grid place-items-center">
-          <span className="grid size-12 place-items-center rounded-full bg-[var(--sh-surface-elevated)]/94 text-[var(--sh-brand-700)] shadow-[var(--sh-shadow-floating)] backdrop-blur-sm">
-            <Play aria-hidden="true" className="ml-0.5 size-5 fill-current" />
-          </span>
-        </div>
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--sh-surface-inverse)]/36 via-transparent to-transparent" />
+        <span className="absolute bottom-2 left-2 rounded-full bg-[var(--sh-surface-elevated)]/92 px-2 py-1 text-[10px] font-semibold text-[var(--sh-brand-700)] shadow-[var(--sh-shadow-card)] backdrop-blur-sm">
+          关键帧示意 · 视频尚未生成
+        </span>
       </div>
     );
   return (

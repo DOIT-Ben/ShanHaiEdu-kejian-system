@@ -25,6 +25,7 @@ corepack pnpm --filter @shanhaiedu/web test
 corepack pnpm --filter @shanhaiedu/web build:storybook
 corepack pnpm --filter @shanhaiedu/web build
 corepack pnpm --filter @shanhaiedu/web test:e2e --project=chromium
+corepack pnpm --filter @shanhaiedu/web test:e2e:runtime --project=runtime-chromium
 ```
 
 也可以运行：

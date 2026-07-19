@@ -142,8 +142,8 @@ export function HomePage({ creationAvailable = true }: { creationAvailable?: boo
                   </span>
                 </div>
                 <h3 className="mt-2 truncate text-xl font-semibold">{currentProject.title}</h3>
-                <p className="mt-1 text-sm text-[var(--sh-ink-muted)]">
-                  下一步：{currentProject.nextAction}
+                <p className="mt-1 line-clamp-2 text-sm text-[var(--sh-ink-muted)]">
+                  {currentProject.nextAction ?? currentProject.knowledgePoint}
                 </p>
               </div>
               <div className="px-4 pb-4 md:pr-6 md:pb-0 md:pl-2">

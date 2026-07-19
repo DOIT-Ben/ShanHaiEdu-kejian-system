@@ -6,6 +6,7 @@ import { listProjectLessons } from "@/features/lessons/api/lessonsApi";
 import { getProject } from "@/features/projects/api/projectsApi";
 import { projectKeys } from "@/features/projects/hooks/useProjectsQuery";
 import { useJobEvents } from "@/shared/api/useJobEvents";
+import { isCsrfTokenAvailable } from "@/shared/api/client";
 import { Button, buttonVariants } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 
@@ -61,6 +62,7 @@ export function RuntimeProjectSetupPage() {
   const job = jobQuery.data;
   const progress = Math.min(100, Math.max(0, job?.progress_percent ?? 0));
   const running = job && !terminalStatuses.has(job.status);
+  const writeReady = isCsrfTokenAvailable();
   return (
     <div className="mx-auto max-w-[980px] px-4 py-5 md:px-6 lg:px-8">
       <FocusPageHeader
@@ -106,7 +108,7 @@ export function RuntimeProjectSetupPage() {
           </div>
           {running ? (
             <Button
-              disabled={cancelMutation.isPending}
+              disabled={cancelMutation.isPending || !writeReady}
               onClick={() => cancelMutation.mutate({ idempotencyKey: crypto.randomUUID(), jobId })}
               variant="secondary"
             >
@@ -122,6 +124,14 @@ export function RuntimeProjectSetupPage() {
             style={{ width: String(progress) + "%" }}
           />
         </div>
+        {running && !writeReady ? (
+          <p
+            className="border-t border-[var(--sh-line-subtle)] px-5 py-3 text-xs text-[var(--sh-warning)]"
+            role="status"
+          >
+            安全会话尚未就绪，暂时不能取消任务。请刷新后重试。
+          </p>
+        ) : null}
       </section>
 
       {job?.status === "succeeded" ? (

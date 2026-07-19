@@ -1,9 +1,9 @@
 import {
   Check,
+  Clock3,
   Download,
   FileCheck2,
   LoaderCircle,
-  Music,
   PencilLine,
   RotateCcw,
   Subtitles,
@@ -19,6 +19,7 @@ import {
   getApprovedVideoStyle,
   getApprovedVideoTitle,
 } from "@/features/workbench/lib/videoWorkflow";
+import { getPlayableFinalVideo } from "@/features/workbench/lib/videoMedia";
 import { useWorkbenchUi } from "@/features/workbench/model/workbenchUi";
 import { WorkbenchPageFrame } from "@/features/workbench/components/WorkbenchPageFrame";
 import {
@@ -52,6 +53,8 @@ export function FinalVideoStep() {
   const adoptedShotCount = approvedFine?.adoptedShots?.length ?? 0;
   const approvedStyle = getApprovedVideoStyle(runtime, projectId, lessonId)?.selectedId;
   const previewVariant = approvedStyle === "clay" ? 1 : approvedStyle === "clean" ? 2 : 0;
+  const playableVideo = getPlayableFinalVideo(runtime, projectId, lessonId);
+  const hasPlayableVideo = playableVideo !== null;
   const nodeState = runtime.nodeStates[`${projectId}:${lessonId}:final-video`];
   const stale = nodeState?.status === "stale";
   const approved = nodeState?.status === "approved";
@@ -94,6 +97,10 @@ export function FinalVideoStep() {
   ].includes(displayStatus);
   const cancellationPending = displayStatus === "cancel_requested";
   const waitingForTask = nodeState?.status === "running" && !activeTask && !invalidTaskReference;
+  const truthfulDisplayStatus =
+    hasPlayableVideo || rendering || waitingForTask || cancellationPending || synthesisNeedsAction
+      ? displayStatus
+      : "not_ready";
   const synthesisLock = useRef(false);
   const [message, setMessage] = useState("");
   const { openContextDrawer } = useWorkbenchUi();
@@ -107,10 +114,14 @@ export function FinalVideoStep() {
     if (nodeState?.status === nextStatus) return;
     updateMockNodeState(projectId, lessonId, "final-video", {
       status: nextStatus,
-      title: "合成完整视频",
+      title: "生成课堂导入视频",
     });
     if (nextStatus === "review_required") {
-      setMessage("成片已经合成完成，请检查后确认。");
+      setMessage(
+        hasPlayableVideo
+          ? "视频文件已准备好，请完整播放后再确认。"
+          : "生成任务已结束，但尚未收到可播放的视频文件。当前只显示关键帧示意。",
+      );
     }
   }, [
     lessonId,
@@ -120,6 +131,7 @@ export function FinalVideoStep() {
     resolvedTask?.status,
     rendering,
     syncingTaskStatus,
+    hasPlayableVideo,
   ]);
 
   const startSynthesis = () => {
@@ -128,35 +140,46 @@ export function FinalVideoStep() {
     const runningNode = updateMockNodeState(projectId, lessonId, "final-video", {
       stale_reason: null,
       status: "running",
-      title: "合成完整视频",
+      title: "生成课堂导入视频",
     });
     const task = createMockTask({
-      detail: "正在重新合成旁白、字幕和已采用片段",
+      detail: "正在生成画面、旁白和字幕",
       node_run_id: runningNode.id,
       progress: 18,
       project_id: projectId,
-      stage: "合成声音与字幕",
+      stage: "生成声音与字幕",
       status: "running",
-      title: "课堂导入视频重新合成",
+      title: "课堂导入视频生成",
     });
     saveMockDraft(
       taskDraftKey,
       { taskId: task.id },
       { lessonId, nodeKey: "final-video", projectId },
     );
-    setMessage("重新合成已开始，可在处理进度中查看。");
+    setMessage("视频生成已开始，可在处理进度中查看。");
   };
+  const reviewItems = hasPlayableVideo
+    ? [
+        [FileCheck2, "画面正常", "完整播放一遍，确认画面清楚、没有卡顿"],
+        [Volume2, "声音清楚", "试听旁白，确认音量平稳、容易听清"],
+        [Subtitles, "字幕易读", "检查字号、停留时间和断句是否合适"],
+      ]
+    : [
+        [FileCheck2, "画面尚未检查", "视频生成后，再确认画面是否正常"],
+        [Volume2, "声音尚未检查", "视频生成后，再确认声音是否清楚"],
+        [Subtitles, "字幕尚未检查", "视频生成后，再确认字幕是否易读"],
+      ];
   return (
     <WorkbenchPageFrame>
       <FocusPageHeader
         action={
-          approved ? (
+          approved && hasPlayableVideo ? (
             <Button
               disabled={rendering}
               onClick={() =>
                 updateMockNodeState(projectId, lessonId, "final-video", {
                   status: "review_required",
-                  title: "合成完整视频",
+                  title: "生成课堂导入视频",
                 })
               }
               size="md"
@@ -168,38 +191,48 @@ export function FinalVideoStep() {
           ) : cancellationPending ? (
             <Button disabled size="md">
               <LoaderCircle aria-hidden="true" className="animate-spin" />
-              正在取消合成
+              正在取消生成
             </Button>
           ) : synthesisNeedsAction ? (
             <Button disabled={rendering} onClick={startSynthesis} size="md">
               <RotateCcw aria-hidden="true" />
-              {displayStatus === "paused" ? "继续合成" : "重新合成"}
+              {displayStatus === "paused" ? "继续生成视频" : "重新生成视频"}
             </Button>
-          ) : (
+          ) : rendering || waitingForTask ? (
+            <Button disabled size="md">
+              <LoaderCircle aria-hidden="true" className="animate-spin" />
+              {rendering ? "视频生成中" : "正在同步视频"}
+            </Button>
+          ) : hasPlayableVideo ? (
             <Button
-              disabled={rendering || waitingForTask}
               onClick={() =>
                 updateMockNodeState(projectId, lessonId, "final-video", {
                   stale_reason: null,
                   status: "approved",
-                  title: "合成完整视频",
+                  title: "生成课堂导入视频",
                 })
               }
               size="md"
             >
-              {rendering ? (
-                <LoaderCircle aria-hidden="true" className="animate-spin" />
-              ) : (
-                <Check aria-hidden="true" />
-              )}
-              {rendering ? "成片合成中" : waitingForTask ? "正在同步成片" : "确认成片"}
+              <Check aria-hidden="true" />
+              确认视频
+            </Button>
+          ) : (
+            <Button disabled size="md" variant="secondary">
+              <Clock3 aria-hidden="true" />
+              视频尚未生成
             </Button>
           )
         }
-        eyebrow="当前要做：检查课堂导入视频成片"
+        description={
+          hasPlayableVideo
+            ? "完整播放一遍，确认画面、声音和字幕都适合课堂使用。"
+            : "当前只有关键帧示意。收到可播放的视频文件后，才会开放播放与确认。"
+        }
+        eyebrow="当前要做：查看课堂导入视频生成状态"
         hideEyebrow
-        status={<StatusBadge status={rendering ? "running" : displayStatus} />}
-        title={`${videoTitle} · ${adoptedShotCount > 0 ? `${String(adoptedShotCount)} 个片段` : "完整视频"}`}
+        status={<StatusBadge status={rendering ? "running" : truthfulDisplayStatus} />}
+        title={`${videoTitle} · ${hasPlayableVideo ? "可播放视频" : adoptedShotCount > 0 ? `${String(adoptedShotCount)} 个关键帧参考` : "关键帧示意"}`}
       />
       {stale ? <StaleContentNotice reason={nodeState.stale_reason?.summary} /> : null}
       <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_280px]">
@@ -208,19 +241,25 @@ export function FinalVideoStep() {
             className="w-full max-w-[min(960px,max(280px,calc((100dvh-302px)*1.7778)))]"
             data-testid="final-video-preview"
           >
-            <VideoScenePreview
-              topic={demo ? undefined : videoTitle}
-              variant={demo ? 3 : previewVariant}
-            />
+            {playableVideo ? (
+              <video
+                aria-label={`${videoTitle}课堂导入视频`}
+                className="aspect-video size-full rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-player)] object-contain"
+                controls
+                preload="metadata"
+              >
+                <source src={playableVideo.src} type={playableVideo.mimeType} />
+              </video>
+            ) : (
+              <VideoScenePreview
+                topic={demo ? undefined : videoTitle}
+                variant={demo ? 3 : previewVariant}
+              />
+            )}
           </div>
         </section>
         <aside className="grid content-start gap-2 sm:grid-cols-2 lg:grid-cols-1">
-          {[
-            [FileCheck2, "技术检查", "画幅、编码、音量通过"],
-            [Volume2, "旁白", "3 段 · 数学读法通过"],
-            [Music, "音乐与音效", "音量平衡通过"],
-            [Subtitles, "字幕", "可读时长与断句通过"],
-          ].map(([Icon, title, detail]) => {
+          {reviewItems.map(([Icon, title, detail]) => {
             const Comp = Icon as typeof FileCheck2;
             return (
               <div
@@ -229,7 +268,7 @@ export function FinalVideoStep() {
               >
                 <Comp
                   aria-hidden="true"
-                  className="mt-0.5 size-4 shrink-0 text-[var(--sh-success)]"
+                  className="mt-0.5 size-4 shrink-0 text-[var(--sh-brand-600)]"
                 />
                 <div>
                   <p className="text-sm font-semibold text-[var(--sh-ink-strong)]">
@@ -243,33 +282,53 @@ export function FinalVideoStep() {
         </aside>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button
-          onClick={() =>
-            downloadExampleFile(
-              `${videoTitle}_预览说明.txt`,
-              `${videoTitle}课堂导入视频预览\n时长：00:55\n画幅：16:9\n包含旁白、音乐与字幕检查结果。`,
-            )
-          }
-          size="sm"
-          variant="secondary"
-        >
-          <Download aria-hidden="true" />
-          下载预览说明
-        </Button>
-        <Button onClick={() => openContextDrawer("checks")} size="sm" variant="quiet">
-          查看质量报告
-        </Button>
+        {playableVideo ? (
+          <Button asChild size="sm" variant="secondary">
+            <a download href={playableVideo.src}>
+              <Download aria-hidden="true" />
+              下载视频
+            </a>
+          </Button>
+        ) : (
+          <Button
+            onClick={() =>
+              downloadExampleFile(
+                `${videoTitle}_关键帧说明.txt`,
+                `${videoTitle}关键帧示意\n当前仅有关键帧参考，视频尚未生成。\n收到可播放的视频文件后，才会开放播放、检查与确认。`,
+              )
+            }
+            size="sm"
+            variant="secondary"
+          >
+            <Download aria-hidden="true" />
+            下载关键帧说明
+          </Button>
+        )}
+        {hasPlayableVideo ? (
+          <Button onClick={() => openContextDrawer("checks")} size="sm" variant="quiet">
+            查看检查项
+          </Button>
+        ) : null}
         <Button
           disabled={rendering || cancellationPending}
           onClick={startSynthesis}
           size="sm"
           variant="quiet"
         >
-          {cancellationPending ? "正在取消" : rendering ? "正在合成" : "重新合成"}
+          {cancellationPending
+            ? "正在取消"
+            : rendering
+              ? "正在生成"
+              : resolvedTask
+                ? "重新生成视频"
+                : "开始生成视频"}
         </Button>
       </div>
       {message ? (
-        <p className="mt-3 text-sm font-medium text-[var(--sh-success)]" role="status">
+        <p
+          className={`mt-3 text-sm font-medium ${hasPlayableVideo ? "text-[var(--sh-success)]" : "text-[var(--sh-warning)]"}`}
+          role="status"
+        >
           {message}
         </p>
       ) : null}

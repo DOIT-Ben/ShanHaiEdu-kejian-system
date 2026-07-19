@@ -233,7 +233,7 @@ export function MasterScriptStep() {
             </Button>
           )
         }
-        eyebrow="当前要做：确认完整视频故事"
+        eyebrow="当前要做：确认视频故事"
         hideEyebrow
         status={
           <StatusBadge status={stale ? "stale" : approved ? "approved" : "review_required"} />
