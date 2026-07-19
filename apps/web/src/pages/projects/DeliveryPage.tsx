@@ -19,6 +19,7 @@ import {
 import { saveMockDraft, type MockRuntimeState, useMockRuntime } from "@/shared/api/mocks/runtime";
 import { listMockSavedResults } from "@/shared/api/mocks/savedResults";
 import { downloadExampleFile } from "@/shared/lib/downloadExampleFile";
+import { downloadRemoteFile } from "@/shared/lib/downloadRemoteFile";
 import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
@@ -36,6 +37,7 @@ export type DeliveryRequirement = {
 };
 
 type DeliveryFile = {
+  acceptedMimeTypes?: readonly string[];
   detail: string;
   downloadUrl?: string;
   icon: LucideIcon;
@@ -187,6 +189,7 @@ function deliveryFiles(
     }
     const extension = requirement.media.mimeType.toLowerCase().includes("webm") ? "webm" : "mp4";
     const videoFile: DeliveryFile = {
+      acceptedMimeTypes: ["video/*"],
       name: `${prefix}_课堂导入.${extension}`,
       detail: `${requirement.label} · 可播放视频文件`,
       downloadUrl: requirement.media.src,
@@ -197,6 +200,7 @@ function deliveryFiles(
     return [
       videoFile,
       {
+        acceptedMimeTypes: ["application/x-subrip", "text/plain", "text/vtt"],
         name: `${prefix}_课堂导入字幕.srt`,
         detail: `${requirement.label} · 独立字幕文件`,
         downloadUrl: requirement.media.subtitleSrc,
@@ -240,6 +244,11 @@ export function DeliveryPage() {
     storedPackage.fingerprint === currentFingerprint;
   const packageStale = storedPackage !== null && !packageReady;
   const [preparing, setPreparing] = useState(false);
+  const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
+  const [downloadFeedback, setDownloadFeedback] = useState<{
+    fileName: string;
+    status: "error" | "success";
+  } | null>(null);
   const stage = preparing ? "preparing" : packageReady ? "ready" : "idle";
   const files = deliveryFiles(project?.title ?? "课堂作品", requirements, allApproved);
   const preparePackage = () => {
@@ -270,6 +279,23 @@ export function DeliveryPage() {
       );
       setPreparing(false);
     }, 450);
+  };
+  const downloadDeliveryFile = async (file: DeliveryFile) => {
+    if (!file.downloadUrl || !file.acceptedMimeTypes || downloadingFile) return;
+    setDownloadingFile(file.name);
+    setDownloadFeedback(null);
+    try {
+      await downloadRemoteFile({
+        acceptedMimeTypes: file.acceptedMimeTypes,
+        filename: file.name,
+        url: file.downloadUrl,
+      });
+      setDownloadFeedback({ fileName: file.name, status: "success" });
+    } catch {
+      setDownloadFeedback({ fileName: file.name, status: "error" });
+    } finally {
+      setDownloadingFile(null);
+    }
   };
   const lessonPlanStatus = aggregateStatus(requirements, "lesson-plan") ?? "not_ready";
   const pptStatus = aggregateStatus(requirements, "ppt");
@@ -336,42 +362,65 @@ export function DeliveryPage() {
           交付包已准备完成，可以下载。
         </p>
       ) : null}
+      {downloadFeedback ? (
+        <p
+          className={`mt-3 rounded-[var(--sh-radius-sm)] p-3 text-sm font-semibold ${
+            downloadFeedback.status === "success"
+              ? "bg-[var(--sh-success-soft)] text-[var(--sh-success)]"
+              : "bg-[var(--sh-danger-soft)] text-[var(--sh-danger)]"
+          }`}
+          role={downloadFeedback.status === "error" ? "alert" : "status"}
+        >
+          {downloadFeedback.status === "success"
+            ? `“${downloadFeedback.fileName}”已开始下载。`
+            : `“${downloadFeedback.fileName}”暂时无法下载。请稍后重试；若仍失败，请联系管理员检查文件访问权限。`}
+        </p>
+      ) : null}
       <div className="mt-4 divide-y divide-[var(--sh-line-subtle)] rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] px-4">
-        {files.map(({ detail, downloadUrl, icon: Icon, name, placeholder, status }) => (
-          <div className="flex flex-wrap items-center gap-3 py-3.5" key={name}>
-            <span className="grid size-9 shrink-0 place-items-center rounded-[var(--sh-radius-sm)] bg-[var(--sh-brand-50)] text-[var(--sh-brand-600)]">
-              <Icon aria-hidden="true" className="size-4" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-[var(--sh-ink-strong)]">{name}</p>
-              <p className="mt-1 text-xs text-[var(--sh-ink-muted)]">{detail}</p>
-            </div>
-            <StatusBadge status={status} />
-            {downloadUrl && packageReady && status === "approved" ? (
-              <Button asChild size="sm" variant="secondary">
-                <a download={name} href={downloadUrl}>
+        {files.map((file) => {
+          const { detail, downloadUrl, icon: Icon, name, placeholder, status } = file;
+          const isDownloading = downloadingFile === name;
+          const downloadFailed =
+            downloadFeedback?.fileName === name && downloadFeedback.status === "error";
+          return (
+            <div className="flex flex-wrap items-center gap-3 py-3.5" key={name}>
+              <span className="grid size-9 shrink-0 place-items-center rounded-[var(--sh-radius-sm)] bg-[var(--sh-brand-50)] text-[var(--sh-brand-600)]">
+                <Icon aria-hidden="true" className="size-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-[var(--sh-ink-strong)]">{name}</p>
+                <p className="mt-1 text-xs text-[var(--sh-ink-muted)]">{detail}</p>
+              </div>
+              <StatusBadge status={status} />
+              {downloadUrl && packageReady && status === "approved" ? (
+                <Button
+                  disabled={downloadingFile !== null}
+                  onClick={() => void downloadDeliveryFile(file)}
+                  size="sm"
+                  variant="secondary"
+                >
                   <Download aria-hidden="true" />
-                  下载文件
-                </a>
-              </Button>
-            ) : (
-              <Button
-                disabled={placeholder || !packageReady || status !== "approved"}
-                onClick={() =>
-                  downloadExampleFile(
-                    `${name}.说明.txt`,
-                    `山海教育课堂作品：${name}\n${detail}\n当前提供文件说明，正式文件将在导出完成后提供。`,
-                  )
-                }
-                size="sm"
-                variant="secondary"
-              >
-                <Download aria-hidden="true" />
-                {placeholder ? "视频尚未生成" : packageReady ? "下载文件说明" : "等待交付包"}
-              </Button>
-            )}
-          </div>
-        ))}
+                  {isDownloading ? "正在下载" : downloadFailed ? "重新下载" : "下载文件"}
+                </Button>
+              ) : (
+                <Button
+                  disabled={placeholder || !packageReady || status !== "approved"}
+                  onClick={() =>
+                    downloadExampleFile(
+                      `${name}.说明.txt`,
+                      `山海教育课堂作品：${name}\n${detail}\n当前提供文件说明，正式文件将在导出完成后提供。`,
+                    )
+                  }
+                  size="sm"
+                  variant="secondary"
+                >
+                  <Download aria-hidden="true" />
+                  {placeholder ? "视频尚未生成" : packageReady ? "下载文件说明" : "等待交付包"}
+                </Button>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

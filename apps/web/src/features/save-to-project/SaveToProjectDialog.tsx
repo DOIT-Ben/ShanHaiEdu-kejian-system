@@ -10,6 +10,7 @@ import {
   listMockSavedResults,
   saveMockResult,
   type MockSavedResult,
+  type MockSavedResultPreview,
   type MockSavedResultType,
 } from "@/shared/api/mocks/savedResults";
 import { Button } from "@/shared/ui/Button";
@@ -19,6 +20,7 @@ import { requiredItem } from "@/shared/lib/requiredItem";
 
 export type SaveResultDescriptor = {
   id: string;
+  preview?: MockSavedResultPreview;
   type: MockSavedResultType;
   title: string;
   lessonLabel?: string;
@@ -126,6 +128,7 @@ export function SaveToProjectDialog({
       : (availableSlots.find((slot) => slot.key === targetSlotKey) ?? defaultSlot);
     const savedResult = saveMockResult({
       lessonLabel: result.lessonLabel ?? "独立创作",
+      ...(result.preview ? { preview: result.preview } : {}),
       projectId,
       replaceMode,
       resultId: result.id,

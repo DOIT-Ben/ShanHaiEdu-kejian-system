@@ -144,6 +144,7 @@ export function RuntimeNewProjectPage() {
   }, [patchRecovery, replaceRecovery, watch]);
 
   const resetDraft = useCallback(() => {
+    if (stage !== "idle") return;
     clearRuntimeNewProjectRecovery();
     const fresh = createRuntimeNewProjectRecovery();
     recoveryRef.current = fresh;
@@ -152,10 +153,11 @@ export function RuntimeNewProjectPage() {
     setMessage("");
     setStage("idle");
     reset(fresh.form);
-  }, [reset]);
+  }, [reset, stage]);
 
   const selectFile = useCallback(
     (nextFile: File | null) => {
+      if (stage !== "idle") return;
       setFile(nextFile);
       setMessage("");
       if (!nextFile) return;
@@ -174,7 +176,7 @@ export function RuntimeNewProjectPage() {
         });
       }
     },
-    [getValues, patchRecovery, replaceRecovery],
+    [getValues, patchRecovery, replaceRecovery, stage],
   );
 
   const setSubmitStage = useCallback(
@@ -295,6 +297,7 @@ export function RuntimeNewProjectPage() {
   const hasPendingProject = Boolean(recovery.projectId);
   const canContinueJob = Boolean(recovery.projectId && recovery.jobId);
   const writeReady = isCsrfTokenAvailable();
+  const submitting = stage !== "idle";
 
   return (
     <div className="mx-auto max-w-[1120px] px-4 py-5 md:px-6 lg:px-8">
@@ -327,7 +330,7 @@ export function RuntimeNewProjectPage() {
                 </Link>
               </Button>
             ) : null}
-            <Button onClick={resetDraft} size="sm" variant="quiet">
+            <Button disabled={submitting} onClick={resetDraft} size="sm" variant="quiet">
               重新开始
             </Button>
           </div>
@@ -340,6 +343,7 @@ export function RuntimeNewProjectPage() {
       ) : null}
 
       <form
+        aria-busy={submitting}
         className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]"
         onSubmit={(event) => void submit(event)}
       >
@@ -351,7 +355,12 @@ export function RuntimeNewProjectPage() {
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <label className="text-sm font-medium text-[var(--sh-ink-default)]">
               项目名称
-              <input className={inputClass} {...register("title")} placeholder="例如：认识百分数" />
+              <input
+                className={inputClass}
+                disabled={submitting}
+                {...register("title")}
+                placeholder="例如：认识百分数"
+              />
               {errors.title ? (
                 <span className="mt-1 block text-xs text-[var(--sh-danger)]">
                   {errors.title.message}
@@ -362,6 +371,7 @@ export function RuntimeNewProjectPage() {
               知识点
               <input
                 className={inputClass}
+                disabled={submitting}
                 {...register("knowledgePoint")}
                 placeholder="例如：百分数的意义"
               />
@@ -380,6 +390,7 @@ export function RuntimeNewProjectPage() {
                   <Select
                     ariaLabel="选择年级"
                     className="mt-1.5 w-full"
+                    disabled={submitting}
                     onValueChange={field.onChange}
                     options={["一年级", "二年级", "三年级", "四年级", "五年级", "六年级"].map(
                       (value) => ({ label: value, value }),
@@ -398,6 +409,7 @@ export function RuntimeNewProjectPage() {
                   <Select
                     ariaLabel="选择教材版本"
                     className="mt-1.5 w-full"
+                    disabled={submitting}
                     onValueChange={field.onChange}
                     options={["人教版", "北师大版", "苏教版"].map((value) => ({
                       label: value,
@@ -418,6 +430,7 @@ export function RuntimeNewProjectPage() {
                 <Select
                   ariaLabel="选择制作方式"
                   className="mt-1.5 w-full sm:w-72"
+                  disabled={submitting}
                   onValueChange={field.onChange}
                   options={[
                     { label: "边看边确认", value: "guided" },
@@ -439,6 +452,7 @@ export function RuntimeNewProjectPage() {
             <input
               accept="application/pdf"
               className="sr-only"
+              disabled={submitting}
               onChange={(event) => selectFile(event.target.files?.[0] ?? null)}
               type="file"
             />
@@ -457,7 +471,7 @@ export function RuntimeNewProjectPage() {
               {message}
             </p>
           ) : null}
-          <Button className="mt-4 w-full" disabled={stage !== "idle" || !writeReady} type="submit">
+          <Button className="mt-4 w-full" disabled={submitting || !writeReady} type="submit">
             {stage === "idle" ? <Upload aria-hidden="true" /> : null}
             {stageLabels[stage]}
           </Button>

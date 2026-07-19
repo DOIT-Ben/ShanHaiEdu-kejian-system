@@ -29,6 +29,7 @@ import {
   useMockRuntime,
 } from "@/shared/api/mocks/runtime";
 import { downloadExampleFile } from "@/shared/lib/downloadExampleFile";
+import { downloadRemoteFile } from "@/shared/lib/downloadRemoteFile";
 import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
@@ -103,6 +104,9 @@ export function FinalVideoStep() {
       : "not_ready";
   const synthesisLock = useRef(false);
   const [message, setMessage] = useState("");
+  const [videoDownloadState, setVideoDownloadState] = useState<"error" | "idle" | "loading">(
+    "idle",
+  );
   const { openContextDrawer } = useWorkbenchUi();
   useEffect(() => {
     if (!rendering) synthesisLock.current = false;
@@ -119,7 +123,7 @@ export function FinalVideoStep() {
     if (nextStatus === "review_required") {
       setMessage(
         hasPlayableVideo
-          ? "视频文件已准备好，请完整播放后再确认。"
+          ? "画面文件已准备好，请完整播放后再确认。声音与字幕按当前可用能力分别检查。"
           : "生成任务已结束，但尚未收到可播放的视频文件。当前只显示关键帧示意。",
       );
     }
@@ -158,11 +162,29 @@ export function FinalVideoStep() {
     );
     setMessage("视频生成已开始，可在处理进度中查看。");
   };
+  const downloadVideo = async () => {
+    if (!playableVideo || videoDownloadState === "loading") return;
+    setVideoDownloadState("loading");
+    try {
+      const extension = playableVideo.mimeType.toLowerCase().includes("webm") ? "webm" : "mp4";
+      await downloadRemoteFile({
+        acceptedMimeTypes: ["video/*"],
+        filename: `${videoTitle}_课堂导入.${extension}`,
+        url: playableVideo.src,
+      });
+      setVideoDownloadState("idle");
+      setMessage("视频文件已开始下载。");
+    } catch {
+      setVideoDownloadState("error");
+    }
+  };
   const reviewItems = hasPlayableVideo
     ? [
-        [FileCheck2, "画面正常", "完整播放一遍，确认画面清楚、没有卡顿"],
-        [Volume2, "声音清楚", "试听旁白，确认音量平稳、容易听清"],
-        [Subtitles, "字幕易读", "检查字号、停留时间和断句是否合适"],
+        [FileCheck2, "画面待确认", "完整播放一遍，确认画面清楚、没有卡顿"],
+        [Volume2, "声音待确认", "当前文件可能不含旁白；完整配音属于后续能力"],
+        playableVideo.subtitleSrc
+          ? [Subtitles, "字幕待确认", "已提供独立字幕文件，请检查停留时间和断句"]
+          : [Subtitles, "字幕文件未提供", "当前阶段不以真实字幕阻塞画面文件确认"],
       ]
     : [
         [FileCheck2, "画面尚未检查", "视频生成后，再确认画面是否正常"],
@@ -215,7 +237,7 @@ export function FinalVideoStep() {
               size="md"
             >
               <Check aria-hidden="true" />
-              确认视频
+              确认画面文件
             </Button>
           ) : (
             <Button disabled size="md" variant="secondary">
@@ -226,13 +248,13 @@ export function FinalVideoStep() {
         }
         description={
           hasPlayableVideo
-            ? "完整播放一遍，确认画面、声音和字幕都适合课堂使用。"
+            ? "完整播放一遍，先确认画面文件；声音与字幕按当前可用能力分别检查。"
             : "当前只有关键帧示意。收到可播放的视频文件后，才会开放播放与确认。"
         }
         eyebrow="当前要做：查看课堂导入视频生成状态"
         hideEyebrow
         status={<StatusBadge status={rendering ? "running" : truthfulDisplayStatus} />}
-        title={`${videoTitle} · ${hasPlayableVideo ? "可播放视频" : adoptedShotCount > 0 ? `${String(adoptedShotCount)} 个关键帧参考` : "关键帧示意"}`}
+        title={`${videoTitle} · ${hasPlayableVideo ? "可播放画面文件" : adoptedShotCount > 0 ? `${String(adoptedShotCount)} 个关键帧参考` : "关键帧示意"}`}
       />
       {stale ? <StaleContentNotice reason={nodeState.stale_reason?.summary} /> : null}
       <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_280px]">
@@ -249,6 +271,15 @@ export function FinalVideoStep() {
                 preload="metadata"
               >
                 <source src={playableVideo.src} type={playableVideo.mimeType} />
+                {playableVideo.subtitleSrc ? (
+                  <track
+                    default
+                    kind="subtitles"
+                    label="中文字幕"
+                    src={playableVideo.subtitleSrc}
+                    srcLang="zh-CN"
+                  />
+                ) : null}
               </video>
             ) : (
               <VideoScenePreview
@@ -283,11 +314,22 @@ export function FinalVideoStep() {
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {playableVideo ? (
-          <Button asChild size="sm" variant="secondary">
-            <a download href={playableVideo.src}>
+          <Button
+            disabled={videoDownloadState === "loading"}
+            onClick={() => void downloadVideo()}
+            size="sm"
+            variant="secondary"
+          >
+            {videoDownloadState === "loading" ? (
+              <LoaderCircle aria-hidden="true" className="animate-spin" />
+            ) : (
               <Download aria-hidden="true" />
-              下载视频
-            </a>
+            )}
+            {videoDownloadState === "loading"
+              ? "正在下载视频"
+              : videoDownloadState === "error"
+                ? "重新下载视频"
+                : "下载视频"}
           </Button>
         ) : (
           <Button
@@ -324,6 +366,11 @@ export function FinalVideoStep() {
                 : "开始生成视频"}
         </Button>
       </div>
+      {videoDownloadState === "error" ? (
+        <p className="mt-3 text-sm font-medium text-[var(--sh-danger)]" role="alert">
+          视频文件暂时无法下载。请稍后重试；若仍失败，请联系管理员检查文件访问权限。
+        </p>
+      ) : null}
       {message ? (
         <p
           className={`mt-3 text-sm font-medium ${hasPlayableVideo ? "text-[var(--sh-success)]" : "text-[var(--sh-warning)]"}`}

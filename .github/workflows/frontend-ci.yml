@@ -5,6 +5,8 @@ on:
     paths:
       - "apps/web/**"
       - "contracts/api-surface.openapi.yaml"
+      - "contracts/sse-event.schema.json"
+      - "contracts/fixtures/stage0/job-progress-event.json"
       - "contracts/generated/**"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -16,6 +18,8 @@ on:
     paths:
       - "apps/web/**"
       - "contracts/api-surface.openapi.yaml"
+      - "contracts/sse-event.schema.json"
+      - "contracts/fixtures/stage0/job-progress-event.json"
       - "contracts/generated/**"
       - "package.json"
       - "pnpm-lock.yaml"

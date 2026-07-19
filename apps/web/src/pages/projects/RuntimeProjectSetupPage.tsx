@@ -112,18 +112,33 @@ export function RuntimeProjectSetupPage() {
               onClick={() => cancelMutation.mutate({ idempotencyKey: crypto.randomUUID(), jobId })}
               variant="secondary"
             >
-              取消任务
+              {cancelMutation.isPending
+                ? "正在取消"
+                : cancelMutation.isError
+                  ? "重试取消"
+                  : "取消任务"}
             </Button>
           ) : null}
         </div>
         <div className="h-2 bg-[var(--sh-surface-soft)]">
           <div
             aria-label={"教材处理进度 " + String(progress) + "%"}
+            aria-valuemax={100}
+            aria-valuemin={0}
+            aria-valuenow={progress}
             className="h-full rounded-r-full bg-[image:var(--sh-action-gradient)] transition-[width] duration-[var(--sh-duration-normal)] motion-reduce:transition-none"
             role="progressbar"
             style={{ width: String(progress) + "%" }}
           />
         </div>
+        {cancelMutation.isError ? (
+          <p
+            className="border-t border-[var(--sh-line-subtle)] px-5 py-3 text-sm text-[var(--sh-danger)]"
+            role="alert"
+          >
+            任务还没有取消，请检查网络后重试。正在处理的内容不会丢失。
+          </p>
+        ) : null}
         {running && !writeReady ? (
           <p
             className="border-t border-[var(--sh-line-subtle)] px-5 py-3 text-xs text-[var(--sh-warning)]"

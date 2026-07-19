@@ -96,10 +96,9 @@ function sseResponse(
     payload,
     request_id: null,
   };
-  return new HttpResponse(
-    `id: ${eventId}\nevent: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`,
-    { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } },
-  );
+  return new HttpResponse(`id: 1\nevent: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`, {
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+  });
 }
 
 export const handlers = [
@@ -629,7 +628,7 @@ export const handlers = [
     }
     const projectId = String(params.projectId);
     return sseResponse(
-      "project.updated",
+      "project.created",
       { id: projectId, type: "project" },
       { status: "running" },
       projectId,
@@ -646,7 +645,7 @@ export const handlers = [
       );
     }
     return sseResponse(
-      "generation.succeeded",
+      "generation.job.progress",
       { id: jobId, type: "generation_job" },
       { result_ids: job.resultIds, status: "succeeded" },
       job.projectId ?? null,

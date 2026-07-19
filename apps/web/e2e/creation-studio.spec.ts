@@ -18,6 +18,35 @@ async function chooseSelect(page: Page, label: string, option: string) {
   await page.getByRole("option", { name: option }).click();
 }
 
+function webpDimensions(content: Buffer) {
+  expect(content.subarray(0, 4).toString("ascii")).toBe("RIFF");
+  expect(content.subarray(8, 12).toString("ascii")).toBe("WEBP");
+  const format = content.subarray(12, 16).toString("ascii");
+  if (format === "VP8 ") {
+    return {
+      height: content.readUInt16LE(28) & 0x3fff,
+      width: content.readUInt16LE(26) & 0x3fff,
+    };
+  }
+  if (format === "VP8L") {
+    return {
+      height:
+        1 +
+        (((content[24] ?? 0) & 0x0f) << 10) +
+        ((content[23] ?? 0) << 2) +
+        (((content[22] ?? 0) & 0xc0) >> 6),
+      width: 1 + (((content[22] ?? 0) & 0x3f) << 8) + (content[21] ?? 0),
+    };
+  }
+  if (format === "VP8X") {
+    return {
+      height: 1 + content.readUIntLE(27, 3),
+      width: 1 + content.readUIntLE(24, 3),
+    };
+  }
+  throw new Error(`无法识别 WebP 编码：${format}`);
+}
+
 async function expectNoA11yViolations(page: Page) {
   await page.addScriptTag({ content: axe.source });
   const violations = await page.evaluate(async () => {
@@ -258,8 +287,7 @@ test("图片比例同步应用到预览并下载当前真实素材", async ({ pa
   if (!downloadPath) throw new Error("下载文件路径不可用");
   const content = await readFile(downloadPath);
   expect(download.suggestedFilename()).toMatch(/\.webp$/);
-  expect(content.subarray(0, 4).toString("ascii")).toBe("RIFF");
-  expect(content.subarray(8, 12).toString("ascii")).toBe("WEBP");
+  expect(webpDimensions(content)).toEqual({ height: 900, width: 1600 });
   expect(content.byteLength).toBeGreaterThan(50_000);
 });
 

@@ -61,6 +61,7 @@ describe("mock saved results", () => {
     const first = saveMockResult(
       {
         lessonLabel: "第 1 课时",
+        preview: { candidate: 0, generation: 1, ratio: "1:1" },
         projectId,
         replaceMode: "replace",
         resultId: "image-candidate-1",
@@ -84,6 +85,7 @@ describe("mock saved results", () => {
     const current = saveMockResult(
       {
         lessonLabel: "第 1 课时",
+        preview: { candidate: 1, generation: 2, ratio: "4:3" },
         projectId,
         replaceMode: "replace",
         resultId: "image-candidate-2",
@@ -101,8 +103,16 @@ describe("mock saved results", () => {
       expect.objectContaining({ resultId: "image-candidate-2", version: 2 }),
     ]);
     expect(listMockSavedResultHistory(store.getState(), projectId, "ppt.page-3.hero")).toEqual([
-      expect.objectContaining({ id: current.id, version: 2 }),
-      expect.objectContaining({ id: first.id, version: 1 }),
+      expect.objectContaining({
+        id: current.id,
+        preview: { candidate: 1, generation: 2, ratio: "4:3" },
+        version: 2,
+      }),
+      expect.objectContaining({
+        id: first.id,
+        preview: { candidate: 0, generation: 1, ratio: "1:1" },
+        version: 1,
+      }),
     ]);
     expect(store.getState().drafts[`project:${projectId}:delivery-package`]?.value).toMatchObject({
       status: "stale",

@@ -7,12 +7,19 @@ import {
 
 export type MockSavedResultType = "image" | "ppt_page" | "video" | "audio" | "document";
 
+export type MockSavedResultPreview = {
+  candidate: number;
+  generation: number;
+  ratio: string;
+};
+
 export type MockSavedResult = {
   id: string;
   projectId: string;
   resultId: string;
   type: MockSavedResultType;
   title: string;
+  preview?: MockSavedResultPreview;
   slotKey: string;
   slotLabel: string;
   lessonLabel: string;
@@ -35,6 +42,23 @@ function isSavedResultType(value: unknown): value is MockSavedResultType {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseMockSavedResultPreview(value: unknown): MockSavedResultPreview | null {
+  if (!isRecord(value)) return null;
+  const { candidate, generation, ratio } = value;
+  if (
+    typeof candidate !== "number" ||
+    !Number.isInteger(candidate) ||
+    candidate < 0 ||
+    typeof generation !== "number" ||
+    !Number.isInteger(generation) ||
+    generation < 0 ||
+    (ratio !== "1:1" && ratio !== "4:3" && ratio !== "16:9")
+  ) {
+    return null;
+  }
+  return { candidate, generation, ratio };
 }
 
 const savedResultPrefix = (projectId: string) => `project:${projectId}:saved-result:`;
@@ -64,10 +88,12 @@ function parseMockSavedResult(value: unknown): MockSavedResult | null {
   ) {
     return null;
   }
+  const preview = parseMockSavedResultPreview(result.preview);
   return {
     id: result.id,
     lessonLabel: typeof result.lessonLabel === "string" ? result.lessonLabel : "独立创作",
     projectId: result.projectId,
+    ...(preview ? { preview } : {}),
     replaceMode: result.replaceMode === "append" ? "append" : "replace",
     resultId: result.resultId,
     savedAt: result.savedAt,
