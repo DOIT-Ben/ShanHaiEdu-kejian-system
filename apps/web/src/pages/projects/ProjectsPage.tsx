@@ -93,13 +93,15 @@ export function ProjectsPage() {
               <p className="mt-1 text-sm text-[var(--sh-ink-muted)]">
                 {project.grade} · {project.textbookEdition}
               </p>
-              <p className="mt-3 text-sm font-medium text-[var(--sh-ink-default)]">
-                {project.currentLesson}
+              <p className="mt-3 line-clamp-2 text-sm font-medium text-[var(--sh-ink-default)]">
+                {project.currentLesson ?? project.knowledgePoint}
               </p>
-              <div className="mt-3 rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-soft)] p-3">
-                <p className="text-xs font-semibold text-[var(--sh-brand-600)]">下一件事</p>
-                <p className="mt-1 text-sm text-[var(--sh-ink-strong)]">{project.nextAction}</p>
-              </div>
+              {project.nextAction ? (
+                <div className="mt-3 rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-soft)] p-3">
+                  <p className="text-xs font-semibold text-[var(--sh-brand-600)]">下一件事</p>
+                  <p className="mt-1 text-sm text-[var(--sh-ink-strong)]">{project.nextAction}</p>
+                </div>
+              ) : null}
               <div className="mt-4 flex items-center justify-between gap-3">
                 <span className="flex items-center gap-1.5 text-xs text-[var(--sh-ink-faint)]">
                   <Clock3 aria-hidden="true" className="size-3.5" />

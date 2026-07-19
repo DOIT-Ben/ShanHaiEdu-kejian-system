@@ -2,9 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   apiClient,
   configureCsrfTokenProvider,
+  isCsrfTokenAvailable,
   unwrapApiResult,
   unwrapApiResultWithResponse,
 } from "@/shared/api/client";
+import { apiConfig } from "@/shared/api/config";
+
+const originalApiMode = apiConfig.mode;
 
 function jsonResponse(body: unknown, init: ResponseInit = {}) {
   const headers = new Headers(init.headers);
@@ -18,7 +22,40 @@ function jsonResponse(body: unknown, init: ResponseInit = {}) {
 describe("typed api client", () => {
   afterEach(() => {
     configureCsrfTokenProvider(null);
+    (apiConfig as { mode: string }).mode = originalApiMode;
     vi.unstubAllGlobals();
+  });
+
+  it("真实模式写请求缺少 CSRF token 时在 fetch 前安全失败", async () => {
+    (apiConfig as { mode: string }).mode = "real";
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    expect(isCsrfTokenAvailable()).toBe(false);
+
+    const updatePolicy = () =>
+      apiClient.PATCH("/projects/{project_id}/automation-policy", {
+        body: { mode: "guided" },
+        params: {
+          header: { "Idempotency-Key": "policy-update-1", "If-Match": '"policy-v1"' },
+          path: { project_id: "01960000-0000-7000-8000-000000000001" },
+        },
+      });
+
+    await expect(updatePolicy()).rejects.toMatchObject({
+      code: "CSRF_TOKEN_UNAVAILABLE",
+      retryable: false,
+    });
+    configureCsrfTokenProvider(() => "   ");
+    expect(isCsrfTokenAvailable()).toBe(false);
+    await expect(updatePolicy()).rejects.toMatchObject({
+      code: "CSRF_TOKEN_UNAVAILABLE",
+      retryable: false,
+    });
+    configureCsrfTokenProvider(() => {
+      throw new Error("bootstrap unavailable");
+    });
+    expect(isCsrfTokenAvailable()).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("保留 credentials、幂等键、If-Match、CSRF 与 ETag", async () => {

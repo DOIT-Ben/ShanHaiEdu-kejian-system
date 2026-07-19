@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: ["runtime/**"],
   fullyParallel: false,
   workers: 2,
   retries: 0,

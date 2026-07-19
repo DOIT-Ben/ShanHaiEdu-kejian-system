@@ -16,9 +16,9 @@
 - 正式发布的`shanhai.primary_math.courseware@1.0.0`继续固定原内容、v1工作流和既有项目绑定；主线已经包含#130合并的`1.1.0`/v2前向候选，但在#146加固与PostgreSQL前向发布复验完成前不得作为#89的安全门禁或新项目默认。“1～5的认识”黄金Fixture可以分别启动教案、PPT和视频合同测试，但不代表真实模型或媒体生产完成。
 - 已审核的Markdown TemplateDraft可以通过显式CompilationProfile确定性编译为同一套结构化内容包合同；该能力不替代内容发布服务或模型节点执行运行时。
 - 当前可以通过自动化测试和API/CLI验证后端链路；生产前端已经在Open Draft [PR #111](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/111)恢复远端源码与审查载体，但尚未完成浏览器到部署后端的阶段1真实联调，不得描述为阶段1产品完成。
-- PR #111已经把生产`RuntimeApp`与开发`MockApp`隔离；生产入口实现项目创建、教材SHA-256、上传会话、对象存储直传、上传确认、Generation Job REST/SSE、课时读取和项目概览的前端纵向链，生产构建不以Mock Runtime或演示凭据兜底。
+- PR #111已经把生产`RuntimeApp`与开发`MockApp`隔离；生产入口实现项目创建、教材SHA-256、刷新恢复、上传会话、对象存储直传、上传确认、Generation Job REST/SSE、课时读取和项目概览的前端纵向链，生产构建不以Mock Runtime、合同测试入口或演示凭据兜底。
 - 项目、上传、课时、Workflow、Artifact、素材槽位、创作四动作、Generation Job和项目/Job SSE均已有runtime OpenAPI类型化客户端；当前只有项目、上传、Job、课时、AutomationPolicy与SSE进入生产页面，其余客户端仍待页面编排和真实环境验收。
-- 真实认证bootstrap、当前用户与退出合同仍缺失；后端真实图片/视频Provider Adapter与受控冒烟也尚未完成。开发Mock页面、静态素材和确定性Fake都不能作为真实认证、媒体生成或完整业务闭环证据。
+- 独立Runtime Playwright门禁已经用合同级确定性网络桩覆盖生产路由、CSRF安全阻断、上传刷新恢复与Job/项目SSE；它不替代目标部署环境联调。真实认证bootstrap、当前用户与退出合同仍缺失，相关写操作保持禁用；后端真实图片/视频Provider Adapter与受控冒烟也尚未完成。开发Mock页面、静态关键帧和确定性Fake都不能作为真实认证、媒体生成或完整业务闭环证据。
 
 ## 已完成
 

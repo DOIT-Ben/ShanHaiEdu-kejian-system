@@ -9,9 +9,12 @@ export type ProjectSummary = {
   knowledgePoint: string;
   grade: string;
   textbookEdition: string;
-  currentLesson: string;
-  nextAction: string;
-  progressLabel: string;
+  /** Optional until the lesson/workflow aggregate endpoint supplies it. */
+  currentLesson?: string;
+  /** Optional until the workflow aggregate endpoint supplies a real next action. */
+  nextAction?: string;
+  /** A status label, not a completion percentage or inferred workflow progress. */
+  progressLabel?: string;
   status?: "draft" | "active" | "archived";
   updatedAt: string;
 };

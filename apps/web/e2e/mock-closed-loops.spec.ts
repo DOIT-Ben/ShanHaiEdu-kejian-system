@@ -40,7 +40,7 @@ test("教材文件随新建项目进入教材页", async ({ page }) => {
   await expect(page.getByTestId("markdown-preview")).not.toContainText("百分数表示");
 });
 
-test("新项目可以只通过页面操作走完视频创作主链路", async ({ page }) => {
+test("新项目可以只通过页面操作走到真实视频生成门槛", async ({ page }, testInfo) => {
   test.setTimeout(60_000);
   await loginAsTeacher(page);
   await page.goto("/app/projects/new");
@@ -97,7 +97,7 @@ test("新项目可以只通过页面操作走完视频创作主链路", async ({
   }
 
   await page.goto(`${workUrl}/video-assets`);
-  await page.getByRole("link", { name: "检查视频片段" }).click();
+  await page.getByTestId("workbench-content").getByRole("link", { name: "选择关键帧参考" }).click();
   const shotCards = page.getByRole("button", { name: /^镜头 \d/ });
   const fineDraftKey = `project:${projectId}:lesson:${lessonId}:fine-storyboard`;
   await expect(shotCards).toHaveCount(3);
@@ -105,24 +105,24 @@ test("新项目可以只通过页面操作走完视频创作主链路", async ({
     const shotCard = shotCards.nth(index);
     await shotCard.click();
     await expect(shotCard).toHaveAttribute("aria-pressed", "true");
-    let adopt = page.getByRole("button", { name: "采用这个结果" });
+    let adopt = page.getByRole("button", { name: "选择这个关键帧参考" });
     if (!(await adopt.isVisible())) {
-      const retry = page.getByRole("button", { name: "只重做这个镜头" });
+      const retry = page.getByRole("button", { name: "只重做这个关键帧" });
       if (await retry.isVisible()) {
         await retry.click();
-        await expect(page.getByRole("button", { name: "采用这个结果" })).toBeVisible();
-        adopt = page.getByRole("button", { name: "采用这个结果" });
+        await expect(page.getByRole("button", { name: "选择这个关键帧参考" })).toBeVisible();
+        adopt = page.getByRole("button", { name: "选择这个关键帧参考" });
       }
-      const reselect = page.getByRole("button", { name: /重新选择.*片段/ });
+      const reselect = page.getByRole("button", { name: /重新选择.*关键帧/ });
       if (!(await adopt.isVisible()) && (await reselect.isVisible())) {
         await reselect.click();
-        await expect(page.getByRole("button", { name: "采用这个结果" })).toBeVisible();
-        adopt = page.getByRole("button", { name: "采用这个结果" });
+        await expect(page.getByRole("button", { name: "选择这个关键帧参考" })).toBeVisible();
+        adopt = page.getByRole("button", { name: "选择这个关键帧参考" });
       }
     }
     if (await adopt.isVisible()) {
       if (await adopt.isDisabled()) {
-        await page.getByRole("button", { name: "只重做这个镜头" }).click();
+        await page.getByRole("button", { name: "只重做这个关键帧" }).click();
       }
       await expect(adopt).toBeEnabled();
       await adopt.click();
@@ -157,12 +157,18 @@ test("新项目可以只通过页面操作走完视频创作主链路", async ({
       }, fineDraftKey),
     )
     .toBe("3:approved");
-  await expect(page.getByRole("link", { name: "合成完整视频" }).last()).toBeVisible();
-  await page.getByRole("link", { name: "合成完整视频" }).last().click();
-  await page.getByRole("button", { name: "重新合成" }).click();
-  await expect(page.getByRole("button", { name: "确认成片" })).toBeEnabled({ timeout: 10_000 });
-  await page.getByRole("button", { name: "确认成片" }).click();
-  await expect(page.getByText("已完成", { exact: true }).last()).toBeVisible();
+  await expect(page.getByRole("link", { name: "查看视频生成状态" }).last()).toBeVisible();
+  await page.getByRole("link", { name: "查看视频生成状态" }).last().click();
+  await page.getByRole("button", { name: "开始生成视频" }).click();
+  await expect(page.getByRole("button", { name: "视频尚未生成" })).toBeDisabled({
+    timeout: 10_000,
+  });
+  await expect(page.getByText(/关键帧示意/).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "确认视频" })).toHaveCount(0);
+  await page.screenshot({
+    animations: "disabled",
+    path: testInfo.outputPath("final-video-keyframe-1280.png"),
+  });
 });
 
 test("过期内容选择更新后退出过期状态", async ({ page }) => {

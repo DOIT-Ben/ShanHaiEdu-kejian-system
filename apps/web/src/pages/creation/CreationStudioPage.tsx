@@ -177,9 +177,9 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
   const saveStatus = {
     adopted: "已选中，保存后进入项目",
     draft: "本地草稿已保存",
-    ready: "作品已完成",
+    ready: type === "video" ? "关键帧已准备" : "作品已完成",
     running: "正在创作",
-    saved: "已保存到项目",
+    saved: type === "video" ? "关键帧已保存到项目" : "已保存到项目",
   }[stage];
 
   return (

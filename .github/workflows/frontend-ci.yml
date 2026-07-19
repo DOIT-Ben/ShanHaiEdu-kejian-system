@@ -103,3 +103,6 @@ jobs:
 
       - name: Run Chromium flows
         run: pnpm --filter @shanhaiedu/web test:e2e --project=chromium
+
+      - name: Run runtime contract flows
+        run: pnpm --filter @shanhaiedu/web test:e2e:runtime --project=runtime-chromium

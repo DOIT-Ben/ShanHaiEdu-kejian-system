@@ -32,8 +32,8 @@ export function downloadCreationResult({
   }
   if (type === "video") {
     downloadExampleFile(
-      `${title}_作品${candidateLabel}_预览说明.txt`,
-      `${title}视频预览说明\n作品：${candidateLabel}\n画幅：${ratio}\n可用来查看镜头、时长和画面。`,
+      `${title}_关键帧${candidateLabel}_说明.txt`,
+      `${title}关键帧说明\n关键帧：${candidateLabel}\n画面比例：${ratio}\n当前仅为关键帧示意，视频尚未生成。\n收到真实视频文件后，才会开放播放、确认和视频下载。`,
     );
     return;
   }

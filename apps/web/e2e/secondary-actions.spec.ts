@@ -75,7 +75,7 @@ test("封面重新生成和下载预览均有结果", async ({ page }) => {
   await expect(page.getByRole("button", { name: "选择百格光窗" })).toBeEnabled();
 });
 
-test("资产检查和最终视频重新合成进入任务中心", async ({ page }) => {
+test("资产检查和视频生成进入任务中心", async ({ page }) => {
   await loginAsTeacher(page);
   await unlockWorkbenchStep(page, projectId, lessonId, "video-assets");
   await page.goto(`${workUrl}/video-assets`);
@@ -86,22 +86,22 @@ test("资产检查和最终视频重新合成进入任务中心", async ({ page 
   await page.getByRole("button", { name: "关闭面板" }).click();
   await unlockWorkbenchStep(page, projectId, lessonId, "final-video");
   await page.goto(`${workUrl}/final-video`);
-  await page.getByRole("button", { name: "重新合成" }).click();
-  await expect(page.getByText("重新合成已开始，可在处理进度中查看")).toBeVisible();
+  await page.getByRole("button", { name: "开始生成视频" }).click();
+  await expect(page.getByText("视频生成已开始，可在处理进度中查看")).toBeVisible();
   await page.goto("/app/tasks");
-  await expect(page.getByText("课堂导入视频重新合成")).toBeVisible();
+  await expect(page.getByText("课堂导入视频生成")).toBeVisible();
 });
 
-test("镜头备选和单个镜头重做状态刷新后保留", async ({ page }) => {
+test("关键帧参考和单个关键帧重做状态刷新后保留", async ({ page }) => {
   await loginAsTeacher(page);
   await unlockWorkbenchStep(page, projectId, lessonId, "fine-storyboard");
   await page.goto(`${workUrl}/fine-storyboard`);
-  const candidate = page.getByRole("button", { name: "备选片段 2" });
+  const candidate = page.getByRole("button", { name: "关键帧参考 2" });
   await candidate.click();
-  await page.getByRole("button", { name: "只重做这个镜头" }).click();
-  await expect(page.getByText("镜头 2 已重新制作完成，其他镜头保持不变。")).toBeVisible();
+  await page.getByRole("button", { name: "只重做这个关键帧" }).click();
+  await expect(page.getByText("镜头 2 的关键帧示意已更新，其他镜头保持不变。")).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("button", { name: "备选片段 2" })).toHaveAttribute(
+  await expect(page.getByRole("button", { name: "关键帧参考 2" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );

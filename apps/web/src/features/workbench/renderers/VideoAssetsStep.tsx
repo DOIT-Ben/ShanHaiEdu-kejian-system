@@ -49,7 +49,7 @@ export function VideoAssetsStep() {
               className={buttonVariants({ size: "md" })}
               to={`/app/projects/${projectId}/lessons/${lessonId}/work/fine-storyboard`}
             >
-              检查视频片段
+              选择关键帧参考
               <ArrowRight aria-hidden="true" />
             </Link>
           ) : (

@@ -99,7 +99,7 @@ export function RecentCreationRail({
             <CreativeResultVisual type="video" variant={1} />
           </div>
           <p className="mt-2 truncate text-xs font-medium text-[var(--sh-ink-strong)]">
-            课堂首问片段
+            课堂首问关键帧
           </p>
         </Link>
       </div>

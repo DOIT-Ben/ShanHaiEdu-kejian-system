@@ -31,6 +31,19 @@ async function waitForStablePage(page: Page, heading: string, readyText: string)
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
   await page.evaluate(async () => {
     await document.fonts.ready;
+    await Promise.all(
+      Array.from(document.images, async (image) => {
+        if (!image.complete) {
+          await new Promise<void>((resolve) => {
+            image.addEventListener("load", () => resolve(), { once: true });
+            image.addEventListener("error", () => resolve(), { once: true });
+          });
+        }
+        if (typeof image.decode === "function") {
+          await image.decode().catch(() => undefined);
+        }
+      }),
+    );
     await new Promise<void>((resolve) => {
       requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
     });
@@ -161,7 +174,7 @@ test("1440 首页无横向溢出且用户文案纯净", async ({ page }, testInf
     testInfo,
     "home-1440",
     "从一份教材，到一节孩子愿意听的好课",
-    "继续制作",
+    "继续当前课件",
   );
   await expect(page.getByRole("heading", { name: "也可以直接创作一件作品" })).toBeInViewport();
 });
@@ -175,7 +188,7 @@ test("1024 品牌首页保持单主轴且无横向溢出", async ({ page }, test
     testInfo,
     "home-1024",
     "从一份教材，到一节孩子愿意听的好课",
-    "继续制作",
+    "继续当前课件",
   );
   await expect(page.getByLabel("创作向导")).toHaveCount(0);
   const heroPreview = await page.getByTestId("brand-hero-preview").boundingBox();
@@ -192,7 +205,7 @@ test("390 品牌首页按任务顺序自然下滑", async ({ page }, testInfo) =
     testInfo,
     "home-390",
     "从一份教材，到一节孩子愿意听的好课",
-    "上传教材开始制作",
+    "继续当前课件",
   );
   await expect(page.getByLabel("创作向导")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "继续完成这节课" })).toBeVisible();

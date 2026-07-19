@@ -80,7 +80,7 @@
 | Generation Job | `GET /generation-jobs/{job_id}`；`POST /generation-jobs/{job_id}/cancel`                                                                                                                       | `features/jobs/api/jobsApi.ts`                      | 教材任务进度页已接入                             |
 | SSE            | `GET /projects/{project_id}/events/stream`；`GET /generation-jobs/{job_id}/events/stream`                                                                                                      | `shared/api/useProjectEvents.ts`、`useJobEvents.ts` | 项目概览和教材任务进度页已接入                   |
 
-`shared/api/client.ts` 统一使用 `credentials: include`、标准成功/错误信封和网络错误映射。写操作由各 feature 客户端显式携带 `Idempotency-Key`；并发编辑读取响应 ETag，并在修改时发送 `If-Match`。CSRF header 的注入点已经预留，但必须由尚未实现的真实认证 bootstrap 提供 token。
+`shared/api/client.ts` 统一使用 `credentials: include`、标准成功/错误信封和网络错误映射。写操作由各 feature 客户端显式携带 `Idempotency-Key`；并发编辑读取响应 ETag，并在修改时发送 `If-Match`。CSRF header 必须由真实认证 bootstrap 提供；真实模式没有 token 时，客户端会在 fetch 前安全失败，页面同时禁用新建、取消任务和制作方式写操作。
 
 ## 教材上传纵向链
 
@@ -93,6 +93,8 @@
 5. `POST /projects/{project_id}/materials/{material_id}/confirm` 确认文件，取得 Generation Job；
 6. 进入 setup 页面，通过 Job REST 快照、Job SSE 和 5 秒轮询读取服务端进度，可取消非终态任务；
 7. Job 成功后读取项目课时，并进入项目概览读取项目、课时和制作方式。
+
+当前标签页会在 `sessionStorage` 保存表单、文件元数据与 SHA-256、三段幂等意图、项目 ID、上传会话、ETag 和 Job ID。浏览器刷新后不会伪造或恢复 `File` 对象，而是请用户重新选择同一份 PDF，再从已保存的服务端阶段继续；若签名上传地址已经过期，保留项目并轮换上传与确认意图，重新建立上传会话。
 
 这条链已经完成前端实现和确定性测试，但尚未在真实认证、反向代理、对象存储和后端部署组合环境中完成浏览器端到端验收，不能据此宣布阶段1联调或生产闭环完成。
 
@@ -110,3 +112,5 @@
 - Workflow、Artifact、素材槽位、创作四动作、完整 Job 中心、交付和管理端仍缺生产页面编排与浏览器验收；
 - 后端目前只有 Provider 中立媒体合同和确定性 Fake，真实图片/视频 Adapter 与受控冒烟不属于当前前端已完成能力；
 - Mock 媒体、静态素材和视觉预览只能验证版式，不能作为真实生成、下载或原子写回的验收证据。
+
+独立的 `playwright.runtime.config.ts` 只启动真实模式入口，并使用合同级确定性网络桩覆盖首页、项目、新建上传、刷新恢复、Job REST/SSE 与项目概览；默认 `playwright.config.ts` 继续验证开发 Mock 视觉流程，两者由前端 CI 分别执行。

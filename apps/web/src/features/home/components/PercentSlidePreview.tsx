@@ -73,13 +73,13 @@ function DemoCover({ slide }: { slide: DemoSlide }) {
       />
       <div className="absolute inset-0 bg-gradient-to-r from-[var(--sh-artifact-paper)] via-[var(--sh-artifact-paper)]/90 to-transparent" />
       <div className="relative flex size-full max-w-[56%] flex-col justify-center px-[7%] text-[var(--sh-artifact-ink)]">
-        <p className="text-[clamp(0.45rem,1.15vw,0.78rem)] font-semibold text-[var(--sh-art-green)]">
+        <p className="text-[clamp(0.45rem,3cqw,0.78rem)] font-semibold text-[var(--sh-art-green)]">
           {slide.eyebrow}
         </p>
-        <p className="mt-[4%] text-[clamp(0.8rem,2.7vw,2.15rem)] font-bold leading-tight">
+        <p className="mt-[4%] text-[clamp(0.8rem,8.5cqw,2.15rem)] font-bold leading-tight">
           {slide.title}
         </p>
-        <p className="mt-[4%] max-w-[28rem] text-[clamp(0.42rem,1.15vw,0.82rem)] leading-relaxed text-[var(--sh-artifact-muted)]">
+        <p className="mt-[4%] max-w-[28rem] text-[clamp(0.42rem,3cqw,0.82rem)] leading-relaxed text-[var(--sh-artifact-muted)]">
           {slide.subtitle}
         </p>
       </div>
@@ -91,13 +91,13 @@ function DemoContent({ slide }: { slide: DemoSlide }) {
   return (
     <div className="relative size-full bg-[var(--sh-artifact-paper)] text-[var(--sh-artifact-ink)]">
       <div className="relative z-10 flex h-full w-[38%] flex-col justify-center pl-[6%] pr-[3%]">
-        <p className="text-[clamp(0.42rem,1.1vw,0.76rem)] font-semibold text-[var(--sh-art-green)]">
+        <p className="text-[clamp(0.42rem,2.8cqw,0.76rem)] font-semibold text-[var(--sh-art-green)]">
           {slide.eyebrow}
         </p>
-        <p className="mt-[5%] text-[clamp(0.72rem,2.3vw,1.85rem)] font-bold leading-tight">
+        <p className="mt-[5%] text-[clamp(0.72rem,7.2cqw,1.85rem)] font-bold leading-tight">
           {slide.title}
         </p>
-        <p className="mt-[6%] text-[clamp(0.4rem,1vw,0.74rem)] leading-relaxed text-[var(--sh-artifact-muted)]">
+        <p className="mt-[6%] text-[clamp(0.4rem,2.6cqw,0.74rem)] leading-relaxed text-[var(--sh-artifact-muted)]">
           {slide.subtitle}
         </p>
         <span className="mt-[8%] h-1 w-[34%] rounded-full bg-[var(--sh-art-gold)]" />
@@ -134,13 +134,15 @@ export function PercentSlidePreview({
   return (
     <div
       aria-label={topic ? `${topic}课堂课件页面预览` : slide.alt}
-      className={`relative aspect-video overflow-hidden rounded-[var(--sh-radius-sm)] bg-[var(--sh-artifact-paper)] shadow-[var(--sh-shadow-card)] ${compact ? "ring-1 ring-[var(--sh-line-subtle)]" : ""}`}
+      className={`relative aspect-video overflow-hidden rounded-[var(--sh-radius-sm)] bg-[var(--sh-artifact-paper)] shadow-[var(--sh-shadow-card)] [container-type:inline-size] ${compact ? "ring-1 ring-[var(--sh-line-subtle)]" : ""}`}
       role="img"
     >
       {topic ? (
         <div className="flex size-full flex-col justify-center bg-[var(--sh-artifact-paper)] px-[10%] text-[var(--sh-artifact-ink)]">
           <p className="text-xs font-semibold text-[var(--sh-art-green)]">小学数学课堂</p>
-          <p className="mt-3 text-[clamp(1rem,2.8vw,2.3rem)] font-bold">{topic}</p>
+          <p className="mt-[3%] text-[clamp(0.8rem,8.5cqw,2.3rem)] font-bold leading-tight">
+            {topic}
+          </p>
           <div className="mt-5 grid grid-cols-6 gap-1">
             {Array.from({ length: 18 }, (_, index) => (
               <span

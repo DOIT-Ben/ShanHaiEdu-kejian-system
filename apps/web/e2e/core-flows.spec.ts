@@ -149,7 +149,7 @@ test("改用课堂导入方案后旧母版剧本需要按新方案更新", async
   ).toBeVisible();
 });
 
-test("PPT 正文按可用高度完整显示", async ({ page }) => {
+test("PPT 正文按可用高度完整显示", async ({ page }, testInfo) => {
   await page.setViewportSize({ height: 800, width: 1280 });
   await loginAsTeacher(page);
   await unlockWorkbenchStep(page, projectId, lessonId, "ppt-pages");
@@ -174,6 +174,10 @@ test("PPT 正文按可用高度完整显示", async ({ page }) => {
     (stageBox?.y ?? 0) + (stageBox?.height ?? 0) + 1,
   );
   expect((stageBox?.y ?? 0) + (stageBox?.height ?? 0)).toBeLessThanOrEqual(800);
+  await page.screenshot({
+    animations: "disabled",
+    path: testInfo.outputPath("ppt-pages-1280.png"),
+  });
 
   await page.setViewportSize({ height: 768, width: 1024 });
   await page.reload();

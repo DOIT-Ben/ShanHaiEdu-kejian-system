@@ -77,16 +77,17 @@ corepack pnpm --filter @shanhaiedu/web test
 corepack pnpm --filter @shanhaiedu/web build:storybook
 corepack pnpm --filter @shanhaiedu/web build
 corepack pnpm --filter @shanhaiedu/web test:e2e --project=chromium
+corepack pnpm --filter @shanhaiedu/web test:e2e:runtime --project=runtime-chromium
 ```
 
-也可以运行 `corepack pnpm --filter @shanhaiedu/web release:check` 执行完整前端门禁。Playwright 默认自行启动并关闭隔离的本地开发服务，测试并发固定为 2。
+也可以运行 `corepack pnpm --filter @shanhaiedu/web release:check` 执行完整前端门禁。Runtime Playwright 使用独立配置启动 `VITE_API_MODE=real` 服务，并通过合同级确定性路由桩验证生产路由、上传恢复、Job/SSE 和 CSRF 安全阻断；两套测试不会共用开发入口或业务状态。
 
 ## Runtime 与 Mock 边界
 
 - `App.tsx` 仅在 `import.meta.env.DEV` 且 API 模式为 `mock` 时懒加载 `MockApp`，其他情况统一进入 `RuntimeApp`；
 - MSW Worker 同样只在开发 Mock 模式动态加载；生产构建不会注册或引用 Worker；
 - 生产构建检查会拒绝 MSW Worker、Mock Runtime 标识、开发演示凭据和缺失的静态素材引用；
-- `RuntimeApp` 使用 Cookie 请求、标准错误包、`Idempotency-Key`、ETag/`If-Match` 和可注入的 CSRF token 读取器；
+- `RuntimeApp` 使用 Cookie 请求、标准错误包、`Idempotency-Key`、ETag/`If-Match` 和可注入的 CSRF token 读取器；真实模式没有 token 时写请求在 fetch 前安全失败，相关按钮保持禁用；
 - 项目与 Job SSE 只使对应 TanStack Query 快照失效并重新读取 REST 真相，不在浏览器内拼装业务对象；
 - `MockApp` 保留完整视觉壳、交互状态和本地演示数据，但这些能力不构成真实 API 联调证据。
 
@@ -104,13 +105,13 @@ corepack pnpm --filter @shanhaiedu/web test:e2e --project=chromium
 - 创作批次，以及保存提示词版本、生成候选、采用候选、原子写回项目四个独立动作；
 - Generation Job 查询/取消，以及项目和 Job 两类 SSE 订阅。
 
-其中当前 `RuntimeApp` 页面已经使用项目、上传、Job、课时、AutomationPolicy 和 SSE 客户端完成教材上传纵向链。Workflow、Artifact、素材槽位和创作四动作虽然已有客户端及定向测试，但生产页面仍待接入，不能把开发 Mock 页面描述为真实业务完成。
+其中当前 `RuntimeApp` 页面已经使用项目、上传、Job、课时、AutomationPolicy 和 SSE 客户端完成教材上传纵向链。新建项目页面把表单、文件摘要、幂等意图、项目、上传会话、ETag 和 Job 标识保存在当前标签页，可在刷新后重新选择同一文件继续，且不会复用过期的签名上传地址。Workflow、Artifact、素材槽位和创作四动作虽然已有客户端及定向测试，但生产页面仍待接入，不能把开发 Mock 页面描述为真实业务完成。
 
 ## 当前页面范围与缺口
 
 `RuntimeApp` 当前开放品牌首页、项目列表、新建项目、教材任务进度和项目概览。创作中心、课时工作台、成果、项目任务、交付和管理端尚未接入真实页面，访问时显示安全的不可用状态。
 
-真实认证仍缺少 runtime 合同中的登录、当前用户、刷新和退出入口；前端目前只依赖服务端已有 Cookie，并未建立认证 bootstrap 或 CSRF token 注入。后端真实图片/视频 Provider Adapter 与受控冒烟也尚未完成，前端素材和 Mock 预览不能冒充真实媒体生成结果。
+真实认证仍缺少 runtime 合同中的登录、当前用户、刷新和退出入口；前端目前只依赖服务端已有 Cookie，并未建立生产认证 bootstrap，因此真实写操作会保持禁用。后端真实图片/视频 Provider Adapter 与受控冒烟也尚未完成，前端素材和 Mock 预览不能冒充真实媒体生成结果。
 
 ## 目录结构
 

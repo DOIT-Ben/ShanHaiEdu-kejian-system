@@ -1,16 +1,8 @@
 import createClient, { type Middleware } from "openapi-fetch";
-import type { paths } from "@/generated/api-schema";
+import type { components, paths } from "@/generated/api-schema";
 import { apiConfig } from "@/shared/api/config";
 
-export type ApiErrorBody = {
-  error: {
-    code: string;
-    message: string;
-    retryable: boolean;
-    details?: Record<string, unknown>;
-  };
-  request_id: string;
-};
+export type ApiErrorBody = components["schemas"]["error-envelope.schema"];
 
 export class ApiError extends Error {
   readonly code: string;
@@ -41,6 +33,19 @@ let csrfTokenProvider: CsrfTokenProvider | null = null;
 /** Installs the CSRF token reader supplied by the real authentication bootstrap. */
 export function configureCsrfTokenProvider(provider: CsrfTokenProvider | null) {
   csrfTokenProvider = provider;
+}
+
+function readCsrfToken() {
+  try {
+    return csrfTokenProvider?.()?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Reports bootstrap readiness without exposing the token value. */
+export function isCsrfTokenAvailable() {
+  return readCsrfToken() !== undefined;
 }
 
 export type ApiResponse<T> = {
@@ -96,13 +101,39 @@ function isWriteMethod(method: string) {
   return normalized !== "GET" && normalized !== "HEAD" && normalized !== "OPTIONS";
 }
 
+function csrfTokenUnavailableError() {
+  return new ApiError({
+    error: {
+      code: "CSRF_TOKEN_UNAVAILABLE",
+      message: "安全校验尚未就绪，请刷新页面后重试",
+      retryable: false,
+    },
+    request_id: "client",
+  });
+}
+
+function addCsrfToken(request: Request) {
+  if (!isWriteMethod(request.method)) return;
+
+  const suppliedToken = request.headers.get("X-CSRF-Token")?.trim();
+  if (suppliedToken) {
+    request.headers.set("X-CSRF-Token", suppliedToken);
+    return;
+  }
+
+  const providerToken = readCsrfToken();
+  if (providerToken) {
+    request.headers.set("X-CSRF-Token", providerToken);
+    return;
+  }
+  // Runtime/production writes must never fall back to a cookie-only request.
+  if (import.meta.env.PROD || apiConfig.mode === "real") throw csrfTokenUnavailableError();
+}
+
 const requestMiddleware: Middleware = {
   onRequest({ request }) {
     request.headers.set("Accept", "application/json");
-    if (isWriteMethod(request.method) && !request.headers.has("X-CSRF-Token")) {
-      const csrfToken = csrfTokenProvider?.()?.trim();
-      if (csrfToken) request.headers.set("X-CSRF-Token", csrfToken);
-    }
+    addCsrfToken(request);
     return request;
   },
 };

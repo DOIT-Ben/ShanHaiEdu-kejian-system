@@ -3,6 +3,7 @@ import {
   Download,
   FileArchive,
   FileText,
+  type LucideIcon,
   Presentation,
   Subtitles,
   Video,
@@ -11,6 +12,10 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import type { WorkflowStatus } from "@/entities/workflow/model";
 import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
+import {
+  getPlayableFinalVideo,
+  type PlayableVideoMedia,
+} from "@/features/workbench/lib/videoMedia";
 import { saveMockDraft, type MockRuntimeState, useMockRuntime } from "@/shared/api/mocks/runtime";
 import { listMockSavedResults } from "@/shared/api/mocks/savedResults";
 import { downloadExampleFile } from "@/shared/lib/downloadExampleFile";
@@ -25,7 +30,17 @@ export type DeliveryRequirement = {
   kind: DeliveryRequirementKind;
   label: string;
   lessonTitle: string;
+  media?: PlayableVideoMedia;
   revision: number;
+  status: WorkflowStatus;
+};
+
+type DeliveryFile = {
+  detail: string;
+  downloadUrl?: string;
+  icon: LucideIcon;
+  name: string;
+  placeholder?: boolean;
   status: WorkflowStatus;
 };
 
@@ -79,12 +94,22 @@ export function buildDeliveryRequirements(runtime: MockRuntimeState, projectId: 
       });
     }
     if (!disabledBranchStatuses.has(lesson.videoStatus)) {
+      const finalVideo = nodeStatus(
+        runtime,
+        projectId,
+        lesson.id,
+        "final-video",
+        lesson.videoStatus,
+      );
+      const media = getPlayableFinalVideo(runtime, projectId, lesson.id);
       requirements.push({
         key: `${lesson.id}:final-video`,
         kind: "video",
         label: `${lessonLabel} · 课堂导入视频`,
         lessonTitle: lesson.title,
-        ...nodeStatus(runtime, projectId, lesson.id, "final-video", lesson.videoStatus),
+        revision: finalVideo.revision,
+        status: media ? finalVideo.status : "not_ready",
+        ...(media ? { media } : {}),
       });
     }
     return requirements;
@@ -98,7 +123,14 @@ export function createDeliveryFingerprint(runtime: MockRuntimeState, projectId: 
     .sort((left, right) => left.slotKey.localeCompare(right.slotKey));
   return JSON.stringify({
     lessonRevision: runtime.nodeStates[`${projectId}:*:lesson-division`]?.revision ?? 0,
-    requirements: requirements.map(({ key, revision, status }) => ({ key, revision, status })),
+    requirements: requirements.map(({ key, media, revision, status }) => ({
+      key,
+      mediaReady: Boolean(media),
+      mimeType: media?.mimeType ?? null,
+      revision,
+      status,
+      subtitleReady: Boolean(media?.subtitleSrc),
+    })),
     savedResults,
   });
 }
@@ -114,7 +146,7 @@ function deliveryFiles(
   requirements: DeliveryRequirement[],
   packageApproved: boolean,
 ) {
-  const files = requirements.flatMap((requirement) => {
+  const files = requirements.flatMap<DeliveryFile>((requirement) => {
     const prefix = `${projectTitle}_${requirement.lessonTitle}`;
     if (requirement.kind === "lesson-plan") {
       return [
@@ -142,16 +174,32 @@ function deliveryFiles(
         },
       ];
     }
+    if (!requirement.media) {
+      return [
+        {
+          name: `${prefix}_视频尚未生成`,
+          detail: `${requirement.label} · 当前只有关键帧参考，收到真实视频后才会提供下载`,
+          icon: Video,
+          placeholder: true,
+          status: "not_ready",
+        },
+      ];
+    }
+    const extension = requirement.media.mimeType.toLowerCase().includes("webm") ? "webm" : "mp4";
+    const videoFile: DeliveryFile = {
+      name: `${prefix}_课堂导入.${extension}`,
+      detail: `${requirement.label} · 可播放视频文件`,
+      downloadUrl: requirement.media.src,
+      icon: Video,
+      status: requirement.status,
+    };
+    if (!requirement.media.subtitleSrc) return [videoFile];
     return [
-      {
-        name: `${prefix}_课堂导入.mp4`,
-        detail: `${requirement.label} · 当前版本说明`,
-        icon: Video,
-        status: requirement.status,
-      },
+      videoFile,
       {
         name: `${prefix}_课堂导入字幕.srt`,
-        detail: `${requirement.label} · 字幕随当前视频版本交付`,
+        detail: `${requirement.label} · 独立字幕文件`,
+        downloadUrl: requirement.media.subtitleSrc,
         icon: Subtitles,
         status: requirement.status,
       },
@@ -159,7 +207,7 @@ function deliveryFiles(
   });
   files.push({
     name: `${projectTitle}_质量报告.pdf`,
-    detail: "教学、技术与视觉检查 · 当前说明",
+    detail: "教学内容、画面、声音与字幕检查 · 当前说明",
     icon: CheckCircle2,
     status: packageApproved ? "approved" : "not_ready",
   });
@@ -289,7 +337,7 @@ export function DeliveryPage() {
         </p>
       ) : null}
       <div className="mt-4 divide-y divide-[var(--sh-line-subtle)] rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] px-4">
-        {files.map(({ detail, icon: Icon, name, status }) => (
+        {files.map(({ detail, downloadUrl, icon: Icon, name, placeholder, status }) => (
           <div className="flex flex-wrap items-center gap-3 py-3.5" key={name}>
             <span className="grid size-9 shrink-0 place-items-center rounded-[var(--sh-radius-sm)] bg-[var(--sh-brand-50)] text-[var(--sh-brand-600)]">
               <Icon aria-hidden="true" className="size-4" />
@@ -299,20 +347,29 @@ export function DeliveryPage() {
               <p className="mt-1 text-xs text-[var(--sh-ink-muted)]">{detail}</p>
             </div>
             <StatusBadge status={status} />
-            <Button
-              disabled={!packageReady || status !== "approved"}
-              onClick={() =>
-                downloadExampleFile(
-                  `${name}.说明.txt`,
-                  `山海教育课堂作品：${name}\n${detail}\n当前提供文件说明，正式文件将在导出完成后提供。`,
-                )
-              }
-              size="sm"
-              variant="secondary"
-            >
-              <Download aria-hidden="true" />
-              {packageReady ? "下载文件说明" : "等待交付包"}
-            </Button>
+            {downloadUrl && packageReady && status === "approved" ? (
+              <Button asChild size="sm" variant="secondary">
+                <a download={name} href={downloadUrl}>
+                  <Download aria-hidden="true" />
+                  下载文件
+                </a>
+              </Button>
+            ) : (
+              <Button
+                disabled={placeholder || !packageReady || status !== "approved"}
+                onClick={() =>
+                  downloadExampleFile(
+                    `${name}.说明.txt`,
+                    `山海教育课堂作品：${name}\n${detail}\n当前提供文件说明，正式文件将在导出完成后提供。`,
+                  )
+                }
+                size="sm"
+                variant="secondary"
+              >
+                <Download aria-hidden="true" />
+                {placeholder ? "视频尚未生成" : packageReady ? "下载文件说明" : "等待交付包"}
+              </Button>
+            )}
           </div>
         ))}
       </div>

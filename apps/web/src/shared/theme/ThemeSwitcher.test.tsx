@@ -39,4 +39,15 @@ describe("主题切换器", () => {
     render(<ThemeSwitcher showLabel />);
     expect(screen.getByText("护眼")).toBeVisible();
   });
+
+  it("入口与菜单项都提供至少 44px 的触控高度", async () => {
+    const user = userEvent.setup();
+    render(<ThemeSwitcher />);
+
+    const trigger = screen.getByRole("button", { name: "切换主题，当前护眼模式" });
+    expect(trigger.className).toContain("h-11");
+    expect(trigger.className).toContain("min-w-11");
+    await user.click(trigger);
+    expect(screen.getByRole("menuitemradio", { name: "白天模式" }).className).toContain("min-h-11");
+  });
 });

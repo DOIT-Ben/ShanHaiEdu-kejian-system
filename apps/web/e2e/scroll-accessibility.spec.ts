@@ -64,7 +64,7 @@ const studios = [
     startLabel: "开始创作图片",
   },
   {
-    downloadLabel: "下载视频说明",
+    downloadLabel: "下载关键帧说明",
     name: "视频",
     path: "/app/creation/videos",
     startLabel: "开始创作视频",
@@ -83,7 +83,7 @@ for (const studio of studios) {
     await loginAsTeacher(page);
     await page.goto(studio.path);
     await page.getByRole("button", { name: studio.startLabel }).click();
-    await expect(page.getByRole("button", { name: "就用这张" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /就用这张|选择这个关键帧/ })).toBeVisible();
 
     const regions = await page.evaluate(() => {
       const main = document.querySelector<HTMLElement>('[data-testid="creation-studio"] > main');
@@ -123,7 +123,7 @@ for (const studio of studios) {
       )
       .toBe(true);
     await expect(page.getByRole("button", { name: studio.downloadLabel })).toBeInViewport();
-    await expect(page.getByRole("button", { name: "就用这张" })).toBeInViewport();
+    await expect(page.getByRole("button", { name: /就用这张|选择这个关键帧/ })).toBeInViewport();
   });
 }
 
@@ -192,11 +192,11 @@ test("1024x768 创作结果和采用操作首屏同时可见", async ({ page }) 
   await loginAsTeacher(page);
   await page.goto("/app/creation/videos");
   await page.getByRole("button", { name: "开始创作视频" }).click();
-  await expect(page.getByRole("button", { name: "就用这张" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /就用这张|选择这个关键帧/ })).toBeVisible();
 
   await expect(page.getByTestId("creation-main-visual")).toBeInViewport();
-  await expect(page.getByRole("button", { name: "下载视频说明" })).toBeInViewport();
-  await expect(page.getByRole("button", { name: "就用这张" })).toBeInViewport();
+  await expect(page.getByRole("button", { name: "下载关键帧说明" })).toBeInViewport();
+  await expect(page.getByRole("button", { name: /就用这张|选择这个关键帧/ })).toBeInViewport();
 
   const mainDimensions = await page
     .locator('[data-testid="creation-studio"] > main')
@@ -214,7 +214,7 @@ test("390x844 三类创作台均可通过窄屏滚轮到达采用操作", async 
   for (const studio of studios) {
     await page.goto(studio.path);
     await page.getByRole("button", { name: studio.startLabel }).click();
-    await expect(page.getByRole("button", { name: "就用这张" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /就用这张|选择这个关键帧/ })).toBeVisible();
     const main = page.locator('[data-testid="creation-studio"] > main');
     const dimensions = await main.evaluate((element) => ({
       clientHeight: element.clientHeight,
@@ -224,6 +224,6 @@ test("390x844 三类创作台均可通过窄屏滚轮到达采用操作", async 
       await main.hover();
       await page.mouse.wheel(0, 2_000);
     }
-    await expect(page.getByRole("button", { name: "就用这张" })).toBeInViewport();
+    await expect(page.getByRole("button", { name: /就用这张|选择这个关键帧/ })).toBeInViewport();
   }
 });

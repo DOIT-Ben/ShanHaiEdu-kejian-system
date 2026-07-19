@@ -30,13 +30,45 @@ describe("delivery requirements", () => {
       expect.arrayContaining([
         expect.objectContaining({ key: `${demoLessonId}:lesson-plan`, status: "approved" }),
         expect.objectContaining({ key: `${demoLessonId}:ppt-pages`, status: "approved" }),
-        expect.objectContaining({ key: `${demoLessonId}:final-video`, status: "approved" }),
+        expect.objectContaining({
+          key: `${demoLessonId}:final-video`,
+          status: "not_ready",
+        }),
         expect.objectContaining({ key: `${secondLesson.id}:lesson-plan`, status: "draft" }),
       ]),
     );
     expect(requirements.some((item) => item.key === `${secondLesson.id}:ppt-pages`)).toBe(false);
     expect(requirements.some((item) => item.key === `${secondLesson.id}:final-video`)).toBe(false);
     expect(requirements.every((item) => item.status === "approved")).toBe(false);
+    expect(
+      requirements.find((item) => item.key === `${demoLessonId}:final-video`)?.media,
+    ).toBeUndefined();
+  });
+
+  it("只有明确的视频地址才允许进入交付", () => {
+    store.updateNodeState(demoProjectId, demoLessonId, "final-video", { status: "approved" });
+    store.saveDraft(
+      `project:${demoProjectId}:lesson:${demoLessonId}:final-video:media`,
+      {
+        mimeType: "video/mp4",
+        src: "https://cdn.example.com/final.mp4",
+        subtitleSrc: "https://cdn.example.com/final.srt",
+      },
+      { lessonId: demoLessonId, nodeKey: "final-video", projectId: demoProjectId },
+    );
+
+    const requirement = buildDeliveryRequirements(store.getState(), demoProjectId).find(
+      (item) => item.key === `${demoLessonId}:final-video`,
+    );
+
+    expect(requirement).toMatchObject({
+      media: {
+        mimeType: "video/mp4",
+        src: "https://cdn.example.com/final.mp4",
+        subtitleSrc: "https://cdn.example.com/final.srt",
+      },
+      status: "approved",
+    });
   });
 
   it("changes the delivery fingerprint when the current saved result changes", () => {
