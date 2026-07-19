@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -19,7 +20,6 @@ from apps.api.model_gateway.contracts import (
     ModelAuditContext,
     ModelGatewayError,
     ModelUsage,
-    TextModelRequest,
 )
 from apps.api.workflows.models import NodeRun, WorkflowRun
 
@@ -67,6 +67,7 @@ class AttemptSuccessAudit:
     actual_model: str
     finish_reason: str | None
     usage: ModelUsage
+    provider_task_id: str | None = None
 
 
 class SqlAlchemyAttemptAuditSink:
@@ -237,7 +238,7 @@ class SqlAlchemyAttemptAuditSink:
         )
 
 
-def model_request_hash(request: TextModelRequest) -> str:
+def model_request_hash(request: BaseModel) -> str:
     payload = json.dumps(
         request.model_dump(mode="json"),
         sort_keys=True,
