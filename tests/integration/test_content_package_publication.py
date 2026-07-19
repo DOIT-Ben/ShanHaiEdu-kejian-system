@@ -119,8 +119,7 @@ def test_golden_release_is_published_from_validated_fixtures_and_is_idempotent(
             {"lesson_count": 2, "lesson_units": [{}]},
         )
         assert any(
-            error["path"] == ["lesson_count"]
-            and "number of items" in error["message"]
+            error["path"] == ["lesson_count"] and "number of items" in error["message"]
             for error in count_report["errors"]
         )
         assert resolve_runtime_defaults(session).content_release_id == release.id
