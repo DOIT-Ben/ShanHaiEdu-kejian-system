@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import asdict, dataclass
+from typing import cast
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -84,7 +86,6 @@ class PromptSnapshotService:
         self._session.add(context_record)
         self._session.flush()
         preview = asdict(prompt.preview)
-        preview["schema"] = preview.pop("output_schema")
         prompt_record = PromptSnapshot(
             id=new_uuid7(),
             organization_id=self._actor.organization_id,
@@ -120,8 +121,94 @@ class PromptSnapshotService:
         return PromptPreviewRead(
             prompt_snapshot_id=prompt.id,
             content_hash=prompt.content_hash,
-            editable_prompt=prompt.editable_prompt,
+            editable_prompt=self._public_editable_prompt(prompt),
             edit_policy=self._public_edit_policy(prompt.preview_json),
+        )
+
+    @classmethod
+    def _public_editable_prompt(cls, prompt: PromptSnapshot) -> str:
+        legacy_summaries, full_context_counts = cls._legacy_context_metadata(prompt.preview_json)
+        full_context_index = 0
+        chunks: list[str] = []
+        for chunk in prompt.editable_prompt.split("\n\n"):
+            if chunk in legacy_summaries:
+                continue
+            if full_context_index < len(full_context_counts):
+                sanitized = cls._sanitize_legacy_full_context(
+                    chunk,
+                    expected_items=full_context_counts[full_context_index],
+                )
+                if sanitized != chunk:
+                    chunk = sanitized
+                    full_context_index += 1
+            chunks.append(chunk)
+        return "\n\n".join(chunks)
+
+    @staticmethod
+    def _legacy_context_metadata(
+        preview_json: dict[str, object],
+    ) -> tuple[set[str], tuple[int, ...]]:
+        summaries = preview_json.get("context_summary")
+        if not isinstance(summaries, list):
+            return set(), ()
+        chunks: set[str] = set()
+        full_context_counts: list[int] = []
+        for raw_summary in cast(list[object], summaries):
+            if not isinstance(raw_summary, dict):
+                continue
+            summary = cast(dict[str, object], raw_summary)
+            exposure = summary.get("exposure")
+            binding_key = summary.get("binding_key")
+            source = summary.get("source")
+            item_count = summary.get("item_count")
+            content_hash = summary.get("content_hash")
+            if not (
+                isinstance(binding_key, str)
+                and isinstance(source, str)
+                and isinstance(item_count, int)
+                and not isinstance(item_count, bool)
+                and isinstance(content_hash, str)
+            ):
+                continue
+            if exposure == "summary":
+                chunks.add(
+                    f"[context:{binding_key}] source={source} "
+                    f"items={item_count} hash={content_hash}"
+                )
+            elif exposure == "full":
+                full_context_counts.append(item_count)
+        return chunks, tuple(full_context_counts)
+
+    @staticmethod
+    def _sanitize_legacy_full_context(chunk: str, *, expected_items: int) -> str:
+        try:
+            payload: object = json.loads(chunk)
+        except json.JSONDecodeError:
+            return chunk
+        if not isinstance(payload, dict):
+            return chunk
+        payload_dict = cast(dict[str, object], payload)
+        if set(payload_dict) != {"context"}:
+            return chunk
+        context = payload_dict["context"]
+        if not isinstance(context, list):
+            return chunk
+        context_items = cast(list[object], context)
+        if len(context_items) != expected_items:
+            return chunk
+        contents: list[object] = []
+        for raw_item in context_items:
+            if not isinstance(raw_item, dict):
+                return chunk
+            item = cast(dict[str, object], raw_item)
+            if "content" not in item or not ({"source_id", "source_version_id"} & item.keys()):
+                return chunk
+            contents.append(item["content"])
+        return json.dumps(
+            {"context": contents},
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
         )
 
     @staticmethod

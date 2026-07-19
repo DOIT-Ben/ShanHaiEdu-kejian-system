@@ -308,12 +308,25 @@ async def test_prompt_preview_endpoint_returns_only_the_safe_projection(
                 "template_version": "1.0.0",
             },
             layers_json={"layers": [{"content": "INTERNAL_METHOD_PRIVATE"}]},
-            editable_prompt="Visible task.",
+            editable_prompt=(
+                "Visible task. Explain source and hash vocabulary to students.\n\n"
+                "[context:preferences] source=project.teacher_preferences "
+                f"items=1 hash={'c' * 64}\n\n"
+                '{"context":[{"content":{"text":"Visible legacy fact"},'
+                '"source_id":"private-source-id","source_version_id":"private-version-id"}]}'
+            ),
             user_diff_json={"mode": "replace_editable_layer"},
             compiled_prompt="PLATFORM_PRIVATE\nINTERNAL_METHOD_PRIVATE\nPROVIDER_PRIVATE",
             request_schema_json={"type": "object", "required": ["fixed_structure"]},
             preview_json={
-                "editable_prompt": "Visible task.",
+                "editable_prompt": (
+                    "Visible task. Explain source and hash vocabulary to students.\n\n"
+                    "[context:preferences] source=project.teacher_preferences "
+                    f"items=1 hash={'c' * 64}\n\n"
+                    '{"context":[{"content":{"text":"Visible legacy fact"},'
+                    '"source_id":"private-source-id",'
+                    '"source_version_id":"private-version-id"}]}'
+                ),
                 "locked_layers": [
                     {"layer": "output_schema", "key": "request_schema", "locked": True}
                 ],
@@ -321,10 +334,17 @@ async def test_prompt_preview_endpoint_returns_only_the_safe_projection(
                     {
                         "binding_key": "preferences",
                         "source": "project.teacher_preferences",
-                        "exposure": "hidden",
+                        "exposure": "summary",
                         "item_count": 1,
                         "content_hash": "c" * 64,
-                    }
+                    },
+                    {
+                        "binding_key": "material",
+                        "source": "material.approved_parse",
+                        "exposure": "full",
+                        "item_count": 1,
+                        "content_hash": "d" * 64,
+                    },
                 ],
                 "schema": {"type": "object", "required": ["fixed_structure"]},
                 "output_schema": {"private": True},
@@ -351,7 +371,10 @@ async def test_prompt_preview_endpoint_returns_only_the_safe_projection(
         }
         assert data["prompt_snapshot_id"] == str(prompt_snapshot.id)
         assert data["content_hash"] == prompt_snapshot.content_hash
-        assert data["editable_prompt"] == prompt_snapshot.editable_prompt
+        assert data["editable_prompt"] == (
+            "Visible task. Explain source and hash vocabulary to students.\n\n"
+            '{"context":[{"text":"Visible legacy fact"}]}'
+        )
         assert data["edit_policy"] == {
             "mode": "replace_editable_layer",
             "max_chars": 100_000,
@@ -362,6 +385,8 @@ async def test_prompt_preview_endpoint_returns_only_the_safe_projection(
         assert "PROVIDER_PRIVATE" not in rendered
         assert "INTERNAL_METHOD_PRIVATE" not in rendered
         assert "fixed_structure" not in rendered
+        assert "private-source-id" not in rendered
+        assert "private-version-id" not in rendered
 
         with factory() as session:
             persisted = session.get(PromptSnapshot, prompt_snapshot.id)

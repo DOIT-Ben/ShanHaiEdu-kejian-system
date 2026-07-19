@@ -548,7 +548,7 @@ paths:
         - $ref: '#/components/parameters/NodeRunId'
       responses:
         '200':
-          description: Editable business prompt and locked layer summaries
+          description: Editable business prompt and its edit policy
           content:
             application/json:
               schema:
@@ -2065,9 +2065,10 @@ components:
           type: object
           additionalProperties: false
           required:
+            - prompt_snapshot_id
+            - content_hash
             - editable_prompt
-            - locked_layers
-            - context_summary
+            - edit_policy
           properties:
             prompt_snapshot_id:
               type: string
@@ -2077,59 +2078,25 @@ components:
               pattern: ^[0-9a-f]{64}$
             editable_prompt:
               type: string
-            locked_layers:
-              type: array
-              items:
-                $ref: '#/components/schemas/PromptLockedLayerSummary'
-            context_summary:
-              type: array
-              items:
-                $ref: '#/components/schemas/PromptContextSummary'
-            schema:
-              type:
-                - object
-                - 'null'
-              additionalProperties: true
+            edit_policy:
+              $ref: '#/components/schemas/PromptEditPolicy'
         request_id:
           type: string
-    PromptLockedLayerSummary:
+    PromptEditPolicy:
       type: object
       additionalProperties: false
+      required:
+        - mode
+        - max_chars
       properties:
-        layer:
+        mode:
           type: string
           enum:
-            - platform_safety
-            - output_schema
-            - provider_format
-        key:
-          type: string
-          minLength: 1
-        locked:
-          type: boolean
-          const: true
-    PromptContextSummary:
-      type: object
-      additionalProperties: false
-      properties:
-        binding_key:
-          type: string
-          minLength: 1
-        source:
-          type: string
-          minLength: 1
-        exposure:
-          type: string
-          enum:
-            - full
-            - summary
-            - hidden
-        item_count:
+            - replace_editable_layer
+        max_chars:
           type: integer
-          minimum: 0
-        content_hash:
-          type: string
-          pattern: ^[0-9a-f]{64}$
+          minimum: 1
+          maximum: 100000
     AcceptedJobEnvelope:
       type: object
       required:
