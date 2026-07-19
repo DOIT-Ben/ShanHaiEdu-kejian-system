@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 from uuid import uuid4
 
@@ -8,7 +11,6 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from apps.api.cli import run_publish_golden_content
 from apps.api.content_runtime.models import (
     ContentDefinitionVersion,
     ContentPackage,
@@ -142,18 +144,33 @@ def test_failed_publication_rolls_back_every_new_runtime_row(
 
 def test_administrative_cli_publishes_and_replays_without_new_versions(
     migrated_database_url: str,
-    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert run_publish_golden_content(database_url=migrated_database_url, root=ROOT) == 0
-    first = json.loads(capsys.readouterr().out)
+    first_process = run_publish_cli(migrated_database_url)
+    assert first_process.returncode == 0, first_process.stderr
+    first = json.loads(first_process.stdout)
     assert first["conclusion"] == "passed"
     assert first["created"] is True
     assert first["runtime_default_version_no"] == 2
 
-    assert run_publish_golden_content(database_url=migrated_database_url, root=ROOT) == 0
-    second = json.loads(capsys.readouterr().out)
+    second_process = run_publish_cli(migrated_database_url)
+    assert second_process.returncode == 0, second_process.stderr
+    second = json.loads(second_process.stdout)
     assert second["created"] is False
     assert second["content_release_id"] == first["content_release_id"]
+
+
+def run_publish_cli(database_url: str) -> subprocess.CompletedProcess[str]:
+    environment = os.environ.copy()
+    environment["SHANHAI_DATABASE_URL"] = database_url
+    return subprocess.run(
+        [sys.executable, "-m", "apps.api.cli", "publish-golden-content"],
+        cwd=ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+    )
 
 
 def publication_counts(session) -> tuple[int, ...]:
