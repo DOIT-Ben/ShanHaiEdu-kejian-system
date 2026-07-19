@@ -27,6 +27,7 @@ EXPECTED_TABLES = {
     "creation_prompt_versions",
     "content_definition_versions",
     "content_package_versions",
+    "content_package_item_versions",
     "content_packages",
     "content_release_items",
     "content_releases",
@@ -54,6 +55,7 @@ EXPECTED_TABLES = {
     "event_stream_entries",
     "source_materials",
     "save_to_project_operations",
+    "runtime_default_versions",
     "upload_sessions",
     "usage_records",
     "users",
@@ -142,7 +144,7 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
             )
             == 1
         )
-    assert ScriptDirectory.from_config(config).get_current_head() == "f1a6c3e9b205"
+    assert ScriptDirectory.from_config(config).get_current_head() == "c2d4e6f8a901"
     previous = os.environ.get("SHANHAI_DATABASE_URL")
     os.environ["SHANHAI_DATABASE_URL"] = postgres_database_url
     try:
