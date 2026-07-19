@@ -11,8 +11,8 @@ from pathlib import Path
 from apps.api.content_runtime.package_source import load_builtin_courseware_release
 from apps.api.content_runtime.publication_service import ContentReleasePublisher
 from apps.api.database import build_engine, build_session_factory
-from apps.api.ids import new_uuid7
 from apps.api.identity.models import SYSTEM_PRINCIPAL_ID
+from apps.api.ids import new_uuid7
 from apps.api.logging import configure_logging
 from apps.api.model_gateway.contracts import (
     ModelCapability,
