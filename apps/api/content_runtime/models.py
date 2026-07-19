@@ -70,6 +70,40 @@ class ContentPackageVersion(Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class ContentPackageItemVersion(Base):
+    __tablename__ = "content_package_item_versions"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('input_definition', 'content_definition', 'style_preset', "
+            "'prompt_template', 'projection_template', 'generation_template')",
+            name="kind_allowed",
+        ),
+        CheckConstraint("checksum ~ '^[0-9a-f]{64}$'", name="checksum_format"),
+        Index(
+            "uq_content_package_item_versions_package_item",
+            "content_package_version_id",
+            "item_key",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    content_package_version_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey(
+            "content_package_versions.id",
+            name="fk_content_package_items_package_version",
+            ondelete="RESTRICT",
+        ),
+        nullable=False,
+    )
+    item_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    kind: Mapped[str] = mapped_column(String(80), nullable=False)
+    schema_id: Mapped[str] = mapped_column(String(500), nullable=False)
+    payload_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    checksum: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
 class ContentRelease(Base):
     __tablename__ = "content_releases"
     __table_args__ = (
@@ -119,6 +153,46 @@ class ContentReleaseItem(Base):
     )
     mount_key: Mapped[str] = mapped_column(String(160), nullable=False)
     priority: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class RuntimeDefaultVersion(Base):
+    __tablename__ = "runtime_default_versions"
+    __table_args__ = (
+        CheckConstraint("version_no > 0", name="version_positive"),
+        Index(
+            "uq_runtime_default_versions_key_version",
+            "runtime_key",
+            "version_no",
+            unique=True,
+        ),
+        Index(
+            "uq_runtime_default_versions_release_workflow",
+            "runtime_key",
+            "content_release_id",
+            "workflow_definition_version_id",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    runtime_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    content_release_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("content_releases.id", ondelete="RESTRICT"), nullable=False
+    )
+    workflow_definition_version_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey(
+            "workflow_definition_versions.id",
+            name="fk_runtime_defaults_workflow_version",
+            ondelete="RESTRICT",
+        ),
+        nullable=False,
+    )
+    activated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    activated_by: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("principals.id", ondelete="RESTRICT"), nullable=False
+    )
 
 
 class ContentDefinitionVersion(Base):
