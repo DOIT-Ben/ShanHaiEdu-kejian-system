@@ -178,7 +178,7 @@ async def test_media_attempts_persist_task_identity_and_provider_neutral_usage(
         "total_tokens": 0,
         "video_seconds": 8,
     }
-    assert attempts[-1].status == "failed"
+    assert attempts[-1].status == "submission_unknown"
     assert attempts[-1].error_code == "MODEL_SUBMISSION_UNKNOWN"
     assert attempts[-1].error_details_json == {
         "retryable": False,

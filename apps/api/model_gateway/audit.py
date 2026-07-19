@@ -4,19 +4,37 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Protocol
 from uuid import UUID
 
 from pydantic import BaseModel
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
-from apps.api.database import utc_now
 from apps.api.ids import new_uuid7
-from apps.api.model_gateway.audit_models import GenerationAttempt, UsageRecord
+from apps.api.jobs.service import (
+    GenerationJobAttemptBindingReader,
+    GenerationJobBinding,
+    GenerationJobCancellationReader,
+)
+from apps.api.model_gateway.audit_contracts import (
+    AttemptCompletion,
+    AttemptHeartbeat,
+    AttemptLease,
+    AttemptRequestAudit,
+    AttemptSuccessAudit,
+    DuplicateAttemptDelivery,
+)
+from apps.api.model_gateway.audit_models import (
+    GenerationAttempt,
+    GenerationAttemptCounter,
+    UsageRecord,
+)
 from apps.api.model_gateway.contracts import (
+    GatewayErrorCode,
     ModelAuditContext,
     ModelGatewayError,
     ModelUsage,
@@ -24,57 +42,27 @@ from apps.api.model_gateway.contracts import (
 from apps.api.workflows.models import NodeRun, WorkflowRun
 
 
-class AttemptAuditSink(Protocol):
-    def start(
-        self,
-        context: ModelAuditContext,
-        request: AttemptRequestAudit,
-        *,
-        provider_name: str | None,
-        provider_model: str | None,
-        route_reason: str,
-    ) -> UUID: ...
-
-    def succeed(
-        self,
-        attempt_id: UUID,
-        context: ModelAuditContext,
-        result: AttemptSuccessAudit,
-        *,
-        latency_ms: int,
-    ) -> None: ...
-
-    def fail(
-        self,
-        attempt_id: UUID,
-        context: ModelAuditContext,
-        error: ModelGatewayError,
-        *,
-        latency_ms: int,
-    ) -> None: ...
-
-
-@dataclass(frozen=True, slots=True)
-class AttemptRequestAudit:
-    request_id: str
-    capability: str
-    request_hash: str
-
-
-@dataclass(frozen=True, slots=True)
-class AttemptSuccessAudit:
-    provider_request_id: str | None
-    actual_model: str
-    finish_reason: str | None
-    usage: ModelUsage
-    provider_task_id: str | None = None
+def database_wall_clock(session: Session) -> datetime:
+    """Return PostgreSQL wall time instead of the transaction-start timestamp."""
+    current_time = session.scalar(select(func.clock_timestamp()))
+    if current_time is None:
+        raise RuntimeError("database wall clock is unavailable")
+    return current_time
 
 
 class SqlAlchemyAttemptAuditSink:
     """Write each audit transition in its own short database transaction."""
 
-    def __init__(self, session_factory: sessionmaker[Session]) -> None:
+    def __init__(
+        self,
+        session_factory: sessionmaker[Session],
+        *,
+        lease_seconds: int = 60,
+    ) -> None:
+        if lease_seconds < 1:
+            raise ValueError("attempt lease must be at least one second")
         self._session_factory = session_factory
+        self._lease_seconds = lease_seconds
 
     def start(
         self,
@@ -84,62 +72,142 @@ class SqlAlchemyAttemptAuditSink:
         provider_name: str | None,
         provider_model: str | None,
         route_reason: str,
-    ) -> UUID:
-        with self._session_factory() as session, session.begin():
-            node = session.scalar(
-                select(NodeRun)
-                .join(WorkflowRun, WorkflowRun.id == NodeRun.workflow_run_id)
-                .where(
-                    NodeRun.id == context.node_run_id,
-                    NodeRun.organization_id == context.organization_id,
-                    WorkflowRun.project_id == context.project_id,
+    ) -> AttemptLease:
+        try:
+            with self._session_factory() as session, session.begin():
+                self._lock_context_node(session, context)
+                self._require_generation_job_binding(session, context)
+                self._reject_duplicate_delivery(session, context, request)
+                attempt_no = self._allocate_attempt_no(session, context.node_run_id)
+                now = database_wall_clock(session)
+                lease_owner = str(new_uuid7())
+                attempt = GenerationAttempt(
+                    id=new_uuid7(),
+                    organization_id=context.organization_id,
+                    project_id=context.project_id,
+                    node_run_id=context.node_run_id,
+                    generation_job_id=context.generation_job_id,
+                    attempt_no=attempt_no,
+                    request_id=request.request_id,
+                    capability=request.capability,
+                    operation_kind=request.operation_kind,
+                    provider_name=provider_name,
+                    provider_model=provider_model,
+                    route_reason=route_reason,
+                    status="running",
+                    request_hash=request.request_hash,
+                    provider_request_id=None,
+                    provider_task_id=None,
+                    lease_owner=lease_owner,
+                    lease_expires_at=now + timedelta(seconds=self._lease_seconds),
+                    heartbeat_at=now,
+                    cancel_requested_at=None,
+                    submitted_at=now,
+                    error_details_json={},
                 )
-                .with_for_update(of=NodeRun)
+                session.add(attempt)
+                session.flush()
+                return AttemptLease(attempt_id=attempt.id, lease_owner=lease_owner)
+        except IntegrityError as exc:
+            if _constraint_name(exc) == "uq_generation_attempts_organization_request":
+                raise DuplicateAttemptDelivery("model request delivery already exists") from None
+            raise
+
+    @staticmethod
+    def _lock_context_node(session: Session, context: ModelAuditContext) -> None:
+        node = session.scalar(
+            select(NodeRun)
+            .join(WorkflowRun, WorkflowRun.id == NodeRun.workflow_run_id)
+            .where(
+                NodeRun.id == context.node_run_id,
+                NodeRun.organization_id == context.organization_id,
+                WorkflowRun.project_id == context.project_id,
             )
-            if node is None:
-                raise RuntimeError("model audit context does not match the target node")
-            attempt_no = session.scalar(
-                select(func.coalesce(func.max(GenerationAttempt.attempt_no), 0)).where(
-                    GenerationAttempt.node_run_id == context.node_run_id
-                )
-            )
-            attempt = GenerationAttempt(
-                id=new_uuid7(),
+            .with_for_update(of=NodeRun)
+        )
+        if node is None:
+            raise RuntimeError("model audit context does not match the target node")
+
+    @staticmethod
+    def _require_generation_job_binding(session: Session, context: ModelAuditContext) -> None:
+        if context.generation_job_id is None:
+            return
+        GenerationJobAttemptBindingReader(session).require_bindable(
+            GenerationJobBinding(
+                generation_job_id=context.generation_job_id,
                 organization_id=context.organization_id,
                 project_id=context.project_id,
-                node_run_id=context.node_run_id,
-                generation_job_id=context.generation_job_id,
-                attempt_no=int(attempt_no or 0) + 1,
-                request_id=request.request_id,
-                capability=request.capability,
-                provider_name=provider_name,
-                provider_model=provider_model,
-                route_reason=route_reason,
-                status="running",
-                request_hash=request.request_hash,
-                provider_request_id=None,
-                provider_task_id=None,
-                error_details_json={},
             )
-            session.add(attempt)
-            session.flush()
-            return attempt.id
+        )
+
+    @staticmethod
+    def _reject_duplicate_delivery(
+        session: Session,
+        context: ModelAuditContext,
+        request: AttemptRequestAudit,
+    ) -> None:
+        duplicate = session.scalar(
+            select(GenerationAttempt.id).where(
+                GenerationAttempt.organization_id == context.organization_id,
+                GenerationAttempt.request_id == request.request_id,
+            )
+        )
+        if duplicate is not None:
+            raise DuplicateAttemptDelivery("model request delivery already exists")
+
+    def heartbeat(
+        self,
+        lease: AttemptLease,
+        context: ModelAuditContext,
+    ) -> AttemptHeartbeat:
+        with self._session_factory() as session, session.begin():
+            attempt = self._find_owned_running(session, lease, context)
+            if attempt is None:
+                return AttemptHeartbeat.LOST
+            if attempt.cancel_requested_at is not None or self._job_cancel_requested(
+                session, attempt
+            ):
+                attempt.cancel_requested_at = attempt.cancel_requested_at or database_wall_clock(
+                    session
+                )
+                return AttemptHeartbeat.CANCEL_REQUESTED
+            now = database_wall_clock(session)
+            attempt.heartbeat_at = now
+            attempt.lease_expires_at = now + timedelta(seconds=self._lease_seconds)
+            return AttemptHeartbeat.ACTIVE
 
     def succeed(
         self,
-        attempt_id: UUID,
+        lease: AttemptLease,
         context: ModelAuditContext,
         result: AttemptSuccessAudit,
         *,
         latency_ms: int,
-    ) -> None:
+    ) -> AttemptCompletion:
         with self._session_factory() as session, session.begin():
-            attempt = self._require_running(session, attempt_id, context)
-            attempt.status = "succeeded"
+            attempt = self._require_owned_running(session, lease, context)
+            now = database_wall_clock(session)
+            outcome = (
+                AttemptCompletion.CANCELLED
+                if attempt.cancel_requested_at is not None
+                or self._job_cancel_requested(session, attempt)
+                else AttemptCompletion.SUCCEEDED
+            )
+            if outcome == AttemptCompletion.CANCELLED:
+                attempt.cancel_requested_at = attempt.cancel_requested_at or now
+            attempt.status = outcome.value
             attempt.provider_request_id = _bounded(result.provider_request_id, 255)
             attempt.provider_task_id = _bounded(result.provider_task_id, 255)
-            attempt.finished_at = utc_now()
+            attempt.finished_at = now
             attempt.latency_ms = latency_ms
+            attempt.lease_owner = None
+            attempt.lease_expires_at = None
+            if outcome == AttemptCompletion.CANCELLED:
+                attempt.error_code = GatewayErrorCode.CANCELLED.value
+                attempt.error_details_json = {
+                    "retryable": False,
+                    "retry_after_seconds": None,
+                }
             session.add(
                 self._usage_record(
                     attempt,
@@ -152,25 +220,44 @@ class SqlAlchemyAttemptAuditSink:
                     provider_model=_bounded(result.actual_model, 160),
                 )
             )
+            return outcome
 
     def fail(
         self,
-        attempt_id: UUID,
+        lease: AttemptLease,
         context: ModelAuditContext,
         error: ModelGatewayError,
         *,
         latency_ms: int,
     ) -> None:
         with self._session_factory() as session, session.begin():
-            attempt = self._require_running(session, attempt_id, context)
-            attempt.status = "cancelled" if error.code.value == "MODEL_CANCELLED" else "failed"
-            attempt.finished_at = utc_now()
-            attempt.error_code = error.code.value
+            attempt = self._require_owned_running(session, lease, context)
+            job_cancelled = self._job_cancel_requested(session, attempt)
+            if job_cancelled and attempt.cancel_requested_at is None:
+                attempt.cancel_requested_at = database_wall_clock(session)
+            attempt.status = (
+                "cancelled"
+                if attempt.cancel_requested_at is not None or job_cancelled
+                else {
+                    "MODEL_CANCELLED": "cancelled",
+                    "MODEL_SUBMISSION_UNKNOWN": "submission_unknown",
+                }.get(error.code.value, "failed")
+            )
+            attempt.finished_at = database_wall_clock(session)
+            attempt.error_code = (
+                GatewayErrorCode.CANCELLED.value
+                if attempt.status == "cancelled"
+                else error.code.value
+            )
             attempt.error_details_json = {
-                "retryable": error.retryable,
-                "retry_after_seconds": error.retry_after_seconds,
+                "retryable": False if attempt.status == "cancelled" else error.retryable,
+                "retry_after_seconds": (
+                    None if attempt.status == "cancelled" else error.retry_after_seconds
+                ),
             }
             attempt.latency_ms = latency_ms
+            attempt.lease_owner = None
+            attempt.lease_expires_at = None
             session.add(
                 self._usage_record(
                     attempt,
@@ -185,25 +272,69 @@ class SqlAlchemyAttemptAuditSink:
             )
 
     @staticmethod
-    def _require_running(
+    def _require_owned_running(
         session: Session,
-        attempt_id: UUID,
+        lease: AttemptLease,
         context: ModelAuditContext,
     ) -> GenerationAttempt:
+        attempt = SqlAlchemyAttemptAuditSink._find_owned_running(session, lease, context)
+        if attempt is None:
+            raise RuntimeError("model audit attempt lease is missing, lost, or already terminal")
+        return attempt
+
+    @staticmethod
+    def _find_owned_running(
+        session: Session,
+        lease: AttemptLease,
+        context: ModelAuditContext,
+    ) -> GenerationAttempt | None:
         attempt = session.scalar(
             select(GenerationAttempt)
             .where(
-                GenerationAttempt.id == attempt_id,
+                GenerationAttempt.id == lease.attempt_id,
                 GenerationAttempt.organization_id == context.organization_id,
                 GenerationAttempt.project_id == context.project_id,
                 GenerationAttempt.node_run_id == context.node_run_id,
                 GenerationAttempt.status == "running",
+                GenerationAttempt.lease_owner == lease.lease_owner,
             )
             .with_for_update()
         )
         if attempt is None:
-            raise RuntimeError("model audit attempt is missing or already terminal")
+            return None
+        database_now = database_wall_clock(session)
+        if attempt.lease_expires_at is None or attempt.lease_expires_at < database_now:
+            return None
         return attempt
+
+    @staticmethod
+    def _job_cancel_requested(session: Session, attempt: GenerationAttempt) -> bool:
+        if attempt.generation_job_id is None:
+            return False
+        binding = GenerationJobBinding(
+            generation_job_id=attempt.generation_job_id,
+            organization_id=attempt.organization_id,
+            project_id=attempt.project_id,
+        )
+        return binding in GenerationJobCancellationReader(session).requested_bindings({binding})
+
+    @staticmethod
+    def _allocate_attempt_no(session: Session, node_run_id: UUID) -> int:
+        statement = (
+            insert(GenerationAttemptCounter)
+            .values(node_run_id=node_run_id, next_attempt_no=2)
+            .on_conflict_do_update(
+                index_elements=[GenerationAttemptCounter.node_run_id],
+                set_={
+                    "next_attempt_no": GenerationAttemptCounter.next_attempt_no + 1,
+                },
+            )
+            .returning(GenerationAttemptCounter.next_attempt_no)
+        )
+        next_attempt_no = session.scalar(statement)
+        if next_attempt_no is None:
+            raise RuntimeError("model attempt number allocation failed")
+        return next_attempt_no - 1
 
     @staticmethod
     def _usage_record(
@@ -262,3 +393,8 @@ def _output_units(usage: ModelUsage) -> dict[str, int]:
     units["completion_tokens"] = usage.completion_tokens
     units["total_tokens"] = usage.total_tokens
     return units
+
+
+def _constraint_name(error: IntegrityError) -> str | None:
+    diagnostic = getattr(error.orig, "diag", None)
+    return getattr(diagnostic, "constraint_name", None)

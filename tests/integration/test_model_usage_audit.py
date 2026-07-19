@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
@@ -66,6 +67,7 @@ def test_attempt_numbers_are_unique_and_usage_is_append_only(
                 attempt_no=1,
                 request_id="req-audit-1",
                 capability="text.smoke",
+                operation_kind="text_generate",
                 provider_name="deterministic-fake",
                 provider_model="fake-text-v1",
                 route_reason="configured_primary",
@@ -99,6 +101,7 @@ def test_attempt_numbers_are_unique_and_usage_is_append_only(
         assert usage.actual_cost == Decimal("0.000000")
 
         with pytest.raises(IntegrityError), session.begin_nested():
+            heartbeat_at = utc_now()
             session.add(
                 GenerationAttempt(
                     id=new_uuid7(),
@@ -109,12 +112,16 @@ def test_attempt_numbers_are_unique_and_usage_is_append_only(
                     attempt_no=1,
                     request_id="req-audit-duplicate",
                     capability="text.smoke",
+                    operation_kind="text_generate",
                     provider_name="deterministic-fake",
                     provider_model="fake-text-v1",
                     route_reason="configured_primary",
                     status="running",
                     request_hash="b" * 64,
                     provider_request_id=None,
+                    lease_owner="test-duplicate-owner",
+                    lease_expires_at=heartbeat_at + timedelta(seconds=30),
+                    heartbeat_at=heartbeat_at,
                     submitted_at=utc_now(),
                     finished_at=None,
                     error_code=None,
@@ -154,6 +161,7 @@ def test_attempt_requires_consistent_terminal_fields(migrated_database_url: str)
                 attempt_no=1,
                 request_id="req-invalid-terminal",
                 capability="text.smoke",
+                operation_kind="text_generate",
                 provider_name="deterministic-fake",
                 provider_model="fake-text-v1",
                 route_reason="configured_primary",
@@ -195,19 +203,20 @@ def test_success_audit_bounds_provider_model_before_persistence(
         generation_job_id=None,
     )
     sink = SqlAlchemyAttemptAuditSink(factory)
-    attempt_id = sink.start(
+    lease = sink.start(
         context,
         AttemptRequestAudit(
             request_id="req-bounded-model",
             capability="text.smoke",
             request_hash="d" * 64,
+            operation_kind="text_generate",
         ),
         provider_name="provider-test",
         provider_model="configured-model",
         route_reason="configured_primary",
     )
     sink.succeed(
-        attempt_id,
+        lease,
         context,
         AttemptSuccessAudit(
             provider_request_id="provider-request-bounded",
@@ -225,7 +234,7 @@ def test_success_audit_bounds_provider_model_before_persistence(
 
     with factory() as session:
         usage = session.scalar(
-            select(UsageRecord).where(UsageRecord.generation_attempt_id == attempt_id)
+            select(UsageRecord).where(UsageRecord.generation_attempt_id == lease.attempt_id)
         )
 
     assert usage is not None

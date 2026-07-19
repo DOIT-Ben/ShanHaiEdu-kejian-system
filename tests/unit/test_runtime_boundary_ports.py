@@ -44,5 +44,5 @@ def test_backend_boundary_document_records_ports_and_live_size_baseline() -> Non
         "CreationPackagePort",
     ):
         assert f"`{name}`" in document
-    assert "4 个生产文件超过 400 行" in document
-    assert "23 个生产函数超过 60 行" in document
+    assert "3 个生产文件超过 400 行" in document
+    assert "22 个生产函数超过 60 行" in document

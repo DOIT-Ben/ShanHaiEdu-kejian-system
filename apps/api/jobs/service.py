@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy import select, tuple_
 from sqlalchemy.orm import Session
 
 from apps.api.database import utc_now
@@ -18,6 +21,83 @@ from apps.api.jobs.schemas import GenerationJobRead
 from apps.api.jobs.state_machine import InvalidJobTransition, require_transition
 from apps.api.reliability.events import EventResource, EventWriter, append_outbox_only
 from apps.api.reliability.idempotency import CommandResult, IdempotencyService
+
+_MODEL_ATTEMPT_JOB_TYPES = frozenset({"creation.item", "creation.batch"})
+_MODEL_ATTEMPT_BINDABLE_STATUSES = frozenset({"running"})
+
+
+@dataclass(frozen=True, slots=True)
+class GenerationJobBinding:
+    generation_job_id: UUID
+    organization_id: UUID
+    project_id: UUID
+
+
+class GenerationJobAttemptBindingReader:
+    """Validate model-attempt ownership without exposing or locking the jobs ORM."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def require_bindable(self, binding: GenerationJobBinding) -> None:
+        job_id = self._session.scalar(
+            select(GenerationJob.id).where(
+                GenerationJob.id == binding.generation_job_id,
+                GenerationJob.organization_id == binding.organization_id,
+                GenerationJob.project_id == binding.project_id,
+                GenerationJob.job_type.in_(_MODEL_ATTEMPT_JOB_TYPES),
+                GenerationJob.status.in_(_MODEL_ATTEMPT_BINDABLE_STATUSES),
+                GenerationJob.cancel_requested_at.is_(None),
+                GenerationJob.deleted_at.is_(None),
+            )
+        )
+        if job_id is None:
+            raise RuntimeError("generation job is not bindable to this model attempt")
+
+
+class GenerationJobCancellationReader:
+    """Expose cancellation state without leaking the jobs ORM model."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def requested_bindings(
+        self, bindings: Collection[GenerationJobBinding]
+    ) -> set[GenerationJobBinding]:
+        if not bindings:
+            return set()
+        keys = {
+            (binding.generation_job_id, binding.organization_id, binding.project_id)
+            for binding in bindings
+        }
+        rows = self._session.execute(
+            select(
+                GenerationJob.id,
+                GenerationJob.organization_id,
+                GenerationJob.project_id,
+            ).where(
+                tuple_(
+                    GenerationJob.id,
+                    GenerationJob.organization_id,
+                    GenerationJob.project_id,
+                ).in_(keys),
+                GenerationJob.job_type.in_(_MODEL_ATTEMPT_JOB_TYPES),
+                GenerationJob.deleted_at.is_(None),
+                (
+                    GenerationJob.status.in_(("cancel_requested", "cancelled"))
+                    | GenerationJob.cancel_requested_at.is_not(None)
+                ),
+            )
+        )
+        return {
+            GenerationJobBinding(
+                generation_job_id=job_id,
+                organization_id=organization_id,
+                project_id=project_id,
+            )
+            for job_id, organization_id, project_id in rows
+            if project_id is not None
+        }
 
 
 class GenerationJobService:

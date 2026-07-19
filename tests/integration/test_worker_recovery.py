@@ -9,7 +9,11 @@ from apps.api.identity.context import ActorContext, system_actor
 from apps.api.identity.models import SYSTEM_ORGANIZATION_ID
 from apps.api.ids import new_uuid7
 from apps.api.jobs.models import GenerationJob
-from apps.api.jobs.service import GenerationJobService
+from apps.api.jobs.service import (
+    GenerationJobBinding,
+    GenerationJobCancellationReader,
+    GenerationJobService,
+)
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.reliability.events import EventResource, EventWriter
@@ -59,6 +63,34 @@ def seed_queued_job(session) -> tuple[GenerationJob, ActorContext]:
         request_id="req-seed-job",
     )
     return job, actor
+
+
+def test_cancellation_reader_exposes_only_requested_job_ids(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session, session.begin():
+        job, _ = seed_queued_job(session)
+        job.job_type = "creation.item"
+        assert job.project_id is not None
+        binding = GenerationJobBinding(
+            generation_job_id=job.id,
+            organization_id=job.organization_id,
+            project_id=job.project_id,
+        )
+        unrelated_id = new_uuid7()
+        unrelated_binding = GenerationJobBinding(
+            generation_job_id=unrelated_id,
+            organization_id=job.organization_id,
+            project_id=job.project_id,
+        )
+        reader = GenerationJobCancellationReader(session)
+        assert reader.requested_bindings({binding, unrelated_binding}) == set()
+
+        job.status = "cancel_requested"
+        job.cancel_requested_at = utc_now()
+        session.flush()
+        assert reader.requested_bindings({binding, unrelated_binding}) == {binding}
 
 
 def test_expired_worker_lease_is_recovered_and_duplicate_delivery_is_absorbed(
