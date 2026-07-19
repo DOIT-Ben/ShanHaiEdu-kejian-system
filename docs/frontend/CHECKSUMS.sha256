@@ -14,7 +14,7 @@ c8e85ac8847868caa1270433c9ba17d7c92bf5555eb45fa8634024d7b6c0ce96  ./checklists/p
 7762267b7ec319d86d218e05c4c03ee6668f7397fe00408f32ce9548e2480172  ./checklists/vendor-handover.md
 26a5d8cf2da9c7be6f97bea2076ee4184e91abd0bc2e0989c52d0541ec5857b0  ./design-tokens/tokens.css
 7c2c9f565f4fd1eb9d509e6ab72ac2ed87acd6ad115794e91afb0ad72e441311  ./design-tokens/tokens.json
-acb03e46fe06bb6a0d6b9bf98fe9aceaea5215395eafc817914f98f34553c059  ./manifest.json
+dacb77f4c731acd3b79b632bd3ccede8b13e3cd6139a24f4da09b8e02773bf86  ./manifest.json
 11d5f1c0ce39fb8ecd9cb0fe3f59bb9d3b93324ca5bb95d61c2c7eec0811dd16  ./templates/.env.example
 5daec0ff7506a4cca918ade64ce747895f7d69893942dab90841a8fd2279d801  ./templates/change-request.md
 7b80dbc877d53f22ea3b093c8d0253dbe45c09a0e8ccb38258a97e8b45f70a8e  ./templates/issue-template.md

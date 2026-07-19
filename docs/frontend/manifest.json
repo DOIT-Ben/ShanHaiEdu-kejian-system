@@ -2,7 +2,7 @@
   "package": "shanhaiedu-frontend-spec",
   "spec_version": "2.0.0",
   "status": "current",
-  "updated_at": "2026-07-17",
+  "updated_at": "2026-07-19",
   "entry": "README.md",
   "contracts": "../../contracts",
   "technology": {
