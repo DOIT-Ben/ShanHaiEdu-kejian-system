@@ -9,7 +9,10 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from apps.api.content_runtime.definition_projection import build_content_json_schema
+from apps.api.content_runtime.definition_projection import (
+    build_content_json_schema,
+    build_content_validation_rules,
+)
 from apps.api.content_runtime.models import (
     ContentDefinitionVersion,
     ContentPackageItemVersion,
@@ -128,7 +131,8 @@ def _verify_content_definitions(
         != build_content_json_schema(cast(dict[str, Any], source.items[key]["spec"]))
         or definitions[key].ui_schema_json != {}
         or definitions[key].export_mapping_json != {}
-        or definitions[key].validation_rules_json != {}
+        or definitions[key].validation_rules_json
+        != build_content_validation_rules(cast(dict[str, Any], source.items[key]["spec"]))
         or definitions[key].checksum != source.manifest_entries[key]["sha256"]
         for key in expected_keys
     ):

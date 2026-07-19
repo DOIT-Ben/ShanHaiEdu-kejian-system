@@ -15,6 +15,7 @@ from apps.api.content_runtime.models import (
     ContentPackageVersion,
     ContentReleaseItem,
 )
+from apps.api.content_runtime.definition_projection import validate_content_rules
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.permissions import ProjectAccessService
@@ -129,17 +130,19 @@ class ArtifactValidation:
         content: dict[str, Any],
     ) -> dict[str, Any]:
         validator = Draft202012Validator(definition.schema_json)
-        errors = sorted(
+        schema_errors = sorted(
             validator.iter_errors(content),  # pyright: ignore[reportUnknownMemberType]
             key=lambda item: list(item.path),
         )
+        errors = [
+            {"path": [str(part) for part in error.path], "message": error.message}
+            for error in schema_errors
+        ]
+        errors.extend(validate_content_rules(definition.validation_rules_json, content))
         return {
             "valid": not errors,
             "schema_id": str(definition.id),
-            "errors": [
-                {"path": [str(part) for part in error.path], "message": error.message}
-                for error in errors
-            ],
+            "errors": errors,
         }
 
     @staticmethod

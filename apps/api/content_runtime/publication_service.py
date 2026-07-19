@@ -11,7 +11,10 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from apps.api.content_runtime.definition_projection import build_content_json_schema
+from apps.api.content_runtime.definition_projection import (
+    build_content_json_schema,
+    build_content_validation_rules,
+)
 from apps.api.content_runtime.models import (
     ContentDefinitionVersion,
     ContentPackage,
@@ -245,7 +248,9 @@ class ContentReleasePublisher:
                         schema_json=build_content_json_schema(cast(dict[str, Any], item["spec"])),
                         ui_schema_json={},
                         export_mapping_json={},
-                        validation_rules_json={},
+                        validation_rules_json=build_content_validation_rules(
+                            cast(dict[str, Any], item["spec"])
+                        ),
                         checksum=cast(str, entry["sha256"]),
                     )
                 )

@@ -17,6 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from alembic import command
+from apps.api.artifacts.validation import ArtifactValidation
 from apps.api.content_runtime.models import (
     ContentDefinitionVersion,
     ContentPackage,
@@ -100,13 +101,28 @@ def test_golden_release_is_published_from_validated_fixtures_and_is_idempotent(
         definition = session.scalar(
             select(ContentDefinitionVersion).where(
                 ContentDefinitionVersion.content_package_version_id == package_version.id,
-                ContentDefinitionVersion.definition_key == "intro.generate_options.output",
+                ContentDefinitionVersion.definition_key == "lesson.division.generate.output",
             )
         )
         assert definition is not None
         validator = Draft202012Validator(definition.schema_json)
         assert list(validator.iter_errors({}))
         assert list(validator.iter_errors({"unexpected": True}))
+        assert definition.schema_json["properties"]["lesson_count"]["minimum"] == 1
+        minimum_report = ArtifactValidation.validation_report(
+            definition,
+            {"lesson_count": 0, "lesson_units": []},
+        )
+        assert any(error["path"] == ["lesson_count"] for error in minimum_report["errors"])
+        count_report = ArtifactValidation.validation_report(
+            definition,
+            {"lesson_count": 2, "lesson_units": [{}]},
+        )
+        assert any(
+            error["path"] == ["lesson_count"]
+            and "number of items" in error["message"]
+            for error in count_report["errors"]
+        )
         assert resolve_runtime_defaults(session).content_release_id == release.id
         assert resolve_runtime_defaults(session).workflow_definition_version_id == workflow.id
 
