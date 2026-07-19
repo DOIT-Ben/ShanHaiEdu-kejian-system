@@ -1,0 +1,7 @@
+dist
+storybook-static
+playwright-report
+test-results
+coverage
+node_modules
+public/mockServiceWorker.js
