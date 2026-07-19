@@ -18,6 +18,7 @@ from apps.api.model_gateway.contracts import (
     ModelUsage,
     VideoModelRequest,
     VideoOperationStatus,
+    VideoPollRequest,
     VideoProviderResult,
 )
 from apps.api.model_gateway.fake import (
@@ -61,9 +62,10 @@ def audit_context() -> ModelAuditContext:
 class RecordingAuditSink:
     attempt_id = UUID("01980000-0000-7000-8000-000000000001")
 
-    def __init__(self, *, fail_success: bool = False) -> None:
+    def __init__(self, *, fail_success: bool = False, fail_failure: bool = False) -> None:
         self.events: list[object] = []
         self._fail_success = fail_success
+        self._fail_failure = fail_failure
 
     def start(
         self,
@@ -106,6 +108,8 @@ class RecordingAuditSink:
         *,
         latency_ms: int,
     ) -> None:
+        if self._fail_failure:
+            raise RuntimeError("private audit failure persistence failure")
         self.events.append(("fail", attempt_id, context, error.code, latency_ms))
 
 
@@ -116,6 +120,20 @@ class InvalidImageProvider:
     async def generate(self, request: ImageModelRequest) -> ImageProviderResult:
         del request
         return cast(ImageProviderResult, {"raw_provider_response": "PRIVATE_RAW_RESPONSE"})
+
+
+class InvalidConstructedImageProvider:
+    provider_name = "invalid-constructed-image-provider"
+    model_name = "invalid-constructed-image-model"
+
+    async def generate(self, request: ImageModelRequest) -> ImageProviderResult:
+        del request
+        return ImageProviderResult.model_construct(
+            provider_request_id="invalid-constructed-request",
+            actual_model=self.model_name,
+            files=[],
+            usage=ModelUsage(),
+        )
 
 
 class CancellableImageProvider:
@@ -162,6 +180,24 @@ async def test_invalid_provider_result_is_normalized_and_closes_attempt() -> Non
     assert "PRIVATE_RAW_RESPONSE" not in repr(sink.events)
 
 
+async def test_invalid_constructed_provider_result_is_revalidated_before_audit() -> None:
+    sink = RecordingAuditSink()
+    gateway = ModelGateway(
+        {},
+        image_routes={
+            ModelCapability.IMAGE_GENERATE_EDUCATION_16X9: InvalidConstructedImageProvider()
+        },
+        audit_sink=sink,
+    )
+
+    with pytest.raises(ModelGatewayError) as captured:
+        await gateway.generate_image(image_request(), audit_context=audit_context())
+
+    assert captured.value.code == GatewayErrorCode.INVALID_RESPONSE
+    assert captured.value.retryable is False
+    assert [event[0] for event in sink.events] == ["start", "fail"]
+
+
 async def test_returned_submission_unknown_is_failed_and_never_retried() -> None:
     provider = ReturnedUnknownVideoProvider(FakeVideoScenario.SUBMISSION_UNKNOWN)
     sink = RecordingAuditSink()
@@ -197,6 +233,69 @@ async def test_video_audit_failure_becomes_non_retryable_unknown_submission() ->
     assert captured.value.__cause__ is None
     assert provider.submit_calls == 1
     assert [event[0] for event in sink.events] == ["start", "fail"]
+
+
+async def test_unknown_submission_survives_failure_audit_outage() -> None:
+    provider = ReturnedUnknownVideoProvider(FakeVideoScenario.SUBMISSION_UNKNOWN)
+    sink = RecordingAuditSink(fail_failure=True)
+    gateway = ModelGateway(
+        {},
+        video_routes={ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S: provider},
+        audit_sink=sink,
+    )
+
+    with pytest.raises(ModelGatewayError) as captured:
+        await gateway.submit_video(video_request(), audit_context=audit_context())
+
+    assert captured.value.code == GatewayErrorCode.SUBMISSION_UNKNOWN
+    assert captured.value.retryable is False
+    assert captured.value.__cause__ is None
+    assert provider.submit_calls == 1
+
+
+async def test_thrown_unknown_submission_survives_failure_audit_outage() -> None:
+    provider = DeterministicFakeVideoProvider(FakeVideoScenario.SUBMISSION_UNKNOWN)
+    sink = RecordingAuditSink(fail_failure=True)
+    gateway = ModelGateway(
+        {},
+        video_routes={ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S: provider},
+        audit_sink=sink,
+    )
+
+    with pytest.raises(ModelGatewayError) as captured:
+        await gateway.submit_video(video_request(), audit_context=audit_context())
+
+    assert captured.value.code == GatewayErrorCode.SUBMISSION_UNKNOWN
+    assert captured.value.retryable is False
+    assert provider.submit_calls == 1
+
+
+async def test_poll_audit_outage_is_not_reported_as_unknown_submission() -> None:
+    provider = DeterministicFakeVideoProvider()
+    submit_gateway = ModelGateway(
+        {},
+        video_routes={ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S: provider},
+    )
+    submitted = await submit_gateway.submit_video(video_request())
+    assert submitted.provider_task_id is not None
+    poll_gateway = ModelGateway(
+        {},
+        video_routes={ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S: provider},
+        audit_sink=RecordingAuditSink(fail_success=True),
+    )
+
+    with pytest.raises(ModelGatewayError) as captured:
+        await poll_gateway.poll_video(
+            VideoPollRequest(
+                capability=ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S,
+                request_id="req-resilient-video-poll",
+                provider_task_id=submitted.provider_task_id,
+            ),
+            audit_context=audit_context(),
+        )
+
+    assert captured.value.code == GatewayErrorCode.AUDIT_UNAVAILABLE
+    assert captured.value.retryable is False
 
 
 async def test_asyncio_task_cancellation_uses_stable_error_and_closes_attempt() -> None:

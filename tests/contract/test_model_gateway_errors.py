@@ -38,3 +38,7 @@ def test_submission_unknown_is_a_non_retryable_platform_error() -> None:
     error = GatewayErrorCode.SUBMISSION_UNKNOWN
 
     assert error.value == "MODEL_SUBMISSION_UNKNOWN"
+
+
+def test_audit_unavailable_has_a_stable_platform_error() -> None:
+    assert GatewayErrorCode.AUDIT_UNAVAILABLE.value == "MODEL_AUDIT_UNAVAILABLE"

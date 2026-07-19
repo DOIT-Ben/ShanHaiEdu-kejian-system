@@ -33,6 +33,7 @@ class GatewayErrorCode(StrEnum):
     CANCELLED = "MODEL_CANCELLED"
     INVALID_RESPONSE = "MODEL_INVALID_RESPONSE"
     SUBMISSION_UNKNOWN = "MODEL_SUBMISSION_UNKNOWN"
+    AUDIT_UNAVAILABLE = "MODEL_AUDIT_UNAVAILABLE"
 
 
 class ModelGatewayError(Exception):
@@ -50,7 +51,7 @@ class ModelGatewayError(Exception):
 
 
 class _StrictModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", revalidate_instances="always")
 
 
 class TextModelRequest(_StrictModel):

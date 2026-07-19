@@ -182,13 +182,23 @@ class ModelGateway:
         )
         if result.status == VideoOperationStatus.SUBMISSION_UNKNOWN:
             error = ModelGatewayError(GatewayErrorCode.SUBMISSION_UNKNOWN, retryable=False)
-            self._fail_audit(attempt_id, audit_context, error, latency_ms=latency_ms)
+            self._best_effort_fail_audit(
+                attempt_id,
+                audit_context,
+                error,
+                latency_ms=latency_ms,
+            )
             log_error(request, provider, error.code, latency_ms)
-            raise error
+            raise error from None
         try:
             self._succeed_audit(attempt_id, audit_context, result, latency_ms=latency_ms)
         except Exception:
-            error = ModelGatewayError(GatewayErrorCode.SUBMISSION_UNKNOWN, retryable=False)
+            code = (
+                GatewayErrorCode.SUBMISSION_UNKNOWN
+                if isinstance(request, VideoModelRequest)
+                else GatewayErrorCode.AUDIT_UNAVAILABLE
+            )
+            error = ModelGatewayError(code, retryable=False)
             self._best_effort_fail_audit(
                 attempt_id,
                 audit_context,
@@ -228,7 +238,7 @@ class ModelGateway:
         attempt_id = self._start_audit(request, audit_context, provider)
         if provider is None:
             error = ModelGatewayError(GatewayErrorCode.ROUTE_UNAVAILABLE, retryable=True)
-            self._fail_audit(attempt_id, audit_context, error, latency_ms=0)
+            self._best_effort_fail_audit(attempt_id, audit_context, error, latency_ms=0)
             log_error(request, None, error.code, 0)
             raise error
 
@@ -247,18 +257,33 @@ class ModelGateway:
         except asyncio.CancelledError:
             latency_ms = round((time.perf_counter() - started) * 1_000)
             error = ModelGatewayError(GatewayErrorCode.CANCELLED, retryable=False)
-            self._fail_audit(attempt_id, audit_context, error, latency_ms=latency_ms)
+            self._best_effort_fail_audit(
+                attempt_id,
+                audit_context,
+                error,
+                latency_ms=latency_ms,
+            )
             log_error(request, provider, error.code, latency_ms)
             raise error from None
         except ModelGatewayError as error:
             latency_ms = round((time.perf_counter() - started) * 1_000)
-            self._fail_audit(attempt_id, audit_context, error, latency_ms=latency_ms)
+            self._best_effort_fail_audit(
+                attempt_id,
+                audit_context,
+                error,
+                latency_ms=latency_ms,
+            )
             log_error(request, provider, error.code, latency_ms)
             raise
         except Exception as cause:
             latency_ms = round((time.perf_counter() - started) * 1_000)
             error = ModelGatewayError(GatewayErrorCode.PROVIDER_UNAVAILABLE, retryable=True)
-            self._fail_audit(attempt_id, audit_context, error, latency_ms=latency_ms)
+            self._best_effort_fail_audit(
+                attempt_id,
+                audit_context,
+                error,
+                latency_ms=latency_ms,
+            )
             log_error(request, provider, error.code, latency_ms)
             raise error from cause
         latency_ms = round((time.perf_counter() - started) * 1_000)
