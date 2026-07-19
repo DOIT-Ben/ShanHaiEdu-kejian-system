@@ -73,12 +73,25 @@ def verify_filesystem(root: Path) -> None:
         raise RuntimeError("long path verification failed")
 
 
+def verify_workspace_write(root: Path) -> None:
+    marker = root / f".shanhai-workspace-write-{os.getpid()}"
+    try:
+        marker.write_text("workspace-write-ok", encoding="utf-8")
+        if marker.read_text(encoding="utf-8") != "workspace-write-ok":
+            raise RuntimeError("workspace write verification failed")
+    finally:
+        marker.unlink(missing_ok=True)
+
+
 def main() -> int:
     errors = []
+    rootless_userns = os.getenv("SHANHAI_CONTAINER_ROOTLESS_USERNS", "false") == "true"
     if platform.system() != "Linux":
         errors.append(f"expected Linux, got {platform.system()}")
-    if hasattr(os, "geteuid") and os.geteuid() == 0:
+    if hasattr(os, "geteuid") and os.geteuid() == 0 and not rootless_userns:
         errors.append("workspace commands must not run as root")
+    if hasattr(os, "geteuid") and os.geteuid() != 0 and rootless_userns:
+        errors.append("rootless Docker workspace must run as container root")
 
     try:
         versions = collect_versions()
@@ -93,6 +106,11 @@ def main() -> int:
     except (OSError, RuntimeError) as exc:
         errors.append(str(exc))
 
+    try:
+        verify_workspace_write(Path(__file__).resolve().parents[1])
+    except (OSError, RuntimeError) as exc:
+        errors.append(str(exc))
+
     if errors:
         for error in errors:
             print(f"FAIL: {error}")
@@ -100,7 +118,8 @@ def main() -> int:
 
     for name, version in versions.items():
         print(f"PASS: {name}={version}")
-    print("PASS: non-root workspace, symbolic links and long paths")
+    identity = "rootless user namespace" if rootless_userns else "non-root container user"
+    print(f"PASS: {identity}, workspace write, symbolic links and long paths")
     return 0
 
 

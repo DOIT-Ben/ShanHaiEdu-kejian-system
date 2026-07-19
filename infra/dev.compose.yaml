@@ -29,8 +29,8 @@ services:
         /home/developer/.cache/uv
         /home/developer/.local/share/pnpm/store
     environment:
-      DEV_UID: ${SHANHAI_DEV_UID:-1000}
-      DEV_GID: ${SHANHAI_DEV_GID:-1000}
+      DEV_UID: ${SHANHAI_WORKSPACE_UID:-1000}
+      DEV_GID: ${SHANHAI_WORKSPACE_GID:-1000}
     volumes:
       - ..:/workspace
       - python_venv:/workspace/.venv
@@ -45,9 +45,9 @@ services:
       context: ..
       dockerfile: infra/dev/Dockerfile
       args:
-        DEV_UID: ${SHANHAI_DEV_UID:-1000}
-        DEV_GID: ${SHANHAI_DEV_GID:-1000}
-    user: "${SHANHAI_DEV_UID:-1000}:${SHANHAI_DEV_GID:-1000}"
+        DEV_UID: ${SHANHAI_IMAGE_DEV_UID:-1000}
+        DEV_GID: ${SHANHAI_IMAGE_DEV_GID:-1000}
+    user: "${SHANHAI_WORKSPACE_UID:-1000}:${SHANHAI_WORKSPACE_GID:-1000}"
     init: true
     cpus: 3.0
     mem_limit: 4g
@@ -56,6 +56,7 @@ services:
       HOME: /home/developer
       SHANHAI_CONTAINER_GIT_DIR: ${SHANHAI_CONTAINER_GIT_DIR:-/git-common}
       SHANHAI_CONTAINER_GIT_WORK_TREE: /workspace
+      SHANHAI_CONTAINER_ROOTLESS_USERNS: ${SHANHAI_CONTAINER_ROOTLESS_USERNS:-false}
       SHANHAI_ENVIRONMENT: development
       SHANHAI_API_HOST: 0.0.0.0
       SHANHAI_API_PORT: 8000
