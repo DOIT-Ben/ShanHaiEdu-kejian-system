@@ -1,10 +1,11 @@
 import { Check, Download, PencilLine, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { useWorkbenchUi } from "@/features/workbench/model/workbenchUi";
+import { PptCoverArtwork, pptCoverOptions } from "@/features/workbench/components/PptCoverArtwork";
 import { WorkbenchPageFrame } from "@/features/workbench/components/WorkbenchPageFrame";
 import { StaleContentNotice } from "@/features/workbench/components/StaleContentNotice";
 import { markPptCoverDependentsStale } from "@/features/workbench/lib/invalidateDependents";
+import { useWorkbenchUi } from "@/features/workbench/model/workbenchUi";
 import { saveMockDraft, updateMockNodeState, useMockRuntime } from "@/shared/api/mocks/runtime";
 import { downloadExampleFile } from "@/shared/lib/downloadExampleFile";
 import { Button } from "@/shared/ui/Button";
@@ -13,50 +14,23 @@ import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { requiredItem } from "@/shared/lib/requiredItem";
 import { demoProjectId } from "@/shared/data/mockData";
 
-const candidates = [
-  {
-    id: 1,
-    label: "百格光窗",
-    image: "/assets/creation/slide-percent-cover.svg",
-  },
-  {
-    id: 2,
-    label: "果汁标签",
-    image: "/assets/creation/slide-percent-grid.svg",
-  },
-  {
-    id: 3,
-    label: "数字航海图",
-    image: "/assets/creation/video-classroom-question.svg",
-  },
-];
-
 function CoverVisual({
   candidate,
   demo,
   topic,
 }: {
-  candidate: (typeof candidates)[number];
+  candidate: { id: number; label: string };
   demo: boolean;
   topic: string;
 }) {
   return (
-    <div className="relative aspect-video overflow-hidden rounded-[var(--sh-radius-sm)] bg-[var(--sh-artifact-paper)]">
-      {demo ? (
-        <img
-          alt={`${candidate.label}课件封面`}
-          className="size-full object-cover"
-          decoding="async"
-          src={candidate.image}
-        />
-      ) : (
-        <div className="flex size-full flex-col justify-center bg-[var(--sh-art-navy)] px-[9%] text-white">
-          <p className="text-xs text-[var(--sh-artifact-on-dark-muted)]">小学数学课堂</p>
-          <p className="mt-2 text-[clamp(1rem,2.8vw,2rem)] font-bold">{topic}</p>
-          <p className="mt-2 text-sm text-[var(--sh-artifact-on-dark-muted)]">{candidate.label}</p>
-        </div>
-      )}
-    </div>
+    <PptCoverArtwork demo={demo} variant={candidate.id}>
+      <p className="text-[clamp(0.45rem,1.1vw,0.76rem)] font-semibold opacity-70">小学数学课堂</p>
+      <p className="mt-[4%] text-[clamp(0.8rem,2.7vw,2rem)] font-bold leading-tight">
+        {demo ? "认识百分数" : topic}
+      </p>
+      <p className="mt-[4%] text-[clamp(0.42rem,1vw,0.74rem)] opacity-70">{candidate.label}</p>
+    </PptCoverArtwork>
   );
 }
 
@@ -67,8 +41,8 @@ export function PptCoverStep() {
   const topic = project?.knowledge_point ?? "本课知识点";
   const demo = projectId === demoProjectId || !project;
   const availableCandidates = demo
-    ? candidates
-    : candidates.map((candidate, index) => ({
+    ? pptCoverOptions
+    : pptCoverOptions.map((candidate, index) => ({
         ...candidate,
         label: ["教材情境", "图形探究", "课堂发现"][index] ?? candidate.label,
       }));

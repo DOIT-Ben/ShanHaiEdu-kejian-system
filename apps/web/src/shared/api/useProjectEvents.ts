@@ -1,112 +1,98 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { apiConfig } from "@/shared/api/config";
+import {
+  runSseSubscription,
+  streamSseEvents,
+  type SseEventEnvelope,
+} from "@/shared/api/eventStream";
 
-const retryDelayMs = 1_500;
-const errorRefreshDelayMs = 1_000;
-
-type ProjectStreamEvent = {
-  data: string;
-  id: string;
-  type: string;
-};
+type ProjectStreamEvent = SseEventEnvelope;
 
 type StreamProjectEventsOptions = {
   fetchImpl?: typeof fetch;
-  lastEventId?: string;
+  lastSequence?: number;
   onEvent: (event: ProjectStreamEvent) => void;
   projectId: string;
   signal?: AbortSignal;
 };
 
 function lastEventStorageKey(projectId: string) {
-  return `shanhaiedu.events.${projectId}.last-id`;
+  return `shanhaiedu.events.project.${projectId}.sequence`;
 }
 
-export function readProjectLastEventId(projectId: string) {
+export function readProjectLastSequence(projectId: string) {
   try {
-    return sessionStorage.getItem(lastEventStorageKey(projectId))?.trim() || undefined;
+    const value = Number(sessionStorage.getItem(lastEventStorageKey(projectId)));
+    return Number.isSafeInteger(value) && value > 0 ? value : undefined;
   } catch {
     return undefined;
   }
 }
 
-function saveProjectLastEventId(projectId: string, eventId: string) {
+function saveProjectLastSequence(projectId: string, sequence: number) {
   try {
-    sessionStorage.setItem(lastEventStorageKey(projectId), eventId);
+    sessionStorage.setItem(lastEventStorageKey(projectId), String(sequence));
   } catch {
     // A live stream remains usable when session storage is unavailable.
   }
 }
 
-function parseEventBlock(block: string): ProjectStreamEvent | null {
-  let id = "";
-  let type = "message";
-  const data: string[] = [];
-  for (const line of block.split(/\r?\n/)) {
-    if (!line || line.startsWith(":")) continue;
-    const separator = line.indexOf(":");
-    const field = separator === -1 ? line : line.slice(0, separator);
-    const value = separator === -1 ? "" : line.slice(separator + 1).replace(/^ /, "");
-    if (field === "id") id = value;
-    else if (field === "event") type = value || "message";
-    else if (field === "data") data.push(value);
+export function clearProjectLastSequence(projectId: string) {
+  try {
+    sessionStorage.removeItem(lastEventStorageKey(projectId));
+  } catch {
+    // A missing session storage must not prevent cursor recovery.
   }
-  return id || data.length > 0 ? { data: data.join("\n"), id, type } : null;
 }
 
-export async function streamProjectEvents({
+export function streamProjectEvents({
   fetchImpl = fetch,
-  lastEventId,
+  lastSequence,
   onEvent,
   projectId,
   signal,
 }: StreamProjectEventsOptions) {
-  const headers = new Headers({ Accept: "text/event-stream" });
-  if (lastEventId) headers.set("Last-Event-ID", lastEventId);
-  const response = await fetchImpl(
-    `${apiConfig.baseUrl}/projects/${encodeURIComponent(projectId)}/events/stream`,
-    { credentials: "include", headers, signal },
-  );
-  if (!response.ok || !response.body) {
-    throw new Error(`PROJECT_EVENT_STREAM_${String(response.status)}`);
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let streamEnded = false;
-  while (!streamEnded) {
-    const { done, value } = await reader.read();
-    streamEnded = done;
-    buffer += decoder.decode(value, { stream: !done }).replace(/\r\n/g, "\n");
-    let boundary = buffer.indexOf("\n\n");
-    while (boundary >= 0) {
-      const event = parseEventBlock(buffer.slice(0, boundary));
-      buffer = buffer.slice(boundary + 2);
-      if (event) onEvent(event);
-      boundary = buffer.indexOf("\n\n");
-    }
-  }
-  const finalEvent = parseEventBlock(buffer);
-  if (finalEvent) onEvent(finalEvent);
+  return streamSseEvents({
+    fetchImpl,
+    lastSequence,
+    onEvent,
+    signal,
+    url: `${apiConfig.baseUrl}/projects/${encodeURIComponent(projectId)}/events/stream`,
+  });
 }
 
-export function createRefreshThrottle(refresh: () => void, delayMs: number) {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  return {
-    cancel() {
-      if (timer) clearTimeout(timer);
-      timer = undefined;
-    },
-    request() {
-      if (timer) return;
-      timer = setTimeout(() => {
-        timer = undefined;
-        refresh();
-      }, delayMs);
-    },
-  };
+export function projectEventQueryKeys(projectId: string, event: ProjectStreamEvent) {
+  if (event.resource.type === "generation_job") {
+    return [
+      ["generation-jobs", event.resource.id],
+      ["tasks", projectId],
+    ] as const;
+  }
+  if (event.resource.type === "project") {
+    return [["projects", projectId], ["projects"]] as const;
+  }
+  return [["projects", projectId, "workflow"]] as const;
+}
+
+async function invalidateProjectQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  projectId: string,
+  event?: ProjectStreamEvent,
+) {
+  const keys = event
+    ? projectEventQueryKeys(projectId, event)
+    : [
+        ["projects"],
+        ["projects", projectId],
+        ["projects", projectId, "workflow"],
+        ["tasks", projectId],
+      ];
+  await Promise.all(
+    keys.map((queryKey) =>
+      queryClient.invalidateQueries({ queryKey, exact: true, refetchType: "active" }),
+    ),
+  );
 }
 
 export function useProjectEvents(projectId: string | undefined) {
@@ -114,44 +100,25 @@ export function useProjectEvents(projectId: string | undefined) {
 
   useEffect(() => {
     if (!projectId || apiConfig.mode !== "real") return;
-    let stopped = false;
-    let retryTimer: ReturnType<typeof setTimeout> | undefined;
-    let lastEventId = readProjectLastEventId(projectId);
     const abortController = new AbortController();
-    const refreshSnapshot = () => {
-      void Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["projects", projectId] }),
-        queryClient.invalidateQueries({ queryKey: ["tasks", projectId] }),
-      ]);
-    };
-    const errorRefresh = createRefreshThrottle(refreshSnapshot, errorRefreshDelayMs);
-    const connect = () => {
-      void streamProjectEvents({
-        lastEventId,
-        onEvent: (event) => {
-          if (event.id) {
-            lastEventId = event.id;
-            saveProjectLastEventId(projectId, event.id);
-          }
-          refreshSnapshot();
-        },
-        projectId,
-        signal: abortController.signal,
-      })
-        .catch((reason: unknown) => {
-          if (reason instanceof DOMException && reason.name === "AbortError") return;
-          errorRefresh.request();
-        })
-        .finally(() => {
-          if (!stopped) retryTimer = setTimeout(connect, retryDelayMs);
-        });
-    };
-    connect();
-    return () => {
-      stopped = true;
-      abortController.abort();
-      if (retryTimer) clearTimeout(retryTimer);
-      errorRefresh.cancel();
-    };
+    const clearCursor = () => clearProjectLastSequence(projectId);
+    void runSseSubscription({
+      clearCursor,
+      connect: (cursor, onEvent, signal) =>
+        streamProjectEvents({
+          lastSequence: cursor,
+          onEvent,
+          projectId,
+          signal,
+        }),
+      initialCursor: readProjectLastSequence(projectId),
+      onEvent: (event) => {
+        void invalidateProjectQueries(queryClient, projectId, event);
+      },
+      refreshSnapshot: () => invalidateProjectQueries(queryClient, projectId),
+      signal: abortController.signal,
+      writeCursor: (sequence) => saveProjectLastSequence(projectId, sequence),
+    });
+    return () => abortController.abort();
   }, [projectId, queryClient]);
 }

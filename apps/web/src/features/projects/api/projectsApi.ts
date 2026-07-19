@@ -1,13 +1,7 @@
-import type { components, paths } from "@/generated/api-schema";
-import { apiRequest, apiRequestWithResponse } from "@/shared/api/client";
+import type { components } from "@/generated/api-schema";
+import { apiClient, unwrapApiResult, unwrapApiResultWithResponse } from "@/shared/api/client";
 
 export type ProjectDto = components["schemas"]["Project"];
-type ProjectListEnvelope =
-  paths["/projects"]["get"]["responses"][200]["content"]["application/json"];
-type ProjectEnvelope =
-  paths["/projects/{project_id}"]["get"]["responses"][200]["content"]["application/json"];
-type CreateProjectEnvelope =
-  paths["/projects"]["post"]["responses"][201]["content"]["application/json"];
 type CreateProjectRequest = components["schemas"]["CreateProjectRequest"];
 
 export type ProjectListPage = {
@@ -16,9 +10,11 @@ export type ProjectListPage = {
 };
 
 export async function listProjectsPage(cursor?: string, limit = 100): Promise<ProjectListPage> {
-  const params = new URLSearchParams({ "page[limit]": String(limit) });
-  if (cursor) params.set("page[cursor]", cursor);
-  const response = await apiRequest<ProjectListEnvelope>(`/projects?${params.toString()}`);
+  const response = unwrapApiResult(
+    await apiClient.GET("/projects", {
+      params: { query: { "page[cursor]": cursor, "page[limit]": limit } },
+    }),
+  );
   return {
     items: response.data.items,
     nextCursor: response.meta.next_cursor ?? undefined,
@@ -30,14 +26,22 @@ export async function listProjects(): Promise<ProjectDto[]> {
 }
 
 export async function getProject(projectId: string): Promise<ProjectDto> {
-  const response = await apiRequest<ProjectEnvelope>(`/projects/${projectId}`);
+  const response = unwrapApiResult(
+    await apiClient.GET("/projects/{project_id}", {
+      params: { path: { project_id: projectId } },
+    }),
+  );
   return response.data;
 }
 
 export async function getProjectVersioned(
   projectId: string,
 ): Promise<{ etag?: string; project: ProjectDto }> {
-  const response = await apiRequestWithResponse<ProjectEnvelope>(`/projects/${projectId}`);
+  const response = unwrapApiResultWithResponse(
+    await apiClient.GET("/projects/{project_id}", {
+      params: { path: { project_id: projectId } },
+    }),
+  );
   return { etag: response.etag, project: response.body.data };
 }
 
@@ -48,10 +52,11 @@ export async function createProject({
   idempotencyKey: string;
   input: CreateProjectRequest;
 }): Promise<ProjectDto> {
-  const response = await apiRequest<CreateProjectEnvelope>("/projects", {
-    method: "POST",
-    body: input,
-    idempotencyKey,
-  });
+  const response = unwrapApiResult(
+    await apiClient.POST("/projects", {
+      body: input,
+      params: { header: { "Idempotency-Key": idempotencyKey } },
+    }),
+  );
   return response.data;
 }

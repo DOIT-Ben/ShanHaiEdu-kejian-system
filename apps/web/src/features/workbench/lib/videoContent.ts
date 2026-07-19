@@ -1,4 +1,9 @@
+import videoStyleGouache from "@/assets/creation/video/video-style-gouache.webp";
+import videoStyleMiniature from "@/assets/creation/video/video-style-miniature.webp";
+import videoStylePaper from "@/assets/creation/video/video-style-paper.webp";
 import type { WorkflowStatus } from "@/entities/workflow/model";
+
+const creationVideoStyleAssets = [videoStylePaper, videoStyleMiniature, videoStyleGouache] as const;
 
 export type VideoStoryBeat = {
   assets: string;
@@ -105,17 +110,17 @@ export const demoVideoStyles: VideoStyle[] = [
   {
     id: "paper",
     name: "纸艺微缩课堂",
-    image: "/assets/creation/video-label-detective.svg",
+    image: creationVideoStyleAssets[0],
   },
   {
     id: "clay",
     name: "柔和黏土定格",
-    image: "/assets/creation/video-classroom-question.svg",
+    image: creationVideoStyleAssets[1],
   },
   {
     id: "clean",
     name: "清透实物插画",
-    image: "/assets/creation/juice-observation.svg",
+    image: creationVideoStyleAssets[2],
   },
 ];
 
@@ -213,17 +218,17 @@ export function createTopicVideoStyles(knowledgePoint: string): VideoStyle[] {
     {
       id: "paper",
       name: `${topic} · 纸艺课堂`,
-      image: "/assets/creation/video-label-detective.svg",
+      image: creationVideoStyleAssets[0],
     },
     {
       id: "clay",
       name: `${topic} · 温和定格`,
-      image: "/assets/creation/video-classroom-question.svg",
+      image: creationVideoStyleAssets[1],
     },
     {
       id: "clean",
       name: `${topic} · 清透插画`,
-      image: "/assets/creation/juice-observation.svg",
+      image: creationVideoStyleAssets[2],
     },
   ];
 }

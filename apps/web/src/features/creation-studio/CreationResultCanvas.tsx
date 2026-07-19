@@ -9,7 +9,7 @@ function PresentationResult({ variation }: { variation: number }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="mx-auto w-full max-w-[480px]">
-        <CreativeResultVisual type="presentation" variant={page + variation} />
+        <CreativeResultVisual page={page} type="presentation" variant={variation} />
         <p className="mt-2 text-center text-xs text-[var(--sh-ink-muted)]">
           第 {page + 1} 页 · {presentationPreviewPages[page]}
         </p>
@@ -23,7 +23,7 @@ function PresentationResult({ variation }: { variation: number }) {
             onClick={() => setPage(index)}
             type="button"
           >
-            <CreativeResultVisual type="presentation" variant={index + variation} />
+            <CreativeResultVisual page={index} type="presentation" variant={variation} />
             <span className="mt-1 block truncate text-xs font-medium text-[var(--sh-ink-strong)]">
               {index + 1}. {label}
             </span>

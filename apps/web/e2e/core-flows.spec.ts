@@ -5,13 +5,16 @@ import { unlockWorkbenchStep } from "./support/runtime";
 const projectId = "01960000-0000-7000-8000-000000000001";
 const lessonId = "01960000-0000-7000-8000-000000000101";
 
-test("首页进入项目并恢复课时工作台", async ({ page }) => {
+test("首页先进入真实项目，再由项目恢复课时工作台", async ({ page }) => {
   await loginAsTeacher(page);
   await page.goto("/app");
   await expect(
     page.getByRole("heading", { name: "从一份教材，到一节孩子愿意听的好课" }),
   ).toBeVisible();
   await page.getByRole("link", { name: "继续制作" }).click();
+  await expect(page).toHaveURL(new RegExp(`/projects/${projectId}$`));
+  await expect(page.getByRole("heading", { name: "认识百分数" }).first()).toBeVisible();
+  await page.getByRole("link", { name: "打开教案" }).click();
   await expect(page).toHaveURL(
     new RegExp(`/projects/${projectId}/lessons/${lessonId}/work/lesson-plan`),
   );
@@ -156,7 +159,7 @@ test("PPT 正文按可用高度完整显示", async ({ page }) => {
   await expect(page.getByRole("button", { name: "查看参考内容" })).toBeVisible();
   await expect(page.getByRole("button", { name: "编辑内容要求" })).toBeVisible();
   const slideImage = page.locator('[role="img"] img');
-  await expect(slideImage).toHaveAttribute("src", "/assets/creation/slide-percent-grid.svg");
+  await expect(slideImage).toHaveAttribute("src", /ppt-content-hundred-grid/);
   await page.getByRole("button", { name: "重新生成本页" }).click();
   await expect(page.getByRole("status")).toContainText("已重新生成并保存");
   await expect(page.getByTestId("ppt-regenerated-note")).toBeVisible();

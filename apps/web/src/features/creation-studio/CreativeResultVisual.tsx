@@ -1,28 +1,20 @@
 import { Play } from "lucide-react";
+import { creationImageAssets, creationVideoShotAssets } from "@/assets/creation/catalog";
 import type { StudioType } from "@/features/creation-studio/model";
 import { PercentSlidePreview } from "@/features/home/components/PercentSlidePreview";
 
-const imageSources = [
-  "/assets/creation/juice-observation.svg",
-  "/assets/creation/fraction-market.svg",
-  "/assets/creation/geometry-garden.svg",
-];
-
-const videoSources = [
-  "/assets/creation/video-label-detective.svg",
-  "/assets/creation/video-classroom-question.svg",
-];
-
 export function CreativeResultVisual({
+  page,
   ratio = "1:1",
   type,
   variant = 0,
 }: {
+  page?: number;
   ratio?: string;
   type: StudioType;
   variant?: number;
 }) {
-  if (type === "presentation") return <PercentSlidePreview variant={variant} />;
+  if (type === "presentation") return <PercentSlidePreview page={page} variant={variant} />;
   if (type === "video")
     return (
       <div className="group relative aspect-video overflow-hidden rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-player)]">
@@ -30,7 +22,7 @@ export function CreativeResultVisual({
           alt="课堂导入视频作品画面"
           className="size-full object-cover transition-transform duration-[var(--sh-duration-slow)] group-hover:scale-[1.015]"
           decoding="async"
-          src={videoSources[variant % videoSources.length]}
+          src={creationVideoShotAssets[variant % creationVideoShotAssets.length]}
         />
         <div className="absolute inset-0 bg-[var(--sh-surface-inverse)]/10" />
         <div className="absolute inset-0 grid place-items-center">
@@ -48,7 +40,7 @@ export function CreativeResultVisual({
         alt="小学数学课堂教学插画作品"
         className="size-full object-cover transition-transform duration-[var(--sh-duration-slow)] group-hover:scale-[1.015]"
         decoding="async"
-        src={imageSources[variant % imageSources.length]}
+        src={creationImageAssets[variant % creationImageAssets.length]}
       />
     </div>
   );

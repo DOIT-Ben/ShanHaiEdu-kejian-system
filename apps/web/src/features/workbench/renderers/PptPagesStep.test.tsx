@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { creationPptContentAssets } from "@/assets/creation/catalog";
 import { PptPagesStep } from "@/features/workbench/renderers/PptPagesStep";
 import { useWorkbenchUi } from "@/features/workbench/model/workbenchUi";
 import {
@@ -56,13 +57,13 @@ describe("PptPagesStep delayed regeneration", () => {
   it("重新生成后画布内容真实变化", async () => {
     const { container } = renderStep();
     const previewImage = container.querySelector('[role="img"] img');
-    expect(previewImage).toHaveAttribute("src", "/assets/creation/slide-percent-grid.svg");
+    expect(previewImage).toHaveAttribute("src", creationPptContentAssets[1]);
     expect(screen.queryByTestId("ppt-regenerated-note")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "重新生成本页" }));
     await act(() => vi.advanceTimersByTimeAsync(500));
 
-    expect(previewImage).toHaveAttribute("src", "/assets/creation/slide-percent-grid.svg");
+    expect(previewImage).toHaveAttribute("src", creationPptContentAssets[1]);
     expect(screen.getByTestId("ppt-regenerated-note")).toHaveTextContent(
       "先观察：涂色部分占整体多少？",
     );

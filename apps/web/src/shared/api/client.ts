@@ -1,3 +1,5 @@
+import createClient, { type Middleware } from "openapi-fetch";
+import type { paths } from "@/generated/api-schema";
 import { apiConfig } from "@/shared/api/config";
 
 export type ApiErrorBody = {
@@ -26,21 +28,17 @@ export class ApiError extends Error {
   }
 }
 
-type RequestOptions = Omit<RequestInit, "body"> & {
-  body?: unknown;
-  idempotent?: boolean;
-  idempotencyKey?: string;
-  etag?: string;
-};
-
 type CsrfTokenProvider = () => string | null | undefined;
+
+type OpenApiResult<T> = {
+  data?: T;
+  error?: unknown;
+  response: Response;
+};
 
 let csrfTokenProvider: CsrfTokenProvider | null = null;
 
-/**
- * Installs the token reader supplied by the real authentication bootstrap.
- * The API client never fetches, persists, or guesses a CSRF token itself.
- */
+/** Installs the CSRF token reader supplied by the real authentication bootstrap. */
 export function configureCsrfTokenProvider(provider: CsrfTokenProvider | null) {
   csrfTokenProvider = provider;
 }
@@ -93,45 +91,25 @@ function invalidResponseError(response: Response) {
   });
 }
 
-function isWriteMethod(method: string | undefined) {
-  const normalized = (method ?? "GET").toUpperCase();
+function isWriteMethod(method: string) {
+  const normalized = method.toUpperCase();
   return normalized !== "GET" && normalized !== "HEAD" && normalized !== "OPTIONS";
 }
 
-async function readJson<T>(response: Response): Promise<T | undefined> {
-  const text = await response.text();
-  if (!text.trim()) return undefined;
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    return undefined;
-  }
-}
+const requestMiddleware: Middleware = {
+  onRequest({ request }) {
+    request.headers.set("Accept", "application/json");
+    if (isWriteMethod(request.method) && !request.headers.has("X-CSRF-Token")) {
+      const csrfToken = csrfTokenProvider?.()?.trim();
+      if (csrfToken) request.headers.set("X-CSRF-Token", csrfToken);
+    }
+    return request;
+  },
+};
 
-export async function apiRequestWithResponse<T>(
-  path: string,
-  options: RequestOptions = {},
-): Promise<ApiResponse<T>> {
-  const { body: requestBody, etag, idempotencyKey, idempotent, ...requestInit } = options;
-  const headers = new Headers(requestInit.headers);
-  headers.set("Accept", "application/json");
-  if (requestBody !== undefined) headers.set("Content-Type", "application/json");
-  if (idempotencyKey) headers.set("Idempotency-Key", idempotencyKey);
-  else if (idempotent) headers.set("Idempotency-Key", crypto.randomUUID());
-  if (etag) headers.set("If-Match", etag);
-  if (isWriteMethod(requestInit.method) && !headers.has("X-CSRF-Token")) {
-    const csrfToken = csrfTokenProvider?.()?.trim();
-    if (csrfToken) headers.set("X-CSRF-Token", csrfToken);
-  }
-
-  let response: Response;
+async function authenticatedFetch(input: Request) {
   try {
-    response = await fetch(`${apiConfig.baseUrl}${path}`, {
-      ...requestInit,
-      body: requestBody === undefined ? undefined : JSON.stringify(requestBody),
-      credentials: "include",
-      headers,
-    });
+    return await globalThis.fetch(input);
   } catch (reason) {
     if (reason instanceof DOMException && reason.name === "AbortError") throw reason;
     throw new ApiError({
@@ -143,18 +121,36 @@ export async function apiRequestWithResponse<T>(
       request_id: "unknown",
     });
   }
-
-  if (!response.ok) {
-    const body = await readJson<unknown>(response);
-    throw new ApiError(isApiErrorBody(body) ? body : fallbackError(response));
-  }
-  const body = response.status === 204 ? (undefined as T) : await readJson<T>(response);
-  if (response.status !== 204 && (body === undefined || !isApiSuccessBody(body))) {
-    throw invalidResponseError(response);
-  }
-  return { body: body as T, etag: response.headers.get("ETag") ?? undefined };
 }
 
-export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  return (await apiRequestWithResponse<T>(path, options)).body;
+function resolveBaseUrl(baseUrl: string) {
+  if (!baseUrl.startsWith("/")) return baseUrl;
+  return new URL(baseUrl, globalThis.location.origin).toString();
+}
+
+export const apiClient = createClient<paths>({
+  baseUrl: resolveBaseUrl(apiConfig.baseUrl),
+  credentials: "include",
+  fetch: authenticatedFetch,
+});
+
+apiClient.use(requestMiddleware);
+
+export function unwrapApiResult<T>(result: OpenApiResult<T>): T {
+  if (!result.response.ok) {
+    throw new ApiError(
+      isApiErrorBody(result.error) ? result.error : fallbackError(result.response),
+    );
+  }
+  if (result.data === undefined || !isApiSuccessBody(result.data)) {
+    throw invalidResponseError(result.response);
+  }
+  return result.data;
+}
+
+export function unwrapApiResultWithResponse<T>(result: OpenApiResult<T>): ApiResponse<T> {
+  return {
+    body: unwrapApiResult(result),
+    etag: result.response.headers.get("ETag") ?? undefined,
+  };
 }

@@ -1,6 +1,7 @@
-import { ArrowRight, BookOpenCheck, Waves } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { LoginBrandLockup, LoginVisualPanel } from "@/pages/auth/LoginBrandVisual";
 import { Button } from "@/shared/ui/Button";
 import { ThemeSwitcher } from "@/shared/theme/ThemeSwitcher";
 import {
@@ -19,42 +20,14 @@ export function LoginPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   return (
-    <div className="relative grid min-h-screen bg-[var(--sh-surface-canvas)] lg:grid-cols-[1.05fr_0.95fr]">
+    <div className="relative grid min-h-screen bg-[var(--sh-surface-canvas)] lg:grid-cols-[minmax(0,1.08fr)_minmax(440px,0.92fr)]">
       <div className="absolute right-4 top-4 z-20 rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-elevated)]/88 shadow-[var(--sh-shadow-card)] backdrop-blur-sm lg:right-6 lg:top-6">
         <ThemeSwitcher showLabel />
       </div>
-      <section className="hidden items-center justify-center overflow-hidden bg-[var(--sh-surface-inverse)] p-12 text-white lg:flex">
-        <div className="max-w-xl">
-          <span className="grid size-12 place-items-center rounded-[var(--sh-radius-sm)] bg-white/10">
-            <Waves aria-hidden="true" className="size-6" />
-          </span>
-          <h1 className="mt-8 text-[42px] font-bold leading-tight text-white">
-            把教材变成完整的课堂作品
-          </h1>
-          <p className="mt-5 max-w-lg leading-7 text-white/70">
-            在同一处完成课时、教案、PPT、课堂导入视频与最终交付。
-          </p>
-          <div className="relative mt-10 pb-10 pr-10">
-            <div className="rotate-[1.5deg] overflow-hidden rounded-[var(--sh-radius-lg)] border-[7px] border-[var(--sh-artifact-paper)] bg-[var(--sh-artifact-paper)] shadow-[var(--sh-shadow-modal)]">
-              <img
-                alt="认识百分数课堂课件封面"
-                className="aspect-video w-full object-cover"
-                src="/assets/creation/slide-percent-cover.svg"
-              />
-            </div>
-            <div className="absolute -bottom-2 right-0 w-[38%] -rotate-[4deg] overflow-hidden rounded-[var(--sh-radius-md)] border-[5px] border-[var(--sh-artifact-paper)] bg-[var(--sh-artifact-paper)] shadow-[var(--sh-shadow-floating)]">
-              <img
-                alt="果汁标签观察教学插画"
-                className="aspect-[4/3] w-full object-cover"
-                src="/assets/creation/juice-observation.svg"
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-      <main className="flex items-center justify-center p-6">
+      <LoginVisualPanel />
+      <main className="flex items-center justify-center px-4 py-20 sm:px-6 lg:py-24">
         <form
-          className="w-full max-w-md rounded-[var(--sh-radius-md)] bg-[var(--sh-surface-elevated)] p-7 shadow-[var(--sh-shadow-card)]"
+          className="w-full max-w-md rounded-[var(--sh-radius-lg)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-6 shadow-[var(--sh-shadow-floating)] sm:p-8"
           onSubmit={(event) => {
             event.preventDefault();
             if (!mockAuthEnabled) {
@@ -86,10 +59,8 @@ export function LoginPage() {
             }
           }}
         >
-          <span className="grid size-11 place-items-center rounded-[var(--sh-radius-sm)] bg-[var(--sh-brand-50)] text-[var(--sh-brand-600)]">
-            <BookOpenCheck aria-hidden="true" className="size-5" />
-          </span>
-          <h2 className="mt-6 text-2xl font-bold text-[var(--sh-ink-strong)]">登录山海教育</h2>
+          <LoginBrandLockup />
+          <h1 className="mt-7 text-2xl font-semibold text-[var(--sh-ink-strong)]">登录山海教育</h1>
           <p className="mt-2 text-sm text-[var(--sh-ink-muted)]">
             {mockAuthEnabled ? "继续你的课堂作品" : "登录服务正在准备中"}
           </p>

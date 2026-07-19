@@ -5,7 +5,10 @@ import { describe, expect, it } from "vitest";
 const appRoot = existsSync(join(process.cwd(), "src/shared/styles/tokens.css"))
   ? process.cwd()
   : join(process.cwd(), "apps/web");
-const tokens = readFileSync(join(appRoot, "src/shared/styles/tokens.css"), "utf8");
+const tokens = readFileSync(join(appRoot, "src/shared/styles/tokens.css"), "utf8").replace(
+  /\r\n/g,
+  "\n",
+);
 
 function contrastRatio(foreground: string, background: string) {
   const luminance = (hex: string) => {

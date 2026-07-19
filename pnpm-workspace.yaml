@@ -1,2 +1,6 @@
 packages:
   - apps/web
+
+onlyBuiltDependencies:
+  - esbuild
+  - msw
