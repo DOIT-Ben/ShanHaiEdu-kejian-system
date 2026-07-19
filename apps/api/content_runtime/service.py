@@ -2,11 +2,31 @@
 
 from __future__ import annotations
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from apps.api.content_runtime.models import ContentRelease
-from apps.api.content_runtime.registry import RuntimeDefaults
+from apps.api.content_runtime.models import ContentRelease, RuntimeDefaultVersion
+from apps.api.content_runtime.registry import DEFAULT_RUNTIME_KEY, RuntimeDefaults
 from apps.api.workflows.models import WorkflowDefinitionVersion
+
+
+def resolve_runtime_defaults(
+    session: Session,
+    *,
+    runtime_key: str = DEFAULT_RUNTIME_KEY,
+) -> RuntimeDefaults:
+    default = session.scalar(
+        select(RuntimeDefaultVersion)
+        .where(RuntimeDefaultVersion.runtime_key == runtime_key)
+        .order_by(RuntimeDefaultVersion.version_no.desc())
+        .limit(1)
+    )
+    if default is None:
+        raise RuntimeError("runtime default is not configured")
+    return RuntimeDefaults(
+        content_release_id=default.content_release_id,
+        workflow_definition_version_id=default.workflow_definition_version_id,
+    )
 
 
 def require_published_runtime(session: Session, defaults: RuntimeDefaults) -> None:

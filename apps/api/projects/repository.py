@@ -7,8 +7,8 @@ from uuid import UUID
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
-from apps.api.content_runtime.registry import BUILTIN_RUNTIME_DEFAULTS, RuntimeDefaults
-from apps.api.content_runtime.service import require_published_runtime
+from apps.api.content_runtime.registry import RuntimeDefaults
+from apps.api.content_runtime.service import require_published_runtime, resolve_runtime_defaults
 from apps.api.database import utc_now
 from apps.api.identity.context import ActorContext
 from apps.api.identity.models import ProjectMember
@@ -24,7 +24,7 @@ class ProjectRepository:
         session: Session,
         actor: ActorContext,
         *,
-        defaults: RuntimeDefaults = BUILTIN_RUNTIME_DEFAULTS,
+        defaults: RuntimeDefaults | None = None,
     ) -> None:
         self._session = session
         self._actor = actor
@@ -33,7 +33,8 @@ class ProjectRepository:
     def create(self, request: CreateProjectRequest) -> Project:
         if self._actor.user_id is None or self._actor.is_system:
             raise ValueError("project creation requires a user actor")
-        require_published_runtime(self._session, self._defaults)
+        defaults = self._defaults or resolve_runtime_defaults(self._session)
+        require_published_runtime(self._session, defaults)
         project_id = new_uuid7()
         project = Project(
             id=project_id,
@@ -52,8 +53,8 @@ class ProjectRepository:
                 or ("automatic" if request.execution_mode == "automatic" else "assisted")
             ),
             owner_principal_id=self._actor.principal_id,
-            content_release_id=self._defaults.content_release_id,
-            workflow_definition_version_id=self._defaults.workflow_definition_version_id,
+            content_release_id=defaults.content_release_id,
+            workflow_definition_version_id=defaults.workflow_definition_version_id,
             created_by=self._actor.principal_id,
             updated_by=self._actor.principal_id,
         )

@@ -16,12 +16,10 @@ from apps.api.content_runtime.models import (
     ContentReleaseItem,
     RuntimeDefaultVersion,
 )
-from apps.api.content_runtime.publication_service import (
-    ContentReleasePublisher,
-    load_builtin_courseware_release,
-    resolve_runtime_defaults,
-)
+from apps.api.content_runtime.package_source import load_builtin_courseware_release
+from apps.api.content_runtime.publication_service import ContentReleasePublisher
 from apps.api.content_runtime.registry import BUILTIN_RUNTIME_DEFAULTS
+from apps.api.content_runtime.service import resolve_runtime_defaults
 from apps.api.database import build_engine, build_session_factory
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
