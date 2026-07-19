@@ -200,6 +200,15 @@ def test_compose_uses_versioned_workspace_image() -> None:
     assert "UV_PYTHON" not in environment
 
 
+def test_compose_cpu_limits_are_selected_by_isolation_mode() -> None:
+    compose = yaml.safe_load((PROJECT_ROOT / "infra/dev.compose.yaml").read_text(encoding="utf-8"))
+
+    assert compose["services"]["postgres"]["cpus"] == "${SHANHAI_POSTGRES_CPUS:-1.5}"
+    assert compose["services"]["redis"]["cpus"] == "${SHANHAI_REDIS_CPUS:-0.5}"
+    assert compose["services"]["minio"]["cpus"] == "${SHANHAI_MINIO_CPUS:-1.0}"
+    assert compose["services"]["workspace"]["cpus"] == "${SHANHAI_WORKSPACE_CPUS:-3.0}"
+
+
 def test_workspace_image_exposes_pnpm_through_dedicated_corepack_shim() -> None:
     project_root = Path(__file__).resolve().parents[2]
     dockerfile = (project_root / "infra/dev/Dockerfile").read_text(encoding="utf-8")
@@ -234,6 +243,10 @@ def test_compose_script_maps_main_and_linked_worktrees_with_unique_ports(tmp_pat
     assert linked_values["SHANHAI_WORKSPACE_UID"] == "0"
     assert linked_values["SHANHAI_WORKSPACE_GID"] == "0"
     assert linked_values["SHANHAI_CONTAINER_ROOTLESS_USERNS"] == "true"
+    assert linked_values["SHANHAI_POSTGRES_CPUS"] == "0"
+    assert linked_values["SHANHAI_REDIS_CPUS"] == "0"
+    assert linked_values["SHANHAI_MINIO_CPUS"] == "0"
+    assert linked_values["SHANHAI_WORKSPACE_CPUS"] == "0"
     assert linked_values["SHANHAI_POSTGRES_PORT"] == "55529"
     assert linked_values["SHANHAI_REDIS_PORT"] == "56476"
     assert linked_values["SHANHAI_DEV_API_PORT"] == "58097"

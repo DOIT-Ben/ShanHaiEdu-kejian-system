@@ -1,14 +1,14 @@
 services:
   postgres:
-    cpus: 1.5
+    cpus: "${SHANHAI_POSTGRES_CPUS:-1.5}"
     mem_limit: 1g
 
   redis:
-    cpus: 0.5
+    cpus: "${SHANHAI_REDIS_CPUS:-0.5}"
     mem_limit: 512m
 
   minio:
-    cpus: 1.0
+    cpus: "${SHANHAI_MINIO_CPUS:-1.0}"
     mem_limit: 1g
 
   workspace-init:
@@ -49,7 +49,7 @@ services:
         DEV_GID: ${SHANHAI_IMAGE_DEV_GID:-1000}
     user: "${SHANHAI_WORKSPACE_UID:-1000}:${SHANHAI_WORKSPACE_GID:-1000}"
     init: true
-    cpus: 3.0
+    cpus: "${SHANHAI_WORKSPACE_CPUS:-3.0}"
     mem_limit: 4g
     pids_limit: 1024
     environment:

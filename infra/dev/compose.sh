@@ -32,6 +32,10 @@ case "$isolation_mode" in
     workspace_uid=0
     workspace_gid=0
     rootless_userns=true
+    postgres_cpus=0
+    redis_cpus=0
+    minio_cpus=0
+    workspace_cpus=0
     ;;
   dedicated-ecs)
     marker_dir="/etc/shanhaiedu"
@@ -50,6 +54,10 @@ case "$isolation_mode" in
     workspace_uid=1000
     workspace_gid=1000
     rootless_userns=false
+    postgres_cpus=1.5
+    redis_cpus=0.5
+    minio_cpus=1.0
+    workspace_cpus=3.0
     ;;
   *)
     fail "SHANHAI_DOCKER_ISOLATION_MODE must be rootless or dedicated-ecs"
@@ -79,6 +87,10 @@ export SHANHAI_COMPOSE_PROJECT="$compose_project"
 export SHANHAI_WORKSPACE_UID="$workspace_uid"
 export SHANHAI_WORKSPACE_GID="$workspace_gid"
 export SHANHAI_CONTAINER_ROOTLESS_USERNS="$rootless_userns"
+export SHANHAI_POSTGRES_CPUS="$postgres_cpus"
+export SHANHAI_REDIS_CPUS="$redis_cpus"
+export SHANHAI_MINIO_CPUS="$minio_cpus"
+export SHANHAI_WORKSPACE_CPUS="$workspace_cpus"
 export SHANHAI_POSTGRES_PORT="${SHANHAI_POSTGRES_PORT:-$((55432 + port_offset))}"
 export SHANHAI_REDIS_PORT="${SHANHAI_REDIS_PORT:-$((56379 + port_offset))}"
 export SHANHAI_DEV_API_PORT="${SHANHAI_DEV_API_PORT:-$((58000 + port_offset))}"
