@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+from collections import Counter
 from pathlib import Path
 from typing import Any, cast
 
@@ -314,7 +315,13 @@ def test_golden_planning_chain_reuses_exact_upstream_outputs() -> None:
 
     assert tuple(chain_inputs) == GOLDEN_CHAIN_INPUT_NODE_KEYS
     assert set(chain_inputs).isdisjoint(MEDIA_BOUNDARY_OUTPUT_ONLY_NODE_KEYS)
-    assert chain_inputs["intro.anchor"]["independent_idea_set"] == outputs["intro.ideate"]
+    assert "intro.generate_options" in outputs
+    assert chain_inputs["intro.generate_options"]["target_lesson_unit"]["lesson_unit_key"] == (
+        case["intro_option_set"]["lesson_unit_key"]
+    )
+    assert chain_inputs["intro.generate_options"]["target_material_evidence"]["knowledge_boundary"] == (
+        case["knowledge_boundary"]
+    )
     assert (
         chain_inputs["ppt.outline.generate"]["ppt_analysis_ref"] == outputs["ppt.content_analyze"]
     )
@@ -345,6 +352,45 @@ def test_golden_planning_chain_reuses_exact_upstream_outputs() -> None:
         chain_inputs["video.asset_prompts.generate"]["current_video_asset_inventory"]
         == outputs["video.asset_inventory.generate"]
     )
+
+
+def test_course_grounded_intro_options_keep_one_current_contract() -> None:
+    case = load_json(GOLDEN_CASE)
+    option_set = case["intro_option_set"]
+    options = option_set["options"]
+
+    assert option_set["knowledge_point"] == case["project"]["knowledge_point"]
+    assert Counter(option["primary_tendency"] for option in options) == Counter(
+        {"science": 3, "application": 3, "story": 3}
+    )
+    assert any(len(option["secondary_tendencies"]) >= 2 for option in options)
+    assert all(option["creative_concept"] for option in options)
+    assert all(option["course_anchor"] for option in options)
+    assert all(option["must_not_preteach"] for option in options)
+    scores = [option["recommendation_score"] for option in options]
+    assert scores.count(max(scores)) == 1
+
+
+def test_retired_intro_contract_tokens_are_absent_from_current_tree() -> None:
+    retired_tokens = (
+        "intro." + "ideate",
+        "intro." + "anchor",
+        "intro_" + "independent_ideas",
+        "independent_" + "without_course",
+    )
+    active_roots = (ROOT / "workflow", CONTRACTS, ROOT / "docs", ROOT / "scripts")
+    text_suffixes = {".json", ".md", ".py", ".yaml", ".yml", ".ts"}
+    offenders: dict[str, list[str]] = {}
+    for active_root in active_roots:
+        for path in active_root.rglob("*"):
+            if not path.is_file() or path.suffix not in text_suffixes:
+                continue
+            text = path.read_text(encoding="utf-8")
+            matches = [token for token in retired_tokens if token in text]
+            if matches:
+                offenders[path.relative_to(ROOT).as_posix()] = matches
+
+    assert offenders == {}
 
 
 @pytest.mark.parametrize(

@@ -73,8 +73,7 @@ def test_schema_and_complete_primary_math_catalog_are_valid() -> None:
         "material.parse",
         "lesson.division.generate",
         "lesson_plan.generate",
-        "intro.ideate",
-        "intro.anchor",
+        "intro.generate_options",
         "ppt.pages.generate",
         "ppt.cover.image.generate",
         "ppt.body_assets.generate",
@@ -100,20 +99,17 @@ def test_catalog_encodes_context_and_reference_asset_boundaries() -> None:
     }
     assert division["reference_asset_policy"] == {"mode": "none", "roles": []}
 
-    ideate = node_by_key(catalog, "intro.ideate")
-    assert ideate["context_policy"]["mode"] == "declared"
-    assert ideate["context_policy"]["allowed_sources"] == ["project.teacher_preferences"]
-    assert {
-        "material.approved_parse",
-        "lesson_division.approved_version",
-        "lesson_plan.approved_version",
-        "ppt_outline.approved_version",
-    }.issubset(ideate["context_policy"]["forbidden_sources"])
-    anchor = node_by_key(catalog, "intro.anchor")
-    assert set(anchor["context_policy"]["allowed_sources"]) == {
+    generate_options = node_by_key(catalog, "intro.generate_options")
+    assert generate_options["context_policy"]["mode"] == "declared"
+    assert set(generate_options["context_policy"]["allowed_sources"]) == {
+        "project.teacher_preferences",
         "lesson_division.approved_version",
         "material.approved_parse",
     }
+    assert {
+        "lesson_plan.approved_version",
+        "ppt_outline.approved_version",
+    }.issubset(generate_options["context_policy"]["forbidden_sources"])
 
     video_script = node_by_key(catalog, "video.master_script.generate")
     assert video_script["context_policy"]["allowed_sources"] == ["intro_selection.snapshot"]
