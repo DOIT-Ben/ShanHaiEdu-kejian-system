@@ -71,9 +71,7 @@ def validate_content_rules(
                 errors.append(
                     {
                         "path": field_path,
-                        "message": (
-                            f"must equal the number of items in {'.'.join(target_path)}"
-                        ),
+                        "message": (f"must equal the number of items in {'.'.join(target_path)}"),
                     }
                 )
     return errors

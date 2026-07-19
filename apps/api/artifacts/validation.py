@@ -10,12 +10,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from apps.api.artifacts.models import Artifact
+from apps.api.content_runtime.definition_projection import validate_content_rules
 from apps.api.content_runtime.models import (
     ContentDefinitionVersion,
     ContentPackageVersion,
     ContentReleaseItem,
 )
-from apps.api.content_runtime.definition_projection import validate_content_rules
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.permissions import ProjectAccessService
