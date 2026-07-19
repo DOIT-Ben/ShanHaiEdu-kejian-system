@@ -998,31 +998,17 @@ export interface components {
         PromptPreviewEnvelope: {
             data: {
                 /** Format: uuid */
-                prompt_snapshot_id?: string;
-                content_hash?: string;
+                prompt_snapshot_id: string;
+                content_hash: string;
                 editable_prompt: string;
-                locked_layers: components["schemas"]["PromptLockedLayerSummary"][];
-                context_summary: components["schemas"]["PromptContextSummary"][];
-                schema?: {
-                    [key: string]: unknown;
-                } | null;
+                edit_policy: components["schemas"]["PromptEditPolicy"];
             };
             request_id: string;
         };
-        PromptLockedLayerSummary: {
+        PromptEditPolicy: {
             /** @enum {string} */
-            layer?: "platform_safety" | "output_schema" | "provider_format";
-            key?: string;
-            /** @constant */
-            locked?: true;
-        };
-        PromptContextSummary: {
-            binding_key?: string;
-            source?: string;
-            /** @enum {string} */
-            exposure?: "full" | "summary" | "hidden";
-            item_count?: number;
-            content_hash?: string;
+            mode: "replace_editable_layer";
+            max_chars: number;
         };
         AcceptedJobEnvelope: {
             data: {
@@ -2249,7 +2235,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Editable business prompt and locked layer summaries */
+            /** @description Editable business prompt and its edit policy */
             200: {
                 headers: {
                     [name: string]: unknown;

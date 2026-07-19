@@ -4,9 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import json
+import re
 import subprocess
 import sys
 from collections.abc import Mapping
+from dataclasses import dataclass
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +19,145 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = Path("contracts/api-surface.openapi.yaml")
 PLANNED_CONTRACT_PATH = Path("contracts/planned-api-surface.openapi.yaml")
+BREAKING_TRANSITIONS_PATH = Path("contracts/openapi-breaking-transitions.json")
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
+SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
+TRANSITION_FIELDS = frozenset(
+    {
+        "id",
+        "issue",
+        "reason",
+        "base_contract_sha256",
+        "current_contract_sha256",
+        "breaking_errors_sha256",
+        "breaking_errors",
+    }
+)
+
+
+@dataclass(frozen=True)
+class BreakingTransition:
+    id: str
+    issue: int
+    reason: str
+    base_contract_sha256: str
+    current_contract_sha256: str
+    breaking_errors_sha256: str
+    breaking_errors: tuple[str, ...]
+
+
+def contract_sha256(contract: bytes) -> str:
+    return sha256(contract).hexdigest()
+
+
+def normalize_breaking_errors(errors: list[str]) -> list[str]:
+    return sorted(set(errors))
+
+
+def errors_sha256(errors: list[str]) -> str:
+    normalized = normalize_breaking_errors(errors)
+    canonical = json.dumps(
+        normalized,
+        ensure_ascii=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return sha256(canonical).hexdigest()
+
+
+def parse_breaking_transitions(document: Any) -> tuple[BreakingTransition, ...]:
+    if not isinstance(document, dict) or set(document) != {"version", "transitions"}:
+        raise ValueError("breaking transition registry must contain version and transitions")
+    if document["version"] != 1 or not isinstance(document["transitions"], list):
+        raise ValueError("unsupported breaking transition registry version")
+
+    parsed: list[BreakingTransition] = []
+    seen_ids: set[str] = set()
+    for raw_transition in document["transitions"]:
+        if not isinstance(raw_transition, dict) or set(raw_transition) != TRANSITION_FIELDS:
+            raise ValueError("breaking transition contains missing or unknown fields")
+
+        transition_id = raw_transition["id"]
+        issue = raw_transition["issue"]
+        reason = raw_transition["reason"]
+        hashes = (
+            raw_transition["base_contract_sha256"],
+            raw_transition["current_contract_sha256"],
+            raw_transition["breaking_errors_sha256"],
+        )
+        raw_errors = raw_transition["breaking_errors"]
+        if (
+            not isinstance(transition_id, str)
+            or not transition_id
+            or transition_id in seen_ids
+            or not isinstance(issue, int)
+            or isinstance(issue, bool)
+            or issue <= 0
+            or not isinstance(reason, str)
+            or not reason.strip()
+            or any(
+                not isinstance(value, str) or SHA256_PATTERN.fullmatch(value) is None
+                for value in hashes
+            )
+            or not isinstance(raw_errors, list)
+            or not raw_errors
+            or any(not isinstance(error, str) or not error for error in raw_errors)
+            or any("*" in error for error in raw_errors)
+            or raw_errors != normalize_breaking_errors(raw_errors)
+            or raw_transition["breaking_errors_sha256"] != errors_sha256(raw_errors)
+        ):
+            raise ValueError(f"invalid breaking transition record: {transition_id!r}")
+
+        seen_ids.add(transition_id)
+        parsed.append(
+            BreakingTransition(
+                id=transition_id,
+                issue=issue,
+                reason=reason,
+                base_contract_sha256=raw_transition["base_contract_sha256"],
+                current_contract_sha256=raw_transition["current_contract_sha256"],
+                breaking_errors_sha256=raw_transition["breaking_errors_sha256"],
+                breaking_errors=tuple(raw_errors),
+            )
+        )
+    return tuple(parsed)
+
+
+def find_approved_breaking_transition(
+    base_contract: bytes,
+    current_contract: bytes,
+    errors: list[str],
+    transitions: tuple[BreakingTransition, ...],
+) -> BreakingTransition | None:
+    normalized_errors = normalize_breaking_errors(errors)
+    base_hash = contract_sha256(base_contract)
+    current_hash = contract_sha256(current_contract)
+    errors_hash = errors_sha256(normalized_errors)
+    for transition in transitions:
+        if (
+            transition.base_contract_sha256 == base_hash
+            and transition.current_contract_sha256 == current_hash
+            and transition.breaking_errors_sha256 == errors_hash
+            and transition.breaking_errors == tuple(normalized_errors)
+        ):
+            return transition
+    return None
+
+
+def is_breaking_transition_approved(
+    base_contract: bytes,
+    current_contract: bytes,
+    errors: list[str],
+    transitions: tuple[BreakingTransition, ...],
+) -> bool:
+    return (
+        find_approved_breaking_transition(
+            base_contract,
+            current_contract,
+            errors,
+            transitions,
+        )
+        is not None
+    )
 
 
 def load_yaml_text(text: str) -> dict[str, Any]:
@@ -25,16 +167,18 @@ def load_yaml_text(text: str) -> dict[str, Any]:
     return document
 
 
-def load_base_contract(base_ref: str) -> dict[str, Any]:
+def load_base_contract_bytes(base_ref: str) -> bytes:
     result = subprocess.run(
         ["git", "show", f"{base_ref}:{CONTRACT_PATH.as_posix()}"],
         cwd=ROOT,
         check=True,
         capture_output=True,
-        text=True,
-        encoding="utf-8",
     )
-    return load_yaml_text(result.stdout)
+    return result.stdout
+
+
+def load_base_contract(base_ref: str) -> dict[str, Any]:
+    return load_yaml_text(load_base_contract_bytes(base_ref).decode("utf-8"))
 
 
 def resolve_local_ref(document: Mapping[str, Any], value: Any) -> Any:
@@ -492,12 +636,17 @@ def main() -> int:
     parser.add_argument("--base-ref", default="origin/main")
     args = parser.parse_args()
     try:
-        base_document = load_base_contract(args.base_ref)
-        current_document = load_yaml_text((ROOT / CONTRACT_PATH).read_text(encoding="utf-8"))
+        base_contract = load_base_contract_bytes(args.base_ref)
+        current_contract = (ROOT / CONTRACT_PATH).read_bytes()
+        base_document = load_yaml_text(base_contract.decode("utf-8"))
+        current_document = load_yaml_text(current_contract.decode("utf-8"))
         planned_document = load_yaml_text(
             (ROOT / PLANNED_CONTRACT_PATH).read_text(encoding="utf-8")
         )
-    except (OSError, ValueError, subprocess.CalledProcessError) as exc:
+        transitions = parse_breaking_transitions(
+            json.loads((ROOT / BREAKING_TRANSITIONS_PATH).read_text(encoding="utf-8"))
+        )
+    except (OSError, UnicodeError, ValueError, subprocess.CalledProcessError) as exc:
         print(f"cannot load OpenAPI contracts: {type(exc).__name__}", file=sys.stderr)
         return 2
 
@@ -507,8 +656,24 @@ def main() -> int:
         planned_document,
     )
     if errors:
+        transition = find_approved_breaking_transition(
+            base_contract,
+            current_contract,
+            errors,
+            transitions,
+        )
+        if transition is not None:
+            print(
+                "OpenAPI compatibility check passed with approved breaking transition "
+                f"{transition.id} (Issue #{transition.issue}) against {args.base_ref}"
+            )
+            return 0
         for error in errors:
             print(f"breaking OpenAPI change: {error}", file=sys.stderr)
+        print(
+            "breaking OpenAPI changes do not exactly match an approved transition",
+            file=sys.stderr,
+        )
         return 1
     print(f"OpenAPI compatibility check passed against {args.base_ref}")
     return 0

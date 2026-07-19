@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
@@ -207,6 +208,8 @@ def test_snapshot_service_is_idempotent_and_never_overwrites_frozen_prompt(
             context=context,
             output_schema={"type": "object"},
             provider_format="PROVIDER_PRIVATE",
+            user_edit_mode="replace_editable_layer",
+            user_edit_max_chars=60_000,
         )
         with pytest.raises(PromptSnapshotError) as caught, session.begin_nested():
             PromptSnapshotService(session, actor).freeze(
@@ -286,12 +289,74 @@ async def test_prompt_preview_endpoint_returns_only_the_safe_projection(
             node_key="prepare",
             status=NodeStatus.READY,
         )
-        context, compiled = compiled_fixture()
-        frozen = PromptSnapshotService(session, actor).freeze(
-            node.id,
-            context=context,
-            prompt=compiled,
+        legacy_bindings = [
+            _legacy_binding(
+                "preferences",
+                "project.teacher_preferences",
+                "summary",
+                [_legacy_item("preference-private", {"tone": "warm"})],
+            ),
+            _legacy_binding(
+                "hidden-rubric",
+                "lesson_plan.approved_version",
+                "hidden",
+                [_legacy_item("hidden-private", {"rubric": "private"})],
+            ),
+            _legacy_binding(
+                "material",
+                "material.approved_parse",
+                "full",
+                [_legacy_item("private-source-id", {"text": "Visible legacy fact"})],
+            ),
+        ]
+        legacy_summaries = [_legacy_summary(binding) for binding in legacy_bindings]
+        summary_chunk = (
+            "[context:preferences] source=project.teacher_preferences "
+            f"items=1 hash={legacy_summaries[0]['content_hash']}"
         )
+        full_chunk = _canonical_json({"context": legacy_bindings[2]["items"]})
+        legacy_editable_prompt = (
+            "Visible task. Explain source and hash vocabulary to students.\n\n"
+            f"{summary_chunk}\n\n{full_chunk}"
+        )
+        context_snapshot = ContextSnapshot(
+            id=new_uuid7(),
+            organization_id=actor.organization_id,
+            project_id=project.id,
+            node_run_id=node.id,
+            bindings_json={"bindings": legacy_bindings},
+            content_hash="a" * 64,
+            created_by=actor.principal_id,
+        )
+        prompt_snapshot = PromptSnapshot(
+            id=new_uuid7(),
+            organization_id=actor.organization_id,
+            project_id=project.id,
+            node_run_id=node.id,
+            context_snapshot_id=context_snapshot.id,
+            template_refs_json={
+                "template_key": "lesson-plan.prompt",
+                "template_version": "1.0.0",
+            },
+            layers_json={"layers": [{"content": "INTERNAL_METHOD_PRIVATE"}]},
+            editable_prompt=legacy_editable_prompt,
+            user_diff_json={"mode": "replace_editable_layer"},
+            compiled_prompt="PLATFORM_PRIVATE\nINTERNAL_METHOD_PRIVATE\nPROVIDER_PRIVATE",
+            request_schema_json={"type": "object", "required": ["fixed_structure"]},
+            preview_json={
+                "editable_prompt": legacy_editable_prompt,
+                "locked_layers": [
+                    {"layer": "output_schema", "key": "request_schema", "locked": True}
+                ],
+                "context_summary": legacy_summaries,
+                "schema": {"type": "object", "required": ["fixed_structure"]},
+                "output_schema": {"private": True},
+                "internal_prompt": "INTERNAL_METHOD_PRIVATE",
+            },
+            content_hash="b" * 64,
+            created_by=actor.principal_id,
+        )
+        session.add_all((context_snapshot, prompt_snapshot))
 
     transport = httpx.ASGITransport(app=app)
     try:
@@ -301,12 +366,40 @@ async def test_prompt_preview_endpoint_returns_only_the_safe_projection(
         assert response.status_code == 200, response.text
         assert_contract_response(response, operation_id="getPromptPreview", status="200")
         data = response.json()["data"]
-        assert data["prompt_snapshot_id"] == str(frozen.prompt.id)
-        assert data["editable_prompt"] == compiled.preview.editable_prompt
+        assert set(data) == {
+            "prompt_snapshot_id",
+            "content_hash",
+            "editable_prompt",
+            "edit_policy",
+        }
+        assert data["prompt_snapshot_id"] == str(prompt_snapshot.id)
+        assert data["content_hash"] == prompt_snapshot.content_hash
+        assert data["editable_prompt"] == (
+            "Visible task. Explain source and hash vocabulary to students.\n\n"
+            '{"context":[{"text":"Visible legacy fact"}]}'
+        )
+        assert data["edit_policy"] == {
+            "mode": "replace_editable_layer",
+            "max_chars": 100_000,
+        }
         rendered = json.dumps(data)
         assert "PLATFORM_PRIVATE" not in rendered
         assert "CONTEXT_PRIVATE" not in rendered
         assert "PROVIDER_PRIVATE" not in rendered
+        assert "INTERNAL_METHOD_PRIVATE" not in rendered
+        assert "fixed_structure" not in rendered
+        assert "private-source-id" not in rendered
+        assert "private-version-id" not in rendered
+
+        with factory() as session:
+            persisted = session.get(PromptSnapshot, prompt_snapshot.id)
+            persisted_context = session.get(ContextSnapshot, context_snapshot.id)
+            assert persisted is not None and persisted_context is not None
+            assert persisted.layers_json == prompt_snapshot.layers_json
+            assert persisted.compiled_prompt == prompt_snapshot.compiled_prompt
+            assert persisted.request_schema_json == prompt_snapshot.request_schema_json
+            assert persisted.content_hash == prompt_snapshot.content_hash
+            assert persisted_context.bindings_json == context_snapshot.bindings_json
     finally:
         app.state.database_engine.dispose()
 
@@ -342,5 +435,46 @@ def compiled_fixture():
         context=context,
         output_schema={"type": "object"},
         provider_format="PROVIDER_PRIVATE",
+        user_edit_mode="replace_editable_layer",
+        user_edit_max_chars=60_000,
     )
     return context, compiled
+
+
+def _legacy_item(identifier: str, content: object) -> dict[str, object]:
+    return {
+        "source_id": identifier,
+        "source_version_id": f"{identifier}-v1",
+        "content": content,
+    }
+
+
+def _legacy_binding(
+    key: str,
+    source: str,
+    exposure: str,
+    items: list[dict[str, object]],
+) -> dict[str, object]:
+    return {"binding_key": key, "source": source, "exposure": exposure, "items": items}
+
+
+def _legacy_summary(binding: dict[str, object]) -> dict[str, object]:
+    items = binding["items"]
+    assert isinstance(items, list)
+    return {
+        "binding_key": binding["binding_key"],
+        "source": binding["source"],
+        "exposure": binding["exposure"],
+        "item_count": len(items),
+        "content_hash": hashlib.sha256(_canonical_json({"items": items}).encode()).hexdigest(),
+    }
+
+
+def _canonical_json(value: object) -> str:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )

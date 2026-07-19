@@ -61,7 +61,7 @@
 | `POST` | `/artifacts/{artifact_id}/versions` | 从草稿创建不可变版本 |
 | `GET` | `/artifact-versions/{version_id}` | 读取指定版本 |
 | `GET` | `/artifact-versions/{version_id}/dependencies` | 来源和影响关系 |
-| `GET` | `/node-runs/{node_run_id}/prompt-preview` | 获取可见业务提示词 |
+| `GET` | `/node-runs/{node_run_id}/prompt-preview` | 获取业务提示词及编辑策略，不返回隐藏结构合同 |
 | `POST` | `/node-runs/{node_run_id}/prompt-revisions` | 保存教师修改后的提示词 |
 | `GET` | `/projects/{project_id}/asset-package` | 项目资产包聚合视图 |
 | `GET` | `/projects/{project_id}/asset-slots` | 槽位及当前绑定 |

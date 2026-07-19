@@ -486,6 +486,8 @@ async def test_stage1_backend_vertical_flow_uses_real_services_and_fake_model(
                 context=context,
                 output_schema={"type": "object"},
                 provider_format="PRIVATE_PROVIDER_FORMAT",
+                user_edit_mode="replace_editable_layer",
+                user_edit_max_chars=60_000,
             )
             frozen = PromptSnapshotService(session, actor).freeze(
                 node.id, context=context, prompt=prompt

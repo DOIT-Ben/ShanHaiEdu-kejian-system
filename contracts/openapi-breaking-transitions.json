@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "transitions": [
+    {
+      "id": "issue-51-prompt-preview-public-projection",
+      "issue": 51,
+      "reason": "Remove private Context, locked layer, and output Schema metadata from the teacher-facing Prompt Preview contract while retaining it in the server-side PromptSnapshot.",
+      "base_contract_sha256": "f50d6b4ec60fcce74b8ec048952e1edd5f37593d8b81cab53202beb92fcaccbe",
+      "current_contract_sha256": "e42900bfc85d262c176669b4aa06cefef5656b5a2594809d702e15e14ae1b580",
+      "breaking_errors_sha256": "df7a4b915f38e753ae701ed27db4d22fcb4550c17ef74602e094d1817a6eae9e",
+      "breaking_errors": [
+        "GET /node-runs/{node_run_id}/prompt-preview response 200 application/json.data: property removed: context_summary",
+        "GET /node-runs/{node_run_id}/prompt-preview response 200 application/json.data: property removed: locked_layers",
+        "GET /node-runs/{node_run_id}/prompt-preview response 200 application/json.data: property removed: schema",
+        "GET /node-runs/{node_run_id}/prompt-preview response 200 application/json.data: required properties changed",
+        "component schema removed: PromptContextSummary",
+        "component schema removed: PromptLockedLayerSummary",
+        "components.schemas.PromptPreviewEnvelope.data: property removed: context_summary",
+        "components.schemas.PromptPreviewEnvelope.data: property removed: locked_layers",
+        "components.schemas.PromptPreviewEnvelope.data: property removed: schema",
+        "components.schemas.PromptPreviewEnvelope.data: required properties changed"
+      ]
+    }
+  ]
+}
