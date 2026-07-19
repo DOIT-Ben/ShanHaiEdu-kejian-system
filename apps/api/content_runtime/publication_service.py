@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any, cast
@@ -10,6 +11,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from apps.api.content_runtime.definition_projection import build_content_json_schema
 from apps.api.content_runtime.models import (
     ContentDefinitionVersion,
     ContentPackage,
@@ -23,6 +25,7 @@ from apps.api.content_runtime.package_source import (
     BuiltinCoursewareReleaseSource,
     ContentPublicationConflict,
 )
+from apps.api.content_runtime.publication_verifier import verify_existing_publication
 from apps.api.content_runtime.registry import DEFAULT_RUNTIME_KEY
 from apps.api.database import utc_now
 from apps.api.ids import new_uuid7
@@ -56,6 +59,7 @@ class ContentReleasePublisher:
         published_by: UUID,
     ) -> PublicationResult:
         with self._session.begin_nested():
+            self._lock_publication()
             package = self._find_package(source.package_key)
             if package is not None:
                 self._require_package_identity(package, source)
@@ -238,7 +242,9 @@ class ContentReleasePublisher:
                         id=new_uuid7(),
                         definition_key=item_key,
                         content_package_version_id=package_version_id,
-                        schema_json=cast(dict[str, Any], item["spec"]),
+                        schema_json=build_content_json_schema(
+                            cast(dict[str, Any], item["spec"])
+                        ),
                         ui_schema_json={},
                         export_mapping_json={},
                         validation_rules_json={},
@@ -308,12 +314,7 @@ class ContentReleasePublisher:
             workflow_definition_id=workflow_id,
             version_no=version_no,
             graph_json=source.workflow_catalog,
-            input_contract_json={
-                "package_key": source.package_key,
-                "package_semantic_version": source.semantic_version,
-                "package_checksum": source.package_checksum,
-                "workflow_checksum": source.workflow_checksum,
-            },
+            input_contract_json=source.workflow_input_contract,
             status="draft",
             checksum=source.workflow_checksum,
             published_at=None,
@@ -330,60 +331,23 @@ class ContentReleasePublisher:
         )
         return (current or 0) + 1
 
+    def _lock_publication(self) -> None:
+        digest = hashlib.sha256(f"content-release:{DEFAULT_RUNTIME_KEY}".encode()).digest()
+        lock_id = int.from_bytes(digest[:8], byteorder="big", signed=True)
+        self._session.execute(select(func.pg_advisory_xact_lock(lock_id)))
+
     def _require_existing_publication(
         self,
         source: BuiltinCoursewareReleaseSource,
         package_version: ContentPackageVersion,
     ) -> PublicationResult:
-        if (
-            package_version.status != "published"
-            or package_version.checksum != source.package_checksum
-            or package_version.manifest_json != source.manifest
-        ):
-            raise ContentPublicationConflict("package version conflicts with validated source")
-        item_rows = list(
-            self._session.scalars(
-                select(ContentPackageItemVersion).where(
-                    ContentPackageItemVersion.content_package_version_id == package_version.id
-                )
-            )
-        )
-        items = {row.item_key: row for row in item_rows}
-        if set(items) != set(source.items) or any(
-            items[key].payload_json != source.items[key]
-            or items[key].checksum != source.manifest_entries[key]["sha256"]
-            for key in source.items
-        ):
-            raise ContentPublicationConflict("published package items conflict with source")
-        release = self._find_release(source.release_key)
-        workflow = self._session.scalar(
-            select(WorkflowDefinitionVersion).where(
-                WorkflowDefinitionVersion.checksum == source.workflow_checksum
-            )
-        )
-        if release is None or release.status != "published" or workflow is None:
-            raise ContentPublicationConflict("published package is missing release or workflow")
-        release_item = self._session.scalar(
-            select(ContentReleaseItem).where(
-                ContentReleaseItem.content_release_id == release.id,
-                ContentReleaseItem.content_package_version_id == package_version.id,
-            )
-        )
-        default = self._session.scalar(
-            select(RuntimeDefaultVersion).where(
-                RuntimeDefaultVersion.runtime_key == DEFAULT_RUNTIME_KEY,
-                RuntimeDefaultVersion.content_release_id == release.id,
-                RuntimeDefaultVersion.workflow_definition_version_id == workflow.id,
-            )
-        )
-        if release_item is None or default is None:
-            raise ContentPublicationConflict("published release is incomplete")
+        existing = verify_existing_publication(self._session, source, package_version)
         return PublicationResult(
             created=False,
             content_package_version_id=package_version.id,
-            content_release_id=release.id,
-            workflow_definition_version_id=workflow.id,
-            runtime_default_version_no=default.version_no,
+            content_release_id=existing.content_release_id,
+            workflow_definition_version_id=existing.workflow_definition_version_id,
+            runtime_default_version_no=existing.runtime_default_version_no,
             package_checksum=source.package_checksum,
             workflow_checksum=source.workflow_checksum,
         )

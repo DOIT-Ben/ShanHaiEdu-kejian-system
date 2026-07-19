@@ -48,6 +48,15 @@ class BuiltinCoursewareReleaseSource:
         return cast(str, self.workflow_catalog["workflow_key"])
 
     @property
+    def workflow_input_contract(self) -> dict[str, str]:
+        return {
+            "package_key": self.package_key,
+            "package_semantic_version": self.semantic_version,
+            "package_checksum": self.package_checksum,
+            "workflow_checksum": self.workflow_checksum,
+        }
+
+    @property
     def content_definition_count(self) -> int:
         return sum(
             entry["kind"] == "content_definition" for entry in self.manifest_entries.values()

@@ -4,13 +4,19 @@ import json
 import os
 import subprocess
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event
 from uuid import uuid4
 
 import pytest
+from alembic.config import Config
+from jsonschema import Draft202012Validator
 from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 
+from alembic import command
 from apps.api.content_runtime.models import (
     ContentDefinitionVersion,
     ContentPackage,
@@ -24,7 +30,9 @@ from apps.api.content_runtime.package_source import load_builtin_courseware_rele
 from apps.api.content_runtime.publication_service import ContentReleasePublisher
 from apps.api.content_runtime.registry import BUILTIN_RUNTIME_DEFAULTS
 from apps.api.content_runtime.service import resolve_runtime_defaults
-from apps.api.database import build_engine, build_session_factory
+from apps.api.database import build_engine, build_session_factory, utc_now
+from apps.api.identity.models import SYSTEM_PRINCIPAL_ID
+from apps.api.ids import new_uuid7
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.workflows.models import WorkflowDefinitionVersion
@@ -89,6 +97,16 @@ def test_golden_release_is_published_from_validated_fixtures_and_is_idempotent(
             )
             == source.content_definition_count
         )
+        definition = session.scalar(
+            select(ContentDefinitionVersion).where(
+                ContentDefinitionVersion.content_package_version_id == package_version.id,
+                ContentDefinitionVersion.definition_key == "intro.generate_options.output",
+            )
+        )
+        assert definition is not None
+        validator = Draft202012Validator(definition.schema_json)
+        assert list(validator.iter_errors({}))
+        assert list(validator.iter_errors({"unexpected": True}))
         assert resolve_runtime_defaults(session).content_release_id == release.id
         assert resolve_runtime_defaults(session).workflow_definition_version_id == workflow.id
 
@@ -140,6 +158,108 @@ def test_failed_publication_rolls_back_every_new_runtime_row(
             == 0
         )
         assert resolve_runtime_defaults(session) == BUILTIN_RUNTIME_DEFAULTS
+
+
+def test_published_package_item_cannot_be_moved_to_a_draft_package(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    source = load_builtin_courseware_release(ROOT)
+
+    with factory() as session, session.begin():
+        actor = seed_test_actor(session)
+        published = ContentReleasePublisher(session).publish(
+            source,
+            published_by=actor.principal_id,
+        )
+        published_version = session.get(
+            ContentPackageVersion,
+            published.content_package_version_id,
+        )
+        assert published_version is not None
+        draft = ContentPackageVersion(
+            id=new_uuid7(),
+            content_package_id=published_version.content_package_id,
+            semantic_version="0.0.0-trigger-test",
+            runtime_constraint=source.runtime_constraint,
+            manifest_json={},
+            archive_asset_version_id=None,
+            checksum="0" * 63 + "1",
+            status="draft",
+            validated_at=utc_now(),
+            published_at=None,
+        )
+        session.add(draft)
+        session.flush()
+        item = session.scalar(
+            select(ContentPackageItemVersion).where(
+                ContentPackageItemVersion.content_package_version_id == published_version.id
+            )
+        )
+        assert item is not None
+        with pytest.raises(IntegrityError), session.begin_nested():
+            item.content_package_version_id = draft.id
+            session.flush()
+
+
+def test_concurrent_first_publication_is_serialized_and_replayed(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    source = load_builtin_courseware_release(ROOT)
+    lock_acquired = Event()
+    allow_first_to_continue = Event()
+
+    class BlockingPublisher(ContentReleasePublisher):
+        def _lock_publication(self) -> None:
+            super()._lock_publication()
+            lock_acquired.set()
+            if not allow_first_to_continue.wait(timeout=10):
+                raise TimeoutError("test did not release the first publication")
+
+    def publish(*, blocking: bool):
+        with factory() as session, session.begin():
+            publisher_type = BlockingPublisher if blocking else ContentReleasePublisher
+            return publisher_type(session).publish(
+                source,
+                published_by=SYSTEM_PRINCIPAL_ID,
+            )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first_future = executor.submit(publish, blocking=True)
+        assert lock_acquired.wait(timeout=5)
+        second_future = executor.submit(publish, blocking=False)
+        try:
+            time.sleep(0.2)
+            assert not second_future.done()
+        finally:
+            allow_first_to_continue.set()
+        first = first_future.result(timeout=10)
+        second = second_future.result(timeout=10)
+
+    assert first.created is True
+    assert second == first.as_existing()
+
+
+def test_published_content_blocks_destructive_migration_downgrade(
+    migrated_database_url: str,
+) -> None:
+    first = run_publish_cli(migrated_database_url)
+    assert first.returncode == 0, first.stderr
+    previous = os.environ.get("SHANHAI_DATABASE_URL")
+    os.environ["SHANHAI_DATABASE_URL"] = migrated_database_url
+    try:
+        with pytest.raises(DBAPIError, match="cannot downgrade published content"):
+            command.downgrade(Config("alembic.ini"), "f1a6c3e9b205")
+    finally:
+        if previous is None:
+            os.environ.pop("SHANHAI_DATABASE_URL", None)
+        else:
+            os.environ["SHANHAI_DATABASE_URL"] = previous
+
+    replay = run_publish_cli(migrated_database_url)
+    assert replay.returncode == 0, replay.stderr
+    assert json.loads(replay.stdout)["created"] is False
 
 
 def test_administrative_cli_publishes_and_replays_without_new_versions(

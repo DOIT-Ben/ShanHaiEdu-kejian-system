@@ -47,6 +47,23 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.execute(
+        f"""
+        DO $$
+        BEGIN
+            IF EXISTS (SELECT 1 FROM content_package_item_versions)
+               OR EXISTS (
+                   SELECT 1 FROM runtime_default_versions
+                   WHERE id <> '{BUILTIN_RUNTIME_DEFAULT_VERSION_ID}'::uuid
+               ) THEN
+                RAISE EXCEPTION
+                    'cannot downgrade published content item or runtime default history'
+                    USING ERRCODE = '55000';
+            END IF;
+        END;
+        $$;
+        """
+    )
     op.execute("DROP TRIGGER IF EXISTS trg_runtime_default_immutable ON runtime_default_versions")
     op.execute("DROP FUNCTION IF EXISTS protect_runtime_default_version()")
     op.execute(
@@ -158,12 +175,18 @@ def _create_immutability_triggers() -> None:
         """
         CREATE FUNCTION prevent_published_package_item_mutation()
         RETURNS trigger AS $$
-        DECLARE package_version_id uuid;
+        DECLARE old_package_version_id uuid;
+        DECLARE new_package_version_id uuid;
         BEGIN
-            package_version_id := CASE WHEN TG_OP = 'DELETE'
-                THEN OLD.content_package_version_id ELSE NEW.content_package_version_id END;
+            IF TG_OP IN ('UPDATE', 'DELETE') THEN
+                old_package_version_id := OLD.content_package_version_id;
+            END IF;
+            IF TG_OP IN ('INSERT', 'UPDATE') THEN
+                new_package_version_id := NEW.content_package_version_id;
+            END IF;
             IF EXISTS (SELECT 1 FROM content_package_versions
-                       WHERE id = package_version_id AND status = 'published') THEN
+                       WHERE id IN (old_package_version_id, new_package_version_id)
+                         AND status = 'published') THEN
                 RAISE EXCEPTION 'published content package items are immutable'
                     USING ERRCODE = '23514';
             END IF;
