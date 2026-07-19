@@ -243,7 +243,7 @@ async def test_success_logs_hash_provider_handles_instead_of_recording_raw_ids(
     def capture(_message: str, *, extra: dict[str, object]) -> None:
         captured.update(extra)
 
-    monkeypatch.setattr("apps.api.model_gateway.gateway.logger.info", capture)
+    monkeypatch.setattr("apps.api.model_gateway.telemetry.logger.info", capture)
     provider = DeterministicFakeVideoProvider()
     gateway = ModelGateway(
         {},

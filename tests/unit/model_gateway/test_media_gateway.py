@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+
 import pytest
 
 from apps.api.model_gateway.contracts import (
@@ -51,7 +53,8 @@ async def test_image_fake_returns_file_facts_without_writing_media() -> None:
     result = await gateway.generate_image(image_request())
 
     assert result.kind == "image"
-    assert result.files[0].storage_key == "fake/req-fake-image/image-1.png"
+    request_key = hashlib.sha256(b"req-fake-image").hexdigest()[:24]
+    assert result.files[0].storage_key == f"fake/{request_key}/image-1.png"
     assert result.files[0].sha256 == "0" * 64
     assert result.usage.output_units == {"images": 1}
 

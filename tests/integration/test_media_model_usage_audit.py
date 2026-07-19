@@ -12,8 +12,11 @@ from apps.api.model_gateway.contracts import (
     ModelAuditContext,
     ModelCapability,
     ModelGatewayError,
+    ModelUsage,
     VideoModelRequest,
+    VideoOperationStatus,
     VideoPollRequest,
+    VideoProviderResult,
 )
 from apps.api.model_gateway.fake import (
     DeterministicFakeImageProvider,
@@ -26,6 +29,19 @@ from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.workflows.service import WorkflowRuntimeService
 from tests.fakes.identity import seed_test_actor
 from workflow.node_state import NodeStatus
+
+
+class ReturnedUnknownVideoProvider(DeterministicFakeVideoProvider):
+    async def submit(self, request: VideoModelRequest) -> VideoProviderResult:
+        self.submit_calls += 1
+        return VideoProviderResult(
+            status=VideoOperationStatus.SUBMISSION_UNKNOWN,
+            provider_request_id=f"fake:{request.request_id}",
+            provider_task_id=None,
+            actual_model=self.model_name,
+            files=[],
+            usage=ModelUsage(),
+        )
 
 
 async def test_media_attempts_persist_task_identity_and_provider_neutral_usage(
@@ -106,7 +122,7 @@ async def test_media_attempts_persist_task_identity_and_provider_neutral_usage(
             audit_context=audit_context,
         )
 
-    unknown_provider = DeterministicFakeVideoProvider(FakeVideoScenario.SUBMISSION_UNKNOWN)
+    unknown_provider = ReturnedUnknownVideoProvider(FakeVideoScenario.SUBMISSION_UNKNOWN)
     unknown_gateway = ModelGateway(
         {},
         video_routes={ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S: unknown_provider},

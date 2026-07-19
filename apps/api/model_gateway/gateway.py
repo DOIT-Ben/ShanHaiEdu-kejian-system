@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import logging
+import asyncio
 import time
 from collections.abc import Awaitable, Callable, Mapping
 from typing import TypeVar
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from apps.api.model_gateway.audit import (
     AttemptAuditSink,
@@ -30,6 +30,7 @@ from apps.api.model_gateway.contracts import (
     TextProviderResult,
     VideoGatewayResult,
     VideoModelRequest,
+    VideoOperationStatus,
     VideoPollRequest,
     VideoProviderResult,
 )
@@ -40,8 +41,11 @@ from apps.api.model_gateway.ports import (
     TextProvider,
     VideoProvider,
 )
-
-logger = logging.getLogger(__name__)
+from apps.api.model_gateway.telemetry import (
+    log_audit_recovery_failure,
+    log_error,
+    log_success,
+)
 
 ProviderT = TypeVar("ProviderT", bound=ProviderMetadata)
 ProviderResultT = TypeVar("ProviderResultT", bound=BaseModel)
@@ -72,13 +76,14 @@ class ModelGateway:
         provider, result, attempt_id, latency_ms = await self._execute(
             request,
             self._text_routes,
+            TextProviderResult,
             lambda route: route.complete(request),
             cancellation=cancellation,
             audit_context=audit_context,
         )
         self._succeed_audit(attempt_id, audit_context, result, latency_ms=latency_ms)
         route = self._route(request.capability, provider)
-        self._log_success(request, provider, route, result, latency_ms)
+        log_success(request, provider, route, result, latency_ms)
         return TextGatewayResult(
             request_id=request.request_id,
             text=result.text,
@@ -100,13 +105,14 @@ class ModelGateway:
         provider, result, attempt_id, latency_ms = await self._execute(
             request,
             self._image_routes,
+            ImageProviderResult,
             lambda route: route.generate(request),
             cancellation=cancellation,
             audit_context=audit_context,
         )
         self._succeed_audit(attempt_id, audit_context, result, latency_ms=latency_ms)
         route = self._route(request.capability, provider)
-        self._log_success(request, provider, route, result, latency_ms)
+        log_success(request, provider, route, result, latency_ms)
         return ImageGatewayResult(
             request_id=request.request_id,
             route=route,
@@ -169,13 +175,30 @@ class ModelGateway:
         provider, result, attempt_id, latency_ms = await self._execute(
             request,
             self._video_routes,
+            VideoProviderResult,
             invoke,
             cancellation=cancellation,
             audit_context=audit_context,
         )
-        self._succeed_audit(attempt_id, audit_context, result, latency_ms=latency_ms)
+        if result.status == VideoOperationStatus.SUBMISSION_UNKNOWN:
+            error = ModelGatewayError(GatewayErrorCode.SUBMISSION_UNKNOWN, retryable=False)
+            self._fail_audit(attempt_id, audit_context, error, latency_ms=latency_ms)
+            log_error(request, provider, error.code, latency_ms)
+            raise error
+        try:
+            self._succeed_audit(attempt_id, audit_context, result, latency_ms=latency_ms)
+        except Exception:
+            error = ModelGatewayError(GatewayErrorCode.SUBMISSION_UNKNOWN, retryable=False)
+            self._best_effort_fail_audit(
+                attempt_id,
+                audit_context,
+                error,
+                latency_ms=latency_ms,
+            )
+            log_error(request, provider, error.code, latency_ms)
+            raise error from None
         route = self._route(request.capability, provider)
-        self._log_success(request, provider, route, result, latency_ms)
+        log_success(request, provider, route, result, latency_ms)
         return VideoGatewayResult(
             request_id=request.request_id,
             status=result.status,
@@ -192,6 +215,7 @@ class ModelGateway:
         self,
         request: GatewayRequest,
         routes: Mapping[ModelCapability, ProviderT],
+        result_type: type[ProviderResultT],
         invoke: Callable[[ProviderT], Awaitable[ProviderResultT]],
         *,
         cancellation: CancellationToken | None,
@@ -205,24 +229,37 @@ class ModelGateway:
         if provider is None:
             error = ModelGatewayError(GatewayErrorCode.ROUTE_UNAVAILABLE, retryable=True)
             self._fail_audit(attempt_id, audit_context, error, latency_ms=0)
-            self._audit_error(request, None, error.code, 0)
+            log_error(request, None, error.code, 0)
             raise error
 
         started = time.perf_counter()
         try:
-            result = await invoke(provider)
+            raw_result = await invoke(provider)
+            try:
+                result = result_type.model_validate(raw_result)
+            except ValidationError as cause:
+                raise ModelGatewayError(
+                    GatewayErrorCode.INVALID_RESPONSE,
+                    retryable=False,
+                ) from cause
             if cancellation is not None and cancellation.cancelled:
                 raise ModelGatewayError(GatewayErrorCode.CANCELLED, retryable=False)
+        except asyncio.CancelledError:
+            latency_ms = round((time.perf_counter() - started) * 1_000)
+            error = ModelGatewayError(GatewayErrorCode.CANCELLED, retryable=False)
+            self._fail_audit(attempt_id, audit_context, error, latency_ms=latency_ms)
+            log_error(request, provider, error.code, latency_ms)
+            raise error from None
         except ModelGatewayError as error:
             latency_ms = round((time.perf_counter() - started) * 1_000)
             self._fail_audit(attempt_id, audit_context, error, latency_ms=latency_ms)
-            self._audit_error(request, provider, error.code, latency_ms)
+            log_error(request, provider, error.code, latency_ms)
             raise
         except Exception as cause:
             latency_ms = round((time.perf_counter() - started) * 1_000)
             error = ModelGatewayError(GatewayErrorCode.PROVIDER_UNAVAILABLE, retryable=True)
             self._fail_audit(attempt_id, audit_context, error, latency_ms=latency_ms)
-            self._audit_error(request, provider, error.code, latency_ms)
+            log_error(request, provider, error.code, latency_ms)
             raise error from cause
         latency_ms = round((time.perf_counter() - started) * 1_000)
         return provider, result, attempt_id, latency_ms
@@ -288,6 +325,19 @@ class ModelGateway:
             return
         self._audit_sink.fail(attempt_id, context, error, latency_ms=latency_ms)
 
+    def _best_effort_fail_audit(
+        self,
+        attempt_id: UUID | None,
+        context: ModelAuditContext | None,
+        error: ModelGatewayError,
+        *,
+        latency_ms: int,
+    ) -> None:
+        try:
+            self._fail_audit(attempt_id, context, error, latency_ms=latency_ms)
+        except Exception:
+            log_audit_recovery_failure(error.code)
+
     @staticmethod
     def _route(capability: ModelCapability, provider: ProviderMetadata) -> RouteDecision:
         return RouteDecision(
@@ -295,58 +345,4 @@ class ModelGateway:
             provider=provider.provider_name,
             model=provider.model_name,
             reason="configured_primary",
-        )
-
-    @staticmethod
-    def _log_success(
-        request: GatewayRequest,
-        provider: ProviderMetadata,
-        route: RouteDecision,
-        result: TextProviderResult | ImageProviderResult | VideoProviderResult,
-        latency_ms: int,
-    ) -> None:
-        logger.info(
-            "model_gateway_attempt_completed",
-            extra={
-                "request_id": request.request_id,
-                "capability": route.capability.value,
-                "provider": provider.provider_name,
-                "model": provider.model_name,
-                "route_reason": route.reason,
-                "latency_ms": latency_ms,
-                "prompt_tokens": result.usage.prompt_tokens,
-                "completion_tokens": result.usage.completion_tokens,
-                "total_tokens": result.usage.total_tokens,
-                "input_units": result.usage.input_units,
-                "output_units": result.usage.output_units,
-                "cost": str(result.usage.cost) if result.usage.cost is not None else None,
-                "currency": result.usage.currency,
-                "provider_request_id": result.provider_request_id,
-                "provider_task_id": (
-                    result.provider_task_id if isinstance(result, VideoProviderResult) else None
-                ),
-                "outcome": "succeeded",
-            },
-        )
-
-    @staticmethod
-    def _audit_error(
-        request: GatewayRequest,
-        provider: ProviderMetadata | None,
-        code: GatewayErrorCode,
-        latency_ms: int,
-    ) -> None:
-        capability = request.capability
-        logger.warning(
-            "model_gateway_attempt_failed",
-            extra={
-                "request_id": request.request_id,
-                "capability": capability.value,
-                "provider": provider.provider_name if provider else None,
-                "model": provider.model_name if provider else None,
-                "route_reason": "configured_primary" if provider else "no_configured_route",
-                "latency_ms": latency_ms,
-                "error_code": code.value,
-                "outcome": "failed",
-            },
         )

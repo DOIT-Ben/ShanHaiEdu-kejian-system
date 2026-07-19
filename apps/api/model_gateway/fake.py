@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from decimal import Decimal
 from enum import StrEnum
 
@@ -87,12 +88,13 @@ class DeterministicFakeImageProvider:
 
     async def generate(self, request: ImageModelRequest) -> ImageProviderResult:
         _raise_fake_error(self._scenario)
+        request_key = _fake_key(request.request_id)
         return ImageProviderResult(
             provider_request_id=f"fake:{request.request_id}",
             actual_model=self.model_name,
             files=[
                 GeneratedFileFact(
-                    storage_key=f"fake/{request.request_id}/image-1.png",
+                    storage_key=f"fake/{request_key}/image-1.png",
                     sha256="0" * 64,
                     size_bytes=1024,
                     mime_type="image/png",
@@ -118,7 +120,7 @@ class DeterministicFakeVideoProvider:
         self.submit_calls += 1
         if self._scenario == FakeVideoScenario.SUBMISSION_UNKNOWN:
             raise ModelGatewayError(GatewayErrorCode.SUBMISSION_UNKNOWN, retryable=False)
-        task_id = f"fake-task:{request.request_id}"
+        task_id = f"fake-task:{_fake_key(request.request_id)}"
         self._poll_counts[task_id] = 0
         return self._result(
             request_id=request.request_id,
@@ -180,3 +182,7 @@ class DeterministicFakeVideoProvider:
             files=files,
             usage=usage,
         )
+
+
+def _fake_key(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:24]
