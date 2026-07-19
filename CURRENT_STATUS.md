@@ -15,8 +15,10 @@
 - OpenAPI、JSON Schema、生成TypeScript客户端、确定性Mock/Fake和后端CI已经进入自动门禁；文本模型网关已经完成受控真实冒烟。
 - 正式发布的`shanhai.primary_math.courseware@1.0.0`继续固定原内容、v1工作流和既有项目绑定；主线已经包含#130合并的`1.1.0`/v2前向候选，但在#146加固与PostgreSQL前向发布复验完成前不得作为#89的安全门禁或新项目默认。“1～5的认识”黄金Fixture可以分别启动教案、PPT和视频合同测试，但不代表真实模型或媒体生产完成。
 - 已审核的Markdown TemplateDraft可以通过显式CompilationProfile确定性编译为同一套结构化内容包合同；该能力不替代内容发布服务或模型节点执行运行时。
-- 当前可以通过自动化测试和API/CLI验证后端链路，但尚未完成浏览器到真实API的阶段1纵向演示，不得描述为阶段1产品完成。
-- 生产前端仍由[Issue #4](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)独立负责；先前的PR #33已经关闭且未合并，当前没有可供#11联调的开放前端PR，任何本地前端分支或交付ZIP都不能替代远端源码交接。
+- 当前可以通过自动化测试和API/CLI验证后端链路；生产前端已经在Open Draft [PR #111](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/111)恢复远端源码与审查载体，但尚未完成浏览器到部署后端的阶段1真实联调，不得描述为阶段1产品完成。
+- PR #111已经把生产`RuntimeApp`与开发`MockApp`隔离；生产入口实现项目创建、教材SHA-256、上传会话、对象存储直传、上传确认、Generation Job REST/SSE、课时读取和项目概览的前端纵向链，生产构建不以Mock Runtime或演示凭据兜底。
+- 项目、上传、课时、Workflow、Artifact、素材槽位、创作四动作、Generation Job和项目/Job SSE均已有runtime OpenAPI类型化客户端；当前只有项目、上传、Job、课时、AutomationPolicy与SSE进入生产页面，其余客户端仍待页面编排和真实环境验收。
+- 真实认证bootstrap、当前用户与退出合同仍缺失；后端真实图片/视频Provider Adapter与受控冒烟也尚未完成。开发Mock页面、静态素材和确定性Fake都不能作为真实认证、媒体生成或完整业务闭环证据。
 
 ## 已完成
 
