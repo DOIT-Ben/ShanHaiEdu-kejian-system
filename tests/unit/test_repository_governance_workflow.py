@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 WORKFLOW = Path(__file__).resolve().parents[2] / ".github/workflows/repository-governance.yml"
+CHECK_SCRIPT = Path(__file__).resolve().parents[2] / "scripts/check-repository.sh"
 
 
 def test_pull_request_declaration_checks_rerun_for_body_and_draft_changes() -> None:
@@ -17,3 +18,9 @@ def test_pull_request_declaration_check_receives_pr_identity_and_draft_state() -
 
     assert '--pr-number "${{ github.event.pull_request.number }}"' in text
     assert '--is-draft "${{ github.event.pull_request.draft }}"' in text
+
+
+def test_repository_check_prefers_the_linux_project_virtual_environment() -> None:
+    text = CHECK_SCRIPT.read_text(encoding="utf-8")
+
+    assert '"$repo_root/.venv/bin/python"' in text

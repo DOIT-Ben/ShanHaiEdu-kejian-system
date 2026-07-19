@@ -6,7 +6,9 @@ repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
 
 git diff --check
-if [[ -x "$repo_root/.venv/Scripts/python.exe" ]]; then
+if [[ -x "$repo_root/.venv/bin/python" ]]; then
+  repository_python="$repo_root/.venv/bin/python"
+elif [[ -x "$repo_root/.venv/Scripts/python.exe" ]]; then
   repository_python="$repo_root/.venv/Scripts/python.exe"
 elif command -v python3 >/dev/null 2>&1 && python3 --version >/dev/null 2>&1; then
   repository_python=python3
