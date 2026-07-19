@@ -70,8 +70,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** 更新项目设置 */
-        patch: operations["updateProject"];
+        patch?: never;
         trace?: never;
     };
     "/projects/{project_id}/automation-policy": {
@@ -382,40 +381,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/lessons/{lesson_id}/intro-options": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 获取课时三类九套导入设计 */
-        get: operations["getLessonIntroOptions"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/lessons/{lesson_id}/intro-selections": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 选择一个课堂导入方案 */
-        post: operations["selectLessonIntroOption"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/node-runs/{node_run_id}/prompt-preview": {
         parameters: {
             query?: never;
@@ -427,40 +392,6 @@ export interface paths {
         get: operations["getPromptPreview"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/node-runs/{node_run_id}/start": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 启动节点运行 */
-        post: operations["startNodeRun"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/node-runs/{node_run_id}/creation-packages": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 从项目节点创建不可变创作包 */
-        post: operations["createCreationPackage"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1092,20 +1023,6 @@ export interface components {
             item_count?: number;
             content_hash?: string;
         };
-        IntroSelectionEnvelope: {
-            data: {
-                /** Format: uuid */
-                selection_id: string;
-                /** Format: uuid */
-                option_set_version_id: string;
-                option_key: string;
-                /** @enum {unknown} */
-                choice_mode: "teacher_selected" | "policy_default";
-                /** Format: date-time */
-                selected_at: string;
-            };
-            request_id: string;
-        };
         AcceptedJobEnvelope: {
             data: {
                 /** Format: uuid */
@@ -1533,272 +1450,6 @@ export interface components {
          * @enum {string}
          */
         "workflow-node-status.schema": "disabled" | "not_ready" | "ready" | "draft" | "queued" | "running" | "review_required" | "approved" | "partially_completed" | "failed" | "paused" | "cancel_requested" | "cancelled" | "stale" | "skipped";
-        option: {
-            option_key: string;
-            /** @enum {unknown} */
-            category: "science" | "application" | "story";
-            title: string;
-            independent_concept: string;
-            hook: string;
-            viewer_value: string;
-            /** @enum {unknown} */
-            suggested_medium: "video" | "image" | "physical_object" | "question" | "performance" | "mixed";
-            duration_seconds: number;
-            replacement_field_key: string | null;
-            course_anchor: string;
-            classroom_first_question: string;
-            handoff_moment: string;
-            must_not_preteach: string[];
-            fit_reason: string;
-            risks: string[];
-            recommendation_score: number;
-            recommendation_reason: string;
-        };
-        /**
-         * IntroOptionSet
-         * @description 三类九套课堂导入设计。业务校验器额外保证每类恰好三套、最高推荐分唯一。
-         */
-        "intro-option-set.schema": {
-            /** Format: uuid */
-            option_set_id: string;
-            /** Format: uuid */
-            lesson_unit_id: string;
-            /** @enum {unknown} */
-            status: "draft" | "review_required" | "approved" | "stale";
-            /** Format: uuid */
-            ideation_context_snapshot_id: string;
-            /** Format: uuid */
-            anchoring_context_snapshot_id: string;
-            options: components["schemas"]["option"][];
-            /** Format: date-time */
-            created_at: string;
-            $defs: {
-                option: {
-                    option_key: string;
-                    /** @enum {unknown} */
-                    category: "science" | "application" | "story";
-                    title: string;
-                    independent_concept: string;
-                    hook: string;
-                    viewer_value: string;
-                    /** @enum {unknown} */
-                    suggested_medium: "video" | "image" | "physical_object" | "question" | "performance" | "mixed";
-                    duration_seconds: number;
-                    replacement_field_key: string | null;
-                    course_anchor: string;
-                    classroom_first_question: string;
-                    handoff_moment: string;
-                    must_not_preteach: string[];
-                    fit_reason: string;
-                    risks: string[];
-                    recommendation_score: number;
-                    recommendation_reason: string;
-                };
-            };
-        };
-        reference_asset: {
-            /** Format: uuid */
-            asset_version_id: string;
-            role: string;
-        };
-        legacy_item: {
-            item_key: string;
-            position: number;
-            title: string;
-            prompt: {
-                [key: string]: unknown;
-            };
-            reference_assets?: components["schemas"]["reference_asset"][];
-            output_spec: {
-                [key: string]: unknown;
-            };
-            target_slot_key?: string | null;
-            consistency_key?: string | null;
-        };
-        current_item: {
-            item_key: string;
-            position: number;
-            title: string;
-            business_prompt: string;
-            prompt: {
-                [key: string]: unknown;
-            };
-            reference_assets?: components["schemas"]["reference_asset"][];
-            output_spec: {
-                [key: string]: unknown;
-            };
-            target_slot_key: string;
-            consistency_key?: string | null;
-        };
-        legacy_package: {
-            /** Format: uuid */
-            package_id: string;
-            /** @enum {unknown} */
-            package_type: "image" | "video" | "presentation";
-            /** @enum {unknown} */
-            status: "building" | "ready" | "invalid" | "expired";
-            source: {
-                /** Format: uuid */
-                project_id: string;
-                /** Format: uuid */
-                lesson_unit_id?: string | null;
-                /** Format: uuid */
-                node_run_id: string;
-                /** @default false */
-                is_stale: boolean;
-            };
-            style_contract?: {
-                [key: string]: unknown;
-            } | null;
-            items: components["schemas"]["legacy_item"][];
-            target_rules?: {
-                [key: string]: unknown;
-            };
-            /** Format: date-time */
-            created_at: string;
-        };
-        current_package: {
-            /** @constant */
-            schema_version: "2.0";
-            /** Format: uuid */
-            package_id: string;
-            /** @enum {unknown} */
-            package_type: "image" | "video" | "presentation";
-            /** @enum {unknown} */
-            status: "building" | "ready" | "invalid" | "expired";
-            source: {
-                /** Format: uuid */
-                project_id: string;
-                /** Format: uuid */
-                workflow_run_id: string;
-                /** Format: uuid */
-                lesson_unit_id?: string | null;
-                /** Format: uuid */
-                source_node_run_id: string;
-                /** @default false */
-                is_stale: boolean;
-            };
-            /** Format: uuid */
-            context_snapshot_id: string;
-            /** Format: uuid */
-            source_prompt_snapshot_id: string;
-            style_contract?: {
-                [key: string]: unknown;
-            } | null;
-            items: components["schemas"]["current_item"][];
-            target_rules: {
-                replace_modes: ("reject_if_occupied" | "replace_active" | "append")[];
-                /** @default true */
-                allow_download: boolean;
-            };
-            content_hash: string;
-            /** Format: date-time */
-            created_at: string;
-        };
-        /** CreationPackage */
-        "creation-package.schema": {
-            $defs: {
-                reference_asset: {
-                    /** Format: uuid */
-                    asset_version_id: string;
-                    role: string;
-                };
-                legacy_item: {
-                    item_key: string;
-                    position: number;
-                    title: string;
-                    prompt: {
-                        [key: string]: unknown;
-                    };
-                    reference_assets?: components["schemas"]["reference_asset"][];
-                    output_spec: {
-                        [key: string]: unknown;
-                    };
-                    target_slot_key?: string | null;
-                    consistency_key?: string | null;
-                };
-                legacy_package: {
-                    /** Format: uuid */
-                    package_id: string;
-                    /** @enum {unknown} */
-                    package_type: "image" | "video" | "presentation";
-                    /** @enum {unknown} */
-                    status: "building" | "ready" | "invalid" | "expired";
-                    source: {
-                        /** Format: uuid */
-                        project_id: string;
-                        /** Format: uuid */
-                        lesson_unit_id?: string | null;
-                        /** Format: uuid */
-                        node_run_id: string;
-                        /** @default false */
-                        is_stale: boolean;
-                    };
-                    style_contract?: {
-                        [key: string]: unknown;
-                    } | null;
-                    items: components["schemas"]["legacy_item"][];
-                    target_rules?: {
-                        [key: string]: unknown;
-                    };
-                    /** Format: date-time */
-                    created_at: string;
-                };
-                current_item: {
-                    item_key: string;
-                    position: number;
-                    title: string;
-                    business_prompt: string;
-                    prompt: {
-                        [key: string]: unknown;
-                    };
-                    reference_assets?: components["schemas"]["reference_asset"][];
-                    output_spec: {
-                        [key: string]: unknown;
-                    };
-                    target_slot_key: string;
-                    consistency_key?: string | null;
-                };
-                current_package: {
-                    /** @constant */
-                    schema_version: "2.0";
-                    /** Format: uuid */
-                    package_id: string;
-                    /** @enum {unknown} */
-                    package_type: "image" | "video" | "presentation";
-                    /** @enum {unknown} */
-                    status: "building" | "ready" | "invalid" | "expired";
-                    source: {
-                        /** Format: uuid */
-                        project_id: string;
-                        /** Format: uuid */
-                        workflow_run_id: string;
-                        /** Format: uuid */
-                        lesson_unit_id?: string | null;
-                        /** Format: uuid */
-                        source_node_run_id: string;
-                        /** @default false */
-                        is_stale: boolean;
-                    };
-                    /** Format: uuid */
-                    context_snapshot_id: string;
-                    /** Format: uuid */
-                    source_prompt_snapshot_id: string;
-                    style_contract?: {
-                        [key: string]: unknown;
-                    } | null;
-                    items: components["schemas"]["current_item"][];
-                    target_rules: {
-                        replace_modes: ("reject_if_occupied" | "replace_active" | "append")[];
-                        /** @default true */
-                        allow_download: boolean;
-                    };
-                    content_hash: string;
-                    /** Format: date-time */
-                    created_at: string;
-                };
-            };
-        } & (components["schemas"]["legacy_package"] | components["schemas"]["current_package"]);
     };
     responses: {
         /** @description Error envelope */
@@ -1964,40 +1615,6 @@ export interface operations {
             200: {
                 headers: {
                     ETag?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProjectEnvelope"];
-                };
-            };
-            "4XX": components["responses"]["Error"];
-        };
-    };
-    updateProject: {
-        parameters: {
-            query?: never;
-            header: {
-                "If-Match": components["parameters"]["IfMatch"];
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                project_id: components["parameters"]["ProjectId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    title?: string;
-                    execution_mode?: components["schemas"]["AutomationPolicyMode"];
-                    automation_mode?: components["schemas"]["AutomationMode"];
-                };
-            };
-        };
-        responses: {
-            /** @description Updated project */
-            200: {
-                headers: {
                     [name: string]: unknown;
                 };
                 content: {
@@ -2549,65 +2166,6 @@ export interface operations {
             "4XX": components["responses"]["Error"];
         };
     };
-    getLessonIntroOptions: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                lesson_id: components["parameters"]["LessonId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Three categories and nine approved or draft introduction options */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data: components["schemas"]["intro-option-set.schema"];
-                        request_id: string;
-                    };
-                };
-            };
-            "4XX": components["responses"]["Error"];
-        };
-    };
-    selectLessonIntroOption: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                lesson_id: components["parameters"]["LessonId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** Format: uuid */
-                    intro_option_set_version_id: string;
-                    option_key: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Immutable active selection created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IntroSelectionEnvelope"];
-                };
-            };
-            "4XX": components["responses"]["Error"];
-        };
-    };
     getPromptPreview: {
         parameters: {
             query?: never;
@@ -2626,58 +2184,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PromptPreviewEnvelope"];
-                };
-            };
-            "4XX": components["responses"]["Error"];
-        };
-    };
-    startNodeRun: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                node_run_id: components["parameters"]["NodeRunId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    /** Format: uuid */
-                    prompt_revision_id?: string;
-                };
-            };
-        };
-        responses: {
-            202: components["responses"]["AcceptedJob"];
-            "4XX": components["responses"]["Error"];
-        };
-    };
-    createCreationPackage: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                node_run_id: components["parameters"]["NodeRunId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Immutable package created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data: components["schemas"]["creation-package.schema"];
-                        request_id: string;
-                    };
                 };
             };
             "4XX": components["responses"]["Error"];

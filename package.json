@@ -7,14 +7,15 @@
     "node": ">=22"
   },
   "scripts": {
-    "contracts:lint": "redocly lint contracts/api-surface.openapi.yaml",
+    "contracts:lint": "redocly lint contracts/api-surface.openapi.yaml && redocly lint contracts/planned-api-surface.openapi.yaml",
+    "contracts:surface": "uv run python scripts/check_api_surface.py",
     "contracts:schema": "ajv compile --spec=draft2020 -c ajv-formats -s 'contracts/*.schema.json'",
     "contracts:bundle": "redocly bundle contracts/api-surface.openapi.yaml -o contracts/generated/openapi.bundle.yaml",
     "contracts:generate": "pnpm contracts:bundle && openapi-typescript contracts/generated/openapi.bundle.yaml -o contracts/generated/typescript/schema.ts",
     "contracts:typecheck": "tsc -p tsconfig.contracts.json --noEmit",
     "contracts:test": "uv run pytest tests/contract",
     "contracts:check-generated": "pnpm contracts:generate && git diff --exit-code -- contracts/generated",
-    "contracts:check": "pnpm contracts:lint && pnpm contracts:schema && pnpm contracts:generate && pnpm contracts:typecheck && pnpm contracts:test && pnpm contracts:check-generated"
+    "contracts:check": "pnpm contracts:lint && pnpm contracts:surface && pnpm contracts:schema && pnpm contracts:generate && pnpm contracts:typecheck && pnpm contracts:test && pnpm contracts:check-generated"
   },
   "dependencies": {
     "openapi-fetch": "0.14.0"

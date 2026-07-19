@@ -5,7 +5,8 @@
 ## 文件
 
 - `api-conventions.md`：HTTP、分页、并发、幂等和错误约定。
-- `api-surface.openapi.yaml`：当前核心联调面；后端实现须生成更完整 OpenAPI，且不得违背此处语义。
+- `api-surface.openapi.yaml`：当前真实可调用的联调面；operationId与后端运行时OpenAPI必须双向一致，也是生成客户端和Mock消费者的唯一API来源。
+- `planned-api-surface.openapi.yaml`：尚未注册到运行时的规划接口，只用于产品和工程追踪，不参与客户端生成、Mock运行或当前可用性声明。
 - `error-envelope.schema.json`：统一错误响应。
 - `sse-event.schema.json`：统一事件信封。
 - `creation-lifecycle-event.schema.json`：提示词版本、候选采用、项目写回和下游stale传播事件。
@@ -41,7 +42,7 @@
 
 ## 使用规则
 
-1. 前端从 OpenAPI 生成 API 类型，不手写第二套 DTO。
+1. 前端只从`api-surface.openapi.yaml`生成API类型，不手写第二套DTO，也不得消费`planned-api-surface.openapi.yaml`。
 2. 后端 CI 校验响应和事件符合 Schema。
 3. 破坏性变更必须同时修改调用方、测试、迁移和本文档，不另建补丁说明。
 4. 未在合同中定义的供应商字段只能停留在后端适配层，不能泄漏为前端依赖。
@@ -63,6 +64,7 @@
 ```powershell
 pnpm install --frozen-lockfile
 pnpm contracts:lint
+pnpm contracts:surface
 pnpm contracts:generate
 pnpm contracts:typecheck
 pnpm contracts:test

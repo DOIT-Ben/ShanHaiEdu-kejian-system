@@ -11,7 +11,9 @@
 - 写请求使用 `Idempotency-Key`；草稿和配置更新使用 `ETag` / `If-Match`。
 - 删除默认为软删除或归档；永久清理仅由保留策略执行。
 
-## 2. 资源端点
+## 2. 资源端点目标设计
+
+本节描述完整产品目标，不代表所有端点已经注册。当前真实可调用接口只以`contracts/api-surface.openapi.yaml`为准，并由CI与FastAPI运行时operationId双向校验；已经明确但尚未实现的接口进入`contracts/planned-api-surface.openapi.yaml`，不得用于客户端生成、Mock运行或联调完成声明。目标表、规划合同和当前合同分别承担设计、排期和运行职责，不能互相冒充。
 
 ### 项目与教材
 

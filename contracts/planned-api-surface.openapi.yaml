@@ -1,0 +1,163 @@
+openapi: 3.1.0
+info:
+  title: ShanHaiEdu Planned API Surface
+  version: 1.0.0
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+  description: >-
+    尚未注册到后端运行时的规划接口。本文件只用于产品和工程追踪，
+    不参与前端客户端生成、Mock运行或当前API可用性声明。
+x-shanhai-contract-kind: planned
+servers:
+  - url: /api/v2
+security:
+  - cookieAuth: []
+paths:
+  /projects/{project_id}:
+    patch:
+      summary: 更新项目设置
+      operationId: updateProject
+      x-shanhai-availability: planned
+      parameters:
+        - $ref: './api-surface.openapi.yaml#/components/parameters/ProjectId'
+        - $ref: './api-surface.openapi.yaml#/components/parameters/IfMatch'
+        - $ref: './api-surface.openapi.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                title: {type: string, minLength: 1, maxLength: 255}
+                execution_mode:
+                  $ref: './api-surface.openapi.yaml#/components/schemas/AutomationPolicyMode'
+                automation_mode:
+                  $ref: './api-surface.openapi.yaml#/components/schemas/AutomationMode'
+              not:
+                type: object
+                properties:
+                  automation_mode: {}
+                  execution_mode: {}
+                required: [automation_mode, execution_mode]
+      responses:
+        '200':
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: './api-surface.openapi.yaml#/components/schemas/ProjectEnvelope'
+        '4XX':
+          $ref: './api-surface.openapi.yaml#/components/responses/Error'
+  /lessons/{lesson_id}/intro-options:
+    get:
+      summary: 获取课时三类九套导入设计
+      operationId: getLessonIntroOptions
+      x-shanhai-availability: planned
+      parameters:
+        - $ref: './api-surface.openapi.yaml#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Three categories and nine approved or draft introduction options
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data: {$ref: './intro-option-set.schema.json'}
+                  request_id: {type: string}
+        '4XX':
+          $ref: './api-surface.openapi.yaml#/components/responses/Error'
+  /lessons/{lesson_id}/intro-selections:
+    post:
+      summary: 选择一个课堂导入方案
+      operationId: selectLessonIntroOption
+      x-shanhai-availability: planned
+      parameters:
+        - $ref: './api-surface.openapi.yaml#/components/parameters/LessonId'
+        - $ref: './api-surface.openapi.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [intro_option_set_version_id, option_key]
+              properties:
+                intro_option_set_version_id: {type: string, format: uuid}
+                option_key: {type: string}
+      responses:
+        '201':
+          description: Immutable active selection created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntroSelectionEnvelope'
+        '4XX':
+          $ref: './api-surface.openapi.yaml#/components/responses/Error'
+  /node-runs/{node_run_id}/start:
+    post:
+      summary: 启动节点运行
+      operationId: startNodeRun
+      x-shanhai-availability: planned
+      parameters:
+        - $ref: './api-surface.openapi.yaml#/components/parameters/NodeRunId'
+        - $ref: './api-surface.openapi.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prompt_revision_id: {type: string, format: uuid}
+      responses:
+        '202':
+          $ref: './api-surface.openapi.yaml#/components/responses/AcceptedJob'
+        '4XX':
+          $ref: './api-surface.openapi.yaml#/components/responses/Error'
+  /node-runs/{node_run_id}/creation-packages:
+    post:
+      summary: 从项目节点创建不可变创作包
+      operationId: createCreationPackage
+      x-shanhai-availability: planned
+      parameters:
+        - $ref: './api-surface.openapi.yaml#/components/parameters/NodeRunId'
+        - $ref: './api-surface.openapi.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Immutable package created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data:
+                    $ref: './creation-package.schema.json'
+                  request_id: {type: string}
+        '4XX':
+          $ref: './api-surface.openapi.yaml#/components/responses/Error'
+components:
+  securitySchemes:
+    cookieAuth:
+      $ref: './api-surface.openapi.yaml#/components/securitySchemes/cookieAuth'
+  schemas:
+    IntroSelectionEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [selection_id, option_set_version_id, option_key, choice_mode, selected_at]
+          properties:
+            selection_id: {type: string, format: uuid}
+            option_set_version_id: {type: string, format: uuid}
+            option_key: {type: string}
+            choice_mode: {enum: [teacher_selected, policy_default]}
+            selected_at: {type: string, format: date-time}
+        request_id: {type: string}
