@@ -7,6 +7,15 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 from uuid import UUID
 
+from apps.api.model_gateway.contracts import (
+    ModelAuditContext,
+    TextGatewayResult,
+    TextModelRequest,
+)
+from apps.api.model_gateway.ports import CancellationToken
+from workflow.node_state import NodeStatus
+from workflow.prompt_runtime import AssembledContext, CompiledPrompt
+
 
 @dataclass(frozen=True, slots=True)
 class RuntimeNodeDefinition:
@@ -103,7 +112,7 @@ class WorkflowExecutionPort(Protocol):
         self, node_run_id: UUID, *, for_update: bool
     ) -> WorkflowExecutionContext: ...
 
-    def transition(self, node_run_id: UUID, target: str) -> None: ...
+    def transition(self, node_run_id: UUID, target: NodeStatus) -> None: ...
 
 
 class ArtifactPort(Protocol):
@@ -115,9 +124,7 @@ class ArtifactPort(Protocol):
 
 
 class AssetPort(Protocol):
-    def list_context_items(
-        self, project_id: UUID, source: str
-    ) -> tuple[AssetContextItem, ...]: ...
+    def list_context_items(self, project_id: UUID, source: str) -> tuple[AssetContextItem, ...]: ...
 
 
 class PromptSnapshotPort(Protocol):
@@ -125,19 +132,19 @@ class PromptSnapshotPort(Protocol):
         self,
         node_run_id: UUID,
         *,
-        context: object,
-        prompt: object,
+        context: AssembledContext,
+        prompt: CompiledPrompt,
     ) -> FrozenSnapshotRefs: ...
 
 
 class ModelInvocationPort(Protocol):
     async def generate_text(
         self,
-        request: object,
+        request: TextModelRequest,
         *,
-        cancellation: object | None = None,
-        audit_context: object | None = None,
-    ) -> object: ...
+        cancellation: CancellationToken | None = None,
+        audit_context: ModelAuditContext | None = None,
+    ) -> TextGatewayResult: ...
 
 
 class CreationPackagePort(Protocol):

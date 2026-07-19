@@ -12,13 +12,10 @@ from typing import Any
 
 FILE_LINE_LIMIT = 400
 FUNCTION_LINE_LIMIT = 60
-ISSUE_REFERENCE = re.compile(
-    r"^(?:#\d+|https://github\.com/[^/]+/[^/]+/issues/\d+)$"
-)
+ISSUE_REFERENCE = re.compile(r"^(?:#\d+|https://github\.com/[^/]+/[^/]+/issues/\d+)$")
 MODEL_MODULE = re.compile(r"^apps\.api\.([a-z0-9_]+)\.(?:models|[a-z0-9_]+_models)$")
-TYPE_ALIAS = re.compile(
-    r"(?m)^type ([A-Za-z_][A-Za-z0-9_]*) = "
-)
+TYPE_ALIAS = re.compile(r"(?m)^type ([A-Za-z_][A-Za-z0-9_]*) = ")
+TYPE_ALIAS_LINE = re.compile(r"^type [A-Za-z_][A-Za-z0-9_]* = ")
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,16 +97,12 @@ def check_cross_module_model_imports(
     baseline: RepositoryGovernanceBaseline,
     errors: list[str],
 ) -> None:
-    allowed = {
-        (item.source, item.target, item.names)
-        for item in baseline.model_imports
-    }
+    allowed = {(item.source, item.target, item.names) for item in baseline.model_imports}
     for item in _find_cross_module_model_imports(files, root, errors):
         if (item.source, item.target, item.names) not in allowed:
             names = ", ".join(item.names)
             errors.append(
-                f"unauthorized cross-module ORM import: {item.source} -> "
-                f"{item.target} [{names}]"
+                f"unauthorized cross-module ORM import: {item.source} -> {item.target} [{names}]"
             )
 
 
@@ -120,9 +113,7 @@ def check_python_size_limits(
     errors: list[str],
 ) -> None:
     file_baseline = {item.path: item for item in baseline.oversized_files}
-    function_baseline = {
-        (item.path, item.qualname): item for item in baseline.oversized_functions
-    }
+    function_baseline = {(item.path, item.qualname): item for item in baseline.oversized_functions}
     for path in sorted(files):
         relative = path.relative_to(root).as_posix()
         try:
@@ -149,15 +140,13 @@ def check_python_size_limits(
         if item.line_count <= FUNCTION_LINE_LIMIT:
             continue
         print(
-            f"warning: long function: {item.path}::{item.qualname} "
-            f"has {item.line_count} lines",
+            f"warning: long function: {item.path}::{item.qualname} has {item.line_count} lines",
             file=sys.stderr,
         )
         exception = function_baseline.get((item.path, item.qualname))
         if exception is None:
             errors.append(
-                f"unowned long function: {item.path}::{item.qualname} "
-                f"has {item.line_count} lines"
+                f"unowned long function: {item.path}::{item.qualname} has {item.line_count} lines"
             )
         elif item.line_count > exception.line_count:
             errors.append(
@@ -190,12 +179,13 @@ def _find_cross_module_model_imports(
         source_owner = _source_owner(Path(relative))
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module is not None:
-                target_owner = _model_owner(node.module)
+                target = _resolve_import(relative, node)
+                target_owner = _model_owner(target)
                 if target_owner is not None and target_owner != source_owner:
                     imports.append(
                         ModelImport(
                             source=relative,
-                            target=node.module,
+                            target=target,
                             names=tuple(sorted(alias.name for alias in node.names)),
                         )
                     )
@@ -213,9 +203,7 @@ def _find_cross_module_model_imports(
     return sorted(imports, key=lambda item: (item.source, item.target, item.names))
 
 
-def _find_function_sizes(
-    files: list[Path], root: Path, errors: list[str]
-) -> list[FunctionSize]:
+def _find_function_sizes(files: list[Path], root: Path, errors: list[str]) -> list[FunctionSize]:
     result: list[FunctionSize] = []
     for path in sorted(files):
         relative = path.relative_to(root).as_posix()
@@ -261,9 +249,18 @@ class _FunctionVisitor(ast.NodeVisitor):
 def _parse(path: Path, relative: str, errors: list[str]) -> ast.Module | None:
     try:
         source = path.read_text(encoding="utf-8")
-        if sys.version_info < (3, 12):
-            source = TYPE_ALIAS.sub(r"\1 = ", source)
-        return ast.parse(source, filename=relative)
+        try:
+            return ast.parse(source, filename=relative)
+        except SyntaxError as exc:
+            lines = source.splitlines()
+            if (
+                exc.lineno is None
+                or exc.lineno > len(lines)
+                or TYPE_ALIAS_LINE.match(lines[exc.lineno - 1]) is None
+            ):
+                raise
+            compatible_source = TYPE_ALIAS.sub(r"\1 = ", source)
+            return ast.parse(compatible_source, filename=relative)
     except (OSError, UnicodeError, SyntaxError) as exc:
         errors.append(f"cannot parse Python source {relative}: {exc}")
         return None
@@ -282,9 +279,16 @@ def _model_owner(module: str) -> str | None:
     return match.group(1) if match is not None else None
 
 
-def _load_model_imports(
-    payload: dict[str, Any], errors: list[str]
-) -> list[ModelImportException]:
+def _resolve_import(source: str, node: ast.ImportFrom) -> str:
+    if node.level == 0:
+        return node.module or ""
+    package = list(Path(source).parts[:-1])
+    keep = max(0, len(package) - node.level + 1)
+    suffix = (node.module or "").split(".") if node.module else []
+    return ".".join([*package[:keep], *suffix])
+
+
+def _load_model_imports(payload: dict[str, Any], errors: list[str]) -> list[ModelImportException]:
     result: list[ModelImportException] = []
     for index, item in _entries(payload, "cross_module_model_imports", errors):
         label = f"cross_module_model_imports[{index}]"
@@ -292,8 +296,10 @@ def _load_model_imports(
         source = _text(item, "source", label, errors)
         target = _text(item, "target", label, errors)
         names_value = item.get("names")
-        if not isinstance(names_value, list) or not names_value or not all(
-            isinstance(name, str) and name for name in names_value
+        if (
+            not isinstance(names_value, list)
+            or not names_value
+            or not all(isinstance(name, str) and name for name in names_value)
         ):
             errors.append(f"invalid governance baseline {label}: names must be non-empty strings")
             names: tuple[str, ...] = ()
@@ -304,9 +310,7 @@ def _load_model_imports(
     return result
 
 
-def _load_file_sizes(
-    payload: dict[str, Any], errors: list[str]
-) -> list[FileSizeException]:
+def _load_file_sizes(payload: dict[str, Any], errors: list[str]) -> list[FileSizeException]:
     result: list[FileSizeException] = []
     for index, item in _entries(payload, "oversized_files", errors):
         label = f"oversized_files[{index}]"
@@ -318,9 +322,7 @@ def _load_file_sizes(
     return result
 
 
-def _load_function_sizes(
-    payload: dict[str, Any], errors: list[str]
-) -> list[FunctionSizeException]:
+def _load_function_sizes(payload: dict[str, Any], errors: list[str]) -> list[FunctionSizeException]:
     result: list[FunctionSizeException] = []
     for index, item in _entries(payload, "oversized_functions", errors):
         label = f"oversized_functions[{index}]"
@@ -349,9 +351,7 @@ def _entries(
     return result
 
 
-def _metadata(
-    item: dict[str, Any], label: str, errors: list[str]
-) -> tuple[str, str, str] | None:
+def _metadata(item: dict[str, Any], label: str, errors: list[str]) -> tuple[str, str, str] | None:
     owner = item.get("owner")
     reason = item.get("reason")
     exit_issue = item.get("exit_issue")
@@ -370,9 +370,7 @@ def _metadata(
     return owner.strip(), reason.strip(), exit_issue.strip()
 
 
-def _text(
-    item: dict[str, Any], key: str, label: str, errors: list[str]
-) -> str | None:
+def _text(item: dict[str, Any], key: str, label: str, errors: list[str]) -> str | None:
     value = item.get(key)
     if not isinstance(value, str) or not value.strip():
         errors.append(f"invalid governance baseline {label}: {key} is required")
@@ -380,9 +378,7 @@ def _text(
     return value.strip()
 
 
-def _positive_int(
-    item: dict[str, Any], key: str, label: str, errors: list[str]
-) -> int | None:
+def _positive_int(item: dict[str, Any], key: str, label: str, errors: list[str]) -> int | None:
     value = item.get(key)
     if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
         errors.append(f"invalid governance baseline {label}: {key} must be positive")

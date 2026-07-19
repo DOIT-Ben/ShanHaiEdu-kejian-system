@@ -4,10 +4,13 @@ import json
 from pathlib import Path
 
 from scripts.check_repository import (
+    ROOT,
     check_cross_module_model_imports,
     check_python_size_limits,
     load_repository_governance_baseline,
+    production_python_files,
 )
+from scripts.repository_governance import _parse
 
 
 def _baseline(path: Path, **overrides: object):
@@ -87,6 +90,61 @@ def test_cross_module_model_gate_rejects_new_or_expanded_import(tmp_path: Path) 
     ]
 
 
+def test_cross_module_model_gate_resolves_relative_imports(tmp_path: Path) -> None:
+    source = tmp_path / "apps/api/artifacts/service.py"
+    source.parent.mkdir(parents=True)
+    source.write_text(
+        "from ..workflows.models import NodeRun\n",
+        encoding="utf-8",
+    )
+    baseline = _baseline(tmp_path / "baseline.json")
+    errors: list[str] = []
+
+    check_cross_module_model_imports([source], tmp_path, baseline, errors)
+
+    assert errors == [
+        "unauthorized cross-module ORM import: apps/api/artifacts/service.py -> "
+        "apps.api.workflows.models [NodeRun]"
+    ]
+
+
+def test_parser_accepts_pep_695_type_alias_on_supported_or_fallback_python(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "module.py"
+    source.write_text("type Identifier = str\nvalue: Identifier = 'ok'\n", encoding="utf-8")
+    errors: list[str] = []
+
+    tree = _parse(source, "module.py", errors)
+
+    assert tree is not None
+    assert errors == []
+
+
+def test_parser_does_not_hide_non_pep_695_syntax_errors(tmp_path: Path) -> None:
+    source = tmp_path / "module.py"
+    source.write_text("type Identifier = str\ndef broken(\n", encoding="utf-8")
+    errors: list[str] = []
+
+    tree = _parse(source, "module.py", errors)
+
+    assert tree is None
+    assert len(errors) == 1
+    assert errors[0].startswith("cannot parse Python source module.py:")
+
+
+def test_parser_does_not_retry_when_first_error_is_not_a_type_alias(tmp_path: Path) -> None:
+    source = tmp_path / "module.py"
+    source.write_text("def broken(\ntype Identifier = str\n", encoding="utf-8")
+    errors: list[str] = []
+
+    tree = _parse(source, "module.py", errors)
+
+    assert tree is None
+    assert len(errors) == 1
+    assert errors[0].startswith("cannot parse Python source module.py:")
+
+
 def test_governance_baseline_requires_owner_reason_and_exit_issue(tmp_path: Path) -> None:
     path = tmp_path / "baseline.json"
     path.write_text(
@@ -122,9 +180,7 @@ def test_governance_baseline_requires_owner_reason_and_exit_issue(tmp_path: Path
     ]
 
 
-def test_size_gate_reports_owned_exceptions_without_failing(
-    tmp_path: Path, capsys
-) -> None:
+def test_size_gate_reports_owned_exceptions_without_failing(tmp_path: Path, capsys) -> None:
     oversized_file = tmp_path / "apps/api/uploads/service.py"
     oversized_file.parent.mkdir(parents=True)
     oversized_file.write_text("\n".join(["value = 1"] * 401) + "\n", encoding="utf-8")
@@ -136,18 +192,12 @@ def test_size_gate_reports_owned_exceptions_without_failing(
     )
     baseline = _baseline(
         tmp_path / "baseline.json",
-        oversized_files=[
-            _exception(path="apps/api/uploads/service.py", line_count=401)
-        ],
-        oversized_functions=[
-            _exception(path="workers/task.py", qualname="run", line_count=61)
-        ],
+        oversized_files=[_exception(path="apps/api/uploads/service.py", line_count=401)],
+        oversized_functions=[_exception(path="workers/task.py", qualname="run", line_count=61)],
     )
     errors: list[str] = []
 
-    check_python_size_limits(
-        [oversized_file, long_function], tmp_path, baseline, errors
-    )
+    check_python_size_limits([oversized_file, long_function], tmp_path, baseline, errors)
 
     assert errors == []
     report = capsys.readouterr().err
@@ -167,18 +217,37 @@ def test_size_gate_rejects_unowned_trigger_and_owned_net_growth(tmp_path: Path) 
     )
     baseline = _baseline(
         tmp_path / "baseline.json",
-        oversized_files=[
-            _exception(path="apps/api/uploads/service.py", line_count=401)
-        ],
+        oversized_files=[_exception(path="apps/api/uploads/service.py", line_count=401)],
     )
     errors: list[str] = []
 
-    check_python_size_limits(
-        [oversized_file, new_long_function], tmp_path, baseline, errors
-    )
+    check_python_size_limits([oversized_file, new_long_function], tmp_path, baseline, errors)
 
     assert errors == [
         "oversized file grew beyond its owned baseline: "
         "apps/api/uploads/service.py has 402 lines (baseline 401)",
         "unowned long function: workers/new_task.py::run has 61 lines",
     ]
+
+
+def test_live_size_baseline_is_exactly_four_files_and_twenty_three_functions(
+    capsys,
+) -> None:
+    files = production_python_files(
+        [*ROOT.joinpath("apps/api").rglob("*.py"), *ROOT.joinpath("workers").rglob("*.py")],
+        ROOT,
+    )
+    errors: list[str] = []
+    baseline = load_repository_governance_baseline(
+        ROOT / "scripts/repository-governance-baseline.json", errors
+    )
+    assert baseline is not None
+
+    check_python_size_limits(files, ROOT, baseline, errors)
+
+    assert errors == []
+    assert len(baseline.oversized_files) == 4
+    assert len(baseline.oversized_functions) == 23
+    report = capsys.readouterr().err
+    assert report.count("warning: oversized file:") == 4
+    assert report.count("warning: long function:") == 23
