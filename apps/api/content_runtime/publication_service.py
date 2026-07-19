@@ -242,9 +242,7 @@ class ContentReleasePublisher:
                         id=new_uuid7(),
                         definition_key=item_key,
                         content_package_version_id=package_version_id,
-                        schema_json=build_content_json_schema(
-                            cast(dict[str, Any], item["spec"])
-                        ),
+                        schema_json=build_content_json_schema(cast(dict[str, Any], item["spec"])),
                         ui_schema_json={},
                         export_mapping_json={},
                         validation_rules_json={},

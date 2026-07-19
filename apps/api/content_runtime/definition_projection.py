@@ -32,9 +32,7 @@ def _object_schema(fields: list[dict[str, Any]]) -> dict[str, Any]:
     schema: dict[str, Any] = {
         "type": "object",
         "additionalProperties": False,
-        "properties": {
-            cast(str, field["field_key"]): _field_schema(field) for field in fields
-        },
+        "properties": {cast(str, field["field_key"]): _field_schema(field) for field in fields},
     }
     required = [cast(str, field["field_key"]) for field in fields if field["required"]]
     if required:
