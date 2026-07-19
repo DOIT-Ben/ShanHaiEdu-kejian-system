@@ -47,13 +47,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        "DROP TRIGGER IF EXISTS trg_runtime_default_immutable ON runtime_default_versions"
-    )
+    op.execute("DROP TRIGGER IF EXISTS trg_runtime_default_immutable ON runtime_default_versions")
     op.execute("DROP FUNCTION IF EXISTS protect_runtime_default_version()")
     op.execute(
-        "DROP TRIGGER IF EXISTS trg_content_package_item_immutable "
-        "ON content_package_item_versions"
+        "DROP TRIGGER IF EXISTS trg_content_package_item_immutable ON content_package_item_versions"
     )
     op.execute("DROP FUNCTION IF EXISTS prevent_published_package_item_mutation()")
     op.drop_index(
