@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from uuid import uuid4
 
@@ -7,6 +8,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
+from apps.api.cli import run_publish_golden_content
 from apps.api.content_runtime.models import (
     ContentDefinitionVersion,
     ContentPackage,
@@ -136,6 +138,22 @@ def test_failed_publication_rolls_back_every_new_runtime_row(
             == 0
         )
         assert resolve_runtime_defaults(session) == BUILTIN_RUNTIME_DEFAULTS
+
+
+def test_administrative_cli_publishes_and_replays_without_new_versions(
+    migrated_database_url: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert run_publish_golden_content(database_url=migrated_database_url, root=ROOT) == 0
+    first = json.loads(capsys.readouterr().out)
+    assert first["conclusion"] == "passed"
+    assert first["created"] is True
+    assert first["runtime_default_version_no"] == 2
+
+    assert run_publish_golden_content(database_url=migrated_database_url, root=ROOT) == 0
+    second = json.loads(capsys.readouterr().out)
+    assert second["created"] is False
+    assert second["content_release_id"] == first["content_release_id"]
 
 
 def publication_counts(session) -> tuple[int, ...]:
