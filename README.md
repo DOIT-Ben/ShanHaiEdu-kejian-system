@@ -90,14 +90,21 @@ bash infra/dev/compose.sh down
 
 包装脚本按worktree目录派生Compose项目名和宿主端口，并把Git公共元数据只读挂载给测试，不让容器写Git仓库。它会拒绝共享rootful daemon和低于30 GiB空闲空间的启动/构建。本地`.env`、数据库、缓存和对象存储数据不得提交。普通测试和CI不连接真实模型Provider。完整拓扑、并行worktree、迁移和回退规则见[Linux开发环境与迁移](docs/governance/Linux开发环境与迁移.md)。
 
-真实文本模型只通过显式冒烟命令调用。先在受控环境中注入密钥变量，不把密钥写入`.env`、命令历史或参数；再配置非敏感路由并运行：
+真实文本模型只通过显式冒烟命令调用。阿里云开发环境从仓库外受控文件加载统一网关配置，不把密钥写入仓库`.env`、命令历史或参数；其他环境按[内容运行时与模型网关](docs/backend/03_内容运行时与模型网关.md)注入同名变量：
 
-```powershell
-$env:SHANHAI_TEXT_PROVIDER_NAME="newapi"
-$env:SHANHAI_TEXT_PROVIDER_BASE_URL="https://newapi.doitbenai.cloud/v1"
-$env:SHANHAI_TEXT_PROVIDER_MODEL="deepseek"
-$env:SHANHAI_TEXT_PROVIDER_SECRET_ENV="NEWAPI_TEXT_API_KEY"
-uv run python -m apps.api.cli model-smoke --capability text.smoke --real
+```bash
+set -a
+. /srv/shanhaiedu/runtime/secrets/model-gateway.env
+set +a
+
+bash infra/dev/compose.sh run --rm --no-deps \
+  -e MODEL_GATEWAY_API_KEY \
+  -e SHANHAI_TEXT_PROVIDER_NAME \
+  -e SHANHAI_TEXT_PROVIDER_BASE_URL \
+  -e SHANHAI_TEXT_PROVIDER_MODEL \
+  -e SHANHAI_TEXT_PROVIDER_SECRET_ENV \
+  -e SHANHAI_TEXT_PROVIDER_TIMEOUT_SECONDS \
+  workspace uv run python -m apps.api.cli model-smoke --capability text.smoke --real
 ```
 
 命令只输出脱敏Provider/模型、request ID、UTC、耗时、用量、成本和结论，不输出密钥、提示词或模型正文。
