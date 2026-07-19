@@ -98,6 +98,19 @@
 - 内容包运行时先支持内置受控包；管理端导入界面可以后置。
 - 首套内置包使用已批准的23节点输入、Prompt、输出和投影合同；黄金Fixture只作为确定性开发基线，阶段出口仍使用真实教材和真实文本模型。
 
+### 启动依赖与实施波次
+
+阶段2不能从通用执行器直接开工。先关闭Provider、当前合同、内容发布、公共Prompt、关系语义、Attempt恢复和模块边界门禁，再进入跨模块原子执行。每个Issue继续使用独立短分支和Draft PR；同一文件、同一机器合同或同一跨模块事务所有者存在竞争写入时，即使未达到三个任务上限也不得并发。
+
+1. 首个动作只恢复[Issue #61](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/61)：从最新`main`校准既有Draft PR，确认Provider中立合同、确定性Fake和统一网关边界，不在旧准备提交上继续堆实现。
+2. 第一波最多并行#61、[Issue #85](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/85)和[Issue #88](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/88)。三者分别拥有模型调用基础、当前/规划API分层和黄金ContentRelease发布，禁止跨入彼此所有权。
+3. 第二波推进[Issue #51](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/51)、[Issue #92](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/92)为通用执行器拆出的最小应用接口/增长门禁子任务，以及[Decision #82](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/82)。#51必须在#85之后；#92不借机全量重构。
+4. 第三波推进[Issue #86](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/86)、[Issue #90](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/90)和[Decision #83](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/83)。#86固定stale关系语义，#90固定Attempt恢复与并发序号，二者完成前不启动通用执行器。
+5. [Issue #89](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/89)满足全部前置后先作为唯一后端主任务启动，使用真实PostgreSQL和确定性Fake关闭一个黄金文本节点的原子纵向链；Adapter真实冒烟和阶段真实文本出口单独执行，不能用Fake替代。
+6. #89稳定后，[Issue #84](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/84)和[Issue #87](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/87)可以在无文件竞争时并行。破坏性列退役[Issue #91](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/91)必须等消费者归零并取得当次明确批准；治理兼容[Issue #94](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/94)只在PR #62进入终态后启动。
+
+普通CI始终使用确定性Fake。#61的Provider Adapter变化、#89的阶段文本出口以及后续图片/视频阶段出口必须分别使用受控真实冒烟，并只记录脱敏Provider、模型、request ID、UTC、延迟、用量、成本和结论。
+
 ### 可见成果
 
 教师从教材得到可编辑、可批准、可追溯的多课时教案和导入方案。

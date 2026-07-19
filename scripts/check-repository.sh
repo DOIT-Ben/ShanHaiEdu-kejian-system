@@ -21,6 +21,7 @@ fi
 pnpm contracts:lint
 pnpm contracts:schema
 
+"$repository_python" scripts/build_frontend_package.py --check
 unzip -t deliverables/shanhaiedu-frontend-package.zip >/dev/null
 package_dir=$(mktemp -d "${TMPDIR:-/tmp}/shanhaiedu-package-check.XXXXXX")
 trap 'rm -rf "$package_dir"' EXIT
