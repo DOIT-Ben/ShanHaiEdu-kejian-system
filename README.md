@@ -76,8 +76,11 @@ bash infra/dev/compose.sh build workspace
 ```bash
 bash infra/dev/compose.sh up -d
 bash infra/dev/compose.sh exec workspace bash infra/dev/bootstrap.sh
+bash infra/dev/compose.sh exec workspace uv run python -m apps.api.cli publish-golden-content
 bash infra/dev/compose.sh exec workspace uv run uvicorn apps.api.main:app --host 0.0.0.0 --port 8000
 ```
+
+`publish-golden-content`在Alembic升级后发布并激活仓库内置黄金内容包。命令可安全重复执行；相同版本不会产生伪版本，已创建项目继续固定原Release。
 
 容器使用 `GET /health/live` 和 `GET /health/ready`；共享API合同中的兼容路径是 `GET /api/v2/health/live` 和 `GET /api/v2/health/ready`。停止本地依赖但保留数据：
 
