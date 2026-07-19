@@ -74,6 +74,17 @@ printf '%s\\n' 'fake 100000000 1 99999999 1% /'
         encoding="utf-8",
     )
     disk_free.chmod(0o755)
+    identity = fake_bin / "id"
+    identity.write_text(
+        """#!/usr/bin/env bash
+case "${1:-}" in
+  -u|-g) printf '%s\\n' '1000' ;;
+  *) exec /usr/bin/id "$@" ;;
+esac
+""",
+        encoding="utf-8",
+    )
+    identity.chmod(0o755)
 
     env = {key: value for key, value in os.environ.items() if not key.startswith("SHANHAI_")}
     env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
@@ -269,8 +280,8 @@ def test_compose_script_requires_audited_dedicated_host_marker(tmp_path: Path) -
 
     marker.write_text("shanhaiedu-dedicated-development-host-v1\n", encoding="utf-8")
     values = run_compose_script(repository, tmp_path / "dedicated.env", env)
-    assert values["SHANHAI_WORKSPACE_UID"] == str(os.getuid())
-    assert values["SHANHAI_WORKSPACE_GID"] == str(os.getgid())
+    assert values["SHANHAI_WORKSPACE_UID"] == "1000"
+    assert values["SHANHAI_WORKSPACE_GID"] == "1000"
     assert values["SHANHAI_CONTAINER_ROOTLESS_USERNS"] == "false"
 
 
