@@ -11,23 +11,10 @@ from typing import Any, cast
 
 from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 
+from workflow.model_capabilities import WORKFLOW_MODEL_CAPABILITIES
+
 MAX_NODE_CATALOG_BYTES = 5_000_000
-REGISTERED_MODEL_CAPABILITIES = frozenset(
-    {
-        "audio.tts.child_friendly_zh",
-        "image.generate.education_16x9",
-        "text.structured.audio_plan",
-        "text.structured.creative_education",
-        "text.structured.creative_video",
-        "text.structured.image_prompt",
-        "text.structured.ppt_content",
-        "text.structured.ppt_design",
-        "text.structured.ppt_page_design",
-        "text.structured.zh_primary_math",
-        "video.image_to_video.6s_30s",
-        "vision.evaluate.classroom_video",
-    }
-)
+REGISTERED_MODEL_CAPABILITIES = WORKFLOW_MODEL_CAPABILITIES
 FORBIDDEN_EXECUTOR_TOKENS = frozenset(
     {"bash", "cmd", "http", "https", "javascript", "node", "powershell", "python", "shell"}
 )

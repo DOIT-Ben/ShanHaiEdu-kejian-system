@@ -10,19 +10,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-
-class ModelCapability(StrEnum):
-    TEXT_SMOKE = "text.smoke"
-    TEXT_STRUCTURED_AUDIO_PLAN = "text.structured.audio_plan"
-    TEXT_STRUCTURED_CREATIVE_EDUCATION = "text.structured.creative_education"
-    TEXT_STRUCTURED_CREATIVE_VIDEO = "text.structured.creative_video"
-    TEXT_STRUCTURED_IMAGE_PROMPT = "text.structured.image_prompt"
-    TEXT_STRUCTURED_PPT_CONTENT = "text.structured.ppt_content"
-    TEXT_STRUCTURED_PPT_DESIGN = "text.structured.ppt_design"
-    TEXT_STRUCTURED_PPT_PAGE_DESIGN = "text.structured.ppt_page_design"
-    TEXT_STRUCTURED_ZH_PRIMARY_MATH = "text.structured.zh_primary_math"
-    IMAGE_GENERATE_EDUCATION_16X9 = "image.generate.education_16x9"
-    VIDEO_IMAGE_TO_VIDEO_6S_30S = "video.image_to_video.6s_30s"
+from workflow.model_capabilities import ModelCapability
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,12 +130,16 @@ ModelRequest = Annotated[
 ]
 
 
+UsageUnitName = Annotated[str, Field(min_length=1, max_length=80, pattern=r"^[a-z][a-z0-9_]*$")]
+UsageUnitValue = Annotated[int, Field(ge=0)]
+
+
 class ModelUsage(_StrictModel):
     prompt_tokens: int = Field(default=0, ge=0)
     completion_tokens: int = Field(default=0, ge=0)
     total_tokens: int = Field(default=0, ge=0)
-    input_units: dict[str, int] = Field(default_factory=dict)
-    output_units: dict[str, int] = Field(default_factory=dict)
+    input_units: dict[UsageUnitName, UsageUnitValue] = Field(default_factory=dict)
+    output_units: dict[UsageUnitName, UsageUnitValue] = Field(default_factory=dict)
     cost: Decimal | None = Field(default=None, ge=0, le=Decimal("999999999999.999999"))
     currency: str = Field(default="USD", pattern=r"^[A-Z]{3}$")
 
@@ -161,6 +153,18 @@ class GeneratedFileFact(_StrictModel):
     width: int | None = Field(default=None, gt=0)
     height: int | None = Field(default=None, gt=0)
     duration_seconds: int | None = Field(default=None, gt=0)
+
+    @model_validator(mode="after")
+    def require_safe_storage_key(self) -> Self:
+        segments = self.storage_key.split("/")
+        if (
+            self.storage_key.startswith("/")
+            or "://" in self.storage_key
+            or "\\" in self.storage_key
+            or any(segment in {"", ".", ".."} for segment in segments)
+        ):
+            raise ValueError("storage_key must be a safe relative object key")
+        return self
 
 
 class TextProviderResult(_StrictModel):
@@ -178,6 +182,11 @@ class ImageProviderResult(_StrictModel):
     actual_model: str = Field(min_length=1, max_length=160)
     files: list[GeneratedFileFact] = Field(min_length=1, max_length=16)
     usage: ModelUsage
+
+    @model_validator(mode="after")
+    def require_image_files(self) -> Self:
+        _require_media_type(self.files, "image/")
+        return self
 
 
 class VideoOperationStatus(StrEnum):
@@ -203,19 +212,7 @@ class VideoProviderResult(_StrictModel):
 
     @model_validator(mode="after")
     def require_state_facts(self) -> Self:
-        recoverable = {
-            VideoOperationStatus.SUBMITTED,
-            VideoOperationStatus.POLLING,
-            VideoOperationStatus.SUCCEEDED,
-            VideoOperationStatus.FAILED,
-            VideoOperationStatus.CANCELLED,
-        }
-        if self.status in recoverable and not self.provider_task_id:
-            raise ValueError("recoverable video states require provider_task_id")
-        if self.status == VideoOperationStatus.SUCCEEDED and not self.files:
-            raise ValueError("succeeded video results require generated file facts")
-        if self.status != VideoOperationStatus.SUCCEEDED and self.files:
-            raise ValueError("only succeeded video results may contain files")
+        _require_video_state(self.status, self.provider_task_id, self.files)
         return self
 
 
@@ -248,6 +245,11 @@ class ImageGatewayResult(_StrictModel):
     usage: ModelUsage
     latency_ms: int = Field(ge=0)
 
+    @model_validator(mode="after")
+    def require_image_files(self) -> Self:
+        _require_media_type(self.files, "image/")
+        return self
+
 
 class VideoGatewayResult(_StrictModel):
     kind: Literal["video"] = "video"
@@ -264,8 +266,40 @@ class VideoGatewayResult(_StrictModel):
     usage: ModelUsage
     latency_ms: int = Field(ge=0)
 
+    @model_validator(mode="after")
+    def require_state_facts(self) -> Self:
+        _require_video_state(self.status, self.provider_task_id, self.files)
+        return self
+
 
 ModelResult = Annotated[
     TextGatewayResult | ImageGatewayResult | VideoGatewayResult,
     Field(discriminator="kind"),
 ]
+
+
+def _require_video_state(
+    status: VideoOperationStatus,
+    provider_task_id: str | None,
+    files: list[GeneratedFileFact],
+) -> None:
+    recoverable = {
+        VideoOperationStatus.SUBMITTED,
+        VideoOperationStatus.POLLING,
+        VideoOperationStatus.SUCCEEDED,
+        VideoOperationStatus.FAILED,
+        VideoOperationStatus.CANCELLED,
+    }
+    if status in recoverable and not provider_task_id:
+        raise ValueError("recoverable video states require provider_task_id")
+    if status == VideoOperationStatus.SUCCEEDED:
+        if not files:
+            raise ValueError("succeeded video results require generated file facts")
+        _require_media_type(files, "video/")
+    elif files:
+        raise ValueError("only succeeded video results may contain files")
+
+
+def _require_media_type(files: list[GeneratedFileFact], expected_prefix: str) -> None:
+    if any(not file.mime_type.startswith(expected_prefix) for file in files):
+        raise ValueError(f"generated files must use {expected_prefix} MIME types")

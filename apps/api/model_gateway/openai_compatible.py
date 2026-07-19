@@ -89,7 +89,7 @@ def map_provider_error(status_code: int, error_type: str | None) -> ModelGateway
         "refusal",
     }:
         return ModelGatewayError(GatewayErrorCode.REJECTED, retryable=False)
-    if status_code in {502, 503} or normalized in {
+    if 500 <= status_code < 600 or normalized in {
         "provider_overloaded",
         "provider_unavailable",
         "server",

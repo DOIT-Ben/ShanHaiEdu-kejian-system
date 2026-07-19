@@ -15,6 +15,7 @@ from apps.api.model_gateway.contracts import (
     ModelResult,
     ModelUsage,
     TextModelRequest,
+    VideoGatewayResult,
     VideoModelRequest,
     VideoOperationStatus,
     VideoProviderResult,
@@ -191,3 +192,79 @@ def test_platform_media_reference_contains_no_provider_transport_fields() -> Non
     }
     assert ModelCapability.IMAGE_GENERATE_EDUCATION_16X9.value.startswith("image.")
     assert ImageProviderResult.model_config["extra"] == "forbid"
+
+
+@pytest.mark.parametrize(
+    "storage_key",
+    [
+        "https://provider.test/private-result.png",
+        "/absolute/result.png",
+        "generated/../private/result.png",
+        "generated\\private\\result.png",
+    ],
+)
+def test_generated_file_facts_reject_provider_urls_and_unsafe_paths(storage_key: str) -> None:
+    with pytest.raises(ValidationError):
+        GeneratedFileFact(
+            storage_key=storage_key,
+            sha256="2" * 64,
+            size_bytes=1,
+            mime_type="image/png",
+        )
+
+
+def test_usage_units_are_nonnegative_and_provider_neutral() -> None:
+    with pytest.raises(ValidationError):
+        ModelUsage(output_units={"images": -1})
+
+
+def test_media_results_enforce_file_type_and_recoverable_video_state() -> None:
+    video_file = GeneratedFileFact(
+        storage_key="generated/video.mp4",
+        sha256="3" * 64,
+        size_bytes=1,
+        mime_type="video/mp4",
+        duration_seconds=8,
+    )
+    image_file = GeneratedFileFact(
+        storage_key="generated/image.png",
+        sha256="4" * 64,
+        size_bytes=1,
+        mime_type="image/png",
+        width=1280,
+        height=720,
+    )
+
+    with pytest.raises(ValidationError):
+        ImageProviderResult(
+            provider_request_id="provider-request-wrong-media",
+            actual_model="fake-image-v1",
+            files=[video_file],
+            usage=ModelUsage(),
+        )
+    with pytest.raises(ValidationError):
+        VideoProviderResult(
+            status=VideoOperationStatus.SUCCEEDED,
+            provider_request_id="provider-request-wrong-media",
+            provider_task_id="provider-task-1",
+            actual_model="fake-video-v1",
+            files=[image_file],
+            usage=ModelUsage(),
+        )
+    with pytest.raises(ValidationError):
+        VideoGatewayResult(
+            request_id="req-invalid-submitted-result",
+            status=VideoOperationStatus.SUBMITTED,
+            route={
+                "capability": "video.image_to_video.6s_30s",
+                "provider": "provider-test",
+                "model": "provider-model",
+                "reason": "configured_primary",
+            },
+            provider_request_id="provider-request-1",
+            provider_task_id=None,
+            actual_model="provider-model",
+            files=[],
+            usage=ModelUsage(),
+            latency_ms=1,
+        )

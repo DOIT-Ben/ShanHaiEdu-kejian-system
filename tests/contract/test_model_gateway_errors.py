@@ -17,12 +17,14 @@ from apps.api.model_gateway.openai_compatible import map_provider_error
         (404, "not_found", GatewayErrorCode.ROUTE_UNAVAILABLE, False),
         (502, "provider_unavailable", GatewayErrorCode.PROVIDER_UNAVAILABLE, True),
         (500, "server", GatewayErrorCode.PROVIDER_UNAVAILABLE, True),
+        (500, None, GatewayErrorCode.PROVIDER_UNAVAILABLE, True),
+        (504, None, GatewayErrorCode.PROVIDER_UNAVAILABLE, True),
         (400, "invalid_request", GatewayErrorCode.INVALID_RESPONSE, False),
     ],
 )
 def test_provider_errors_map_to_stable_platform_codes(
     status: int,
-    error_type: str,
+    error_type: str | None,
     expected: GatewayErrorCode,
     retryable: bool,
 ) -> None:
