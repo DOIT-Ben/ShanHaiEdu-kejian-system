@@ -11,6 +11,21 @@ import sys
 from pathlib import Path
 from urllib.parse import unquote
 
+if __package__:
+    from .repository_governance import (
+        check_cross_module_model_imports,
+        check_python_size_limits,
+        load_repository_governance_baseline,
+        production_python_files,
+    )
+else:
+    from repository_governance import (  # type: ignore[import-not-found]
+        check_cross_module_model_imports,
+        check_python_size_limits,
+        load_repository_governance_baseline,
+        production_python_files,
+    )
+
 try:
     import yaml
 except ImportError:  # pragma: no cover - reported as a repository setup error
@@ -35,6 +50,7 @@ REQUIRED = {
     "contracts/mock-scenarios.schema.json",
     "package.json",
     "pnpm-lock.yaml",
+    "scripts/repository-governance-baseline.json",
 }
 
 FORBIDDEN_DIRECTORIES = {
@@ -330,6 +346,13 @@ def main() -> int:
     check_current_status(ROOT / "CURRENT_STATUS.md", ROOT, errors)
     check_project_memory_index(ROOT / "docs/governance/项目记忆与接手索引.md", errors)
     check_checksum_manifest(FRONTEND_CHECKSUMS, errors)
+    baseline = load_repository_governance_baseline(
+        ROOT / "scripts/repository-governance-baseline.json", errors
+    )
+    if baseline is not None:
+        python_files = production_python_files(files, ROOT)
+        check_cross_module_model_imports(python_files, ROOT, baseline, errors)
+        check_python_size_limits(python_files, ROOT, baseline, errors)
     report_size_triggers(files)
 
     if errors:
