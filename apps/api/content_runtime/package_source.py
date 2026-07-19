@@ -67,7 +67,7 @@ def load_builtin_courseware_release(root: Path) -> BuiltinCoursewareReleaseSourc
         schema_path=contracts_root / "workflow-node-generation-binding.schema.json",
     )
     manifest_entries = {
-        cast(str, entry["item_key"]): cast(dict[str, Any], entry)
+        cast(str, entry["item_key"]): entry
         for entry in cast(list[dict[str, Any]], package.manifest["items"])
     }
     entrypoints = set(cast(list[str], package.manifest["entrypoints"]))
