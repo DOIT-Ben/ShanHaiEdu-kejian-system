@@ -19,9 +19,15 @@ PACKAGE_ROOT = "shanhaiedu-frontend-package"
 ROOT_FILES = {"AGENTS.md", "CURRENT_STATUS.md", "README.md"}
 REQUIRED_FILES = ROOT_FILES | {
     "contracts/README.md",
+    "contracts/api-surface.openapi.yaml",
+    "contracts/fixtures/primary-math-courseware-package/manifest.json",
+    "contracts/generated/openapi.bundle.yaml",
+    "contracts/generated/typescript/schema.ts",
     "docs/START_HERE.md",
+    "docs/frontend/CHECKSUMS.sha256",
     "docs/frontend/manifest.json",
     "docs/vendor/FRONTEND_KICKOFF_INSTRUCTION.md",
+    "docs/workflows/generation-guide/README.md",
 }
 
 
@@ -106,7 +112,6 @@ def build_archive() -> bytes:
     source_digest = _source_digest(sources)
     package_manifest = {
         "entry": "README.md",
-        "file_count": len(sources),
         "generated_on": generated_on.isoformat(),
         "package": PACKAGE_ROOT,
         "schema_version": 1,
@@ -115,6 +120,7 @@ def build_archive() -> bytes:
             "frontend, backend and governance handoff documents",
             "OpenAPI, JSON Schema, generated TypeScript and golden fixtures",
         ],
+        "source_file_count": len(sources),
         "source_tree_sha256": source_digest,
     }
     packaged = dict(sources)
