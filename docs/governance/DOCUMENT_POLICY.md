@@ -111,7 +111,7 @@ copy / backup / 临时
 - 包内必须有入口、范围、校验和与生成日期。
 - 包不是事实源；相同内容仍以仓库现行文件为准。
 - 外包或第三方返回源码后，必须通过PR进入正式代码目录，不能以ZIP长期代替源码。
-- 当前前端交付包由`uv run python scripts/build_frontend_package.py`从现行文档、合同、生成类型和黄金Fixture确定性重建；仓库门禁使用`--check`拒绝内容过期但内部校验仍通过的ZIP。
+- 当前前端交付包由`uv run python scripts/build_frontend_package.py`从现行文档、合同、生成类型和黄金Fixture确定性重建；`deliverables/shanhaiedu-frontend-package.snapshot.json`独立绑定UTC生成时刻、源文件数和源树摘要，源摘要不变时重复构建必须保持相同时间和ZIP字节；仓库门禁使用`--check`同时拒绝过期sidecar、过期ZIP和仅内部校验仍通过的旧包。
 
 ## 9. CURRENT_STATUS维护
 
