@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
@@ -288,12 +289,42 @@ async def test_prompt_preview_endpoint_returns_only_the_safe_projection(
             node_key="prepare",
             status=NodeStatus.READY,
         )
+        legacy_bindings = [
+            _legacy_binding(
+                "preferences",
+                "project.teacher_preferences",
+                "summary",
+                [_legacy_item("preference-private", {"tone": "warm"})],
+            ),
+            _legacy_binding(
+                "hidden-rubric",
+                "lesson_plan.approved_version",
+                "hidden",
+                [_legacy_item("hidden-private", {"rubric": "private"})],
+            ),
+            _legacy_binding(
+                "material",
+                "material.approved_parse",
+                "full",
+                [_legacy_item("private-source-id", {"text": "Visible legacy fact"})],
+            ),
+        ]
+        legacy_summaries = [_legacy_summary(binding) for binding in legacy_bindings]
+        summary_chunk = (
+            "[context:preferences] source=project.teacher_preferences "
+            f"items=1 hash={legacy_summaries[0]['content_hash']}"
+        )
+        full_chunk = _canonical_json({"context": legacy_bindings[2]["items"]})
+        legacy_editable_prompt = (
+            "Visible task. Explain source and hash vocabulary to students.\n\n"
+            f"{summary_chunk}\n\n{full_chunk}"
+        )
         context_snapshot = ContextSnapshot(
             id=new_uuid7(),
             organization_id=actor.organization_id,
             project_id=project.id,
             node_run_id=node.id,
-            bindings_json={"bindings": [{"source": "CONTEXT_PRIVATE"}]},
+            bindings_json={"bindings": legacy_bindings},
             content_hash="a" * 64,
             created_by=actor.principal_id,
         )
@@ -308,44 +339,16 @@ async def test_prompt_preview_endpoint_returns_only_the_safe_projection(
                 "template_version": "1.0.0",
             },
             layers_json={"layers": [{"content": "INTERNAL_METHOD_PRIVATE"}]},
-            editable_prompt=(
-                "Visible task. Explain source and hash vocabulary to students.\n\n"
-                "[context:preferences] source=project.teacher_preferences "
-                f"items=1 hash={'c' * 64}\n\n"
-                '{"context":[{"content":{"text":"Visible legacy fact"},'
-                '"source_id":"private-source-id","source_version_id":"private-version-id"}]}'
-            ),
+            editable_prompt=legacy_editable_prompt,
             user_diff_json={"mode": "replace_editable_layer"},
             compiled_prompt="PLATFORM_PRIVATE\nINTERNAL_METHOD_PRIVATE\nPROVIDER_PRIVATE",
             request_schema_json={"type": "object", "required": ["fixed_structure"]},
             preview_json={
-                "editable_prompt": (
-                    "Visible task. Explain source and hash vocabulary to students.\n\n"
-                    "[context:preferences] source=project.teacher_preferences "
-                    f"items=1 hash={'c' * 64}\n\n"
-                    '{"context":[{"content":{"text":"Visible legacy fact"},'
-                    '"source_id":"private-source-id",'
-                    '"source_version_id":"private-version-id"}]}'
-                ),
+                "editable_prompt": legacy_editable_prompt,
                 "locked_layers": [
                     {"layer": "output_schema", "key": "request_schema", "locked": True}
                 ],
-                "context_summary": [
-                    {
-                        "binding_key": "preferences",
-                        "source": "project.teacher_preferences",
-                        "exposure": "summary",
-                        "item_count": 1,
-                        "content_hash": "c" * 64,
-                    },
-                    {
-                        "binding_key": "material",
-                        "source": "material.approved_parse",
-                        "exposure": "full",
-                        "item_count": 1,
-                        "content_hash": "d" * 64,
-                    },
-                ],
+                "context_summary": legacy_summaries,
                 "schema": {"type": "object", "required": ["fixed_structure"]},
                 "output_schema": {"private": True},
                 "internal_prompt": "INTERNAL_METHOD_PRIVATE",
@@ -436,3 +439,42 @@ def compiled_fixture():
         user_edit_max_chars=60_000,
     )
     return context, compiled
+
+
+def _legacy_item(identifier: str, content: object) -> dict[str, object]:
+    return {
+        "source_id": identifier,
+        "source_version_id": f"{identifier}-v1",
+        "content": content,
+    }
+
+
+def _legacy_binding(
+    key: str,
+    source: str,
+    exposure: str,
+    items: list[dict[str, object]],
+) -> dict[str, object]:
+    return {"binding_key": key, "source": source, "exposure": exposure, "items": items}
+
+
+def _legacy_summary(binding: dict[str, object]) -> dict[str, object]:
+    items = binding["items"]
+    assert isinstance(items, list)
+    return {
+        "binding_key": binding["binding_key"],
+        "source": binding["source"],
+        "exposure": binding["exposure"],
+        "item_count": len(items),
+        "content_hash": hashlib.sha256(_canonical_json({"items": items}).encode()).hexdigest(),
+    }
+
+
+def _canonical_json(value: object) -> str:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )

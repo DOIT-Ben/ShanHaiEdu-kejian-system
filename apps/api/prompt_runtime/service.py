@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import asdict, dataclass
 from typing import cast
@@ -31,6 +32,178 @@ class PromptSnapshotError(ValueError):
 class FrozenPromptSnapshots:
     context: ContextSnapshot
     prompt: PromptSnapshot
+
+
+@dataclass(frozen=True, slots=True)
+class _LegacyContextProjection:
+    technical_chunk: str
+    public_chunk: str | None
+
+
+_LEGACY_SUMMARY_KEYS = frozenset(
+    {"binding_key", "source", "exposure", "item_count", "content_hash"}
+)
+_LEGACY_BINDING_KEYS = frozenset({"binding_key", "source", "exposure", "items"})
+_LEGACY_ITEM_KEYS = frozenset({"source_id", "source_version_id", "content"})
+
+
+def _project_legacy_editable_prompt(
+    editable_prompt: str,
+    preview_json: dict[str, object],
+    bindings_json: dict[str, object],
+) -> str:
+    projections = _validated_legacy_context_projections(
+        editable_prompt,
+        preview_json,
+        bindings_json,
+    )
+    if not projections:
+        return editable_prompt
+    chunks = editable_prompt.split("\n\n")
+    technical_suffix = [projection.technical_chunk for projection in projections]
+    if len(chunks) < len(technical_suffix) or chunks[-len(technical_suffix) :] != technical_suffix:
+        return editable_prompt
+    public_suffix = [
+        projection.public_chunk for projection in projections if projection.public_chunk is not None
+    ]
+    return "\n\n".join([*chunks[: -len(technical_suffix)], *public_suffix])
+
+
+def _validated_legacy_context_projections(
+    editable_prompt: str,
+    preview_json: dict[str, object],
+    bindings_json: dict[str, object],
+) -> tuple[_LegacyContextProjection, ...] | None:
+    if preview_json.get("editable_prompt") != editable_prompt:
+        return None
+    summaries = preview_json.get("context_summary")
+    bindings_container = _exact_object(bindings_json, frozenset({"bindings"}))
+    if not isinstance(summaries, list) or bindings_container is None:
+        return None
+    bindings = bindings_container["bindings"]
+    if not isinstance(bindings, list):
+        return None
+    summary_items = cast(list[object], summaries)
+    binding_items = cast(list[object], bindings)
+    if len(summary_items) != len(binding_items):
+        return None
+
+    projections: list[_LegacyContextProjection] = []
+    for raw_summary, raw_binding in zip(
+        summary_items,
+        binding_items,
+        strict=True,
+    ):
+        valid, projection = _validate_legacy_context_pair(raw_summary, raw_binding)
+        if not valid:
+            return None
+        if projection is not None:
+            projections.append(projection)
+    return tuple(projections)
+
+
+def _validate_legacy_context_pair(
+    raw_summary: object,
+    raw_binding: object,
+) -> tuple[bool, _LegacyContextProjection | None]:
+    summary = _exact_object(raw_summary, _LEGACY_SUMMARY_KEYS)
+    binding = _exact_object(raw_binding, _LEGACY_BINDING_KEYS)
+    if summary is None or binding is None:
+        return False, None
+    exposure = summary["exposure"]
+    binding_key = summary["binding_key"]
+    source = summary["source"]
+    item_count = summary["item_count"]
+    content_hash = summary["content_hash"]
+    if not (
+        exposure in {"full", "summary", "hidden"}
+        and isinstance(binding_key, str)
+        and isinstance(source, str)
+        and isinstance(item_count, int)
+        and not isinstance(item_count, bool)
+        and item_count >= 0
+        and isinstance(content_hash, str)
+        and binding["binding_key"] == binding_key
+        and binding["source"] == source
+        and binding["exposure"] == exposure
+    ):
+        return False, None
+    items = _validated_legacy_items(binding["items"])
+    if items is None or len(items) != item_count:
+        return False, None
+    canonical_items = _canonical_json_text({"items": items})
+    if (
+        canonical_items is None
+        or hashlib.sha256(canonical_items.encode()).hexdigest() != content_hash
+    ):
+        return False, None
+    if exposure == "hidden":
+        return True, None
+    if exposure == "summary":
+        return (
+            True,
+            _LegacyContextProjection(
+                technical_chunk=(
+                    f"[context:{binding_key}] source={source} "
+                    f"items={item_count} hash={content_hash}"
+                ),
+                public_chunk=None,
+            ),
+        )
+    technical_chunk = _canonical_json_text({"context": items})
+    public_chunk = _canonical_json_text({"context": [item["content"] for item in items]})
+    if technical_chunk is None or public_chunk is None:
+        return False, None
+    return True, _LegacyContextProjection(
+        technical_chunk=technical_chunk,
+        public_chunk=public_chunk,
+    )
+
+
+def _validated_legacy_items(value: object) -> list[dict[str, object]] | None:
+    if not isinstance(value, list):
+        return None
+    items: list[dict[str, object]] = []
+    sort_keys: list[tuple[str, str]] = []
+    for raw_item in cast(list[object], value):
+        item = _exact_object(raw_item, _LEGACY_ITEM_KEYS)
+        if item is None:
+            return None
+        source_id = item["source_id"]
+        source_version_id = item["source_version_id"]
+        if (
+            not isinstance(source_id, str)
+            or not source_id
+            or not isinstance(source_version_id, str | None)
+        ):
+            return None
+        items.append(item)
+        sort_keys.append((source_id, source_version_id or ""))
+    if sort_keys != sorted(sort_keys):
+        return None
+    return items
+
+
+def _exact_object(value: object, keys: frozenset[str]) -> dict[str, object] | None:
+    if not isinstance(value, dict):
+        return None
+    result = cast(dict[str, object], value)
+    if frozenset(result) != keys:
+        return None
+    return result
+
+
+def _canonical_json_text(value: object) -> str | None:
+    try:
+        return json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+    except (TypeError, ValueError):
+        return None
 
 
 class PromptSnapshotService:
@@ -118,97 +291,19 @@ class PromptSnapshotService:
 
     def get_public_preview(self, node_run_id: UUID) -> PromptPreviewRead:
         prompt = self.get_prompt(node_run_id)
+        context = self._repository.context_for_node(node_run_id)
+        editable_prompt = prompt.editable_prompt
+        if context is not None:
+            editable_prompt = _project_legacy_editable_prompt(
+                editable_prompt,
+                prompt.preview_json,
+                context.bindings_json,
+            )
         return PromptPreviewRead(
             prompt_snapshot_id=prompt.id,
             content_hash=prompt.content_hash,
-            editable_prompt=self._public_editable_prompt(prompt),
+            editable_prompt=editable_prompt,
             edit_policy=self._public_edit_policy(prompt.preview_json),
-        )
-
-    @classmethod
-    def _public_editable_prompt(cls, prompt: PromptSnapshot) -> str:
-        legacy_summaries, full_context_counts = cls._legacy_context_metadata(prompt.preview_json)
-        full_context_index = 0
-        chunks: list[str] = []
-        for chunk in prompt.editable_prompt.split("\n\n"):
-            if chunk in legacy_summaries:
-                continue
-            if full_context_index < len(full_context_counts):
-                sanitized = cls._sanitize_legacy_full_context(
-                    chunk,
-                    expected_items=full_context_counts[full_context_index],
-                )
-                if sanitized != chunk:
-                    chunk = sanitized
-                    full_context_index += 1
-            chunks.append(chunk)
-        return "\n\n".join(chunks)
-
-    @staticmethod
-    def _legacy_context_metadata(
-        preview_json: dict[str, object],
-    ) -> tuple[set[str], tuple[int, ...]]:
-        summaries = preview_json.get("context_summary")
-        if not isinstance(summaries, list):
-            return set(), ()
-        chunks: set[str] = set()
-        full_context_counts: list[int] = []
-        for raw_summary in cast(list[object], summaries):
-            if not isinstance(raw_summary, dict):
-                continue
-            summary = cast(dict[str, object], raw_summary)
-            exposure = summary.get("exposure")
-            binding_key = summary.get("binding_key")
-            source = summary.get("source")
-            item_count = summary.get("item_count")
-            content_hash = summary.get("content_hash")
-            if not (
-                isinstance(binding_key, str)
-                and isinstance(source, str)
-                and isinstance(item_count, int)
-                and not isinstance(item_count, bool)
-                and isinstance(content_hash, str)
-            ):
-                continue
-            if exposure == "summary":
-                chunks.add(
-                    f"[context:{binding_key}] source={source} "
-                    f"items={item_count} hash={content_hash}"
-                )
-            elif exposure == "full":
-                full_context_counts.append(item_count)
-        return chunks, tuple(full_context_counts)
-
-    @staticmethod
-    def _sanitize_legacy_full_context(chunk: str, *, expected_items: int) -> str:
-        try:
-            payload: object = json.loads(chunk)
-        except json.JSONDecodeError:
-            return chunk
-        if not isinstance(payload, dict):
-            return chunk
-        payload_dict = cast(dict[str, object], payload)
-        if set(payload_dict) != {"context"}:
-            return chunk
-        context = payload_dict["context"]
-        if not isinstance(context, list):
-            return chunk
-        context_items = cast(list[object], context)
-        if len(context_items) != expected_items:
-            return chunk
-        contents: list[object] = []
-        for raw_item in context_items:
-            if not isinstance(raw_item, dict):
-                return chunk
-            item = cast(dict[str, object], raw_item)
-            if "content" not in item or not ({"source_id", "source_version_id"} & item.keys()):
-                return chunk
-            contents.append(item["content"])
-        return json.dumps(
-            {"context": contents},
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
         )
 
     @staticmethod
