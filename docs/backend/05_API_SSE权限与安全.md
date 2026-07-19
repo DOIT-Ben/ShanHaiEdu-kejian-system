@@ -31,7 +31,7 @@
 | `GET` | `/lessons/{lesson_id}` | 查询课时详情和四个分支配置 |
 | `PATCH` | `/lessons/{lesson_id}/branches` | 开关导入设计、PPT和视频分支 |
 | `GET` | `/lessons/{lesson_id}/intro-options` | 读取三类九套、打分和当前选择 |
-| `POST` | `/lessons/{lesson_id}/intro-options/generate` | 启动独立创意与锚定两阶段生成 |
+| `POST` | `/lessons/{lesson_id}/intro-options/generate` | 启动课程驱动的单节点导入方案生成 |
 | `POST` | `/lessons/{lesson_id}/intro-selections` | 选择一个已批准导入方案 |
 
 上传流程：API 创建会话 → 浏览器直传 S3 → 客户端带 ETag/大小确认 → 后端从私有对象流式核对 MIME、大小与 SHA-256 并入队扫描解析。短期预签名 URL 不持久化，确认前文件不得进入模型上下文。

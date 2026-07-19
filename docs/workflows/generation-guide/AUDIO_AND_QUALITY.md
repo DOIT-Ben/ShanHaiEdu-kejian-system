@@ -145,7 +145,7 @@
 
 ## 3. 视频课堂质量评估 (`video.classroom_quality.evaluate`)
 
-**做什么：** 以最终视频和已选导入快照评估独立创意、交接、不得提前讲授、连续性和课堂可用性。
+**做什么：** 以最终视频和已选导入快照评估课程驱动创意、交接、不得提前讲授、连续性和课堂可用性。
 
 **逻辑模型能力：** `vision.evaluate.classroom_video`  **视觉预设：** 无固定视觉预设
 
@@ -171,15 +171,15 @@
 
 **角色（平台固定）**
 
-> 你是课堂导入视频的独立质量评估员，按已选导入方案快照检查最终视频。
+> 你是课堂导入视频质量评估员，按已选导入方案快照检查最终视频。
 
 **任务（教师可修改）**
 
-> 观看最终视频并评估独立创意是否成立、是否准确继承钩子、是否在唯一handoff_moment交接、是否没有提前讲授、视觉动作是否连续、是否适合真实课堂。所有问题给出时间区间和受影响shot。
+> 观看最终视频并评估课程驱动创意是否完整、是否准确继承钩子和课程关联、是否在唯一handoff_moment交接、是否没有提前讲授、视觉动作是否连续、是否适合真实课堂。所有问题给出时间区间和受影响shot。
 
 **方法（平台固定）**
 
-> 以已选方案快照为唯一课程语义基准，不读取教案、教材或PPT。逐段比较independent_concept、hook、course_anchor、classroom_first_question、handoff_moment和must_not_preteach；同时检查画面可读性、节奏、儿童安全、连续性、字幕音频同步和课堂暂停点。分项评分并按阈值给出通过结论。
+> 以intro_selection.snapshot为唯一课程语义基准，不读取教案、教材或PPT。逐段比较creative_concept、hook、course_anchor、classroom_first_question、handoff_moment和must_not_preteach；同时检查画面可读性、节奏、儿童安全、连续性、字幕音频同步和课堂暂停点。分项评分并按阈值给出通过结论。
 
 **质量门禁（平台固定）**
 
@@ -192,7 +192,7 @@
 | 质量报告键 (`classroom_quality_report_key`) | `text` | 是 | 否 | 按结构化合同生成 |
 | 来源视频版本 (`quality_source_video_ref`) | `reference` | 是 | 否 | 按结构化合同生成 |
 | 已选方案键 (`quality_intro_option_key`) | `reference` | 是 | 否 | 按结构化合同生成 |
-| 独立创意完整度 (`independent_creative_score`) | `number` | 是 | 否 | 按结构化合同生成 |
+| 课程驱动创意完整度 (`course_grounded_creative_score`) | `number` | 是 | 否 | 按结构化合同生成 |
 | 课堂交接准确度 (`handoff_accuracy_score`) | `number` | 是 | 否 | 按结构化合同生成 |
 | 未提前讲授 (`no_preteach_score`) | `number` | 是 | 否 | 按结构化合同生成 |
 | 视觉与动作连续性 (`continuity_score`) | `number` | 是 | 否 | 按结构化合同生成 |
@@ -209,7 +209,7 @@
 ```markdown
 # 视频课堂质量报告
 
-独立创意：{{independent_creative_score}}
+课程驱动创意：{{course_grounded_creative_score}}
 
 课堂交接：{{handoff_accuracy_score}}
 

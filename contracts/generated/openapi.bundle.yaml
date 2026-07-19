@@ -950,6 +950,8 @@ components:
           schema:
             $ref: '#/components/schemas/AcceptedJobEnvelope'
   schemas:
+    IntroOptionSet:
+      $ref: '#/components/schemas/intro-option-set.schema'
     AutomationMode:
       type: string
       enum:
@@ -3299,4 +3301,276 @@ components:
         - cancelled
         - stale
         - skipped
+    tendency:
+      enum:
+        - science
+        - application
+        - story
+    option:
+      type: object
+      additionalProperties: false
+      required:
+        - option_key
+        - lesson_unit_key
+        - knowledge_point
+        - primary_tendency
+        - secondary_tendencies
+        - title
+        - creative_concept
+        - hook
+        - viewer_value
+        - suggested_medium
+        - duration_seconds
+        - course_anchor
+        - classroom_first_question
+        - handoff_moment
+        - must_not_preteach
+        - fit_reason
+        - risks
+        - recommendation_score
+        - recommendation_reason
+      properties:
+        option_key:
+          type: string
+          pattern: ^INTRO-(SCI|APP|STO)-[0-9]{2}$
+        lesson_unit_key:
+          type: string
+          minLength: 1
+        knowledge_point:
+          type: string
+          minLength: 1
+        primary_tendency:
+          $ref: '#/components/schemas/tendency'
+        secondary_tendencies:
+          type: array
+          minItems: 1
+          maxItems: 2
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/tendency'
+        title:
+          type: string
+          minLength: 1
+        creative_concept:
+          type: string
+          minLength: 1
+        hook:
+          type: string
+          minLength: 1
+        viewer_value:
+          type: string
+          minLength: 1
+        suggested_medium:
+          enum:
+            - video
+            - image
+            - physical_object
+            - question
+            - performance
+            - mixed
+        duration_seconds:
+          type: integer
+          minimum: 10
+          maximum: 600
+        course_anchor:
+          type: string
+          minLength: 1
+        classroom_first_question:
+          type: string
+          minLength: 1
+        handoff_moment:
+          type: string
+          minLength: 1
+        must_not_preteach:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+          uniqueItems: true
+        fit_reason:
+          type: string
+          minLength: 1
+        risks:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        recommendation_score:
+          type: integer
+          minimum: 1
+          maximum: 100
+        recommendation_reason:
+          type: string
+          minLength: 1
+    intro-option-set.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://shanhaiedu.local/contracts/intro-option-set.schema.json
+      title: IntroOptionSet
+      description: 由最小课程种子直接生成的一套或三类九套课堂导入方案。业务校验器额外保证主要倾向分布、课程追溯、辅助倾向交叉和最高推荐分唯一。
+      type: object
+      additionalProperties: false
+      required:
+        - option_set_id
+        - lesson_unit_id
+        - generation_mode
+        - source_lesson_unit_key
+        - knowledge_point
+        - status
+        - generation_context_snapshot_id
+        - options
+        - created_at
+      properties:
+        option_set_id:
+          type: string
+          format: uuid
+        lesson_unit_id:
+          type: string
+          format: uuid
+        generation_mode:
+          enum:
+            - default_nine
+            - refine_existing
+        source_lesson_unit_key:
+          type: string
+          minLength: 1
+        knowledge_point:
+          type: string
+          minLength: 1
+        status:
+          enum:
+            - draft
+            - review_required
+            - approved
+            - stale
+        generation_context_snapshot_id:
+          type: string
+          format: uuid
+        options:
+          type: array
+          minItems: 1
+          maxItems: 9
+          items:
+            $ref: '#/components/schemas/option'
+        created_at:
+          type: string
+          format: date-time
+      allOf:
+        - if:
+            properties:
+              generation_mode:
+                const: default_nine
+          then:
+            properties:
+              options:
+                minItems: 9
+                maxItems: 9
+          else:
+            properties:
+              options:
+                minItems: 1
+                maxItems: 1
+      $defs:
+        tendency:
+          enum:
+            - science
+            - application
+            - story
+        option:
+          type: object
+          additionalProperties: false
+          required:
+            - option_key
+            - lesson_unit_key
+            - knowledge_point
+            - primary_tendency
+            - secondary_tendencies
+            - title
+            - creative_concept
+            - hook
+            - viewer_value
+            - suggested_medium
+            - duration_seconds
+            - course_anchor
+            - classroom_first_question
+            - handoff_moment
+            - must_not_preteach
+            - fit_reason
+            - risks
+            - recommendation_score
+            - recommendation_reason
+          properties:
+            option_key:
+              type: string
+              pattern: ^INTRO-(SCI|APP|STO)-[0-9]{2}$
+            lesson_unit_key:
+              type: string
+              minLength: 1
+            knowledge_point:
+              type: string
+              minLength: 1
+            primary_tendency:
+              $ref: '#/components/schemas/tendency'
+            secondary_tendencies:
+              type: array
+              minItems: 1
+              maxItems: 2
+              uniqueItems: true
+              items:
+                $ref: '#/components/schemas/tendency'
+            title:
+              type: string
+              minLength: 1
+            creative_concept:
+              type: string
+              minLength: 1
+            hook:
+              type: string
+              minLength: 1
+            viewer_value:
+              type: string
+              minLength: 1
+            suggested_medium:
+              enum:
+                - video
+                - image
+                - physical_object
+                - question
+                - performance
+                - mixed
+            duration_seconds:
+              type: integer
+              minimum: 10
+              maximum: 600
+            course_anchor:
+              type: string
+              minLength: 1
+            classroom_first_question:
+              type: string
+              minLength: 1
+            handoff_moment:
+              type: string
+              minLength: 1
+            must_not_preteach:
+              type: array
+              minItems: 1
+              items:
+                type: string
+                minLength: 1
+              uniqueItems: true
+            fit_reason:
+              type: string
+              minLength: 1
+            risks:
+              type: array
+              items:
+                type: string
+                minLength: 1
+            recommendation_score:
+              type: integer
+              minimum: 1
+              maximum: 100
+            recommendation_reason:
+              type: string
+              minLength: 1
 x-shanhai-contract-kind: runtime

@@ -155,7 +155,7 @@ def test_catalog_hash_is_deterministic_for_semantically_identical_objects() -> N
     assert first_validated.canonical_json == second_validated.canonical_json
     assert first_validated.content_hash == second_validated.content_hash
     assert first_validated.content_hash == (
-        "53c0a752a3af09261df32b5a175d9ad7abc7d20f975460ef7bb2d6e7e172318b"
+        "b2e0976f4e77273f95bc92d2c6a287f9c2fd3fd8b564c5d23873238e75633f81"
     )
 
 

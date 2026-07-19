@@ -8,14 +8,13 @@
 flowchart TD
     Material[上传小知识点教材] --> Divide[课时划分]
     Divide --> Plan[每课时教案]
-    Divide --> Intro[独立创意三类九套]
-    Intro --> Anchor[最小课程锚定]
-    Anchor --> Select[选择导入方案]
+    Divide --> Intro[课程驱动三类九套]
+    Intro --> Select[选择导入方案]
     Plan --> PPT{启用PPT}
     Select --> Video{启用导入视频}
     PPT --> Delivery[项目交付]
     Video --> Delivery
-    Anchor --> Delivery
+    Intro --> Delivery
     Plan --> Delivery
 ```
 
@@ -42,7 +41,7 @@ flowchart TD
 
 ### 首套内置生成基线
 
-`shanhai.primary_math.courseware@1.0.0`是首套可执行业务内容基线。其声明源位于`workflow/builtin/primary_math_courseware/generation-source.json`，确定性构建后为现行目录中的23个`model_generation`节点各提供：
+`shanhai.primary_math.courseware@1.0.0`是首套可执行业务内容基线。其声明源位于`workflow/builtin/primary_math_courseware/generation-source.json`，确定性构建后为现行目录中的22个`model_generation`节点各提供：
 
 - 教师输入、系统补全和Context注入字段；
 - 可编辑业务Prompt与只读方法、质量门；
@@ -77,7 +76,7 @@ flowchart TD
 
 课时划分只决定分几课时和每课时讲什么，不同时生成详细教案。教案按项目固定的内容定义版本生成。
 
-每课时默认同时生成三类九套导入设计：先在无课程上下文中生成九个独立创意，再只为每个创意补充一个最小课程锚点和推荐度。最终方案集作为独立附录产物；教师可以稍后选择，不阻塞教案和 PPT。
+每课时默认同时生成三类九套导入设计：单个节点读取批准课时、知识点、学习目标、内容边界、不得提前讲授、年级/年龄、教材证据摘要和可选教师偏好，一次生成最终九套方案。三种主要倾向各三套并允许辅助倾向交叉；方案集作为独立附录产物，教师可以稍后选择，不阻塞教案和PPT。
 
 ## 3. PPT流程
 
@@ -105,8 +104,7 @@ flowchart TD
 ## 4. 课堂导入视频流程
 
 ```text
-三类九套独立创意
-→ 最小课程锚定与推荐度
+课程驱动三类九套与推荐度
 → 教师选择一个导入方案
 → 完整母版剧本
 → 粗分镜

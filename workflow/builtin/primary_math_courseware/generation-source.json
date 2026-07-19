@@ -483,96 +483,27 @@
       }
     },
     {
-      "template_key": "intro.ideate",
-      "title": "独立导入创意",
-      "description": "在严格隔离课程上下文的条件下，默认生成科普、应用、故事各三套独立创意，或只完善教师已有的一套创意。",
+      "template_key": "intro.generate_options",
+      "title": "课程驱动导入方案",
+      "description": "以已批准课时、知识边界、最小教材证据和教师偏好，在一次生成中产出一套或三类九套最终课堂导入方案。",
       "model_capability": "text.structured.creative_education",
       "input": {
-        "description": "只接收生成方式、创意类别规则、年龄安全边界、通用媒介偏好和可选已有创意。",
+        "description": "输入生成方式和最小课程种子；不接收完整教案、PPT或视频产物。",
         "fields": [
           {"field_key": "generation_mode", "label": "生成方式", "value_type": "enum", "required": true, "source": "teacher", "visibility": "primary", "widget": "select", "default_value": "default_nine", "options": [{"value": "default_nine", "label": "三类九套"}, {"value": "refine_existing", "label": "完善已有创意"}]},
           {"field_key": "existing_idea_ref", "label": "已有创意", "value_type": "reference", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea"},
-          {"field_key": "ideas_per_category", "label": "每类方案数", "value_type": "number", "required": true, "source": "system", "visibility": "hidden", "widget": "number", "default_value": 3, "validation": {"minimum": 3, "maximum": 3}},
-          {"field_key": "audience_age_band", "label": "受众年龄段", "value_type": "text", "required": true, "source": "system", "visibility": "hidden", "widget": "text", "default_value": "6-12岁"},
+          {"field_key": "target_lesson_unit", "label": "目标课时", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "knowledge_point", "label": "知识点", "value_type": "text", "required": true, "source": "context", "visibility": "hidden", "widget": "text"},
+          {"field_key": "learning_objective_summary", "label": "一句话学习目标", "value_type": "rich_text", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "teaching_content_boundary", "label": "教学内容边界", "value_type": "rich_text", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "must_not_preteach", "label": "不得提前讲授", "value_type": "list", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
+          {"field_key": "grade_level", "label": "年级", "value_type": "text", "required": true, "source": "context", "visibility": "hidden", "widget": "text"},
+          {"field_key": "audience_age_band", "label": "受众年龄段", "value_type": "text", "required": true, "source": "context", "visibility": "hidden", "widget": "text"},
+          {"field_key": "target_material_evidence", "label": "教材证据摘要", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
           {"field_key": "medium_preferences", "label": "媒介偏好", "value_type": "list", "required": false, "source": "teacher", "visibility": "secondary", "widget": "multiselect"},
+          {"field_key": "duration_preference_seconds", "label": "建议导入时长", "value_type": "number", "required": false, "source": "teacher", "visibility": "secondary", "widget": "number", "validation": {"minimum": 60, "maximum": 180}},
           {"field_key": "creative_preferences", "label": "创意偏好", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 4000}},
           {"field_key": "general_teacher_preferences", "label": "教师通用偏好", "value_type": "reference", "required": false, "source": "context", "visibility": "hidden", "widget": "textarea"}
-        ]
-      },
-      "output": {
-        "description": "不含教材、知识点或课程锚点的一套或九套独立创意。",
-        "definition_role": "intermediate",
-        "fields": [
-          {"field_key": "idea_set_key", "label": "创意集键", "type": "text", "required": true, "editable": false, "deletable": false, "visibility": "hidden"},
-          {
-            "field_key": "independent_ideas",
-            "label": "独立创意",
-            "type": "repeatable",
-            "required": true,
-            "editable": true,
-            "deletable": false,
-            "repeatable": true,
-            "min_items": 1,
-            "max_items": 9,
-            "children": [
-              {"field_key": "idea_key", "label": "创意键", "type": "text", "required": true, "editable": false, "deletable": false},
-              {"field_key": "idea_category", "label": "类别", "type": "enum", "required": true, "editable": false, "deletable": false, "options": [{"value": "science", "label": "科普"}, {"value": "application", "label": "应用"}, {"value": "story", "label": "故事"}]},
-              {"field_key": "idea_title", "label": "标题", "type": "text", "required": true, "editable": true, "deletable": false},
-              {"field_key": "independent_concept", "label": "独立创意概念", "type": "rich_text", "required": true, "editable": true, "deletable": false},
-              {"field_key": "creative_hook", "label": "开场钩子", "type": "rich_text", "required": true, "editable": true, "deletable": false},
-              {"field_key": "viewer_value", "label": "独立观看价值", "type": "rich_text", "required": true, "editable": true, "deletable": false},
-              {"field_key": "suggested_medium", "label": "建议媒介", "type": "enum", "required": true, "editable": true, "deletable": false},
-              {"field_key": "safety_notes", "label": "儿童安全说明", "type": "list", "required": true, "editable": true, "deletable": false}
-            ]
-          },
-          {
-            "field_key": "diversity_check",
-            "label": "多样性检查",
-            "type": "group",
-            "required": true,
-            "editable": false,
-            "deletable": false,
-            "children": [
-              {"field_key": "category_counts", "label": "分类计数", "type": "object", "required": true, "editable": false, "deletable": false},
-              {"field_key": "distinct_hooks", "label": "钩子实质不同", "type": "boolean", "required": true, "editable": false, "deletable": false},
-              {"field_key": "independent_without_course", "label": "脱离课程仍成立", "type": "boolean", "required": true, "editable": false, "deletable": false},
-              {"field_key": "diversity_notes", "label": "差异说明", "type": "rich_text", "required": true, "editable": false, "deletable": false}
-            ]
-          }
-        ]
-      },
-      "prompt": {
-        "role": "你是面向儿童的独立创意策划师，擅长科普观察、真实任务和完整小故事。",
-        "task": "在不知道教材、学科、课题、教案和PPT的前提下，default_nine生成科普、应用、故事三类各三套、共九套实质不同的独立创意；refine_existing只完善教师已有的一套创意，不扩成九套。此阶段不要补课程锚点、课堂问题、知识点或推荐分。",
-        "method": "科普类围绕值得观察或解释的现象与未知；应用类围绕真实任务、限制、选择或完成目标的需要；故事类围绕人物或主体的目标、变化、阻碍、误会或悬念。每套写清独立概念、开场钩子、去掉任何课程回接后仍然存在的观看价值、适合媒介和安全注意。refine_existing保留教师原意，只补完整性、可观看价值和安全边界。创意可自然出现儿童、成人、动物、机器、自然或抽象主体，但不能因小学受众而默认使用教师、教室和课堂活动。",
-        "quality_gate": "default_nine每类恰好三套、总数九套且不能只替换标题、角色名或场景；refine_existing恰好一套且不改变教师核心创意。不知道课程的人仍能理解事件，去掉未来锚点后仍值得观看或参与；不得泄漏教材、知识点、教案、PPT、课程标题、分镜、旁白、字幕、资产、Provider或费用；内容适龄、安全、不鼓励危险模仿。",
-        "context_bindings": [
-          {"binding_key": "teacher_preferences", "source": "project.teacher_preferences", "required": false, "exposure": "summary", "max_items": 1, "max_bytes": 20000}
-        ],
-        "max_chars": 30000
-      },
-      "projection": {
-        "output_format": "markdown",
-        "renderer_id": "shanhai.intro_independent_ideas.markdown.v1",
-        "template": "# 独立导入创意\n\n{{independent_ideas}}\n\n## 多样性检查\n{{diversity_check}}",
-        "allowed_variables": ["independent_ideas", "diversity_check"],
-        "roles": ["teacher_view"],
-        "teacher_visible": true
-      }
-    },
-    {
-      "template_key": "intro.anchor",
-      "title": "最小课程锚定",
-      "description": "只为一套或九套独立创意补充唯一最小课程锚点、首问、交接和推荐度，不改写独立创意。",
-      "model_capability": "text.structured.zh_primary_math",
-      "input": {
-        "description": "输入一套或九套独立创意，并注入已批准课时和教材证据。",
-        "fields": [
-          {"field_key": "independent_idea_set", "label": "独立创意集", "value_type": "reference", "required": true, "source": "system", "visibility": "hidden", "widget": "textarea"},
-          {"field_key": "target_lesson_unit", "label": "目标课时", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
-          {"field_key": "target_material_evidence", "label": "教材证据", "value_type": "reference", "required": true, "source": "context", "visibility": "hidden", "widget": "textarea"},
-          {"field_key": "duration_preference_seconds", "label": "建议导入时长", "value_type": "number", "required": false, "source": "teacher", "visibility": "secondary", "widget": "number", "validation": {"minimum": 60, "maximum": 180}},
-          {"field_key": "anchor_requirements", "label": "锚点补充要求", "value_type": "rich_text", "required": false, "source": "teacher", "visibility": "secondary", "widget": "textarea", "validation": {"max_length": 4000}}
         ]
       },
       "output": {
@@ -581,6 +512,8 @@
         "fields": [
           {"field_key": "option_set_key", "label": "方案集键", "type": "text", "required": true, "editable": false, "deletable": false, "visibility": "hidden"},
           {"field_key": "source_lesson_unit_key", "label": "来源课时键", "type": "reference", "required": true, "editable": false, "deletable": false, "visibility": "hidden"},
+          {"field_key": "source_knowledge_point", "label": "来源知识点", "type": "text", "required": true, "editable": false, "deletable": false, "visibility": "hidden"},
+          {"field_key": "source_material_evidence_keys", "label": "来源教材证据", "type": "list", "required": true, "editable": false, "deletable": false, "visibility": "hidden"},
           {
             "field_key": "options",
             "label": "导入方案",
@@ -593,21 +526,24 @@
             "max_items": 9,
             "children": [
               {"field_key": "option_key", "label": "方案键", "type": "text", "required": true, "editable": false, "deletable": false},
-              {"field_key": "source_idea_key", "label": "独立创意键", "type": "reference", "required": true, "editable": false, "deletable": false},
-              {"field_key": "option_category", "label": "类别", "type": "enum", "required": true, "editable": false, "deletable": false},
-              {"field_key": "option_title", "label": "标题", "type": "text", "required": true, "editable": true, "deletable": false},
-              {"field_key": "anchored_independent_concept", "label": "独立创意", "type": "rich_text", "required": true, "editable": false, "deletable": false},
-              {"field_key": "anchored_hook", "label": "钩子", "type": "rich_text", "required": true, "editable": false, "deletable": false},
-              {"field_key": "anchored_viewer_value", "label": "独立价值", "type": "rich_text", "required": true, "editable": false, "deletable": false},
-              {"field_key": "anchored_medium", "label": "建议媒介", "type": "enum", "required": true, "editable": true, "deletable": false},
-              {"field_key": "suggested_duration_seconds", "label": "建议时长", "type": "number", "required": true, "editable": true, "deletable": false},
-              {"field_key": "course_anchor", "label": "唯一课程锚点", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "lesson_unit_key", "label": "来源课时键", "type": "reference", "required": true, "editable": false, "deletable": false},
+              {"field_key": "knowledge_point", "label": "知识点", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "primary_tendency", "label": "主要创作倾向", "type": "enum", "required": true, "editable": false, "deletable": false, "options": [{"value": "science", "label": "科普"}, {"value": "application", "label": "应用"}, {"value": "story", "label": "故事"}]},
+              {"field_key": "secondary_tendencies", "label": "辅助创作倾向", "type": "list", "required": true, "editable": true, "deletable": false},
+              {"field_key": "title", "label": "标题", "type": "text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "creative_concept", "label": "课程驱动创意概念", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "hook", "label": "钩子", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "viewer_value", "label": "观看价值", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "suggested_medium", "label": "建议媒介", "type": "enum", "required": true, "editable": true, "deletable": false},
+              {"field_key": "duration_seconds", "label": "建议时长", "type": "number", "required": true, "editable": true, "deletable": false},
+              {"field_key": "course_anchor", "label": "课程关联", "type": "rich_text", "required": true, "editable": true, "deletable": false},
               {"field_key": "classroom_first_question", "label": "课堂第一问", "type": "rich_text", "required": true, "editable": true, "deletable": false},
               {"field_key": "handoff_moment", "label": "交接时刻", "type": "rich_text", "required": true, "editable": true, "deletable": false},
-              {"field_key": "option_must_not_preteach", "label": "不得提前讲授", "type": "list", "required": true, "editable": false, "deletable": false},
+              {"field_key": "must_not_preteach", "label": "不得提前讲授", "type": "list", "required": true, "editable": false, "deletable": false},
               {"field_key": "fit_reason", "label": "适配理由", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "risks", "label": "风险", "type": "list", "required": true, "editable": true, "deletable": false},
               {"field_key": "recommendation_score", "label": "推荐分", "type": "number", "required": true, "editable": false, "deletable": false},
-              {"field_key": "option_risks", "label": "风险", "type": "list", "required": true, "editable": true, "deletable": false}
+              {"field_key": "recommendation_reason", "label": "推荐理由", "type": "rich_text", "required": true, "editable": false, "deletable": false}
             ]
           },
           {
@@ -619,28 +555,28 @@
             "deletable": false,
             "children": [
               {"field_key": "recommended_option_key", "label": "最高推荐方案", "type": "reference", "required": true, "editable": false, "deletable": false},
-              {"field_key": "recommendation_reason", "label": "推荐理由", "type": "rich_text", "required": true, "editable": false, "deletable": false},
               {"field_key": "single_highest_score", "label": "最高分唯一", "type": "boolean", "required": true, "editable": false, "deletable": false}
             ]
           }
         ]
       },
       "prompt": {
-        "role": "你是小学数学课堂导入锚定设计师，负责把已经成立的独立创意最小化地接回一个已批准课时。",
-        "task": "逐套保留独立创意的标题、独立概念、钩子和观看价值，只补一个课程锚点、课堂第一问、交接时刻、不得提前讲授、适配理由、风险和推荐分。不得重写独立创意，不得生成分镜、旁白、字幕、资产或模型参数。",
-        "method": "先从批准课时与教材证据提取当前核心学习边界和不得提前讲授内容。对每套创意找到一个具体的触发事件、可见现象、真实选择或未完成行动作为唯一回接；锚点只负责把注意力带回课堂，不解释整节课。交接时刻必须可定位，课堂第一问必须可直接由教师提出。推荐度综合独立性、课时适配、可制作性、时长和风险；default_nine必须产生唯一最高值，refine_existing只有一套并保留教师选择。",
-        "quality_gate": "default_nine科普、应用、故事各恰好三套，refine_existing恰好一套；独立创意字段与上游逐字一致；每套只有一个课程锚点，且去掉锚点仍成立；不得提前讲出需要学生发现的定义、写法、方法或结论；default_nine最高推荐分必须唯一；不得因为小学受众默认教师、教室或儿童角色；输出不含教案正文、PPT、分镜、旁白、字幕、资产、Provider和费用。",
+        "role": "你是小学数学课程驱动的课堂导入方案设计师，擅长从知识点、学习目标、教材证据和不得提前讲授边界中设计科普、应用、故事倾向可交叉的创意方案。",
+        "task": "读取目标课时稳定键、知识点、一句话学习目标、教学内容边界、must_not_preteach、年级或年龄段、教材证据摘要及可选教师创意、媒介和时长偏好，在一次调用中直接生成最终intro_option_set。default_nine生成九套；refine_existing只完善一套。不要生成教案正文、PPT、分镜、旁白、字幕、资产、Provider参数或费用。",
+        "method": "先提取课程种子，再从可观察现象、真实任务、人物或主体目标等不同角度生成创意；课程依据必须从创意形成开始参与，不能在完成后补贴课题词。每套同时形成主要与辅助倾向、创意概念、钩子、观看价值、课程关联、课堂第一问、交接时刻、不得提前讲授、媒介、时长、适配、风险和推荐结论。science、application、story只是主要倾向，辅助倾向可以交叉。",
+        "quality_gate": "default_nine主要倾向各恰好三套，至少一套包含两个以上辅助倾向；refine_existing恰好一套。每套必须可追溯目标课时、知识点和教材证据，创意与课程依据存在实质关联；不得提前讲出需要学生发现的定义、写法、方法或结论；default_nine最高推荐分必须唯一；不得把三种倾向解释为互斥类别；输出不含完整教案、PPT、视频产物、Provider和费用。",
         "context_bindings": [
           {"binding_key": "approved_lesson_unit", "source": "lesson_division.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 200000},
-          {"binding_key": "approved_material", "source": "material.approved_parse", "required": true, "exposure": "summary", "max_items": 50, "max_bytes": 300000}
+          {"binding_key": "approved_material", "source": "material.approved_parse", "required": true, "exposure": "summary", "max_items": 50, "max_bytes": 300000},
+          {"binding_key": "teacher_preferences", "source": "project.teacher_preferences", "required": false, "exposure": "summary", "max_items": 1, "max_bytes": 20000}
         ],
         "max_chars": 40000
       },
       "projection": {
         "output_format": "markdown",
         "renderer_id": "shanhai.intro_option_set.markdown.v1",
-        "template": "# 课堂导入设计\n\n{{options}}\n\n## 推荐结论\n{{recommendation_summary}}",
-        "allowed_variables": ["options", "recommendation_summary"],
+        "template": "# 课程驱动课堂导入设计\n\n知识点：{{source_knowledge_point}}\n\n{{options}}\n\n## 推荐结论\n{{recommendation_summary}}",
+        "allowed_variables": ["source_knowledge_point", "options", "recommendation_summary"],
         "roles": ["teacher_view", "export"],
         "teacher_visible": true
       }
@@ -1094,7 +1030,7 @@
     {
       "template_key": "video.master_script.generate",
       "title": "视频母版剧本生成",
-      "description": "只从已选导入方案不可变快照扩写完整独立短片剧本，并准确停在课堂交接时刻。",
+      "description": "只从已选课程驱动导入方案的不可变快照扩写完整短片剧本，并准确停在课堂交接时刻。",
       "model_capability": "text.structured.creative_video",
       "style_preset_refs": ["style.primary_math.paper_clay"],
       "input": {
@@ -1177,10 +1113,10 @@
         ]
       },
       "prompt": {
-        "role": "你是独立创意课堂导入短片的母版编剧，负责把已选方案扩写为完整可生产故事。",
+        "role": "你是课程驱动课堂导入短片的母版编剧，负责把已选方案扩写为完整可生产故事。",
         "task": "严格继承已选方案的标题、独立概念、钩子、课程锚点、课堂第一问、交接时刻和不得提前讲授内容，生成完整故事与场次，并给出60至180秒内的时长建议。不得重新选择创意，不得读取或推测教案、教材、PPT。此阶段不要写shot级提示词或臆造价格。",
-        "method": "先让脱离课程仍成立的故事具有清楚的开始状态、目标或未知、可见变化和结局推进，再只在最后按上游唯一锚点回接。每个场次写明目的、地点、人物或主体、动作、旁白、对白、声音意图、开始和结束状态及预计时长。根据故事场次、可见节拍、预计镜头数、节奏和交接点推荐60至180秒内的精确总时长；teacher_fixed时尊重教师目标，system_recommended时使用建议值。价格由服务端当前路由和版本化价格档案另行估算，模型只声明需要报价，不输出金额。",
-        "quality_gate": "上游独立创意与锚点字段不得改写；完整故事不是梗概或shot列表；结尾准确停在handoff_moment；不得解释must_not_preteach；建议时长和最终目标均在60至180秒，场次时长总和等于目标时长；建议理由与预计镜头数可复核；不包含Provider、模型、参考图位置、虚构费用、自动批准或下一工具。",
+        "method": "从已选快照的creative_concept、hook、viewer_value、knowledge_point和course_anchor展开故事，使课程依据贯穿故事起点、变化与课堂交接，而不是在结尾临时贴入。每个场次写明目的、地点、人物或主体、动作、旁白、对白、声音意图、开始和结束状态及预计时长。根据故事场次、可见节拍、预计镜头数、节奏和交接点推荐60至180秒内的精确总时长；teacher_fixed时尊重教师目标，system_recommended时使用建议值。价格由服务端当前路由和版本化价格档案另行估算，模型只声明需要报价，不输出金额。",
+        "quality_gate": "已选快照中的课程驱动创意、钩子、观看价值、课程关联和交接字段不得改写；完整故事不是梗概或shot列表；结尾准确停在handoff_moment；不得解释must_not_preteach；建议时长和最终目标均在60至180秒，场次时长总和等于目标时长；建议理由与预计镜头数可复核；不包含Provider、模型、参考图位置、虚构费用、自动批准或下一工具。",
         "context_bindings": [
           {"binding_key": "selected_intro", "source": "intro_selection.snapshot", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 100000}
         ],
@@ -1244,7 +1180,7 @@
       "prompt": {
         "role": "你是创意短片粗分镜设计师，负责验证故事节奏、时长和可制作性。",
         "task": "把批准母版剧本按场次和故事节拍拆成粗分镜。每个beat只说明发生什么、学生看到什么变化、预计多长、需要哪些资产和怎样衔接；不要写逐秒运镜、参考图序号或视频模型提示词。",
-        "method": "保持母版剧本场次、开始结束状态和唯一课堂交接不变。按可见变化拆分2个以上节拍，每个节拍只有一个主要事件，稳定引用来源scene_key。预计时长总和等于母版目标时长，并为后续人物、场景、道具、生物资产清单提供明确需求。",
+        "method": "从已选快照与批准母版继承课程驱动创意和交接边界，不重新解释课程依据。保持母版剧本场次、开始结束状态和唯一课堂交接不变。按可见变化拆分2个以上节拍，每个节拍只有一个主要事件，稳定引用来源scene_key。预计时长总和等于母版目标时长，并为后续人物、场景、道具、生物资产清单提供明确需求。",
         "quality_gate": "不改写已选方案或母版剧本；节拍顺序连续、来源有效、单节拍单事件；总时长一致；最后节拍才到达handoff_moment；不包含Provider提示词、参考图位置、shot时长硬切、资产文件或模型参数。",
         "context_bindings": [
           {"binding_key": "selected_intro", "source": "intro_selection.snapshot", "required": true, "exposure": "summary", "max_items": 1, "max_bytes": 100000},
@@ -1635,7 +1571,7 @@
       "prompt": {
         "role": "你是创意短片细分镜导演，负责把已批准节拍和图片资产变成6至30秒逐shot生产合同。",
         "task": "在母版剧本、粗分镜、视频风格和已批准图片资产全部齐备后，生成逐shot细分镜。每个shot只有一个主要可见节拍、一个明确终点和一次主要运镜，并输出可直接提交视频模型的完整提示词。",
-        "method": "按故事节拍和逻辑Provider能力为每个shot选择6至30秒的精确时长，使全部shot总和等于已确认母版目标时长。每个shot稳定引用scene和beat，写明开始/结束状态、景别、角度、起止构图、一次主要运镜、主体动作时间顺序、旁白/对白/声音占位和连续性锁定。每张已批准垫图按连续image_index登记语义名、版本和用途，提示词中的垫图标记与结构一一对应。最后一个shot才到达课堂交接。",
+        "method": "每个shot必须可追溯已选课程驱动方案、来源scene和beat。按故事节拍和逻辑Provider能力为每个shot选择6至30秒的精确时长，使全部shot总和等于已确认母版目标时长。写明开始/结束状态、景别、角度、起止构图、一次主要运镜、主体动作时间顺序、旁白/对白/声音占位和连续性锁定。每张已批准垫图按连续image_index登记语义名、版本和用途，提示词中的垫图标记与结构一一对应。最后一个shot才到达课堂交接。",
         "quality_gate": "shot顺序连续，每个时长为6至30秒且总和精确；每个shot单节拍单运镜；所有资产版本已批准且引用存在；人物、道具、光线、天气和动作状态无解释跳变；不把旁白字幕交给视频画面生成；结尾不越过handoff_moment、不解释must_not_preteach。",
         "context_bindings": [
           {"binding_key": "selected_intro", "source": "intro_selection.snapshot", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 100000},
@@ -1850,7 +1786,7 @@
     {
       "template_key": "video.classroom_quality.evaluate",
       "title": "视频课堂质量评估",
-      "description": "以最终视频和已选导入快照评估独立创意、交接、不得提前讲授、连续性和课堂可用性。",
+      "description": "以最终视频和已选导入快照评估课程驱动创意、交接、不得提前讲授、连续性和课堂可用性。",
       "model_capability": "vision.evaluate.classroom_video",
       "input": {
         "description": "输入最终视频参考、已选导入方案和评估阈值。",
@@ -1868,7 +1804,7 @@
           {"field_key": "classroom_quality_report_key", "label": "质量报告键", "type": "text", "required": true, "editable": false, "deletable": false},
           {"field_key": "quality_source_video_ref", "label": "来源视频版本", "type": "reference", "required": true, "editable": false, "deletable": false},
           {"field_key": "quality_intro_option_key", "label": "已选方案键", "type": "reference", "required": true, "editable": false, "deletable": false},
-          {"field_key": "independent_creative_score", "label": "独立创意完整度", "type": "number", "required": true, "editable": false, "deletable": false},
+          {"field_key": "course_grounded_creative_score", "label": "课程驱动创意完整度", "type": "number", "required": true, "editable": false, "deletable": false},
           {"field_key": "handoff_accuracy_score", "label": "课堂交接准确度", "type": "number", "required": true, "editable": false, "deletable": false},
           {"field_key": "no_preteach_score", "label": "未提前讲授", "type": "number", "required": true, "editable": false, "deletable": false},
           {"field_key": "continuity_score", "label": "视觉与动作连续性", "type": "number", "required": true, "editable": false, "deletable": false},
@@ -1895,9 +1831,9 @@
         ]
       },
       "prompt": {
-        "role": "你是课堂导入视频的独立质量评估员，按已选导入方案快照检查最终视频。",
-        "task": "观看最终视频并评估独立创意是否成立、是否准确继承钩子、是否在唯一handoff_moment交接、是否没有提前讲授、视觉动作是否连续、是否适合真实课堂。所有问题给出时间区间和受影响shot。",
-        "method": "以已选方案快照为唯一课程语义基准，不读取教案、教材或PPT。逐段比较independent_concept、hook、course_anchor、classroom_first_question、handoff_moment和must_not_preteach；同时检查画面可读性、节奏、儿童安全、连续性、字幕音频同步和课堂暂停点。分项评分并按阈值给出通过结论。",
+        "role": "你是课堂导入视频质量评估员，按已选导入方案快照检查最终视频。",
+        "task": "观看最终视频并评估课程驱动创意是否完整、是否准确继承钩子和课程关联、是否在唯一handoff_moment交接、是否没有提前讲授、视觉动作是否连续、是否适合真实课堂。所有问题给出时间区间和受影响shot。",
+        "method": "以intro_selection.snapshot为唯一课程语义基准，不读取教案、教材或PPT。逐段比较creative_concept、hook、course_anchor、classroom_first_question、handoff_moment和must_not_preteach；同时检查画面可读性、节奏、儿童安全、连续性、字幕音频同步和课堂暂停点。分项评分并按阈值给出通过结论。",
         "quality_gate": "不得因个人审美改写上游创意；所有失败有可定位证据；任何提前讲授、越过交接、严重安全问题或不可播放都必须阻塞通过；发现只指向受影响shot，不要求无关镜头重做；报告不包含Provider、密钥或原始敏感模型响应。",
         "context_bindings": [
           {"binding_key": "selected_intro", "source": "intro_selection.snapshot", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 100000}
@@ -1907,8 +1843,8 @@
       "projection": {
         "output_format": "markdown",
         "renderer_id": "shanhai.video_classroom_quality.markdown.v1",
-        "template": "# 视频课堂质量报告\n\n独立创意：{{independent_creative_score}}\n\n课堂交接：{{handoff_accuracy_score}}\n\n未提前讲授：{{no_preteach_score}}\n\n连续性：{{continuity_score}}\n\n课堂可用性：{{classroom_usability_score}}\n\n## 发现\n{{classroom_quality_findings}}\n\n通过：{{classroom_quality_passed}}\n\n{{classroom_quality_summary}}",
-        "allowed_variables": ["independent_creative_score", "handoff_accuracy_score", "no_preteach_score", "continuity_score", "classroom_usability_score", "classroom_quality_findings", "classroom_quality_passed", "classroom_quality_summary"],
+        "template": "# 视频课堂质量报告\n\n课程驱动创意：{{course_grounded_creative_score}}\n\n课堂交接：{{handoff_accuracy_score}}\n\n未提前讲授：{{no_preteach_score}}\n\n连续性：{{continuity_score}}\n\n课堂可用性：{{classroom_usability_score}}\n\n## 发现\n{{classroom_quality_findings}}\n\n通过：{{classroom_quality_passed}}\n\n{{classroom_quality_summary}}",
+        "allowed_variables": ["course_grounded_creative_score", "handoff_accuracy_score", "no_preteach_score", "continuity_score", "classroom_usability_score", "classroom_quality_findings", "classroom_quality_passed", "classroom_quality_summary"],
         "roles": ["teacher_view", "export"],
         "teacher_visible": true
       }

@@ -11,7 +11,7 @@
 - `sse-event.schema.json`：统一事件信封。
 - `creation-lifecycle-event.schema.json`：提示词版本、候选采用、项目写回和下游stale传播事件。
 - `workflow-node-status.schema.json`：节点状态枚举。
-- `intro-option-set.schema.json`：三类九套导入设计、最小课程锚点和选择交接。
+- `intro-option-set.schema.json`：课程驱动的三类九套导入设计、课程追溯和选择交接。
 - `ppt-page-spec.schema.json`：PPT逐页四层结构、白底和可编辑内容合同。
 - `video-shot.schema.json`：细分镜、垫图引用和6至30秒逻辑生成合同。
 - `creation-package.schema.json`：项目导入通用创作台的不可变包；兼容旧包，2.0包强制工作流来源、上下文快照和目标槽位。
@@ -33,7 +33,7 @@
 - `fixtures/stage0/`：项目、上传、任务、工作流聚合、错误和SSE的确定性合同样例。
 - `fixtures/creation-lifecycle/`：project/standalone批次、提示词版本、采用、项目写回、CreationPackage 2.0和stale事件样例。
 - `fixtures/workflow-node-generation-bindings/`：覆盖教材、课时、教案、三类九套、PPT、图片、视频、音频和交付的完整脱敏节点目录样例。
-- `fixtures/primary-math-courseware-package/`：由内置生成源确定性展开的首套小学数学业务内容包；23个模型节点均有输入、Prompt、输出、投影和生成模板。
+- `fixtures/primary-math-courseware-package/`：由内置生成源确定性展开的首套小学数学业务内容包；22个模型节点均有输入、Prompt、输出、投影和生成模板。
 - `fixtures/golden-projects/`：不包含原教材和媒体文件的脱敏黄金项目；固定可复现实例、上下文隔离、跨成果质量不变量和分支可消费的精确规划输出。
 - `generated/`：由当前OpenAPI确定性生成的bundle和TypeScript类型，不是第二份手工合同。
 - `typescript/client.ts`：基于生成paths和openapi-fetch的共享客户端工厂。

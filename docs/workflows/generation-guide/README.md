@@ -10,7 +10,7 @@
 - **更新规则：** 修改权威源后运行渲染脚本；测试会逐字检查生成结果。
 - **替换/删除规则：** 内容包退役或生成方式变化时，由同一 PR 替换入口并删除本目录。
 
-当前内容包：`shanhai.primary_math.courseware@1.0.0`，共 23 个模型节点。
+当前内容包：`shanhai.primary_math.courseware@1.0.0`，共 22 个模型节点。
 
 ## 怎么看
 
@@ -24,7 +24,7 @@
 ## 分册
 
 1. [课时划分与十二部分教案](LESSON.md)
-2. [三类九套与最小课程锚定](INTRO.md)
+2. [课程驱动的三类九套导入方案](INTRO.md)
 3. [PPT 内容分析、大纲与逐页设计](PPT_DESIGN.md)
 4. [PPT 封面与正文图片](PPT_IMAGES.md)
 5. [视频剧本、粗分镜与视觉母图](VIDEO_SCRIPT_AND_STYLE.md)

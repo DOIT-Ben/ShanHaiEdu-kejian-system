@@ -1,0 +1,84 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "intro.generate_options.prompt",
+    "name": "课程驱动导入方案业务Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "intro.generate_options.prompt",
+    "title": "课程驱动导入方案业务Prompt",
+    "description": "以已批准课时、知识边界、最小教材证据和教师偏好，在一次生成中产出一套或三类九套最终课堂导入方案。",
+    "model_capability": "text.structured.creative_education",
+    "input_definition_ref": {
+      "item_key": "intro.generate_options.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "intro.generate_options.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是小学数学课程驱动的课堂导入方案设计师，擅长从知识点、学习目标、教材证据和不得提前讲授边界中设计科普、应用、故事倾向可交叉的创意方案。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "读取目标课时稳定键、知识点、一句话学习目标、教学内容边界、must_not_preteach、年级或年龄段、教材证据摘要及可选教师创意、媒介和时长偏好，在一次调用中直接生成最终intro_option_set。default_nine生成九套；refine_existing只完善一套。不要生成教案正文、PPT、分镜、旁白、字幕、资产、Provider参数或费用。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "先提取课程种子，再从可观察现象、真实任务、人物或主体目标等不同角度生成创意；课程依据必须从创意形成开始参与，不能在完成后补贴课题词。每套同时形成主要与辅助倾向、创意概念、钩子、观看价值、课程关联、课堂第一问、交接时刻、不得提前讲授、媒介、时长、适配、风险和推荐结论。science、application、story只是主要倾向，辅助倾向可以交叉。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "default_nine主要倾向各恰好三套，至少一套包含两个以上辅助倾向；refine_existing恰好一套。每套必须可追溯目标课时、知识点和教材证据，创意与课程依据存在实质关联；不得提前讲出需要学生发现的定义、写法、方法或结论；default_nine最高推荐分必须唯一；不得把三种倾向解释为互斥类别；输出不含完整教案、PPT、视频产物、Provider和费用。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [
+      {
+        "binding_key": "approved_lesson_unit",
+        "source": "lesson_division.approved_version",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 200000
+      },
+      {
+        "binding_key": "approved_material",
+        "source": "material.approved_parse",
+        "required": true,
+        "exposure": "summary",
+        "max_items": 50,
+        "max_bytes": 300000
+      },
+      {
+        "binding_key": "teacher_preferences",
+        "source": "project.teacher_preferences",
+        "required": false,
+        "exposure": "summary",
+        "max_items": 1,
+        "max_bytes": 20000
+      }
+    ],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 40000
+    }
+  }
+}

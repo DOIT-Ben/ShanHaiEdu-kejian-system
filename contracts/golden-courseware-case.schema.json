@@ -200,17 +200,19 @@
     "introOption": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["option_key", "category", "title", "independent_concept", "hook", "viewer_value", "suggested_medium", "duration_seconds", "replacement_field_key", "course_anchor", "classroom_first_question", "handoff_moment", "must_not_preteach", "fit_reason", "risks", "recommendation_score", "recommendation_reason"],
+      "required": ["option_key", "lesson_unit_key", "knowledge_point", "primary_tendency", "secondary_tendencies", "title", "creative_concept", "hook", "viewer_value", "suggested_medium", "duration_seconds", "course_anchor", "classroom_first_question", "handoff_moment", "must_not_preteach", "fit_reason", "risks", "recommendation_score", "recommendation_reason"],
       "properties": {
         "option_key": {"type": "string", "pattern": "^INTRO-(SCI|APP|STO)-[0-9]{2}$"},
-        "category": {"enum": ["science", "application", "story"]},
+        "lesson_unit_key": {"$ref": "#/$defs/key"},
+        "knowledge_point": {"type": "string", "minLength": 1},
+        "primary_tendency": {"enum": ["science", "application", "story"]},
+        "secondary_tendencies": {"type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": true, "items": {"enum": ["science", "application", "story"]}},
         "title": {"type": "string", "minLength": 1},
-        "independent_concept": {"type": "string", "minLength": 1},
+        "creative_concept": {"type": "string", "minLength": 1},
         "hook": {"type": "string", "minLength": 1},
         "viewer_value": {"type": "string", "minLength": 1},
         "suggested_medium": {"enum": ["video", "image", "physical_object", "question", "performance", "mixed"]},
         "duration_seconds": {"type": "integer", "minimum": 10, "maximum": 600},
-        "replacement_field_key": {"type": ["string", "null"]},
         "course_anchor": {"type": "string", "minLength": 1},
         "classroom_first_question": {"type": "string", "minLength": 1},
         "handoff_moment": {"type": "string", "minLength": 1},
@@ -224,11 +226,12 @@
     "introOptionSet": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["option_set_key", "generation_mode", "lesson_unit_key", "options", "quality_expectations"],
+      "required": ["option_set_key", "generation_mode", "lesson_unit_key", "knowledge_point", "options", "quality_expectations"],
       "properties": {
         "option_set_key": {"$ref": "#/$defs/key"},
         "generation_mode": {"enum": ["default_nine", "refine_existing"]},
         "lesson_unit_key": {"$ref": "#/$defs/key"},
+        "knowledge_point": {"type": "string", "minLength": 1},
         "options": {"type": "array", "minItems": 1, "maxItems": 9, "items": {"$ref": "#/$defs/introOption"}},
         "quality_expectations": {"type": "object", "additionalProperties": true}
       },

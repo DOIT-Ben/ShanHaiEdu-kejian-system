@@ -102,13 +102,18 @@ def _render_intro(golden: Mapping[str, Any]) -> list[str]:
     lines = [
         "## 4. 三类九套示例",
         "",
-        "| 类别 | 方案 | 媒介/时长 | 推荐分 | 最小课程锚点 |",
+        "| 主要/辅助倾向 | 方案 | 媒介/时长 | 推荐分 | 课程关联与交接 |",
         "| --- | --- | --- | --- | --- |",
     ]
     for option in cast(list[dict[str, Any]], option_set["options"]):
         medium = f"{medium_labels[option['suggested_medium']]} / {option['duration_seconds']} 秒"
+        tendencies = (
+            labels[option["primary_tendency"]]
+            + " / "
+            + "、".join(labels[item] for item in option["secondary_tendencies"])
+        )
         lines.append(
-            f"| {labels[option['category']]} | {cell(option['title'])} | {medium} | "
+            f"| {tendencies} | {cell(option['title'])} | {medium} | "
             f"{option['recommendation_score']} | {cell(option['course_anchor'])} |"
         )
     snapshot = cast(Mapping[str, Any], selection["snapshot"])

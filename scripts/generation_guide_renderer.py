@@ -11,10 +11,7 @@ CHAPTER_NODE_KEYS: dict[str, tuple[str, ...]] = {
         "lesson.division.generate",
         "lesson_plan.generate",
     ),
-    "INTRO.md": (
-        "intro.ideate",
-        "intro.anchor",
-    ),
+    "INTRO.md": ("intro.generate_options",),
     "PPT_DESIGN.md": (
         "ppt.content_analyze",
         "ppt.outline.generate",
@@ -50,7 +47,7 @@ CHAPTER_NODE_KEYS: dict[str, tuple[str, ...]] = {
 
 CHAPTER_TITLES = {
     "LESSON.md": "课时划分与十二部分教案",
-    "INTRO.md": "三类九套与最小课程锚定",
+    "INTRO.md": "课程驱动的三类九套导入方案",
     "PPT_DESIGN.md": "PPT 内容分析、大纲与逐页设计",
     "PPT_IMAGES.md": "PPT 封面与正文图片",
     "VIDEO_SCRIPT_AND_STYLE.md": "视频剧本、粗分镜与视觉母图",
@@ -282,7 +279,7 @@ def _render_readme(source: Mapping[str, Any]) -> str:
             "## 分册",
             "",
             "1. [课时划分与十二部分教案](LESSON.md)",
-            "2. [三类九套与最小课程锚定](INTRO.md)",
+            "2. [课程驱动的三类九套导入方案](INTRO.md)",
             "3. [PPT 内容分析、大纲与逐页设计](PPT_DESIGN.md)",
             "4. [PPT 封面与正文图片](PPT_IMAGES.md)",
             "5. [视频剧本、粗分镜与视觉母图](VIDEO_SCRIPT_AND_STYLE.md)",

@@ -122,7 +122,7 @@ def _master_script_output(case: dict[str, Any]) -> dict[str, Any]:
             key: copy.deepcopy(quality[key])
             for key in (
                 "selected_intro_snapshot_preserved",
-                "independent_story_complete_before_anchor",
+                "course_grounding_preserved",
                 "only_final_shot_hands_off",
                 "must_not_preteach_preserved",
             )

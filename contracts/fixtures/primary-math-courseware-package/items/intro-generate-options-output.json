@@ -2,14 +2,14 @@
   "api_version": "shanhai.edu/v1",
   "kind": "content_definition",
   "metadata": {
-    "key": "intro.anchor.output",
-    "name": "最小课程锚定输出",
+    "key": "intro.generate_options.output",
+    "name": "课程驱动导入方案输出",
     "domain": "primary_math",
     "locale": "zh-CN"
   },
   "spec": {
-    "definition_key": "intro.anchor.output",
-    "title": "最小课程锚定输出",
+    "definition_key": "intro.generate_options.output",
+    "title": "课程驱动导入方案输出",
     "description": "一套或三类九套完整导入方案、默认路径唯一最高推荐分和可冻结选择快照。",
     "definition_role": "artifact",
     "fields": [
@@ -26,6 +26,24 @@
         "field_key": "source_lesson_unit_key",
         "label": "来源课时键",
         "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "visibility": "hidden"
+      },
+      {
+        "field_key": "source_knowledge_point",
+        "label": "来源知识点",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "visibility": "hidden"
+      },
+      {
+        "field_key": "source_material_evidence_keys",
+        "label": "来源教材证据",
+        "type": "list",
         "required": true,
         "editable": false,
         "deletable": false,
@@ -51,23 +69,53 @@
             "deletable": false
           },
           {
-            "field_key": "source_idea_key",
-            "label": "独立创意键",
+            "field_key": "lesson_unit_key",
+            "label": "来源课时键",
             "type": "reference",
             "required": true,
             "editable": false,
             "deletable": false
           },
           {
-            "field_key": "option_category",
-            "label": "类别",
-            "type": "enum",
+            "field_key": "knowledge_point",
+            "label": "知识点",
+            "type": "text",
             "required": true,
             "editable": false,
             "deletable": false
           },
           {
-            "field_key": "option_title",
+            "field_key": "primary_tendency",
+            "label": "主要创作倾向",
+            "type": "enum",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "options": [
+              {
+                "value": "science",
+                "label": "科普"
+              },
+              {
+                "value": "application",
+                "label": "应用"
+              },
+              {
+                "value": "story",
+                "label": "故事"
+              }
+            ]
+          },
+          {
+            "field_key": "secondary_tendencies",
+            "label": "辅助创作倾向",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "title",
             "label": "标题",
             "type": "text",
             "required": true,
@@ -75,31 +123,31 @@
             "deletable": false
           },
           {
-            "field_key": "anchored_independent_concept",
-            "label": "独立创意",
+            "field_key": "creative_concept",
+            "label": "课程驱动创意概念",
             "type": "rich_text",
             "required": true,
-            "editable": false,
+            "editable": true,
             "deletable": false
           },
           {
-            "field_key": "anchored_hook",
+            "field_key": "hook",
             "label": "钩子",
             "type": "rich_text",
             "required": true,
-            "editable": false,
+            "editable": true,
             "deletable": false
           },
           {
-            "field_key": "anchored_viewer_value",
-            "label": "独立价值",
+            "field_key": "viewer_value",
+            "label": "观看价值",
             "type": "rich_text",
             "required": true,
-            "editable": false,
+            "editable": true,
             "deletable": false
           },
           {
-            "field_key": "anchored_medium",
+            "field_key": "suggested_medium",
             "label": "建议媒介",
             "type": "enum",
             "required": true,
@@ -107,7 +155,7 @@
             "deletable": false
           },
           {
-            "field_key": "suggested_duration_seconds",
+            "field_key": "duration_seconds",
             "label": "建议时长",
             "type": "number",
             "required": true,
@@ -116,7 +164,7 @@
           },
           {
             "field_key": "course_anchor",
-            "label": "唯一课程锚点",
+            "label": "课程关联",
             "type": "rich_text",
             "required": true,
             "editable": true,
@@ -139,7 +187,7 @@
             "deletable": false
           },
           {
-            "field_key": "option_must_not_preteach",
+            "field_key": "must_not_preteach",
             "label": "不得提前讲授",
             "type": "list",
             "required": true,
@@ -155,6 +203,14 @@
             "deletable": false
           },
           {
+            "field_key": "risks",
+            "label": "风险",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
             "field_key": "recommendation_score",
             "label": "推荐分",
             "type": "number",
@@ -163,11 +219,11 @@
             "deletable": false
           },
           {
-            "field_key": "option_risks",
-            "label": "风险",
-            "type": "list",
+            "field_key": "recommendation_reason",
+            "label": "推荐理由",
+            "type": "rich_text",
             "required": true,
-            "editable": true,
+            "editable": false,
             "deletable": false
           }
         ]
@@ -184,14 +240,6 @@
             "field_key": "recommended_option_key",
             "label": "最高推荐方案",
             "type": "reference",
-            "required": true,
-            "editable": false,
-            "deletable": false
-          },
-          {
-            "field_key": "recommendation_reason",
-            "label": "推荐理由",
-            "type": "rich_text",
             "required": true,
             "editable": false,
             "deletable": false
