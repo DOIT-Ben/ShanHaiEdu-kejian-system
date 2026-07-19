@@ -60,7 +60,7 @@ Issue进入`ready`前必须写清：
 
 ```bash
 git fetch origin --prune
-git worktree add -b feat/123-project-assets ../shanhaiedu-worktrees/123-project-assets origin/main
+git worktree add -b feat/123-project-assets /srv/shanhaiedu/worktrees/123-project-assets origin/main
 ```
 
 分支格式为：
@@ -84,8 +84,8 @@ git worktree add -b feat/123-project-assets ../shanhaiedu-worktrees/123-project-
 一个工作目录只处理一个分支。需要并行时使用仓库外部Git worktree：
 
 ```bash
-mkdir -p ../shanhaiedu-worktrees
-git worktree add ../shanhaiedu-worktrees/123-project-assets feat/123-project-assets
+mkdir -p /srv/shanhaiedu/worktrees
+git worktree add /srv/shanhaiedu/worktrees/123-project-assets feat/123-project-assets
 ```
 
 禁止在仓库内部创建第二份clone、源码副本、`backup/`、`copy/`或任务临时目录。
