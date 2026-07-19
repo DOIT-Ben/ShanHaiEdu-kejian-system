@@ -1,16 +1,46 @@
 from __future__ import annotations
 
+import json
 from copy import deepcopy
+from hashlib import sha256
 from pathlib import Path
 
+import pytest
 import yaml
 
 from scripts.check_openapi_compatibility import (
+    BreakingTransition,
+    contract_sha256,
+    errors_sha256,
     find_breaking_changes,
     find_partition_aware_breaking_changes,
+    is_breaking_transition_approved,
+    parse_breaking_transitions,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def make_transition(
+    *,
+    base_contract: bytes = b"base contract\n",
+    current_contract: bytes = b"current contract\n",
+    errors: list[str] | None = None,
+) -> dict:
+    breaking_errors = errors or ["component schema removed: PrivateSchema"]
+    return {
+        "id": "issue-51-prompt-preview-public-projection",
+        "issue": 51,
+        "reason": "Remove private Prompt Preview implementation metadata.",
+        "base_contract_sha256": contract_sha256(base_contract),
+        "current_contract_sha256": contract_sha256(current_contract),
+        "breaking_errors_sha256": errors_sha256(breaking_errors),
+        "breaking_errors": breaking_errors,
+    }
+
+
+def parse_transition(transition: dict) -> tuple[BreakingTransition, ...]:
+    return parse_breaking_transitions({"version": 1, "transitions": [transition]})
 
 
 def load_current_contract() -> dict:
@@ -213,3 +243,129 @@ def test_one_of_wrapper_is_breaking_when_legacy_branch_is_removed() -> None:
         "POST /projects request body application/json: no backward-compatible schema branch remains"
         in errors
     )
+
+
+def test_exact_breaking_transition_is_approved() -> None:
+    base_contract = b"base contract\n"
+    current_contract = b"current contract\n"
+    errors = [
+        "GET /prompt-preview: response property removed: context_summary",
+        "component schema removed: PromptContextSummary",
+    ]
+    transition = make_transition(
+        base_contract=base_contract,
+        current_contract=current_contract,
+        errors=errors,
+    )
+
+    assert (
+        transition["breaking_errors_sha256"]
+        == sha256(
+            json.dumps(errors, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+    )
+    assert is_breaking_transition_approved(
+        base_contract,
+        current_contract,
+        errors,
+        parse_transition(transition),
+    )
+
+
+@pytest.mark.parametrize("missing_index", [0, 1])
+def test_breaking_transition_rejects_missing_actual_error(missing_index: int) -> None:
+    errors = ["first breaking error", "second breaking error"]
+    transition = make_transition(errors=errors)
+
+    assert not is_breaking_transition_approved(
+        b"base contract\n",
+        b"current contract\n",
+        errors[:missing_index] + errors[missing_index + 1 :],
+        parse_transition(transition),
+    )
+
+
+def test_breaking_transition_rejects_extra_actual_error() -> None:
+    errors = ["approved breaking error"]
+    transition = make_transition(errors=errors)
+
+    assert not is_breaking_transition_approved(
+        b"base contract\n",
+        b"current contract\n",
+        [*errors, "POST /unrelated: operation removed"],
+        parse_transition(transition),
+    )
+
+
+@pytest.mark.parametrize(
+    ("base_contract", "current_contract"),
+    [
+        (b"changed base contract\n", b"current contract\n"),
+        (b"base contract\n", b"changed current contract\n"),
+    ],
+)
+def test_breaking_transition_rejects_contract_hash_mismatch(
+    base_contract: bytes,
+    current_contract: bytes,
+) -> None:
+    transition = make_transition()
+
+    assert not is_breaking_transition_approved(
+        base_contract,
+        current_contract,
+        ["component schema removed: PrivateSchema"],
+        parse_transition(transition),
+    )
+
+
+def test_breaking_transition_rejects_missing_record() -> None:
+    assert not is_breaking_transition_approved(
+        b"base contract\n",
+        b"current contract\n",
+        ["component schema removed: PrivateSchema"],
+        (),
+    )
+
+
+def test_breaking_transition_rejects_unknown_record_field() -> None:
+    transition = make_transition()
+    transition["extra"] = "not allowed"
+
+    with pytest.raises(ValueError):
+        parse_transition(transition)
+
+
+def test_breaking_transition_rejects_wildcard_with_matching_fingerprint() -> None:
+    transition = make_transition()
+    wildcard_errors = ["component schema removed: *"]
+    transition["breaking_errors"] = wildcard_errors
+    transition["breaking_errors_sha256"] = errors_sha256(wildcard_errors)
+
+    with pytest.raises(ValueError):
+        parse_transition(transition)
+
+
+@pytest.mark.parametrize(
+    "unnormalized_errors",
+    [
+        ["second error", "first error"],
+        ["duplicate error", "duplicate error"],
+    ],
+)
+def test_breaking_transition_rejects_unnormalized_errors(
+    unnormalized_errors: list[str],
+) -> None:
+    transition = make_transition()
+    transition["breaking_errors"] = unnormalized_errors
+    transition["breaking_errors_sha256"] = errors_sha256(unnormalized_errors)
+
+    with pytest.raises(ValueError):
+        parse_transition(transition)
+
+
+def test_breaking_transition_rejects_incorrect_error_fingerprint() -> None:
+    transition = make_transition()
+    transition["breaking_errors_sha256"] = "0" * 64
+
+    with pytest.raises(ValueError):
+        parse_transition(transition)
