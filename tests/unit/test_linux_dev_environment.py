@@ -135,7 +135,7 @@ def test_bootstrap_sync_uses_pinned_system_python() -> None:
     bootstrap = (project_root / "infra/dev/bootstrap.sh").read_text(encoding="utf-8")
 
     assert "uv sync --frozen --python /usr/local/bin/python" in bootstrap
-    assert 'pnpm install --frozen-lockfile --store-dir "$PNPM_HOME/store"' in bootstrap
+    assert 'CI=true pnpm install --frozen-lockfile --store-dir "$PNPM_HOME/store"' in bootstrap
     assert "git config --global --replace-all safe.directory /workspace" in bootstrap
     assert "git config --global core.autocrlf input" in bootstrap
 
