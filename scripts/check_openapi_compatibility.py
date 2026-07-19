@@ -446,10 +446,11 @@ def find_partition_aware_breaking_changes(
             planned_operation = planned_operations.get(key)
             if key in current_operations or planned_operation is None:
                 continue
-            if (
-                base_operation.get("operationId") == planned_operation.get("operationId")
-                and planned_operation.get("x-shanhai-availability") == "planned"
-            ):
+            if planned_operation.get(
+                "x-shanhai-availability"
+            ) == "planned" and normalize_partition_value(
+                base_operation
+            ) == normalize_partition_value(planned_operation):
                 allowed_operations.add(key)
 
         base_schemas = base_document.get("components", {}).get("schemas", {})
@@ -469,6 +470,21 @@ def find_partition_aware_breaking_changes(
         allowed_removed_operations=frozenset(allowed_operations),
         allowed_removed_schemas=frozenset(allowed_schemas),
     )
+
+
+def normalize_partition_value(value: Any) -> Any:
+    if isinstance(value, list):
+        return [normalize_partition_value(item) for item in value]
+    if not isinstance(value, Mapping):
+        return value
+    normalized: dict[str, Any] = {}
+    for key, item in value.items():
+        if key == "x-shanhai-availability":
+            continue
+        if key == "$ref" and isinstance(item, str):
+            item = item.removeprefix("./api-surface.openapi.yaml")
+        normalized[str(key)] = normalize_partition_value(item)
+    return normalized
 
 
 def main() -> int:

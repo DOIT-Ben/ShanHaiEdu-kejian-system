@@ -30,14 +30,15 @@ def _operations(
     document: Mapping[str, Any],
     label: str,
     errors: list[str],
-) -> dict[str, Mapping[str, Any]]:
-    operations: dict[str, Mapping[str, Any]] = {}
+) -> dict[str, tuple[str, str, Mapping[str, Any]]]:
+    operations: dict[str, tuple[str, str, Mapping[str, Any]]] = {}
     paths = document.get("paths", {})
     if not isinstance(paths, Mapping):
         errors.append(f"{label} paths must be an object")
         return operations
-    for path_item in paths.values():
-        if not isinstance(path_item, Mapping):
+    path_prefix = _relative_server_prefix(document)
+    for path, path_item in paths.items():
+        if not isinstance(path, str) or not isinstance(path_item, Mapping):
             continue
         for method, operation in path_item.items():
             if method not in HTTP_METHODS or not isinstance(operation, Mapping):
@@ -49,8 +50,22 @@ def _operations(
             if operation_id in operations:
                 errors.append(f"{label} has duplicate operationId: {operation_id}")
                 continue
-            operations[operation_id] = operation
+            effective_path = f"{path_prefix}{path}" if path_prefix else path
+            operations[operation_id] = (effective_path, method, operation)
     return operations
+
+
+def _relative_server_prefix(document: Mapping[str, Any]) -> str:
+    servers = document.get("servers")
+    if not isinstance(servers, list) or len(servers) != 1:
+        return ""
+    server = servers[0]
+    if not isinstance(server, Mapping):
+        return ""
+    url = server.get("url")
+    if not isinstance(url, str) or not url.startswith("/"):
+        return ""
+    return url.rstrip("/")
 
 
 def find_surface_errors(
@@ -72,9 +87,18 @@ def find_surface_errors(
         errors.append(f"current contract operation is not registered at runtime: {operation_id}")
     for operation_id in sorted(set(runtime_operations) - set(current_operations)):
         errors.append(f"runtime operation is missing from current contract: {operation_id}")
+    for operation_id in sorted(set(runtime_operations) & set(current_operations)):
+        runtime_path, runtime_method, _runtime_operation = runtime_operations[operation_id]
+        current_path, current_method, _current_operation = current_operations[operation_id]
+        if (runtime_path, runtime_method) != (current_path, current_method):
+            errors.append(
+                "current contract path/method differs from runtime: "
+                f"{operation_id} ({current_method.upper()} {current_path} != "
+                f"{runtime_method.upper()} {runtime_path})"
+            )
     for operation_id in sorted(set(current_operations) & set(planned_operations)):
         errors.append(f"operation appears in current and planned contracts: {operation_id}")
-    for operation_id, operation in sorted(planned_operations.items()):
+    for operation_id, (_path, _method, operation) in sorted(planned_operations.items()):
         if operation.get("x-shanhai-availability") != "planned":
             errors.append(f"planned operation lacks availability marker: {operation_id}")
 

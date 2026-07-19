@@ -66,6 +66,12 @@ def test_initial_mixed_surface_partition_tracks_never_runtime_contracts() -> Non
 
     assert find_partition_aware_breaking_changes(base, current, planned) == []
 
+    planned["paths"]["/future"]["post"]["responses"]["204"]["description"] = (
+        "Changed during partition"
+    )
+    errors = find_partition_aware_breaking_changes(base, current, planned)
+    assert "POST /future: operation removed" in errors
+
 
 def test_runtime_contract_cannot_later_move_back_to_planned() -> None:
     base = load_current_contract()

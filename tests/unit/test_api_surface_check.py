@@ -40,6 +40,20 @@ def test_static_only_and_runtime_only_operations_fail() -> None:
     assert "runtime operation is missing from current contract: runtimeOnly" in errors
 
 
+def test_matching_operation_id_must_keep_runtime_path_and_method() -> None:
+    runtime = contract("runtime", ("getProject",))
+    current = deepcopy(runtime)
+    current["paths"]["/wrong-project-path"] = current["paths"].pop("/getProject")
+    planned = contract("planned", ())
+
+    errors = find_surface_errors(runtime, current, planned)
+
+    assert (
+        "current contract path/method differs from runtime: getProject "
+        "(GET /wrong-project-path != GET /getProject)"
+    ) in errors
+
+
 def test_planned_operations_must_be_disjoint_and_marked() -> None:
     runtime = contract("runtime", ("getProject",))
     current = deepcopy(runtime)
