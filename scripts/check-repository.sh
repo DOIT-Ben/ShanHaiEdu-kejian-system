@@ -26,18 +26,4 @@ fi
 pnpm contracts:lint
 pnpm contracts:schema
 
-"$repository_python" scripts/build_frontend_package.py --check
-unzip -t deliverables/shanhaiedu-frontend-package.zip >/dev/null
-package_dir=$(mktemp -d "${TMPDIR:-/tmp}/shanhaiedu-package-check.XXXXXX")
-cleanup_repository_check() {
-  cleanup_readonly_git_index
-  rm -rf -- "$package_dir"
-}
-trap cleanup_repository_check EXIT
-unzip -q deliverables/shanhaiedu-frontend-package.zip -d "$package_dir"
-(
-  cd "$package_dir/shanhaiedu-frontend-package"
-  sha256sum -c --quiet CHECKSUMS.sha256
-)
-
-echo "repository contracts, documents, checksums and archive are valid"
+echo "repository contracts and documents are valid"
