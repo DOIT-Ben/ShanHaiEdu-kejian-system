@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -146,6 +147,20 @@ def test_verify_checks_staged_and_unstaged_diffs() -> None:
 
     assert "git diff --check" in verify
     assert "git diff --cached --check" in verify
+    assert "readonly_git_index.sh" in verify
+
+
+def test_generated_contract_check_uses_a_readonly_index_copy() -> None:
+    project_root = Path(__file__).resolve().parents[2]
+    package = json.loads((project_root / "package.json").read_text(encoding="utf-8"))
+    assert package["scripts"]["contracts:check-generated"] == (
+        "bash scripts/check_generated_contracts.sh"
+    )
+    assert package["scripts"]["contracts:check"] == "bash scripts/check_contracts.sh"
+    helper = (project_root / "scripts/readonly_git_index.sh").read_text(encoding="utf-8")
+    assert "GIT_INDEX_FILE" in helper
+    assert "GIT_OPTIONAL_LOCKS=0" in helper
+    assert "GIT_INDEX_FILE=/dev/null" in helper
 
 
 def test_compose_shares_only_download_caches_across_worktrees() -> None:
@@ -182,6 +197,7 @@ def test_compose_mounts_worktree_git_metadata_read_only() -> None:
         "${SHANHAI_CONTAINER_GIT_DIR:-/git-common}"
     )
     assert workspace["environment"]["SHANHAI_CONTAINER_GIT_WORK_TREE"] == "/workspace"
+    assert workspace["environment"]["GIT_OPTIONAL_LOCKS"] == "0"
     assert "GIT_DIR" not in workspace["environment"]
     assert "GIT_WORK_TREE" not in workspace["environment"]
 

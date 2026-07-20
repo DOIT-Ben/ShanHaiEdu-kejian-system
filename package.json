@@ -14,8 +14,8 @@
     "contracts:generate": "pnpm contracts:bundle && openapi-typescript contracts/generated/openapi.bundle.yaml -o contracts/generated/typescript/schema.ts",
     "contracts:typecheck": "tsc -p tsconfig.contracts.json --noEmit",
     "contracts:test": "uv run pytest tests/contract",
-    "contracts:check-generated": "pnpm contracts:generate && git diff --exit-code -- contracts/generated",
-    "contracts:check": "pnpm contracts:lint && pnpm contracts:surface && pnpm contracts:schema && pnpm contracts:generate && pnpm contracts:typecheck && pnpm contracts:test && pnpm contracts:check-generated"
+    "contracts:check-generated": "bash scripts/check_generated_contracts.sh",
+    "contracts:check": "bash scripts/check_contracts.sh"
   },
   "dependencies": {
     "openapi-fetch": "0.14.0"
