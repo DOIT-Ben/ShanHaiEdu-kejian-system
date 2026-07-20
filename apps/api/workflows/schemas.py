@@ -9,6 +9,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 from apps.api.projects.schemas import ProjectRead
+from apps.api.artifacts.schemas import ArtifactStaleReasonRead
 from workflow.node_state import NodeStatus
 
 
@@ -33,7 +34,7 @@ class NodeRunRead(BaseModel):
     node_key: str
     run_no: int
     status: NodeStatus
-    stale_reason: dict[str, Any] | None
+    stale_reason: ArtifactStaleReasonRead | None
     started_at: datetime | None
     finished_at: datetime | None
 

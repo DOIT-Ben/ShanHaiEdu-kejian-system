@@ -3,10 +3,65 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+class AllImpactScopeRead(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["all"]
+
+
+class KeyedImpactScopeRead(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["keyed"]
+    selector: Literal["lesson_key"]
+    keys: list[str] = Field(min_length=1)
+
+    @field_validator("keys")
+    @classmethod
+    def require_canonical_keys(cls, keys: list[str]) -> list[str]:
+        if any(not key.strip() for key in keys):
+            raise ValueError("keys must be non-empty")
+        if len(set(keys)) != len(keys) or keys != sorted(keys):
+            raise ValueError("keys must be unique and sorted")
+        return keys
+
+
+ArtifactImpactScopeRead = Annotated[
+    AllImpactScopeRead | KeyedImpactScopeRead,
+    Field(discriminator="mode"),
+]
+
+
+class ArtifactStaleBindingRead(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    relation_type: Literal["derives_from", "references", "constrains"]
+    binding_key: str = Field(min_length=1, max_length=160)
+    impact_scope: ArtifactImpactScopeRead
+
+
+class ArtifactStaleReasonRead(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason_code: Literal[
+        "UPSTREAM_APPROVED_VERSION_CHANGED", "UPSTREAM_APPROVAL_REVOKED"
+    ]
+    replaced_upstream_version_id: UUID
+    replacement_version_id: UUID | None
+    bindings: list[ArtifactStaleBindingRead] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_replacement(self) -> "ArtifactStaleReasonRead":
+        is_revoke = self.reason_code == "UPSTREAM_APPROVAL_REVOKED"
+        if is_revoke != (self.replacement_version_id is None):
+            raise ValueError("replacement_version_id does not match reason_code")
+        return self
 
 
 class CreateArtifactRequest(BaseModel):
@@ -74,7 +129,7 @@ class ArtifactRead(BaseModel):
     artifact_type: str
     content_definition_version_id: UUID
     status: Literal["draft", "in_review", "approved", "stale", "archived"]
-    stale_reason: dict[str, Any] | None
+    stale_reason: ArtifactStaleReasonRead | None
     lock_version: int
     current_draft: ArtifactDraftRead | None
     current_submitted_version: ArtifactVersionRead | None
