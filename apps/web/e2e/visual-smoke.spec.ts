@@ -446,8 +446,11 @@ test("1440 素材预览不随卡片无限放大", async ({ page }) => {
         expected: preview.getAttribute("data-preview-ratio"),
       })),
     );
+  const expectedRatios: Record<string, number> = { "1:1": 1, "4:3": 4 / 3, "16:9": 16 / 9 };
   mediaRatios.forEach(({ actual, expected }) => {
-    expect(actual).toBeCloseTo(expected === "square" ? 1 : 16 / 9, 1);
+    const expectedRatio = expected ? expectedRatios[expected] : undefined;
+    expect(expectedRatio).toBeDefined();
+    expect(actual).toBeCloseTo(expectedRatio ?? 0, 1);
   });
 });
 
