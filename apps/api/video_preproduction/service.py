@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import re
 from decimal import Decimal
+
+from pydantic import ValidationError
 
 from apps.api.video_preproduction.fake import ScriptedDeterministicTextFake
 from apps.api.video_preproduction.models import (
@@ -160,14 +161,12 @@ def _require_master_source(
 
 def _require_pricing(request: VideoPreproductionRequest) -> PricingSnapshot:
     pricing = request.pricing_snapshot
-    if (
-        pricing is None
-        or not pricing.version
-        or re.fullmatch(r"[A-Z]{3}", pricing.currency) is None
-        or pricing.image_candidate_unit_price <= 0
-    ):
+    if pricing is None:
         raise VideoPreproductionError("PRICING_SNAPSHOT_REQUIRED")
-    return pricing
+    try:
+        return PricingSnapshot.model_validate(pricing.model_dump(mode="python"))
+    except ValidationError as exc:
+        raise VideoPreproductionError("PRICING_SNAPSHOT_REQUIRED") from exc
 
 
 def _story_complexity(

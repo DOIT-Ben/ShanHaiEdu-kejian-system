@@ -146,6 +146,19 @@ def test_master_generation_rejects_missing_or_invalid_pricing_before_fake_call()
     for payload in (
         valid.model_copy(update={"pricing_snapshot": None}),
         valid.model_copy(update={"pricing_snapshot": invalid_pricing}),
+        *(
+            valid.model_copy(
+                update={
+                    "pricing_snapshot": PricingSnapshot.model_construct(
+                        version="video-pricing-constructed",
+                        currency="CNY",
+                        image_candidate_unit_price=Decimal("0.80"),
+                        candidates_per_asset=count,
+                    )
+                }
+            )
+            for count in (0, 9)
+        ),
     ):
         with pytest.raises(VideoPreproductionError) as caught:
             service.generate_master_script(payload)
