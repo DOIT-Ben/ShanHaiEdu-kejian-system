@@ -251,9 +251,7 @@ def test_catalog_semantics_are_available_without_reloading_the_schema() -> None:
 
 def test_internal_input_requires_its_producer_in_the_dependency_closure() -> None:
     catalog = load_catalog()
-    node_by_key(catalog, "ppt.cover.prompt.generate")["dependencies"] = [
-        "ppt.outline.approve"
-    ]
+    node_by_key(catalog, "ppt.cover.prompt.generate")["dependencies"] = ["ppt.outline.approve"]
 
     assert_rejected(catalog, "NODE_BINDING_INPUT_DEPENDENCY_MISSING")
     with pytest.raises(NodeGenerationBindingError) as caught:
@@ -263,9 +261,7 @@ def test_internal_input_requires_its_producer_in_the_dependency_closure() -> Non
 
 def test_cross_branch_input_requires_one_unambiguous_producer() -> None:
     catalog = load_catalog()
-    node_by_key(catalog, "delivery.package")["input_contract_refs"].append(
-        "package:creation_image"
-    )
+    node_by_key(catalog, "delivery.package")["input_contract_refs"].append("package:creation_image")
 
     assert_rejected(catalog, "NODE_BINDING_INPUT_PRODUCER_AMBIGUOUS")
     with pytest.raises(NodeGenerationBindingError) as caught:
@@ -285,9 +281,7 @@ def test_external_inputs_cannot_alias_a_published_output() -> None:
 
 def test_direct_gate_cannot_approve_a_different_contract() -> None:
     catalog = load_catalog()
-    node_by_key(catalog, "ppt.outline.approve")["input_contract_refs"] = [
-        "approval:lesson_plan"
-    ]
+    node_by_key(catalog, "ppt.outline.approve")["input_contract_refs"] = ["approval:lesson_plan"]
 
     assert_rejected(catalog, "NODE_BINDING_OUTPUT_QUALITY_GATE_INVALID")
     with pytest.raises(NodeGenerationBindingError) as caught:
@@ -351,9 +345,10 @@ def test_output_contract_and_content_definition_mappings_are_unambiguous() -> No
 
 def test_model_artifact_content_must_preserve_the_validated_output_root() -> None:
     catalog = load_catalog()
-    node_by_key(catalog, "ppt.outline.generate")["output_persistence"]["artifact"][
-        "content"
-    ] = {"source": "constant", "value": {}}
+    node_by_key(catalog, "ppt.outline.generate")["output_persistence"]["artifact"]["content"] = {
+        "source": "constant",
+        "value": {},
+    }
 
     assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
     with pytest.raises(NodeGenerationBindingError) as caught:
@@ -363,9 +358,9 @@ def test_model_artifact_content_must_preserve_the_validated_output_root() -> Non
 
 def test_same_branch_model_artifact_input_requires_a_relation_binding() -> None:
     catalog = load_catalog()
-    relations = node_by_key(catalog, "ppt.cover.prompt.generate")["output_persistence"][
-        "artifact"
-    ]["relations"]
+    relations = node_by_key(catalog, "ppt.cover.prompt.generate")["output_persistence"]["artifact"][
+        "relations"
+    ]
     relations[:] = [
         relation
         for relation in relations
@@ -388,9 +383,7 @@ def test_quality_gate_report_refs_must_be_unique() -> None:
 
 def test_quality_report_mapping_requires_real_validator_output() -> None:
     catalog = load_catalog()
-    mapping = node_by_key(catalog, "lesson_plan.validate")["quality_report_persistence"][
-        "mapping"
-    ]
+    mapping = node_by_key(catalog, "lesson_plan.validate")["quality_report_persistence"]["mapping"]
     mapping["conclusion"] = {"source": "constant", "value": "passed"}
 
     assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
@@ -398,9 +391,7 @@ def test_quality_report_mapping_requires_real_validator_output() -> None:
 
 def test_quality_report_validator_set_must_match_the_node() -> None:
     catalog = load_catalog()
-    persistence = node_by_key(catalog, "lesson_plan.validate")[
-        "quality_report_persistence"
-    ]
+    persistence = node_by_key(catalog, "lesson_plan.validate")["quality_report_persistence"]
     persistence["validator_refs"].pop()
 
     assert_rejected(catalog, "NODE_BINDING_QUALITY_VALIDATOR_INVALID")
@@ -477,14 +468,12 @@ def test_output_persistence_string_bounds_match_runtime_dtos() -> None:
     max_contract_ref = f"{'a' * 79}:{'b' * 80}"
     node_by_key(catalog, "material.file_validate")["output_contract_refs"][0] = max_contract_ref
     node_by_key(catalog, "material.parse")["input_contract_refs"][1] = max_contract_ref
-    lesson_artifact = node_by_key(catalog, "lesson_plan.generate")["output_persistence"][
-        "artifact"
-    ]
+    lesson_artifact = node_by_key(catalog, "lesson_plan.generate")["output_persistence"]["artifact"]
     lesson_artifact["identity"]["artifact_key_prefix"] = "a" * 79
     lesson_artifact["artifact_type"] = "a" * 80
-    package = node_by_key(catalog, "ppt.body_asset_prompts.generate")[
-        "output_persistence"
-    ]["creation_package"]
+    package = node_by_key(catalog, "ppt.body_asset_prompts.generate")["output_persistence"][
+        "creation_package"
+    ]
     package["package_key"]["prefix"] = "a" * 120
     package["target_rules"]["target_slot_prefix"] = f"{'a' * 158}."
 
@@ -495,15 +484,13 @@ def test_output_persistence_string_bounds_match_runtime_dtos() -> None:
     node_by_key(catalog, "material.file_validate")["output_contract_refs"][0] = (
         oversized_contract_ref
     )
-    node_by_key(catalog, "material.parse")["input_contract_refs"][1] = (
-        oversized_contract_ref
-    )
+    node_by_key(catalog, "material.parse")["input_contract_refs"][1] = oversized_contract_ref
     assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
 
     catalog = load_catalog()
-    node_by_key(catalog, "lesson_plan.generate")["output_persistence"]["artifact"][
-        "identity"
-    ]["artifact_key_prefix"] = "a" * 80
+    node_by_key(catalog, "lesson_plan.generate")["output_persistence"]["artifact"]["identity"][
+        "artifact_key_prefix"
+    ] = "a" * 80
     assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
 
     catalog = load_catalog()
@@ -513,16 +500,16 @@ def test_output_persistence_string_bounds_match_runtime_dtos() -> None:
     assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
 
     catalog = load_catalog()
-    package = node_by_key(catalog, "ppt.body_asset_prompts.generate")[
-        "output_persistence"
-    ]["creation_package"]
+    package = node_by_key(catalog, "ppt.body_asset_prompts.generate")["output_persistence"][
+        "creation_package"
+    ]
     package["package_key"]["prefix"] = "a" * 121
     assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
 
     catalog = load_catalog()
-    package = node_by_key(catalog, "ppt.body_asset_prompts.generate")[
-        "output_persistence"
-    ]["creation_package"]
+    package = node_by_key(catalog, "ppt.body_asset_prompts.generate")["output_persistence"][
+        "creation_package"
+    ]
     package["target_rules"]["target_slot_prefix"] = f"{'a' * 159}."
     assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
 

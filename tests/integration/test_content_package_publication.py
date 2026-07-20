@@ -57,9 +57,7 @@ from workflow.registry import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
-LEGACY_RELEASE_FIXTURE_ROOT = (
-    ROOT / "tests/fixtures/content_runtime/primary_math_courseware_1_0"
-)
+LEGACY_RELEASE_FIXTURE_ROOT = ROOT / "tests/fixtures/content_runtime/primary_math_courseware_1_0"
 LEGACY_PACKAGE_CHECKSUM = "894771a7472723cb70a4586a7905af480e04f5baee636351a4cc0597c6c9712f"
 LEGACY_WORKFLOW_CHECKSUM = "268f503e9e7e455aab936e885d1c67b1934384d45c2ef0e4d0399683e579e7ea"
 
@@ -558,10 +556,7 @@ def legacy_courseware_release(
             raise AssertionError(f"legacy package item drifted: {item_key}")
     package_checksum = canonical_json_sha256(manifest)
     workflow_checksum = hashlib.sha256(canonical_catalog_json(catalog)).hexdigest()
-    if (
-        package_checksum != LEGACY_PACKAGE_CHECKSUM
-        or workflow_checksum != LEGACY_WORKFLOW_CHECKSUM
-    ):
+    if package_checksum != LEGACY_PACKAGE_CHECKSUM or workflow_checksum != LEGACY_WORKFLOW_CHECKSUM:
         raise AssertionError("legacy release checksum differs from the published snapshot")
     return replace(
         source,

@@ -425,9 +425,7 @@ def test_rejects_unknown_superseding_and_untrusted_relations() -> None:
 @pytest.mark.parametrize("pointer", ["relative", "/bad~2", "/#", "/*", "/..", "/items/01"])
 def test_rejects_unsafe_or_noncanonical_projection_pointers(pointer: str) -> None:
     binding = _binding(package=True)
-    binding["output_persistence"]["creation_package"]["item_mapping"]["title"][
-        "pointer"
-    ] = pointer
+    binding["output_persistence"]["creation_package"]["item_mapping"]["title"]["pointer"] = pointer
     plan = _compile(binding)
     with pytest.raises(OutputProjectionError) as caught:
         materialize_creation_package(plan, artifact_result=_artifact_result(plan))
@@ -516,9 +514,9 @@ def test_rejects_target_slots_outside_declared_namespace() -> None:
 
 def test_rejects_target_slot_prefix_that_cannot_have_a_valid_suffix() -> None:
     binding = _binding(package=True)
-    binding["output_persistence"]["creation_package"]["target_rules"][
-        "target_slot_prefix"
-    ] = f"{'a' * 159}."
+    binding["output_persistence"]["creation_package"]["target_rules"]["target_slot_prefix"] = (
+        f"{'a' * 159}."
+    )
 
     plan = _compile(binding)
     with pytest.raises(OutputProjectionError) as caught:
@@ -797,9 +795,7 @@ def test_phase_two_rejects_simultaneous_definition_and_declaration_replacement()
     forged_binding = _binding(package=True)
     forged_binding["output_persistence"]["creation_package"]["package_type"] = "video"
     forged_definition = _definition(forged_binding)
-    forged_declaration = forged_definition.node_binding["output_persistence"][
-        "creation_package"
-    ]
+    forged_declaration = forged_definition.node_binding["output_persistence"]["creation_package"]
 
     with pytest.raises(OutputProjectionError) as caught:
         replace(

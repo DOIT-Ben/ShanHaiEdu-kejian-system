@@ -38,9 +38,7 @@ def minimal_v2_catalog() -> dict[str, Any]:
     }
     catalog["catalog_key"] = "test.material"
     catalog["workflow_key"] = "test.material"
-    catalog["nodes"] = [
-        node for node in catalog["nodes"] if node["node_key"] in node_keys
-    ]
+    catalog["nodes"] = [node for node in catalog["nodes"] if node["node_key"] in node_keys]
     referenced_validators = {
         (
             ref["key"],
@@ -89,8 +87,7 @@ def test_registry_loads_the_published_catalog_with_one_deterministic_order() -> 
     assert len(registered.output_definition_index) == 22
     assert registered.output_definition_index is registered.indexes.output_definition_index
     assert {
-        producer.node_key
-        for producer in registered.producers_by_contract["asset:image_candidates"]
+        producer.node_key for producer in registered.producers_by_contract["asset:image_candidates"]
     } == {
         "ppt.cover.image.generate",
         "video.style_master.image.generate",
@@ -192,9 +189,7 @@ def test_registry_rejects_external_inputs_that_alias_published_outputs() -> None
 
 def test_registry_rejects_non_root_artifact_content_projection() -> None:
     catalog = load_catalog()
-    node = next(
-        item for item in catalog["nodes"] if item["node_key"] == "ppt.outline.generate"
-    )
+    node = next(item for item in catalog["nodes"] if item["node_key"] == "ppt.outline.generate")
     node["output_persistence"]["artifact"]["content"] = {
         "source": "constant",
         "value": {},
@@ -225,13 +220,11 @@ def test_registry_rejects_missing_same_branch_model_relation() -> None:
 def test_registry_rejects_an_unusable_target_slot_prefix() -> None:
     catalog = load_catalog()
     node = next(
-        item
-        for item in catalog["nodes"]
-        if item["node_key"] == "ppt.body_asset_prompts.generate"
+        item for item in catalog["nodes"] if item["node_key"] == "ppt.body_asset_prompts.generate"
     )
-    node["output_persistence"]["creation_package"]["target_rules"][
-        "target_slot_prefix"
-    ] = f"{'a' * 159}."
+    node["output_persistence"]["creation_package"]["target_rules"]["target_slot_prefix"] = (
+        f"{'a' * 159}."
+    )
 
     with pytest.raises(WorkflowDefinitionError) as caught:
         BUILTIN_WORKFLOW_REGISTRY.load(catalog)
@@ -351,13 +344,11 @@ def test_registry_builds_an_immutable_validator_descriptor_index() -> None:
 
     assert len(registered.validator_descriptor_index) == len(catalog["validator_descriptors"])
     assert (
-        registered.validator_descriptor_index[identity]["implementation_status"]
-        == "contract_only"
+        registered.validator_descriptor_index[identity]["implementation_status"] == "contract_only"
     )
     catalog["validator_descriptors"][0]["implementation_status"] = "changed"
     assert (
-        registered.validator_descriptor_index[identity]["implementation_status"]
-        == "contract_only"
+        registered.validator_descriptor_index[identity]["implementation_status"] == "contract_only"
     )
     with pytest.raises(TypeError):
         cast(dict[str, Any], registered.validator_descriptor_index[identity])["key"] = "changed"

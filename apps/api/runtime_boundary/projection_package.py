@@ -112,11 +112,9 @@ def _validate_plan_provenance(plan: OutputProjectionPlan) -> None:
     definition = plan.definition
     if (
         definition.content_release_id != execution.content_release_id
-        or definition.workflow_definition_version_id
-        != execution.workflow_definition_version_id
+        or definition.workflow_definition_version_id != execution.workflow_definition_version_id
         or definition.node_key != execution.node_key
-        or definition.content_definition_version_id
-        != write.content_definition_version_id
+        or definition.content_definition_version_id != write.content_definition_version_id
         or write.project_id != execution.project_id
         or write.node_run_id != execution.node_run_id
         or write.lesson_unit_id != execution.lesson_unit_id
