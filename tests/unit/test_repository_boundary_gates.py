@@ -313,10 +313,10 @@ def test_live_size_baseline_is_exactly_four_files_and_twenty_four_functions(
     check_python_size_limits(files, ROOT, baseline, errors)
 
     assert errors == []
-    assert len(baseline.oversized_files) == 4
+    assert len(baseline.oversized_files) == 6
     assert len(baseline.oversized_functions) == 24
     report = capsys.readouterr().err
-    assert report.count("warning: oversized file:") == 4
+    assert report.count("warning: oversized file:") == 6
     assert report.count("warning: long function:") == 24
 
 

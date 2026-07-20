@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 from threading import Event
 from uuid import uuid4
@@ -13,8 +16,9 @@ from uuid import uuid4
 import pytest
 from alembic.config import Config
 from jsonschema import Draft202012Validator
-from sqlalchemy import func, select
+from sqlalchemy import func, inspect, select
 from sqlalchemy.exc import DBAPIError, IntegrityError
+from sqlalchemy.orm import Session
 
 from alembic import command
 from apps.api.artifacts.validation import ArtifactValidation
@@ -27,8 +31,11 @@ from apps.api.content_runtime.models import (
     ContentReleaseItem,
     RuntimeDefaultVersion,
 )
-from apps.api.content_runtime.package_source import load_builtin_courseware_release
-from apps.api.content_runtime.publication_service import ContentReleasePublisher
+from apps.api.content_runtime.package_source import (
+    BuiltinCoursewareReleaseSource,
+    load_builtin_courseware_release,
+)
+from apps.api.content_runtime.publication_service import ContentReleasePublisher, PublicationResult
 from apps.api.content_runtime.registry import BUILTIN_RUNTIME_DEFAULTS
 from apps.api.content_runtime.service import resolve_runtime_defaults
 from apps.api.database import build_engine, build_session_factory, utc_now
@@ -38,8 +45,82 @@ from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.workflows.models import WorkflowDefinitionVersion
 from tests.fakes.identity import seed_test_actor
+from workflow.content_package import canonical_json_sha256
+from workflow.node_generation_binding import canonical_catalog_json
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def legacy_courseware_release(
+    source: BuiltinCoursewareReleaseSource,
+) -> BuiltinCoursewareReleaseSource:
+    manifest = deepcopy(source.manifest)
+    catalog = deepcopy(source.workflow_catalog)
+    manifest["semantic_version"] = "1.0.0"
+    catalog["semantic_version"] = "1.0.0"
+    return replace(
+        source,
+        manifest=manifest,
+        workflow_catalog=catalog,
+        package_checksum=canonical_json_sha256(manifest),
+        workflow_checksum=hashlib.sha256(canonical_catalog_json(catalog)).hexdigest(),
+    )
+
+
+def snapshot_publication_rows(
+    session: Session,
+    result: PublicationResult,
+) -> tuple[object, ...]:
+    def values(row: object | None) -> tuple[tuple[str, object], ...]:
+        assert row is not None
+        return tuple(
+            (attribute.key, deepcopy(getattr(row, attribute.key)))
+            for attribute in inspect(row).mapper.column_attrs
+        )
+
+    package_version = session.get(ContentPackageVersion, result.content_package_version_id)
+    assert package_version is not None
+    rows = (
+        session.get(ContentPackage, package_version.content_package_id),
+        package_version,
+        session.get(ContentRelease, result.content_release_id),
+        session.get(WorkflowDefinitionVersion, result.workflow_definition_version_id),
+        session.scalar(
+            select(ContentReleaseItem).where(
+                ContentReleaseItem.content_release_id == result.content_release_id
+            )
+        ),
+        session.scalar(
+            select(RuntimeDefaultVersion).where(
+                RuntimeDefaultVersion.content_release_id == result.content_release_id,
+                RuntimeDefaultVersion.workflow_definition_version_id
+                == result.workflow_definition_version_id,
+            )
+        ),
+    )
+    return (
+        *(values(row) for row in rows),
+        tuple(
+            sorted(
+                values(row)
+                for row in session.scalars(
+                    select(ContentPackageItemVersion).where(
+                        ContentPackageItemVersion.content_package_version_id == package_version.id
+                    )
+                )
+            )
+        ),
+        tuple(
+            sorted(
+                values(row)
+                for row in session.scalars(
+                    select(ContentDefinitionVersion).where(
+                        ContentDefinitionVersion.content_package_version_id == package_version.id
+                    )
+                )
+            )
+        ),
+    )
 
 
 def test_golden_release_is_published_from_validated_fixtures_and_is_idempotent(
@@ -76,10 +157,17 @@ def test_golden_release_is_published_from_validated_fixtures_and_is_idempotent(
         assert second.created is False
         assert second == first.as_existing()
         assert publication_counts(session) == counts_after_first
+        assert source.semantic_version == "1.1.0"
+        assert source.manifest["semantic_version"] == "1.1.0"
+        assert source.workflow_catalog["semantic_version"] == "1.1.0"
+        assert source.release_key == f"{source.package_key}@1.1.0"
         assert package_version is not None
+        assert package_version.semantic_version == "1.1.0"
         assert package_version.manifest_json == source.manifest
+        assert package_version.manifest_json["semantic_version"] == "1.1.0"
         assert package_version.checksum == source.package_checksum
         assert release is not None and release.status == "published"
+        assert release.release_key == source.release_key
         assert release_item is not None
         assert release_item.content_package_version_id == package_version.id
         assert workflow is not None
@@ -124,6 +212,133 @@ def test_golden_release_is_published_from_validated_fixtures_and_is_idempotent(
         )
         assert resolve_runtime_defaults(session).content_release_id == release.id
         assert resolve_runtime_defaults(session).workflow_definition_version_id == workflow.id
+
+
+def test_forward_publication_preserves_legacy_release_and_project_bindings(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    source = load_builtin_courseware_release(ROOT)
+    legacy = legacy_courseware_release(source)
+
+    assert legacy.package_key == source.package_key
+    assert (
+        legacy.manifest["semantic_version"]
+        == legacy.semantic_version
+        == legacy.workflow_catalog["semantic_version"]
+        == "1.0.0"
+    )
+    assert legacy.package_checksum == canonical_json_sha256(legacy.manifest)
+    assert (
+        legacy.workflow_checksum
+        == hashlib.sha256(canonical_catalog_json(legacy.workflow_catalog)).hexdigest()
+    )
+    assert legacy.package_checksum != source.package_checksum
+    assert legacy.workflow_checksum != source.workflow_checksum
+
+    with factory() as session, session.begin():
+        actor = seed_test_actor(session)
+        request = CreateProjectRequest(title="Legacy release", knowledge_point="One half")
+        old_result = ContentReleasePublisher(session).publish(
+            legacy,
+            published_by=actor.principal_id,
+        )
+        old_project = ProjectRepository(session, actor).create(request)
+
+        old_package_version = session.get(
+            ContentPackageVersion,
+            old_result.content_package_version_id,
+        )
+        old_release = session.get(ContentRelease, old_result.content_release_id)
+        old_workflow = session.get(
+            WorkflowDefinitionVersion,
+            old_result.workflow_definition_version_id,
+        )
+        assert old_package_version is not None
+        assert old_release is not None
+        assert old_workflow is not None
+        old_package = session.get(ContentPackage, old_package_version.content_package_id)
+        assert old_package is not None
+        assert old_result.created is True
+        assert old_package_version.semantic_version == legacy.semantic_version == "1.0.0"
+        assert old_package_version.manifest_json == legacy.manifest
+        assert old_package_version.checksum == legacy.package_checksum
+        assert old_release.release_key == legacy.release_key
+        assert old_release.release_key == f"{source.package_key}@1.0.0"
+        assert old_workflow.graph_json == legacy.workflow_catalog
+        assert old_workflow.checksum == legacy.workflow_checksum
+
+        old_snapshot = snapshot_publication_rows(session, old_result)
+        old_project_binding = (
+            old_project.content_release_id,
+            old_project.workflow_definition_version_id,
+        )
+        counts_after_legacy = publication_counts(session)
+
+        current_result = ContentReleasePublisher(session).publish(
+            source,
+            published_by=actor.principal_id,
+        )
+        new_project = ProjectRepository(session, actor).create(
+            request.model_copy(update={"title": "Current release"})
+        )
+
+        current_package_version = session.get(
+            ContentPackageVersion,
+            current_result.content_package_version_id,
+        )
+        current_release = session.get(ContentRelease, current_result.content_release_id)
+        current_workflow = session.get(
+            WorkflowDefinitionVersion,
+            current_result.workflow_definition_version_id,
+        )
+        assert current_package_version is not None
+        assert current_release is not None
+        assert current_workflow is not None
+        assert current_result.created is True
+        assert current_result.content_package_version_id != old_package_version.id
+        assert current_result.content_release_id != old_release.id
+        assert current_result.workflow_definition_version_id != old_workflow.id
+        assert current_package_version.content_package_id == old_package.id
+        assert current_package_version.semantic_version == source.semantic_version == "1.1.0"
+        assert current_package_version.manifest_json == source.manifest
+        assert current_package_version.checksum == source.package_checksum
+        assert current_release.release_key == source.release_key
+        assert current_release.release_key == f"{source.package_key}@1.1.0"
+        assert current_workflow.graph_json == source.workflow_catalog
+        assert current_workflow.checksum == source.workflow_checksum
+        assert old_result.content_release_id == old_project.content_release_id
+        assert (
+            old_result.workflow_definition_version_id == old_project.workflow_definition_version_id
+        )
+        assert new_project.content_release_id == current_result.content_release_id
+        assert (
+            new_project.workflow_definition_version_id
+            == current_result.workflow_definition_version_id
+        )
+        assert old_project_binding == (
+            old_project.content_release_id,
+            old_project.workflow_definition_version_id,
+        )
+
+        counts_after_current = publication_counts(session)
+        assert counts_after_current != counts_after_legacy
+        replay = ContentReleasePublisher(session).publish(
+            source,
+            published_by=actor.principal_id,
+        )
+        assert replay.created is False
+        assert replay == current_result.as_existing()
+        assert publication_counts(session) == counts_after_current
+
+        session.expire_all()
+        session.refresh(old_project)
+        assert (
+            old_project.content_release_id,
+            old_project.workflow_definition_version_id,
+        ) == old_project_binding
+
+        assert snapshot_publication_rows(session, old_result) == old_snapshot
 
 
 def test_publishing_new_default_only_changes_projects_created_after_activation(

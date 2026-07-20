@@ -4,7 +4,7 @@
 
 验证基线：`main`，实现事实以本文件所在提交的代码、迁移和测试为准；任务状态以链接的GitHub Issue和Pull Request为准
 
-当前阶段：阶段0出口尚未关闭；阶段1通用口径校准、后端轨道、首套业务机器合同和后端治理审计已经关闭，阶段2后端已经关闭Prompt公共投影、Attempt恢复与Prompt合同收窄门禁，下一步按#130串行收口通用执行器的剩余合同门禁
+当前阶段：阶段0出口尚未关闭；阶段1通用口径校准、后端轨道、首套业务机器合同和后端治理审计已经关闭，阶段2后端已经关闭Prompt公共投影、Attempt恢复与Prompt合同收窄门禁，#130处于`status:in-progress`分支实现阶段，合并前#89仍保持阻塞
 
 本文件只描述现在，不保存开发日志。任务细节、负责人、讨论和交接以GitHub Issue与Pull Request为准。
 
@@ -47,14 +47,14 @@
 - [Issue #48](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/48)：全流程生成节点与可配置模型I/O绑定的父任务保持`status:ready`；黄金内容包已正式发布，通用执行器由#89承接。
 - [Issue #86](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/86)：已由PR #138合并关闭，统一ArtifactRelation类型、方向与stale影响语义。
 - [Issue #123](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/123)：Prompt领域从未实现的`append`教师修订模式已收窄；受控发布模板inventory为22条`replace_editable_layer`、0条Prompt `append`，下一门禁转为#130。
-- [Issue #130](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/130)：在#123合并后串行补齐模型输出的Artifact/CreationPackage持久化投影；当前仍为`status:blocked`，不代表投影合同已存在。
+- [Issue #130](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/130)：在#123合并后串行补齐模型输出的Artifact/CreationPackage持久化投影；当前为`status:in-progress`，分支正在实现与验证，尚不代表投影合同已合并。
 - [Issue #89](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/89)：继续保持`status:blocked`；#51、#90、#112、#86与#123已经完成，只有#130也合并并在最新`main`上对六项门禁完成新鲜复验后，才作为唯一后端主实现启动。
 - [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)：与生产前端完成真实合同联调；当前因Issue #4没有开放源码PR而等待，不以本地分支、ZIP或Mock代替。
 
 ## 当前阻塞
 
 - 阶段1整体产品出口仍缺少生产前端的真实API联调；后端轨道通过不代表完整阶段1产品完成。
-- #48已有机器合同和黄金数据，但主线尚无读取数据库已发布GenerationTemplate并完成Prompt/Context冻结、模型调用、结构校验和Artifact原子落库的通用执行器；#51、#90、#112、#86与#123已经完成，#89仍等待#130收口，然后在最新`main`上对六项门禁完成新鲜复验。
+- #48已有机器合同和黄金数据，但主线尚无读取数据库已发布GenerationTemplate并完成Prompt/Context冻结、模型调用、结构校验和Artifact原子落库的通用执行器；#51、#90、#112、#86与#123已经完成，#130尚在收口纯投影合同，#89仍等待#130合并后在最新`main`上对六项门禁完成新鲜复验。
 - ShanHaiEdu已经具备Provider中立媒体基础层和Attempt租约恢复，但真实图片/视频Adapter、供应商私有状态映射与受控真实冒烟仍未实现，不能把确定性Fake或恢复基座描述为真实媒体出口。
 - TTS与实时价格计算当前不实现、不冒烟，也不阻塞教材到教案纵向链；PPTX装配、媒体生成和最终交付仍需独立Issue与真实阶段验收。
 
