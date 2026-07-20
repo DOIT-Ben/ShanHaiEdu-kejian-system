@@ -125,3 +125,15 @@ export function isFinalVideoMediaConfirmed(
     (subtitleFormat ?? null) === (media.subtitleFormat ?? null)
   );
 }
+
+export function getConfirmedFinalVideoMedia(
+  runtime: MockRuntimeState,
+  projectId: string,
+  lessonId: string,
+) {
+  const media = getPlayableFinalVideo(runtime, projectId, lessonId);
+  if (!media || runtime.nodeStates[`${projectId}:${lessonId}:final-video`]?.status !== "approved") {
+    return null;
+  }
+  return isFinalVideoMediaConfirmed(runtime, projectId, lessonId, media) ? media : null;
+}

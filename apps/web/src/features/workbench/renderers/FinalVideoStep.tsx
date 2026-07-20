@@ -360,7 +360,6 @@ export function FinalVideoStep() {
                 key={`${videoSourceKey}:${String(videoReloadKey)}`}
                 onCanPlay={() => setVideoLoad({ key: videoSourceKey, status: "ready" })}
                 onError={markVideoError}
-                onLoadedData={() => setVideoLoad({ key: videoSourceKey, status: "ready" })}
                 preload="metadata"
               >
                 <source src={playableVideo.src} type={playableVideo.mimeType} />

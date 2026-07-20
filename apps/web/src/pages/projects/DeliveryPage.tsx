@@ -13,8 +13,7 @@ import { useParams } from "react-router-dom";
 import type { WorkflowStatus } from "@/entities/workflow/model";
 import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
 import {
-  getPlayableFinalVideo,
-  isFinalVideoMediaConfirmed,
+  getConfirmedFinalVideoMedia,
   type PlayableVideoMedia,
   type SubtitleFormat,
 } from "@/features/workbench/lib/videoMedia";
@@ -114,16 +113,15 @@ export function buildDeliveryRequirements(runtime: MockRuntimeState, projectId: 
         "final-video",
         lesson.videoStatus,
       );
-      const media = getPlayableFinalVideo(runtime, projectId, lesson.id);
-      const mediaConfirmed = isFinalVideoMediaConfirmed(runtime, projectId, lesson.id, media);
+      const media = getConfirmedFinalVideoMedia(runtime, projectId, lesson.id);
       requirements.push({
         key: `${lesson.id}:final-video`,
         kind: "video",
         label: `${lessonLabel} · 课堂导入视频`,
         lessonTitle: lesson.title,
         revision: finalVideo.revision,
-        status: media && mediaConfirmed ? finalVideo.status : "not_ready",
-        ...(media && mediaConfirmed ? { media } : {}),
+        status: media ? finalVideo.status : "not_ready",
+        ...(media ? { media } : {}),
       });
     }
     return requirements;

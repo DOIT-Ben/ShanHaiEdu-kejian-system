@@ -13,17 +13,16 @@ import {
   artifactPreviewRegistry,
   type ArtifactType,
 } from "@/features/project-results/artifactPreviewRegistry";
-import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
-import {
-  getPlayableFinalVideo,
-  isFinalVideoMediaConfirmed,
-} from "@/features/workbench/lib/videoMedia";
+import { ConfirmedVideoResult } from "@/features/project-results/ConfirmedVideoResult";
+import { getProjectVideoSummary } from "@/features/project-results/projectVideoResults";
+import type { PlayableVideoMedia } from "@/features/workbench/lib/videoMedia";
 import { saveMockDraft, useMockRuntime } from "@/shared/api/mocks/runtime";
 import {
   listMockSavedResultHistory,
   listMockSavedResults,
   replaceMockResult,
   saveMockResult,
+  type MockSavedResultPreview,
   type SaveMockResultInput,
 } from "@/shared/api/mocks/savedResults";
 import { demoProjectId } from "@/shared/data/mockData";
@@ -34,7 +33,7 @@ import { IconButton } from "@/shared/ui/IconButton";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { Select } from "@/shared/ui/Select";
 
-const seededAssets: Array<{
+type ResultAsset = {
   id: string;
   resultId: string;
   type: ArtifactType;
@@ -43,9 +42,13 @@ const seededAssets: Array<{
   lesson: string;
   slotKey: string;
   version: number;
-  source: "seed";
-  preview?: undefined;
-}> = [
+  source: "media" | "runtime" | "seed";
+  lessonId?: string;
+  media?: PlayableVideoMedia;
+  preview?: MockSavedResultPreview;
+};
+
+const seededAssets: ResultAsset[] = [
   {
     id: "a1",
     resultId: "a1",
@@ -118,7 +121,7 @@ const filters: Array<{ value: "all" | ArtifactType; label: string }> = [
   { value: "all", label: "全部" },
   { value: "image", label: "教学图片" },
   { value: "ppt_page", label: "PPT 页面" },
-  { value: "video", label: "关键帧参考" },
+  { value: "video", label: "课堂视频" },
   { value: "audio", label: "音频字幕" },
   { value: "document", label: "文档" },
 ];
@@ -135,8 +138,25 @@ export function ProjectResultsPage() {
   const [message, setMessage] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [lesson, setLesson] = useState("all");
+  const videoSummary = useMemo(
+    () => getProjectVideoSummary(runtime, projectId),
+    [projectId, runtime],
+  );
   const assets = useMemo(() => {
-    const savedAssets = listMockSavedResults(runtime, projectId).map((result) => ({
+    const mediaAssets: ResultAsset[] = videoSummary.confirmed.map((video) => ({
+      id: `confirmed-video:${video.lessonId}`,
+      lesson: video.lessonLabel,
+      lessonId: video.lessonId,
+      media: video.media,
+      resultId: `confirmed-video:${video.lessonId}:${String(video.revision)}`,
+      slotKey: `video.final:${video.lessonId}`,
+      source: "media",
+      title: `${video.lessonTitle} · 课堂导入视频`,
+      type: "video",
+      use: "课堂导入视频成片",
+      version: Math.max(1, video.revision),
+    }));
+    const savedAssets: ResultAsset[] = listMockSavedResults(runtime, projectId).map((result) => ({
       id: result.id,
       lesson: result.lessonLabel,
       preview: result.preview,
@@ -148,11 +168,15 @@ export function ProjectResultsPage() {
       version: result.version,
       source: "runtime" as const,
     }));
-    const occupiedSlots = new Set(savedAssets.map((asset) => asset.slotKey));
+    const occupiedSlots = new Set([...mediaAssets, ...savedAssets].map((asset) => asset.slotKey));
     return projectId === demoProjectId
-      ? [...savedAssets, ...seededAssets.filter((asset) => !occupiedSlots.has(asset.slotKey))]
-      : savedAssets;
-  }, [projectId, runtime]);
+      ? [
+          ...mediaAssets,
+          ...savedAssets,
+          ...seededAssets.filter((asset) => !occupiedSlots.has(asset.slotKey)),
+        ]
+      : [...mediaAssets, ...savedAssets];
+  }, [projectId, runtime, videoSummary.confirmed]);
   const visible = useMemo(
     () =>
       assets.filter(
@@ -167,21 +191,23 @@ export function ProjectResultsPage() {
   const history = selected
     ? selected.source === "runtime"
       ? listMockSavedResultHistory(runtime, projectId, selected.slotKey)
-      : [
-          {
-            id: selected.id,
-            lessonLabel: selected.lesson,
-            projectId,
-            replaceMode: "replace" as const,
-            resultId: selected.resultId,
-            savedAt: "2026-07-17T02:24:00Z",
-            slotKey: selected.slotKey,
-            slotLabel: selected.use,
-            title: selected.title,
-            type: selected.type,
-            version: selected.version,
-          },
-        ]
+      : selected.source === "seed"
+        ? [
+            {
+              id: selected.id,
+              lessonLabel: selected.lesson,
+              projectId,
+              replaceMode: "replace" as const,
+              resultId: selected.resultId,
+              savedAt: "2026-07-17T02:24:00Z",
+              slotKey: selected.slotKey,
+              slotLabel: selected.use,
+              title: selected.title,
+              type: selected.type,
+              version: selected.version,
+            },
+          ]
+        : []
     : [];
   const SelectedPreview = selected
     ? artifactPreviewRegistry[selected.type]
@@ -190,13 +216,6 @@ export function ProjectResultsPage() {
     Object.values(runtime.nodeStates).find(
       (node) => node.project_id === projectId && keys.includes(node.node_key),
     )?.status ?? "not_ready";
-  const hasPlayableVideo = getApprovedProjectLessons(runtime, projectId).some((item) => {
-    const media = getPlayableFinalVideo(runtime, projectId, item.id);
-    return (
-      runtime.nodeStates[`${projectId}:${item.id}:final-video`]?.status === "approved" &&
-      isFinalVideoMediaConfirmed(runtime, projectId, item.id, media)
-    );
-  });
   const resultCards = [
     {
       title: "教案",
@@ -212,9 +231,9 @@ export function ProjectResultsPage() {
     },
     {
       title: "课堂导入视频",
-      detail: hasPlayableVideo ? "可播放视频与关键帧参考" : "关键帧参考已保存，视频尚未生成",
+      detail: videoSummary.detail,
       icon: Video,
-      status: hasPlayableVideo ? ("approved" as const) : ("not_ready" as const),
+      status: videoSummary.status,
     },
   ];
   const selectAsset = (assetId: string) => {
@@ -222,7 +241,7 @@ export function ProjectResultsPage() {
     setSelectedId(assetId);
   };
   const replaceSelected = () => {
-    if (!selected) return;
+    if (!selected || selected.source === "media") return;
     const nextVersion = selected.version + 1;
     const baseTitle = selected.title.replace(/（调整版 \d+）$/, "");
     const replacement: SaveMockResultInput = {
@@ -372,24 +391,42 @@ export function ProjectResultsPage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold text-[var(--sh-brand-600)]">
-                    {selected.type === "video" ? "当前关键帧参考" : "当前采用版本"}
+                    {selected.source === "media"
+                      ? "当前确认视频"
+                      : selected.type === "video"
+                        ? "当前关键帧参考"
+                        : "当前采用版本"}
                   </p>
                   <h2 className="mt-1 font-semibold text-[var(--sh-ink-strong)]">
                     {selected.title}
                   </h2>
                   <p className="mt-1 text-xs text-[var(--sh-ink-muted)]">版本 {selected.version}</p>
                 </div>
-                <IconButton
-                  label="更多素材操作"
-                  onClick={() => setMessage(`已打开${selected.title}的更多操作`)}
-                >
-                  <MoreHorizontal aria-hidden="true" />
-                </IconButton>
+                {selected.source !== "media" ? (
+                  <IconButton
+                    label="更多素材操作"
+                    onClick={() => setMessage(`已打开${selected.title}的更多操作`)}
+                  >
+                    <MoreHorizontal aria-hidden="true" />
+                  </IconButton>
+                ) : null}
               </div>
-              <div className="mt-4 hidden lg:block">
-                <SelectedPreview preview={selected.preview} />
-              </div>
-              {selected.type === "video" ? (
+              {selected.source === "media" && selected.media && selected.lessonId ? (
+                <div className="mt-4">
+                  <ConfirmedVideoResult
+                    lessonId={selected.lessonId}
+                    media={selected.media}
+                    onDownloaded={() => setMessage(`已开始下载“${selected.title}”`)}
+                    projectId={projectId}
+                    title={selected.title}
+                  />
+                </div>
+              ) : (
+                <div className="mt-4 hidden lg:block">
+                  <SelectedPreview preview={selected.preview} />
+                </div>
+              )}
+              {selected.type === "video" && selected.source !== "media" ? (
                 <p className="mt-3 rounded-[var(--sh-radius-sm)] bg-[var(--sh-warning-soft)] px-3 py-2 text-xs font-medium text-[var(--sh-ink-default)]">
                   当前仅为关键帧示意，视频尚未生成。
                 </p>
@@ -402,57 +439,60 @@ export function ProjectResultsPage() {
                 <div>
                   <dt className="text-xs text-[var(--sh-ink-muted)]">来源</dt>
                   <dd className="mt-1 text-[var(--sh-ink-strong)]">
-                    {selected.lesson} · 创作中心保存
+                    {selected.lesson} ·{" "}
+                    {selected.source === "media" ? "成片页确认" : "创作中心保存"}
                   </dd>
                 </div>
               </dl>
-              <div className="mt-3 flex gap-2 lg:mt-5 lg:grid">
-                <Button
-                  aria-label="替换当前版本"
-                  className="min-w-0 flex-1 px-2 lg:w-full"
-                  onClick={replaceSelected}
-                  size="sm"
-                >
-                  <Replace aria-hidden="true" />
-                  <span className="lg:hidden">替换</span>
-                  <span className="hidden lg:inline">替换当前版本</span>
-                </Button>
-                <Button
-                  aria-label={selected.type === "video" ? "下载关键帧说明" : "下载作品说明"}
-                  className="min-w-0 flex-1 px-2 lg:w-full"
-                  onClick={() => {
-                    const keyframeNotice =
-                      selected.type === "video" ? "\n当前仅为关键帧示意，视频尚未生成。" : "";
-                    downloadExampleFile(
-                      `${selected.title}_${selected.type === "video" ? "关键帧" : "成果"}说明.txt`,
-                      `山海教育项目成果\n作品：${selected.title}\n使用位置：${selected.use}\n来源：${selected.lesson}\n此文件记录当前作品信息。${keyframeNotice}`,
-                    );
-                    setMessage(
-                      `已下载“${selected.title}”的${selected.type === "video" ? "关键帧" : "成果"}说明`,
-                    );
-                  }}
-                  size="sm"
-                  variant="secondary"
-                >
-                  <Download aria-hidden="true" />
-                  <span className="lg:hidden">下载</span>
-                  <span className="hidden lg:inline">
-                    {selected.type === "video" ? "下载关键帧说明" : "下载作品说明"}
-                  </span>
-                </Button>
-                <Button
-                  aria-label="查看历史版本"
-                  className="min-w-0 flex-1 px-2 lg:w-full"
-                  onClick={() => setHistoryOpen((open) => !open)}
-                  size="sm"
-                  variant="quiet"
-                >
-                  <History aria-hidden="true" />
-                  <span className="lg:hidden">历史</span>
-                  <span className="hidden lg:inline">查看历史版本</span>
-                </Button>
-              </div>
-              {historyOpen ? (
+              {selected.source !== "media" ? (
+                <div className="mt-3 flex gap-2 lg:mt-5 lg:grid">
+                  <Button
+                    aria-label="替换当前版本"
+                    className="min-w-0 flex-1 px-2 lg:w-full"
+                    onClick={replaceSelected}
+                    size="sm"
+                  >
+                    <Replace aria-hidden="true" />
+                    <span className="lg:hidden">替换</span>
+                    <span className="hidden lg:inline">替换当前版本</span>
+                  </Button>
+                  <Button
+                    aria-label={selected.type === "video" ? "下载关键帧说明" : "下载作品说明"}
+                    className="min-w-0 flex-1 px-2 lg:w-full"
+                    onClick={() => {
+                      const keyframeNotice =
+                        selected.type === "video" ? "\n当前仅为关键帧示意，视频尚未生成。" : "";
+                      downloadExampleFile(
+                        `${selected.title}_${selected.type === "video" ? "关键帧" : "成果"}说明.txt`,
+                        `山海教育项目成果\n作品：${selected.title}\n使用位置：${selected.use}\n来源：${selected.lesson}\n此文件记录当前作品信息。${keyframeNotice}`,
+                      );
+                      setMessage(
+                        `已下载“${selected.title}”的${selected.type === "video" ? "关键帧" : "成果"}说明`,
+                      );
+                    }}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    <Download aria-hidden="true" />
+                    <span className="lg:hidden">下载</span>
+                    <span className="hidden lg:inline">
+                      {selected.type === "video" ? "下载关键帧说明" : "下载作品说明"}
+                    </span>
+                  </Button>
+                  <Button
+                    aria-label="查看历史版本"
+                    className="min-w-0 flex-1 px-2 lg:w-full"
+                    onClick={() => setHistoryOpen((open) => !open)}
+                    size="sm"
+                    variant="quiet"
+                  >
+                    <History aria-hidden="true" />
+                    <span className="lg:hidden">历史</span>
+                    <span className="hidden lg:inline">查看历史版本</span>
+                  </Button>
+                </div>
+              ) : null}
+              {historyOpen && selected.source !== "media" ? (
                 <section
                   aria-label="历史版本"
                   className="mt-4 rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-soft)] p-4"
