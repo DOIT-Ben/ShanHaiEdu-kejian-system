@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 from uuid import UUID
 
 from apps.api.artifacts.domain import (
@@ -71,8 +71,8 @@ class GeneratedArtifactRelation:
     impact_scope: Mapping[str, Any]
 
     def __post_init__(self) -> None:
-        raw_source_id: object = self.from_artifact_version_id
-        if type(raw_source_id) is not UUID:
+        raw_source_id = cast(object, self.from_artifact_version_id)
+        if not isinstance(raw_source_id, UUID):
             raise ArtifactInvariantError("generated relation source version is invalid")
         raw_relation_type: object = self.relation_type
         if type(raw_relation_type) is not ArtifactRelationType:
