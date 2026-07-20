@@ -190,18 +190,6 @@ export function CreationResultsPanel({
   const candidateDisplayLabel = type === "video" ? "关键帧" : "作品";
   const currentLabel =
     type === "video" ? "当前关键帧" : type === "presentation" ? "当前课件" : "当前作品";
-  const primaryAction =
-    stage === "ready" || stage === "adopted" ? (
-      <Button
-        disabled={hasUnappliedChanges}
-        onClick={onAdvance}
-        ref={saveTriggerRef}
-        size="sm"
-        title={hasUnappliedChanges ? "请先按新要求再创作一组" : undefined}
-      >
-        {stage === "ready" ? "就用这张" : "保存到项目"}
-      </Button>
-    ) : null;
   useEffect(() => {
     const handleFullscreenChange = () =>
       setFullscreen(document.fullscreenElement === previewRef.current);
@@ -211,6 +199,28 @@ export function CreationResultsPanel({
   const changeCandidate = (nextCandidate: number) => {
     if (nextCandidate >= 0 && nextCandidate < candidateCount) onCandidateChange(nextCandidate);
   };
+  const advance = async () => {
+    if (document.fullscreenElement === previewRef.current) {
+      try {
+        await document.exitFullscreen();
+      } catch {
+        // Continue when the browser has already left native fullscreen.
+      }
+    }
+    onAdvance();
+  };
+  const primaryAction =
+    stage === "ready" || stage === "adopted" ? (
+      <Button
+        disabled={hasUnappliedChanges}
+        onClick={() => void advance()}
+        ref={saveTriggerRef}
+        size="sm"
+        title={hasUnappliedChanges ? "请先按新要求再创作一组" : undefined}
+      >
+        {stage === "ready" ? "就用这张" : "保存到项目"}
+      </Button>
+    ) : null;
   const toggleFullscreen = async () => {
     if (document.fullscreenElement === previewRef.current) {
       await document.exitFullscreen();
