@@ -6,8 +6,9 @@ import hashlib
 import json
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 
@@ -21,6 +22,126 @@ class ApprovalAction(StrEnum):
     REQUEST_CHANGES = "request_changes"
     REVOKE = "revoke"
     ACCEPT_STALE = "accept_stale"
+
+
+class ArtifactRelationType(StrEnum):
+    DERIVES_FROM = "derives_from"
+    REFERENCES = "references"
+    CONSTRAINS = "constrains"
+    SUPERSEDES = "supersedes"
+
+    @property
+    def participates_in_dag(self) -> bool:
+        return self is not ArtifactRelationType.SUPERSEDES
+
+    @property
+    def propagates_stale(self) -> bool:
+        return self is not ArtifactRelationType.SUPERSEDES
+
+
+class ImpactSelector(StrEnum):
+    LESSON_KEY = "lesson_key"
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactImpactScope:
+    mode: Literal["all", "keyed"]
+    selector: ImpactSelector | None = None
+    keys: tuple[str, ...] = ()
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "ArtifactImpactScope":
+        if not isinstance(value, Mapping):
+            raise ArtifactInvariantError("impact_scope must be an object")
+        if set(value) == {"mode"} and value.get("mode") == "all":
+            return cls(mode="all")
+        if set(value) != {"mode", "selector", "keys"}:
+            raise ArtifactInvariantError("impact_scope has an unsupported shape")
+        if value.get("mode") != "keyed":
+            raise ArtifactInvariantError("impact_scope mode is invalid")
+        try:
+            selector = ImpactSelector(value["selector"])
+        except (KeyError, ValueError, TypeError) as exc:
+            raise ArtifactInvariantError("impact_scope selector is invalid") from exc
+        raw_keys = value.get("keys")
+        if not isinstance(raw_keys, (list, tuple)) or not raw_keys:
+            raise ArtifactInvariantError("impact_scope keys must be non-empty")
+        if any(not isinstance(key, str) or not key.strip() for key in raw_keys):
+            raise ArtifactInvariantError("impact_scope keys must be non-empty strings")
+        keys = tuple(raw_keys)
+        if len(set(keys)) != len(keys) or list(keys) != sorted(keys):
+            raise ArtifactInvariantError("impact_scope keys must be unique and sorted")
+        return cls(mode="keyed", selector=selector, keys=keys)
+
+    def as_dict(self) -> dict[str, Any]:
+        if self.mode == "all":
+            return {"mode": "all"}
+        return {
+            "mode": "keyed",
+            "selector": self.selector.value if self.selector is not None else None,
+            "keys": list(self.keys),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class StaleImpactDimension:
+    selector: ImpactSelector
+    changed_keys: tuple[str, ...] = ()
+    archived_keys: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        changed = tuple(self.changed_keys)
+        archived = tuple(self.archived_keys)
+        for values in (changed, archived):
+            if len(set(values)) != len(values) or list(values) != sorted(values):
+                raise ArtifactInvariantError(
+                    "stale impact keys must be unique and sorted"
+                )
+            if any(not key.strip() for key in values):
+                raise ArtifactInvariantError("stale impact keys must be non-empty")
+        if set(changed) & set(archived):
+            raise ArtifactInvariantError("changed and archived keys must not overlap")
+
+    @property
+    def affected_keys(self) -> frozenset[str]:
+        return frozenset((*self.changed_keys, *self.archived_keys))
+
+
+@dataclass(frozen=True, slots=True)
+class StaleImpactSelection:
+    mode: Literal["all", "exact"]
+    dimensions: tuple[StaleImpactDimension, ...] = ()
+
+    @classmethod
+    def all(cls) -> "StaleImpactSelection":
+        return cls(mode="all")
+
+    @classmethod
+    def exact(cls, dimensions: Iterable[StaleImpactDimension]) -> "StaleImpactSelection":
+        values = tuple(dimensions)
+        selectors = [dimension.selector for dimension in values]
+        if len(set(selectors)) != len(selectors):
+            raise ArtifactInvariantError("stale impact selectors must be unique")
+        return cls(mode="exact", dimensions=values)
+
+    def matches(self, scope: ArtifactImpactScope) -> ArtifactImpactScope | None:
+        if self.mode == "all" or scope.mode == "all":
+            return scope
+        assert scope.selector is not None
+        dimension = next(
+            (item for item in self.dimensions if item.selector is scope.selector),
+            None,
+        )
+        if dimension is None:
+            raise ArtifactInvariantError("stale impact selection is missing a selector")
+        affected = sorted(set(scope.keys) & dimension.affected_keys)
+        if not affected:
+            return None
+        return ArtifactImpactScope(
+            mode="keyed",
+            selector=scope.selector,
+            keys=tuple(affected),
+        )
 
 
 def canonical_content_hash(content: Mapping[str, Any]) -> str:
