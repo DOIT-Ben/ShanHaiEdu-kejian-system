@@ -95,6 +95,16 @@ def test_example_package_is_valid_and_preserves_teacher_friendly_projections() -
     assert package.items["ppt_design.teacher_markdown"]["spec"]["output_format"] == "markdown"
 
 
+def test_prompt_append_edit_policy_is_rejected_by_the_package_contract(tmp_path: Path) -> None:
+    package_root = copy_example(tmp_path)
+
+    def mutate(item: dict[str, Any]) -> None:
+        item["spec"]["user_edit_policy"]["mode"] = "append"
+
+    update_item(package_root, "image_prompt.authoring", mutate)
+    assert_rejected(package_root, "PACKAGE_ITEM_SPEC_INVALID")
+
+
 def test_unknown_kind_is_rejected(tmp_path: Path) -> None:
     package_root = copy_example(tmp_path)
     manifest = load_json(package_root / "manifest.json")

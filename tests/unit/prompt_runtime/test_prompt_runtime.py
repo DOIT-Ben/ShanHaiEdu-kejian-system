@@ -229,6 +229,25 @@ def test_prompt_revision_only_replaces_the_editable_business_layer() -> None:
     }
 
 
+def test_prompt_runtime_rejects_the_retired_append_edit_policy() -> None:
+    with pytest.raises(PromptRuntimeError) as caught:
+        compile_prompt(
+            template_key="lesson-plan.prompt",
+            template_version="1.0.0",
+            platform_safety="locked safety",
+            sections=(
+                PromptSection("task", "task", "editable task", True, True),
+            ),
+            context=assemble_context((), {}),
+            output_schema={"type": "object"},
+            provider_format="locked provider format",
+            user_edit_mode="append",  # type: ignore[arg-type]
+            user_edit_max_chars=1_000,
+        )
+
+    assert caught.value.code == "PROMPT_EDIT_POLICY_INVALID"
+
+
 def test_teacher_prompt_keeps_full_context_content_without_source_metadata() -> None:
     compiled = compile_prompt(
         template_key="lesson-plan.prompt",
