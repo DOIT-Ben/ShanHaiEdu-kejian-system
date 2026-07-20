@@ -17,7 +17,20 @@ Use each source for one purpose only:
 9. Current code, migrations and tests: implemented runtime behavior.
 10. Git history: superseded versions and historical context.
 
-If intent, contract and implementation disagree, stop and open or update an Issue. Do not silently choose one, support contradictory behavior, or add a patch note.
+当产品意图、合同与实现不一致时，先确认是否存在“当前 Issue”。一个 Issue 只有同时满足以下条件，才可作为当前任务的变更依据：
+
+- Issue 处于开放状态，并由当前任务的唯一负责人持有。
+- Issue 已关联当前任务分支或 Pull Request。
+- Issue 明确写出目标、范围、非范围、验收标准和已经确认的决定。
+- 当前冲突确实落在该 Issue 的显式范围内。
+
+不存在符合条件的当前 Issue 时，必须停止并新建或更新 Issue；不得静默选择一种行为、同时支持互相矛盾的口径，或用补充说明代替正式变更。
+
+存在符合条件的当前 Issue 时，它只授权其范围、验收标准和决定明确描述的变更。实施 Pull Request 必须在同一变更中同步受影响的现行文档、合同和测试，使仓库只保留一套当前口径。
+
+如果变更涉及持久架构或产品行为、已发布 Release、既有项目绑定或跨模块合同，当前 Issue 本身必须是 Decision Issue，或明确链接已经批准的 Decision Issue；否则仍须停止并补齐决策。普通实现 Issue 不得越过这些边界。
+
+上述优先级不得覆盖平台或安全规则、用户当前明确指令，也不得把无关或历史 Issue 当作当前需求。当前 Issue 未明确变更的事实继续遵循既有产品设计、合同和实现边界。
 
 ## 2. Required takeover sequence
 
