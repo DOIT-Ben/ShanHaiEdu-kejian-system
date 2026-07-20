@@ -301,6 +301,4 @@ def test_revoking_an_upstream_approval_marks_real_downstream_stale(
             )
         )
         assert stale_event is not None
-        assert stale_event.summary_json["payload"]["reason_code"] == (
-            "UPSTREAM_APPROVAL_REVOKED"
-        )
+        assert stale_event.summary_json["payload"]["reason_code"] == ("UPSTREAM_APPROVAL_REVOKED")

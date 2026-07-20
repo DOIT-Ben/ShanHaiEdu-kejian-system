@@ -85,9 +85,7 @@ def test_stale_selection_intersects_keyed_scope_and_preserves_all_scope() -> Non
             selector=ImpactSelector.LESSON_KEY,
             keys=("LESSON-001", "LESSON-002"),
         )
-    ) == ArtifactImpactScope(
-        mode="keyed", selector=ImpactSelector.LESSON_KEY, keys=("LESSON-001",)
-    )
+    ) == ArtifactImpactScope(mode="keyed", selector=ImpactSelector.LESSON_KEY, keys=("LESSON-001",))
     assert selection.matches(ArtifactImpactScope(mode="all")) == ArtifactImpactScope(mode="all")
     assert (
         selection.matches(

@@ -80,13 +80,11 @@ class ArtifactRelationService:
 
         # All mutating graph paths acquire the organization lock before row locks.
         self._lock_relation_graph()
-        self._require_project(source_artifact.project_id, action=ProjectAction.EDIT, for_update=True)
-        locked_source = self._repository.get_version(
-            source_version.id, for_update_artifact=True
+        self._require_project(
+            source_artifact.project_id, action=ProjectAction.EDIT, for_update=True
         )
-        locked_target = self._repository.get_version(
-            target_version.id, for_update_artifact=True
-        )
+        locked_source = self._repository.get_version(source_version.id, for_update_artifact=True)
+        locked_target = self._repository.get_version(target_version.id, for_update_artifact=True)
         if locked_source is None or locked_target is None:
             raise self._not_found()
         source_version, source_artifact = locked_source
@@ -158,7 +156,9 @@ class ArtifactRelationService:
         if source_record is None:
             return [], []
         _, source_artifact = source_record
-        self._require_project(source_artifact.project_id, action=ProjectAction.REVIEW, for_update=True)
+        self._require_project(
+            source_artifact.project_id, action=ProjectAction.REVIEW, for_update=True
+        )
         self._repository.get_version(previous_version_id, for_update_artifact=True)
         grouped = self._group_downstream_relations(previous_version_id)
         target_artifact_ids = sorted(grouped, key=str)
@@ -213,7 +213,11 @@ class ArtifactRelationService:
         matched: list[tuple[ArtifactRelation, ArtifactImpactScope]] = []
         for relation in relations:
             scope = self._parse_scope(relation.impact_scope_json)
-            if replacement_version_id is not None and scope.mode == "keyed" and selection.mode == "all":
+            if (
+                replacement_version_id is not None
+                and scope.mode == "keyed"
+                and selection.mode == "all"
+            ):
                 raise self._conflict(
                     "ARTIFACT_IMPACT_SELECTION_REQUIRED",
                     "A keyed relation requires an exact analyzer selection.",

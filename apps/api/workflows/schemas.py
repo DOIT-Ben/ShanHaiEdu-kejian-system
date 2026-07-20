@@ -8,8 +8,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from apps.api.projects.schemas import ProjectRead
 from apps.api.artifacts.schemas import ArtifactStaleReasonRead
+from apps.api.projects.schemas import ProjectRead
 from workflow.node_state import NodeStatus
 
 

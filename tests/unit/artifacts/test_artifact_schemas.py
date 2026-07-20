@@ -61,7 +61,11 @@ def test_stale_reason_accepts_sorted_keyed_scope() -> None:
                 {
                     "relation_type": "derives_from",
                     "binding_key": "lesson-scope",
-                    "impact_scope": {"mode": "keyed", "selector": "lesson_unit_key", "keys": ["LESSON-001"]},
+                    "impact_scope": {
+                        "mode": "keyed",
+                        "selector": "lesson_unit_key",
+                        "keys": ["LESSON-001"],
+                    },
                 }
             ]
         },
@@ -70,7 +74,11 @@ def test_stale_reason_accepts_sorted_keyed_scope() -> None:
                 {
                     "relation_type": "derives_from",
                     "binding_key": "lesson-scope",
-                    "impact_scope": {"mode": "keyed", "selector": "lesson_key", "keys": ["LESSON-002", "LESSON-001"]},
+                    "impact_scope": {
+                        "mode": "keyed",
+                        "selector": "lesson_key",
+                        "keys": ["LESSON-002", "LESSON-001"],
+                    },
                 }
             ]
         },
@@ -83,9 +91,7 @@ def test_stale_reason_rejects_extra_or_incompatible_shapes(overrides: dict[str, 
 
 def test_revoke_requires_null_replacement() -> None:
     with pytest.raises(ValidationError):
-        ArtifactStaleReasonRead.model_validate(
-            _reason(reason_code="UPSTREAM_APPROVAL_REVOKED")
-        )
+        ArtifactStaleReasonRead.model_validate(_reason(reason_code="UPSTREAM_APPROVAL_REVOKED"))
 
     reason = ArtifactStaleReasonRead.model_validate(
         _reason(

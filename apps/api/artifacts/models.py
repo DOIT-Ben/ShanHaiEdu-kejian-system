@@ -261,7 +261,8 @@ class ArtifactRelation(Base):
                 impact_scope_json = '{\"mode\": \"all\"}'::jsonb
                 OR (
                     jsonb_typeof(impact_scope_json) = 'object'
-                    AND (impact_scope_json - 'keys') = '{"mode": "keyed", "selector": "lesson_key"}'::jsonb
+                    AND (impact_scope_json - 'keys') =
+                        '{"mode": "keyed", "selector": "lesson_key"}'::jsonb
                     AND jsonb_typeof(impact_scope_json->'keys') = 'array'
                     AND jsonb_array_length(impact_scope_json->'keys') > 0
                 )

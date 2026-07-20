@@ -49,15 +49,13 @@ class ArtifactStaleBindingRead(BaseModel):
 class ArtifactStaleReasonRead(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    reason_code: Literal[
-        "UPSTREAM_APPROVED_VERSION_CHANGED", "UPSTREAM_APPROVAL_REVOKED"
-    ]
+    reason_code: Literal["UPSTREAM_APPROVED_VERSION_CHANGED", "UPSTREAM_APPROVAL_REVOKED"]
     replaced_upstream_version_id: UUID
     replacement_version_id: UUID | None
     bindings: list[ArtifactStaleBindingRead] = Field(min_length=1)
 
     @model_validator(mode="after")
-    def validate_replacement(self) -> "ArtifactStaleReasonRead":
+    def validate_replacement(self) -> ArtifactStaleReasonRead:
         is_revoke = self.reason_code == "UPSTREAM_APPROVAL_REVOKED"
         if is_revoke != (self.replacement_version_id is None):
             raise ValueError("replacement_version_id does not match reason_code")

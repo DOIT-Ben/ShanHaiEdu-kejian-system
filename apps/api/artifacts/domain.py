@@ -50,7 +50,7 @@ class ArtifactImpactScope:
     keys: tuple[str, ...] = ()
 
     @classmethod
-    def from_mapping(cls, value: Mapping[str, Any]) -> "ArtifactImpactScope":
+    def from_mapping(cls, value: Mapping[str, Any]) -> ArtifactImpactScope:
         if not isinstance(value, Mapping):
             raise ArtifactInvariantError("impact_scope must be an object")
         if set(value) == {"mode"} and value.get("mode") == "all":
@@ -94,9 +94,7 @@ class StaleImpactDimension:
         archived = tuple(self.archived_keys)
         for values in (changed, archived):
             if len(set(values)) != len(values) or list(values) != sorted(values):
-                raise ArtifactInvariantError(
-                    "stale impact keys must be unique and sorted"
-                )
+                raise ArtifactInvariantError("stale impact keys must be unique and sorted")
             if any(not key.strip() for key in values):
                 raise ArtifactInvariantError("stale impact keys must be non-empty")
         if set(changed) & set(archived):
@@ -113,11 +111,11 @@ class StaleImpactSelection:
     dimensions: tuple[StaleImpactDimension, ...] = ()
 
     @classmethod
-    def all(cls) -> "StaleImpactSelection":
+    def all(cls) -> StaleImpactSelection:
         return cls(mode="all")
 
     @classmethod
-    def exact(cls, dimensions: Iterable[StaleImpactDimension]) -> "StaleImpactSelection":
+    def exact(cls, dimensions: Iterable[StaleImpactDimension]) -> StaleImpactSelection:
         values = tuple(dimensions)
         selectors = [dimension.selector for dimension in values]
         if len(set(selectors)) != len(selectors):
