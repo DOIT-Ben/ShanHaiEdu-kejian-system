@@ -1,31 +1,36 @@
-"""Application service for the isolated video preproduction planning slice."""
+"""Stage-gated application service for isolated video preproduction planning."""
 
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Literal
 
 from apps.api.video_preproduction.fake import ScriptedDeterministicTextFake
 from apps.api.video_preproduction.models import (
+    ApprovalFact,
     AssetInventory,
     DurationRecommendation,
     ImagePrompt,
-    MasterScript,
     PricingSnapshot,
     ProductionPlan,
+    ReviewableMasterScriptStage,
+    ReviewableRoughStoryboardStage,
     ReviewableVideoPreproductionPackage,
     RoughBeat,
     RoughStoryboard,
+    StoryComplexity,
     TeacherConfirmation,
     ValidationReport,
     VideoAsset,
     VideoPreproductionRequest,
     VisualPlan,
 )
-from apps.api.video_preproduction.validator import validate_package
-from workflow.content_package import canonical_json_sha256
-
-AssetType = Literal["character", "scene", "prop", "creature"]
+from apps.api.video_preproduction.validator import (
+    canonical_package_hash,
+    validate_approval,
+    validate_master_script,
+    validate_package,
+    validate_rough_storyboard,
+)
 
 
 class VideoPreproductionError(ValueError):
@@ -38,35 +43,97 @@ class VideoPreproductionService:
     def __init__(self, text_fake: ScriptedDeterministicTextFake) -> None:
         self._text_fake = text_fake
 
-    def generate(self, request: VideoPreproductionRequest) -> ReviewableVideoPreproductionPackage:
+    def recommend(self, request: VideoPreproductionRequest) -> DurationRecommendation:
         pricing = _require_pricing(request)
-        recommendation = _recommend_duration(request, pricing)
-        confirmation = _require_teacher_confirmation(request.teacher_confirmation, recommendation)
-        master_script = self._text_fake.generate_master_script(
+        complexity = _story_complexity(request)
+        preference_seconds = {"economy": -10, "balanced": 0, "quality": 10}[request.cost_preference]
+        price_seconds = -10 if pricing.image_candidate_unit_price > Decimal("1.00") else 0
+        duration = min(
+            180,
+            max(60, complexity.scene_count * 25 + preference_seconds + price_seconds),
+        )
+        cost = (
+            pricing.image_candidate_unit_price
+            * pricing.candidates_per_asset
+            * complexity.estimated_asset_count
+        )
+        return DurationRecommendation(
+            recommended_duration_seconds=duration,
+            estimated_cost=cost,
+            pricing_version=pricing.version,
+            currency=pricing.currency,
+            story_complexity=complexity,
+            rationale=(
+                f"creative concept chars: {complexity.creative_concept_chars}",
+                f"course anchor chars: {complexity.course_anchor_chars}",
+                f"scene and beat count: {complexity.scene_count}",
+                f"pricing snapshot: {pricing.version}",
+            ),
+        )
+
+    def generate_master_script(
+        self,
+        request: VideoPreproductionRequest,
+        recommendation: DurationRecommendation,
+        confirmation: TeacherConfirmation | None,
+    ) -> ReviewableMasterScriptStage:
+        if recommendation != self.recommend(request):
+            raise VideoPreproductionError("DURATION_RECOMMENDATION_STALE")
+        confirmed = _require_confirmation(confirmation, recommendation)
+        script = self._text_fake.generate_master_script(
             request.intro_selection_snapshot,
             target_duration_seconds=recommendation.recommended_duration_seconds,
+            scene_count=recommendation.story_complexity.scene_count,
         )
-        rough_storyboard = _build_rough_storyboard(master_script)
-        visual_plan = _build_visual_plan(request.aspect_ratio, request.language)
-        inventory = _build_asset_inventory(rough_storyboard)
-        production_plan = _build_production_plan(inventory, visual_plan)
-        package = ReviewableVideoPreproductionPackage(
+        if validate_master_script(request.intro_selection_snapshot, script):
+            raise VideoPreproductionError("VIDEO_MASTER_SCRIPT_INVALID")
+        return ReviewableMasterScriptStage(
             source_snapshot=request.intro_selection_snapshot,
-            teacher_confirmation=confirmation,
+            teacher_confirmation=confirmed,
             duration_recommendation=recommendation,
-            master_script=master_script,
-            rough_storyboard=rough_storyboard,
-            visual_plan=visual_plan,
-            asset_inventory=inventory,
-            production_plan=production_plan,
-            validation_report=ValidationReport(valid=True, errors=()),
-            canonical_hash="0" * 64,
+            master_script=script,
         )
+
+    def generate_rough_storyboard(
+        self,
+        master_stage: ReviewableMasterScriptStage,
+        master_approval: ApprovalFact | None,
+    ) -> ReviewableRoughStoryboardStage:
+        approved = _require_approval(
+            master_approval,
+            kind="master_script",
+            key=master_stage.master_script.master_script_key,
+            value=master_stage.master_script,
+            error_code="MASTER_SCRIPT_APPROVAL_REQUIRED",
+        )
+        rough = _build_rough_storyboard(master_stage)
+        if validate_rough_storyboard(master_stage.master_script, rough):
+            raise VideoPreproductionError("VIDEO_ROUGH_STORYBOARD_INVALID")
+        return ReviewableRoughStoryboardStage(
+            master_stage=master_stage,
+            master_script_approval=approved,
+            rough_storyboard=rough,
+        )
+
+    def generate_package(
+        self,
+        request: VideoPreproductionRequest,
+        rough_stage: ReviewableRoughStoryboardStage,
+        rough_approval: ApprovalFact | None,
+    ) -> ReviewableVideoPreproductionPackage:
+        approved = _require_approval(
+            rough_approval,
+            kind="rough_storyboard",
+            key=rough_stage.rough_storyboard.rough_storyboard_key,
+            value=rough_stage.rough_storyboard,
+            error_code="ROUGH_STORYBOARD_APPROVAL_REQUIRED",
+        )
+        _require_stage_source(request, rough_stage)
+        package = _build_package(request, rough_stage, approved)
         report = validate_package(package)
         if not report.valid:
             raise VideoPreproductionError("VIDEO_PREPRODUCTION_INVALID")
-        finalized = package.model_copy(update={"validation_report": report})
-        return finalized.model_copy(update={"canonical_hash": _canonical_hash(finalized)})
+        return package.model_copy(update={"validation_report": report})
 
 
 def _require_pricing(request: VideoPreproductionRequest) -> PricingSnapshot:
@@ -75,37 +142,26 @@ def _require_pricing(request: VideoPreproductionRequest) -> PricingSnapshot:
     return request.pricing_snapshot
 
 
-def _recommend_duration(
-    request: VideoPreproductionRequest,
-    pricing: PricingSnapshot,
-) -> DurationRecommendation:
-    story_seconds = min(30, 10 * (1 + len(request.intro_selection_snapshot.must_not_preteach)))
-    preference_seconds = {"economy": -15, "balanced": 0, "quality": 15}[request.cost_preference]
-    price_seconds = -15 if pricing.image_candidate_unit_price > Decimal("1.00") else 0
-    duration = min(180, max(60, 60 + story_seconds + preference_seconds + price_seconds))
-    asset_count = 5
-    estimated_cost = pricing.image_candidate_unit_price * pricing.candidates_per_asset * asset_count
-    rationale = (
-        f"story boundary requires {story_seconds} additional seconds",
-        f"cost preference adjustment is {preference_seconds} seconds",
-        f"pricing snapshot {pricing.version} adjustment is {price_seconds} seconds",
-    )
-    return DurationRecommendation(
-        recommended_duration_seconds=duration,
-        estimated_cost=estimated_cost,
-        pricing_version=pricing.version,
-        currency=pricing.currency,
-        rationale=rationale,
+def _story_complexity(request: VideoPreproductionRequest) -> StoryComplexity:
+    snapshot = request.intro_selection_snapshot
+    creative_chars = len(snapshot.creative_concept.strip())
+    anchor_chars = len(snapshot.course_anchor.strip())
+    combined_chars = creative_chars + anchor_chars
+    scene_count = min(6, max(3, 2 + (combined_chars + 79) // 80))
+    return StoryComplexity(
+        creative_concept_chars=creative_chars,
+        course_anchor_chars=anchor_chars,
+        scene_count=scene_count,
+        beat_count=scene_count,
+        estimated_asset_count=scene_count + 1,
     )
 
 
-def _require_teacher_confirmation(
+def _require_confirmation(
     confirmation: TeacherConfirmation | None,
     recommendation: DurationRecommendation,
 ) -> TeacherConfirmation:
-    if confirmation is None:
-        raise VideoPreproductionError("TEACHER_CONFIRMATION_REQUIRED")
-    if (
+    if confirmation is None or (
         confirmation.pricing_version != recommendation.pricing_version
         or confirmation.currency != recommendation.currency
         or confirmation.confirmed_duration_seconds != recommendation.recommended_duration_seconds
@@ -115,12 +171,45 @@ def _require_teacher_confirmation(
     return confirmation
 
 
-def _build_rough_storyboard(master_script: MasterScript) -> RoughStoryboard:
-    asset_keys = (
-        ("asset-robot", "asset-bay"),
-        ("asset-box", "asset-slot"),
-        ("asset-scan-light",),
-    )
+def _require_approval(
+    approval: ApprovalFact | None,
+    *,
+    kind: str,
+    key: str,
+    value: object,
+    error_code: str,
+) -> ApprovalFact:
+    if approval is None or validate_approval(approval, kind=kind, key=key, value=value):
+        raise VideoPreproductionError(error_code)
+    return approval
+
+
+def _require_stage_source(
+    request: VideoPreproductionRequest,
+    rough_stage: ReviewableRoughStoryboardStage,
+) -> None:
+    master_stage = rough_stage.master_stage
+    if (
+        master_stage.source_snapshot != request.intro_selection_snapshot
+        or master_stage.duration_recommendation
+        != VideoPreproductionService(ScriptedDeterministicTextFake()).recommend(request)
+    ):
+        raise VideoPreproductionError("VIDEO_PREPRODUCTION_SOURCE_STALE")
+    if validate_master_script(master_stage.source_snapshot, master_stage.master_script):
+        raise VideoPreproductionError("VIDEO_MASTER_SCRIPT_INVALID")
+    if validate_rough_storyboard(master_stage.master_script, rough_stage.rough_storyboard):
+        raise VideoPreproductionError("VIDEO_ROUGH_STORYBOARD_INVALID")
+    if validate_approval(
+        rough_stage.master_script_approval,
+        kind="master_script",
+        key=master_stage.master_script.master_script_key,
+        value=master_stage.master_script,
+    ):
+        raise VideoPreproductionError("MASTER_SCRIPT_APPROVAL_REQUIRED")
+
+
+def _build_rough_storyboard(master_stage: ReviewableMasterScriptStage) -> RoughStoryboard:
+    master = master_stage.master_script
     beats = tuple(
         RoughBeat(
             beat_key=f"beat-{scene.position}",
@@ -130,67 +219,118 @@ def _build_rough_storyboard(master_script: MasterScript) -> RoughStoryboard:
             start_state=scene.start_state,
             end_state=scene.end_state,
             duration_seconds=scene.duration_seconds,
-            asset_keys=asset_keys[scene.position - 1],
+            asset_keys=_beat_asset_keys(scene.position),
         )
-        for scene in master_script.scenes
+        for scene in master.scenes
     )
     return RoughStoryboard(
+        rough_storyboard_key=f"rough-{master.master_script_key}",
+        source_master_script_key=master.master_script_key,
         beats=beats,
         total_duration_seconds=sum(beat.duration_seconds for beat in beats),
     )
 
 
-def _build_asset_inventory(storyboard: RoughStoryboard) -> AssetInventory:
-    declarations: tuple[tuple[str, AssetType, str, str, tuple[str, ...]], ...] = (
-        ("asset-robot", "character", "robot", "执行逐项核对。", ("beat-1",)),
-        ("asset-bay", "scene", "supply-bay", "呈现补给舱空间。", ("beat-1",)),
-        ("asset-box", "prop", "supply-box", "呈现待核对的补给盒。", ("beat-2",)),
-        ("asset-slot", "prop", "supply-slot", "呈现一一对应的卡槽。", ("beat-2",)),
-        ("asset-scan-light", "prop", "scan-light", "呈现课堂交接前的状态提示。", ("beat-3",)),
-    )
-    beat_keys = {beat.beat_key for beat in storyboard.beats}
-    assets = tuple(
-        VideoAsset(
-            asset_key=asset_key,
-            asset_type=asset_type,
-            identity_key=identity_key,
-            purpose=purpose,
-            source_beat_keys=source_beat_keys,
-        )
-        for asset_key, asset_type, identity_key, purpose, source_beat_keys in declarations
-        if set(source_beat_keys) <= beat_keys
-    )
-    return AssetInventory(assets=assets)
+def _beat_asset_keys(position: int) -> tuple[str, ...]:
+    if position == 1:
+        return "asset-character", "asset-scene"
+    if position == 2:
+        return ("asset-prop",)
+    if position == 3:
+        return ("asset-creature",)
+    return (f"asset-scene-{position}",)
 
 
-def _build_visual_plan(
-    aspect_ratio: Literal["16:9", "9:16"],
-    language: Literal["zh-CN"],
-) -> VisualPlan:
+def _build_package(
+    request: VideoPreproductionRequest,
+    rough_stage: ReviewableRoughStoryboardStage,
+    rough_approval: ApprovalFact,
+) -> ReviewableVideoPreproductionPackage:
+    master_stage = rough_stage.master_stage
+    visual = _build_visual_plan(request)
+    inventory = _build_asset_inventory(rough_stage.rough_storyboard)
+    plan = _build_production_plan(inventory, visual)
+    package = ReviewableVideoPreproductionPackage(
+        source_snapshot=master_stage.source_snapshot,
+        teacher_confirmation=master_stage.teacher_confirmation,
+        duration_recommendation=master_stage.duration_recommendation,
+        master_script=master_stage.master_script,
+        master_script_approval=rough_stage.master_script_approval,
+        rough_storyboard=rough_stage.rough_storyboard,
+        rough_storyboard_approval=rough_approval,
+        visual_plan=visual,
+        asset_inventory=inventory,
+        production_plan=plan,
+        validation_report=ValidationReport(valid=True, errors=()),
+        canonical_hash="0" * 64,
+    )
+    return package.model_copy(update={"canonical_hash": canonical_package_hash(package)})
+
+
+def _build_visual_plan(request: VideoPreproductionRequest) -> VisualPlan:
     return VisualPlan(
-        aspect_ratio=aspect_ratio,
-        language=language,
+        aspect_ratio=request.aspect_ratio,
+        language=request.language,
         consistency_principles=(
-            "机器人、补给舱和补给盒保持同一造型比例与材质。",
+            "主体、场景、道具和生物保持同一造型比例与材质。",
             "每个资产独立构图, 使用清楚的承托面与接触阴影。",
         ),
         negative_constraints=("文字", "水印", "Logo", "额外主体"),
     )
 
 
-def _build_production_plan(inventory: AssetInventory, visual_plan: VisualPlan) -> ProductionPlan:
+def _build_asset_inventory(storyboard: RoughStoryboard) -> AssetInventory:
+    assets = [
+        VideoAsset(
+            asset_key="asset-character",
+            asset_type="character",
+            identity_key="story-character",
+            purpose="承载故事主要行动。",
+            source_beat_keys=("beat-1",),
+        ),
+        VideoAsset(
+            asset_key="asset-scene",
+            asset_type="scene",
+            identity_key="story-scene",
+            purpose="呈现故事发生空间。",
+            source_beat_keys=("beat-1",),
+        ),
+        VideoAsset(
+            asset_key="asset-prop",
+            asset_type="prop",
+            identity_key="story-prop",
+            purpose="承载第二节拍的可见变化。",
+            source_beat_keys=("beat-2",),
+        ),
+        VideoAsset(
+            asset_key="asset-creature",
+            asset_type="creature",
+            identity_key="story-creature",
+            purpose="承载第三节拍的引导动作。",
+            source_beat_keys=("beat-3",),
+        ),
+    ]
+    assets.extend(
+        VideoAsset(
+            asset_key=f"asset-scene-{beat.position}",
+            asset_type="scene",
+            identity_key=f"story-scene-{beat.position}",
+            purpose=f"呈现第{beat.position}节拍的空间变化。",
+            source_beat_keys=(beat.beat_key,),
+        )
+        for beat in storyboard.beats[3:]
+    )
+    return AssetInventory(assets=tuple(assets))
+
+
+def _build_production_plan(inventory: AssetInventory, visual: VisualPlan) -> ProductionPlan:
     prompts = tuple(
         ImagePrompt(
             asset_key=asset.asset_key,
-            prompt=(f"{asset.purpose} 独立构图, 保持教育短片视觉一致性, 无文字无水印。"),
-            negative_constraints=visual_plan.negative_constraints,
-            aspect_ratio=visual_plan.aspect_ratio,
+            prompt=f"{asset.purpose} 独立构图, 保持统一视觉语言, 无文字无水印。",
+            negative_constraints=visual.negative_constraints,
+            aspect_ratio=visual.aspect_ratio,
         )
         for asset in inventory.assets
     )
     return ProductionPlan(kind="image_prompts_only", image_prompts=prompts)
-
-
-def _canonical_hash(package: ReviewableVideoPreproductionPackage) -> str:
-    payload = package.model_dump(mode="json", exclude={"canonical_hash"})
-    return canonical_json_sha256(payload)

@@ -8,6 +8,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+ApprovalKind = Literal["master_script", "rough_storyboard"]
+AssetType = Literal["character", "scene", "prop", "creature"]
+AspectRatio = Literal["16:9", "9:16"]
+
 
 class _FrozenModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -33,6 +37,31 @@ class PricingSnapshot(_FrozenModel):
     candidates_per_asset: int = Field(ge=1, le=8)
 
 
+class VideoPreproductionRequest(_FrozenModel):
+    intro_selection_snapshot: IntroSelectionSnapshot
+    pricing_snapshot: PricingSnapshot | None
+    aspect_ratio: AspectRatio
+    language: Literal["zh-CN"]
+    cost_preference: Literal["economy", "balanced", "quality"]
+
+
+class StoryComplexity(_FrozenModel):
+    creative_concept_chars: int = Field(gt=0)
+    course_anchor_chars: int = Field(gt=0)
+    scene_count: int = Field(ge=3, le=6)
+    beat_count: int = Field(ge=3, le=6)
+    estimated_asset_count: int = Field(ge=4, le=7)
+
+
+class DurationRecommendation(_FrozenModel):
+    recommended_duration_seconds: int = Field(ge=60, le=180)
+    estimated_cost: Decimal = Field(ge=0)
+    pricing_version: str
+    currency: str = Field(pattern=r"^[A-Z]{3}$")
+    story_complexity: StoryComplexity
+    rationale: tuple[str, ...]
+
+
 class TeacherConfirmation(_FrozenModel):
     pricing_version: str = Field(min_length=1, max_length=160)
     currency: str = Field(pattern=r"^[A-Z]{3}$")
@@ -41,21 +70,12 @@ class TeacherConfirmation(_FrozenModel):
     confirmed_at: datetime
 
 
-class VideoPreproductionRequest(_FrozenModel):
-    intro_selection_snapshot: IntroSelectionSnapshot
-    pricing_snapshot: PricingSnapshot | None
-    aspect_ratio: Literal["16:9", "9:16"]
-    language: Literal["zh-CN"]
-    cost_preference: Literal["economy", "balanced", "quality"]
-    teacher_confirmation: TeacherConfirmation | None
-
-
-class DurationRecommendation(_FrozenModel):
-    recommended_duration_seconds: int = Field(ge=60, le=180)
-    estimated_cost: Decimal = Field(ge=0)
-    pricing_version: str
-    currency: str = Field(pattern=r"^[A-Z]{3}$")
-    rationale: tuple[str, ...]
+class ApprovalFact(_FrozenModel):
+    subject_kind: ApprovalKind
+    subject_key: str = Field(min_length=1, max_length=160)
+    subject_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    approved_by: str = Field(min_length=1, max_length=160)
+    approved_at: datetime
 
 
 class MasterScene(_FrozenModel):
@@ -72,12 +92,23 @@ class MasterScene(_FrozenModel):
 class MasterScript(_FrozenModel):
     master_script_key: str
     selected_intro_snapshot_id: str
+    selected_intro_snapshot_version: str
+    selected_intro_option_key: str
     title: str
+    creative_concept: str
+    course_anchor: str
     narrative_purpose: str
     complete_story: str
     scenes: tuple[MasterScene, ...] = Field(min_length=1)
     target_duration_seconds: int = Field(ge=60, le=180)
     ends_at_handoff: bool
+
+
+class ReviewableMasterScriptStage(_FrozenModel):
+    source_snapshot: IntroSelectionSnapshot
+    teacher_confirmation: TeacherConfirmation
+    duration_recommendation: DurationRecommendation
+    master_script: MasterScript
 
 
 class RoughBeat(_FrozenModel):
@@ -92,24 +123,32 @@ class RoughBeat(_FrozenModel):
 
 
 class RoughStoryboard(_FrozenModel):
+    rough_storyboard_key: str
+    source_master_script_key: str
     beats: tuple[RoughBeat, ...] = Field(min_length=1)
     total_duration_seconds: int = Field(ge=60, le=180)
 
 
+class ReviewableRoughStoryboardStage(_FrozenModel):
+    master_stage: ReviewableMasterScriptStage
+    master_script_approval: ApprovalFact
+    rough_storyboard: RoughStoryboard
+
+
 class VideoAsset(_FrozenModel):
     asset_key: str
-    asset_type: Literal["character", "scene", "prop", "creature"]
+    asset_type: AssetType
     identity_key: str
     purpose: str
     source_beat_keys: tuple[str, ...] = Field(min_length=1)
 
 
 class AssetInventory(_FrozenModel):
-    assets: tuple[VideoAsset, ...] = Field(min_length=1)
+    assets: tuple[VideoAsset, ...] = Field(min_length=4)
 
 
 class VisualPlan(_FrozenModel):
-    aspect_ratio: Literal["16:9", "9:16"]
+    aspect_ratio: AspectRatio
     language: Literal["zh-CN"]
     consistency_principles: tuple[str, ...] = Field(min_length=1)
     negative_constraints: tuple[str, ...] = Field(min_length=1)
@@ -118,13 +157,13 @@ class VisualPlan(_FrozenModel):
 class ImagePrompt(_FrozenModel):
     asset_key: str
     prompt: str
-    negative_constraints: tuple[str, ...]
-    aspect_ratio: Literal["16:9", "9:16"]
+    negative_constraints: tuple[str, ...] = Field(min_length=1)
+    aspect_ratio: AspectRatio
 
 
 class ProductionPlan(_FrozenModel):
     kind: Literal["image_prompts_only"]
-    image_prompts: tuple[ImagePrompt, ...] = Field(min_length=1)
+    image_prompts: tuple[ImagePrompt, ...] = Field(min_length=4)
     media_operations: tuple[()] = ()
 
 
@@ -138,7 +177,9 @@ class ReviewableVideoPreproductionPackage(_FrozenModel):
     teacher_confirmation: TeacherConfirmation
     duration_recommendation: DurationRecommendation
     master_script: MasterScript
+    master_script_approval: ApprovalFact
     rough_storyboard: RoughStoryboard
+    rough_storyboard_approval: ApprovalFact
     visual_plan: VisualPlan
     asset_inventory: AssetInventory
     production_plan: ProductionPlan
