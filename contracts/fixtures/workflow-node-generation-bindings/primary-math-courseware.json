@@ -1312,6 +1312,14 @@
           },
           "relations": [
             {
+              "source_binding": "content:ppt_analysis",
+              "relation_type": "derives_from",
+              "binding_key": "upstream.content.ppt_analysis",
+              "impact_scope": {
+                "mode": "all"
+              }
+            },
+            {
               "source_binding": "approval:lesson_plan",
               "relation_type": "derives_from",
               "binding_key": "upstream.approval.lesson_plan",
@@ -1605,7 +1613,7 @@
       "execution_scope": "lesson_unit",
       "branch_key": "ppt",
       "dependencies": [
-        "ppt.outline.approve"
+        "ppt.pages.generate"
       ],
       "entrypoint": false,
       "output_persistence": {
@@ -1756,7 +1764,16 @@
             "source": "output",
             "pointer": ""
           },
-          "relations": []
+          "relations": [
+            {
+              "source_binding": "prompt:image_request",
+              "relation_type": "derives_from",
+              "binding_key": "upstream.prompt.image_request",
+              "impact_scope": {
+                "mode": "all"
+              }
+            }
+          ]
         }
       }
     },
@@ -2428,7 +2445,47 @@
       "dependencies": [
         "pptx.export"
       ],
-      "entrypoint": false
+      "entrypoint": false,
+      "quality_report_persistence": {
+        "source_input_ref": "asset:pptx",
+        "report_ref": "report:ppt_final_quality",
+        "validator_refs": [
+          {
+            "key": "validator.pptx.openable",
+            "semantic_version": "1.0.0",
+            "implementation_digest": "731f45ce852e911f90a4c718362c45d3a2c4f7fe253471366dbb63d013f92636"
+          },
+          {
+            "key": "validator.pptx.render_match",
+            "semantic_version": "1.0.0",
+            "implementation_digest": "c646fb039acf27b526620249d07b1ff112753ef5cce048e06208dba09cdd2f8d"
+          },
+          {
+            "key": "validator.ppt.teaching_scope",
+            "semantic_version": "1.0.0",
+            "implementation_digest": "4758312d3a681f738a7a95d24b78f698740c7db1058853ee370ef82148130cf6"
+          },
+          {
+            "key": "validator.ppt.layout",
+            "semantic_version": "1.0.0",
+            "implementation_digest": "db82ea70c4d04a2c1a7de25dcc32eae40a13e2c8922eaf91b2f082ccfcfb3b61"
+          }
+        ],
+        "mapping": {
+          "conclusion": {
+            "source": "output",
+            "pointer": "/conclusion"
+          },
+          "findings": {
+            "source": "output",
+            "pointer": "/findings"
+          },
+          "evidence": {
+            "source": "output",
+            "pointer": "/evidence"
+          }
+        }
+      }
     },
     {
       "node_key": "ppt.final.approve",
@@ -2490,7 +2547,13 @@
       ],
       "entrypoint": false,
       "quality_requirement": {
-        "mode": "none"
+        "mode": "reports",
+        "report_refs": [
+          "report:ppt_final_quality"
+        ],
+        "accepted_conclusions": [
+          "passed"
+        ]
       }
     },
     {
@@ -3088,7 +3151,16 @@
             "source": "output",
             "pointer": ""
           },
-          "relations": []
+          "relations": [
+            {
+              "source_binding": "prompt:image_request",
+              "relation_type": "derives_from",
+              "binding_key": "upstream.prompt.image_request",
+              "impact_scope": {
+                "mode": "all"
+              }
+            }
+          ]
         }
       }
     },
@@ -3719,6 +3791,14 @@
               "impact_scope": {
                 "mode": "all"
               }
+            },
+            {
+              "source_binding": "asset:video_image_assets",
+              "relation_type": "derives_from",
+              "binding_key": "upstream.asset.video_image_assets",
+              "impact_scope": {
+                "mode": "all"
+              }
             }
           ]
         }
@@ -4322,15 +4402,16 @@
     },
     {
       "node_key": "video.technical.validate",
-      "title": "视频技术校验",
+      "title": "视频最终技术与课堂质量校验",
       "phase": "video",
       "execution_kind": "deterministic",
       "executor_ref": "executor.video.technical_validate",
       "input_contract_refs": [
-        "asset:video_final"
+        "asset:video_final",
+        "report:video_classroom_quality"
       ],
       "output_contract_refs": [
-        "report:video_technical_quality"
+        "report:video_final_quality"
       ],
       "prompt_exposure_policy": {
         "teacher_business_prompt": "not_applicable",
@@ -4381,6 +4462,21 @@
           "key": "validator.video.timeline_sync",
           "semantic_version": "1.0.0",
           "implementation_digest": "af9edee151a6ff2a77e336af02b8f8f856a675805a0d9a39aeab63b025789a98"
+        },
+        {
+          "key": "validator.video.classroom_quality_schema",
+          "semantic_version": "1.0.0",
+          "implementation_digest": "201783a2e08bb203b8763b0caf04aa833f2b020ddacca65248fd56e4379b7507"
+        },
+        {
+          "key": "validator.video.handoff",
+          "semantic_version": "1.0.0",
+          "implementation_digest": "725c14a6b9dba98cd68bcf2a8fee2876b8851947eff22a914aa27d53631bdab9"
+        },
+        {
+          "key": "validator.video.no_preteach",
+          "semantic_version": "1.0.0",
+          "implementation_digest": "b4632fb9806fa6ddee4b519b16669838f51873ac32324dfa36e2c1d4766f3ebe"
         }
       ],
       "repair_policy": {
@@ -4393,9 +4489,65 @@
       "execution_scope": "lesson_unit",
       "branch_key": "video",
       "dependencies": [
-        "video.timeline.assemble"
+        "video.timeline.assemble",
+        "video.classroom_quality.evaluate"
       ],
-      "entrypoint": false
+      "entrypoint": false,
+      "quality_report_persistence": {
+        "source_input_ref": "asset:video_final",
+        "report_ref": "report:video_final_quality",
+        "validator_refs": [
+          {
+            "key": "validator.video.file",
+            "semantic_version": "1.0.0",
+            "implementation_digest": "554ff7664f90d478c351b4a9d87ccc829495159ee2394c3f28b41ad9f5b49d16"
+          },
+          {
+            "key": "validator.video.codec",
+            "semantic_version": "1.0.0",
+            "implementation_digest": "85d8c5961361b1e68c9956bbbec6a7577778bf969fb329eb982c4c050b4b759b"
+          },
+          {
+            "key": "validator.video.duration",
+            "semantic_version": "1.0.0",
+            "implementation_digest": "64bfa8836c9de2d511e3b615487eed450248e70cc9f5d9e5eb75534fa20b7a0f"
+          },
+          {
+            "key": "validator.video.timeline_sync",
+            "semantic_version": "1.0.0",
+            "implementation_digest": "af9edee151a6ff2a77e336af02b8f8f856a675805a0d9a39aeab63b025789a98"
+          },
+          {
+            "key": "validator.video.classroom_quality_schema",
+            "semantic_version": "1.0.0",
+            "implementation_digest": "201783a2e08bb203b8763b0caf04aa833f2b020ddacca65248fd56e4379b7507"
+          },
+          {
+            "key": "validator.video.handoff",
+            "semantic_version": "1.0.0",
+            "implementation_digest": "725c14a6b9dba98cd68bcf2a8fee2876b8851947eff22a914aa27d53631bdab9"
+          },
+          {
+            "key": "validator.video.no_preteach",
+            "semantic_version": "1.0.0",
+            "implementation_digest": "b4632fb9806fa6ddee4b519b16669838f51873ac32324dfa36e2c1d4766f3ebe"
+          }
+        ],
+        "mapping": {
+          "conclusion": {
+            "source": "output",
+            "pointer": "/conclusion"
+          },
+          "findings": {
+            "source": "output",
+            "pointer": "/findings"
+          },
+          "evidence": {
+            "source": "output",
+            "pointer": "/evidence"
+          }
+        }
+      }
     },
     {
       "node_key": "video.classroom_quality.evaluate",
@@ -4537,8 +4689,7 @@
       "execution_kind": "human_gate",
       "input_contract_refs": [
         "asset:video_final",
-        "report:video_technical_quality",
-        "report:video_classroom_quality"
+        "report:video_final_quality"
       ],
       "output_contract_refs": [
         "approval:video_final"
@@ -4587,12 +4738,17 @@
       "branch_key": "video",
       "dependencies": [
         "video.timeline.assemble",
-        "video.technical.validate",
-        "video.classroom_quality.evaluate"
+        "video.technical.validate"
       ],
       "entrypoint": false,
       "quality_requirement": {
-        "mode": "none"
+        "mode": "reports",
+        "report_refs": [
+          "report:video_final_quality"
+        ],
+        "accepted_conclusions": [
+          "passed"
+        ]
       }
     },
     {

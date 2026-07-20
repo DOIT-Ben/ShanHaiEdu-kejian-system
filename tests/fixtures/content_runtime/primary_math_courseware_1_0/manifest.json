@@ -2,9 +2,9 @@
   "format_version": "1.0",
   "package_key": "shanhai.primary_math.courseware",
   "name": "小学数学标准课件生产内容包",
-  "semantic_version": "1.1.0",
+  "semantic_version": "1.0.0",
   "runtime_constraint": ">=0.1.0 <1.0.0",
-  "change_summary": "发布显式47节点拓扑、22个模型节点输出持久化、质量报告/人工门禁声明和受限Artifact/CreationPackage投影合同；保留首套课时、教案、导入、PPT、图片、视频和音频业务生成合同。",
+  "change_summary": "冻结首套课时、教案、导入、PPT、图片、视频和音频业务生成合同。",
   "dependencies": [],
   "items": [
     {
@@ -306,7 +306,7 @@
       "kind": "content_definition",
       "path": "items/ppt-body-asset-prompts-generate-output.json",
       "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
-      "sha256": "2166c09dd88eab3dfd00bfe295055c6e9a89e5beaffbccf619cff12c689e016c"
+      "sha256": "74979e362f348b87be159cb4321a297e276af32324bd0acea114b86499e7acc3"
     },
     {
       "item_key": "ppt.body_asset_prompts.generate.prompt",
@@ -551,7 +551,7 @@
       "kind": "content_definition",
       "path": "items/video-asset-prompts-generate-output.json",
       "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
-      "sha256": "1dc6ca167c30826bbee353b5c7ffb9605bf83be09daa9f75424b8b9ceed64550"
+      "sha256": "81f09266399c6092d515df8fa1496cb30db85ec856a9323db4d69cf46ae8718c"
     },
     {
       "item_key": "video.asset_prompts.generate.prompt",

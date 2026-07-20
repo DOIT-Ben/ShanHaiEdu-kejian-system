@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections import defaultdict
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Literal, cast
@@ -159,8 +159,24 @@ class StaleImpactSelection:
 
 
 def canonical_content_hash(content: Mapping[str, Any]) -> str:
-    canonical = json.dumps(content, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    canonical = json.dumps(
+        _plain_json_value(content),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _plain_json_value(value: object) -> object:
+    if isinstance(value, Mapping):
+        return {
+            key: _plain_json_value(child)
+            for key, child in cast(Mapping[str, object], value).items()
+        }
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return [_plain_json_value(child) for child in cast(Sequence[object], value)]
+    return value
 
 
 def ensure_relation_is_acyclic(

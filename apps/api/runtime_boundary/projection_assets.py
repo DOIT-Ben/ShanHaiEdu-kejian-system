@@ -25,7 +25,7 @@ def compile_reference_assets(
             "reference_assets must resolve to an array",
         )
     raw_values = tuple(cast(Sequence[object], value))
-    if len(raw_values) > 100:
+    if len(raw_values) > 20:
         raise OutputProjectionError(
             "OUTPUT_PROJECTION_REFERENCE_ASSETS_INVALID",
             "reference assets exceed the maximum count",
