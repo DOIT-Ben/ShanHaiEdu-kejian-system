@@ -8,7 +8,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Any, Literal, cast
 from uuid import UUID
 
 
@@ -50,9 +50,10 @@ class ArtifactImpactScope:
     keys: tuple[str, ...] = ()
 
     @classmethod
-    def from_mapping(cls, value: Mapping[str, Any]) -> ArtifactImpactScope:
+    def from_mapping(cls, value: object) -> ArtifactImpactScope:
         if not isinstance(value, Mapping):
             raise ArtifactInvariantError("impact_scope must be an object")
+        value = cast(Mapping[str, Any], value)
         if set(value) == {"mode"} and value.get("mode") == "all":
             return cls(mode="all")
         if set(value) != {"mode", "selector", "keys"}:
@@ -66,6 +67,7 @@ class ArtifactImpactScope:
         raw_keys = value.get("keys")
         if not isinstance(raw_keys, (list, tuple)) or not raw_keys:
             raise ArtifactInvariantError("impact_scope keys must be non-empty")
+        raw_keys = cast(list[Any] | tuple[Any, ...], raw_keys)
         if any(not isinstance(key, str) or not key.strip() for key in raw_keys):
             raise ArtifactInvariantError("impact_scope keys must be non-empty strings")
         keys = tuple(raw_keys)

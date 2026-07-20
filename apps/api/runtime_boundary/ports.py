@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 from uuid import UUID
 
+from apps.api.artifacts.domain import ArtifactRelationType
 from apps.api.model_gateway.contracts import (
     ModelAuditContext,
     TextGatewayResult,
@@ -58,6 +59,14 @@ class AssetContextItem:
 
 
 @dataclass(frozen=True, slots=True)
+class GeneratedArtifactRelation:
+    from_artifact_version_id: UUID
+    relation_type: ArtifactRelationType
+    binding_key: str
+    impact_scope: Mapping[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
 class GeneratedArtifactWrite:
     project_id: UUID
     node_run_id: UUID
@@ -69,6 +78,7 @@ class GeneratedArtifactWrite:
     content_definition_version_id: UUID
     content: Mapping[str, Any]
     request_id: str
+    relations: tuple[GeneratedArtifactRelation, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

@@ -153,6 +153,60 @@ def test_stale_propagates_only_along_real_relations_and_accept_stale_clears_it(
         assert downstream.stale_reason_json is None
 
 
+def test_supersedes_is_same_artifact_ordered_and_non_stale(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session, session.begin():
+        actor = seed_test_actor(session)
+        project = ProjectRepository(session, actor).create(
+            CreateProjectRequest(title="Fractions", knowledge_point="One half")
+        )
+        artifact, version_one = create_approved(
+            session, actor, project.id, "supersedes", {"value": 1}
+        )
+        draft = ArtifactRepository(session, actor).get_draft(artifact.id, "main")
+        assert draft is not None
+        saved = ArtifactService(session, actor).save_draft(
+            artifact.id,
+            "main",
+            expected_lock_version=draft.lock_version,
+            content={"value": 2},
+            request_id="req-supersedes-save",
+        )
+        version_two = ArtifactService(session, actor).submit(
+            artifact.id,
+            "main",
+            expected_lock_version=saved.lock_version,
+            source_kind="manual",
+            request_id="req-supersedes-submit",
+        )
+        ArtifactService(session, actor).review(
+            version_two.id,
+            action="approve",
+            comment="approved",
+            request_id="req-supersedes-approve",
+        )
+        service = ArtifactService(session, actor)
+        relation = service.add_relation(
+            from_version_id=version_one.id,
+            to_version_id=version_two.id,
+            relation_type="supersedes",
+            binding_key="version-order",
+            impact_scope={"mode": "all"},
+        )
+        assert relation.relation_type == "supersedes"
+        with pytest.raises(ApiError) as reverse:
+            service.add_relation(
+                from_version_id=version_two.id,
+                to_version_id=version_one.id,
+                relation_type="supersedes",
+                binding_key="reverse-order",
+                impact_scope={"mode": "all"},
+            )
+        assert reverse.value.code == "ARTIFACT_SUPERSEDES_VERSION_ORDER"
+
+
 def test_relation_cycle_and_cross_tenant_visibility_are_rejected(
     migrated_database_url: str,
 ) -> None:
@@ -242,6 +296,18 @@ def test_relation_impact_scope_database_constraint_accepts_only_current_shapes(
                 "extra": True,
             },
             {"mode": "all", "extra": True},
+            {"mode": "keyed", "selector": "lesson_key", "keys": [1]},
+            {"mode": "keyed", "selector": "lesson_key", "keys": [""]},
+            {
+                "mode": "keyed",
+                "selector": "lesson_key",
+                "keys": ["LESSON-001", "LESSON-001"],
+            },
+            {
+                "mode": "keyed",
+                "selector": "lesson_key",
+                "keys": ["LESSON-002", "LESSON-001"],
+            },
         ]
         for index, impact_scope in enumerate(invalid_scopes):
             with pytest.raises(IntegrityError):
