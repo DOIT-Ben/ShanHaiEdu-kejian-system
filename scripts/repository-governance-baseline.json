@@ -54,6 +54,8 @@
     {"path": "apps/api/artifacts/router.py", "line_count": 422, "owner": "area:asset", "reason": "Existing artifact routing and presentation responsibilities require a separate split task.", "exit_issue": "#92"},
     {"path": "apps/api/artifacts/relation_service.py", "line_count": 423, "owner": "area:asset", "reason": "Issue #86 adds locked relation ordering and owner reauthorization; split remains assigned to #92.", "exit_issue": "#92"},
     {"path": "apps/api/assets/project_service.py", "line_count": 419, "owner": "area:asset", "reason": "Existing project asset validation responsibilities require a separate split task.", "exit_issue": "#92"},
+    {"path": "apps/api/runtime_boundary/output_projection.py", "line_count": 445, "owner": "area:workflow", "reason": "Issue #130 keeps the published-output compiler in one pure boundary while #92 owns structural extraction.", "exit_issue": "#92"},
+    {"path": "apps/api/runtime_boundary/ports.py", "line_count": 533, "owner": "area:workflow", "reason": "Issue #130 extends the ORM-free runtime DTO boundary; #92 remains the dedicated split task.", "exit_issue": "#92"},
     {"path": "apps/api/uploads/confirmation_service.py", "line_count": 422, "owner": "area:asset", "reason": "Existing upload confirmation transaction requires a separate split task.", "exit_issue": "#92"}
   ],
   "oversized_functions": [

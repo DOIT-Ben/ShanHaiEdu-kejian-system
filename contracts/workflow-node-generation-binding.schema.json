@@ -9,13 +9,27 @@
     "catalog_key",
     "workflow_key",
     "semantic_version",
+    "external_input_contract_refs",
+    "validator_descriptors",
     "nodes"
   ],
   "properties": {
-    "api_version": {"const": "shanhai.workflow-node-generation-binding/v1"},
+    "api_version": {"const": "shanhai.workflow-node-generation-binding/v2"},
     "catalog_key": {"$ref": "#/$defs/key"},
     "workflow_key": {"$ref": "#/$defs/key"},
     "semantic_version": {"$ref": "#/$defs/semanticVersion"},
+    "external_input_contract_refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 500,
+      "items": {"$ref": "#/$defs/contractRef"}
+    },
+    "validator_descriptors": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 500,
+      "items": {"$ref": "#/$defs/validatorDescriptor"}
+    },
     "nodes": {
       "type": "array",
       "minItems": 1,
@@ -35,6 +49,45 @@
     "semanticVersion": {
       "type": "string",
       "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "validatorRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "semantic_version", "implementation_digest"],
+      "properties": {
+        "key": {"$ref": "#/$defs/key"},
+        "semantic_version": {"$ref": "#/$defs/semanticVersion"},
+        "implementation_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "validatorDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "semantic_version",
+        "implementation_digest",
+        "implementation_status"
+      ],
+      "properties": {
+        "key": {"$ref": "#/$defs/key"},
+        "semantic_version": {"$ref": "#/$defs/semanticVersion"},
+        "implementation_digest": {"$ref": "#/$defs/digest"},
+        "implementation_status": {"const": "contract_only"}
+      }
+    },
+    "contentDefinitionRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item_key", "kind"],
+      "properties": {
+        "item_key": {"$ref": "#/$defs/key"},
+        "kind": {"const": "content_definition"}
+      }
     },
     "generationTemplateRef": {
       "type": "object",
@@ -251,6 +304,296 @@
         "required_before_downstream": {"type": "boolean"}
       }
     },
+    "pointerProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "pointer"],
+      "properties": {
+        "source": {"enum": ["output", "item", "runtime"]},
+        "pointer": {"type": "string", "maxLength": 2048}
+      }
+    },
+    "constantProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "value"],
+      "properties": {
+        "source": {"const": "constant"},
+        "value": {}
+      }
+    },
+    "intrinsicProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "name"],
+      "properties": {
+        "source": {"const": "intrinsic"},
+        "name": {"const": "item_position"}
+      }
+    },
+    "valueProjection": {
+      "oneOf": [
+        {"$ref": "#/$defs/pointerProjection"},
+        {"$ref": "#/$defs/constantProjection"},
+        {"$ref": "#/$defs/intrinsicProjection"}
+      ]
+    },
+    "artifactIdentity": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["strategy", "artifact_key"],
+          "properties": {
+            "strategy": {"const": "project_singleton"},
+            "artifact_key": {"$ref": "#/$defs/key"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["strategy", "artifact_key_prefix"],
+          "properties": {
+            "strategy": {"const": "lesson_unit_singleton"},
+            "artifact_key_prefix": {"$ref": "#/$defs/key"}
+          }
+        }
+      ]
+    },
+    "impactScope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {"mode": {"const": "all"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "selector", "keys"],
+          "properties": {
+            "mode": {"const": "keyed"},
+            "selector": {"const": "lesson_key"},
+            "keys": {"$ref": "#/$defs/valueProjection"}
+          }
+        }
+      ]
+    },
+    "relationBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_binding", "relation_type", "binding_key", "impact_scope"],
+      "properties": {
+        "source_binding": {"$ref": "#/$defs/contractRef"},
+        "relation_type": {"enum": ["derives_from", "references", "constrains"]},
+        "binding_key": {"$ref": "#/$defs/key"},
+        "impact_scope": {"$ref": "#/$defs/impactScope"}
+      }
+    },
+    "artifactPersistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "artifact_type",
+        "branch_key",
+        "content_definition_ref",
+        "content",
+        "relations"
+      ],
+      "properties": {
+        "identity": {"$ref": "#/$defs/artifactIdentity"},
+        "artifact_type": {"$ref": "#/$defs/key"},
+        "branch_key": {"$ref": "#/$defs/key"},
+        "content_definition_ref": {"$ref": "#/$defs/contentDefinitionRef"},
+        "content": {"$ref": "#/$defs/valueProjection"},
+        "relations": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {"$ref": "#/$defs/relationBinding"}
+        }
+      }
+    },
+    "creationPackageKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "prefix"],
+      "properties": {
+        "strategy": {"const": "source_artifact_version"},
+        "prefix": {"$ref": "#/$defs/key"}
+      }
+    },
+    "authorizedReferenceAssetsProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "pointer"],
+      "properties": {
+        "source": {"const": "runtime"},
+        "pointer": {"const": "/reference_assets"}
+      }
+    },
+    "itemReferenceAssetsProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "pointer"],
+      "properties": {
+        "source": {"const": "item"},
+        "pointer": {"type": "string", "maxLength": 2048}
+      }
+    },
+    "constantReferenceAssetsProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "value"],
+      "properties": {
+        "source": {"const": "constant"},
+        "value": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["asset_version_id", "role"],
+            "properties": {
+              "asset_version_id": {"type": "string", "format": "uuid"},
+              "role": {"type": "string", "minLength": 1, "maxLength": 160}
+            }
+          }
+        }
+      }
+    },
+    "referenceAssetsProjection": {
+      "oneOf": [
+        {"$ref": "#/$defs/constantReferenceAssetsProjection"},
+        {"$ref": "#/$defs/authorizedReferenceAssetsProjection"},
+        {"$ref": "#/$defs/itemReferenceAssetsProjection"}
+      ]
+    },
+    "creationPackageItemMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_key",
+        "position",
+        "title",
+        "business_prompt",
+        "reference_assets",
+        "output_spec",
+        "target_slot",
+        "consistency_key"
+      ],
+      "properties": {
+        "item_key": {"$ref": "#/$defs/valueProjection"},
+        "position": {"$ref": "#/$defs/valueProjection"},
+        "title": {"$ref": "#/$defs/valueProjection"},
+        "business_prompt": {"$ref": "#/$defs/valueProjection"},
+        "reference_assets": {"$ref": "#/$defs/referenceAssetsProjection"},
+        "output_spec": {"$ref": "#/$defs/valueProjection"},
+        "target_slot": {"$ref": "#/$defs/valueProjection"},
+        "consistency_key": {"$ref": "#/$defs/valueProjection"}
+      }
+    },
+      "targetRules": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["replace_modes", "allow_download", "target_slot_prefix"],
+      "properties": {
+        "replace_modes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["reject_if_occupied", "replace_active", "append"]}
+        },
+        "allow_download": {"type": "boolean"},
+        "target_slot_prefix": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]*\\.$"
+        }
+      }
+    },
+    "creationPackagePersistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package_type",
+        "package_key",
+        "items_pointer",
+        "item_mapping",
+        "target_rules"
+      ],
+      "properties": {
+        "package_type": {"enum": ["image", "video", "presentation"]},
+        "package_key": {"$ref": "#/$defs/creationPackageKey"},
+        "items_pointer": {"type": "string", "maxLength": 2048},
+        "item_mapping": {"$ref": "#/$defs/creationPackageItemMapping"},
+        "target_rules": {"$ref": "#/$defs/targetRules"}
+      }
+    },
+    "outputPersistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact"],
+      "properties": {
+        "artifact": {"$ref": "#/$defs/artifactPersistence"},
+        "creation_package": {"$ref": "#/$defs/creationPackagePersistence"}
+      }
+    },
+    "qualityReportPersistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_input_ref", "report_ref", "validator_refs", "mapping"],
+      "properties": {
+        "source_input_ref": {"$ref": "#/$defs/contractRef"},
+        "report_ref": {"$ref": "#/$defs/contractRef"},
+        "validator_refs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {"$ref": "#/$defs/validatorRef"}
+        },
+        "mapping": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["conclusion", "findings", "evidence"],
+          "properties": {
+            "conclusion": {"$ref": "#/$defs/valueProjection"},
+            "findings": {"$ref": "#/$defs/valueProjection"},
+            "evidence": {"$ref": "#/$defs/valueProjection"}
+          }
+        }
+      }
+    },
+    "qualityRequirement": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {"mode": {"const": "none"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "report_refs", "accepted_conclusions"],
+          "properties": {
+            "mode": {"const": "reports"},
+            "report_refs": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 20,
+              "items": {"$ref": "#/$defs/contractRef"}
+            },
+            "accepted_conclusions": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {"enum": ["passed"]}
+            }
+          }
+        }
+      ]
+    },
     "node": {
       "type": "object",
       "additionalProperties": false,
@@ -259,6 +602,10 @@
         "title",
         "phase",
         "execution_kind",
+        "execution_scope",
+        "branch_key",
+        "entrypoint",
+        "dependencies",
         "input_contract_refs",
         "output_contract_refs",
         "prompt_exposure_policy",
@@ -287,6 +634,18 @@
         "execution_kind": {
           "enum": ["model_generation", "deterministic", "human_gate"]
         },
+        "execution_scope": {"enum": ["project", "lesson_unit"]},
+        "branch_key": {
+          "type": ["string", "null"],
+          "pattern": "^[a-z][a-z0-9_.-]{1,79}$"
+        },
+        "entrypoint": {"type": "boolean"},
+        "dependencies": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 100,
+          "items": {"$ref": "#/$defs/key"}
+        },
         "model_capability": {
           "type": "string",
           "pattern": "^(text|vision|image|video|audio)\\.[a-z][a-z0-9_.-]{1,159}$"
@@ -313,21 +672,55 @@
         "reference_asset_policy": {"$ref": "#/$defs/referenceAssetPolicy"},
         "validator_refs": {
           "type": "array",
+          "uniqueItems": true,
           "maxItems": 100,
-          "items": {"$ref": "#/$defs/key"}
+          "items": {"$ref": "#/$defs/validatorRef"}
         },
         "repair_policy": {"$ref": "#/$defs/repairPolicy"},
-        "approval_policy": {"$ref": "#/$defs/approvalPolicy"}
+        "approval_policy": {"$ref": "#/$defs/approvalPolicy"},
+        "output_persistence": {"$ref": "#/$defs/outputPersistence"},
+        "quality_report_persistence": {"$ref": "#/$defs/qualityReportPersistence"},
+        "quality_requirement": {"$ref": "#/$defs/qualityRequirement"}
       },
       "allOf": [
+        {
+          "if": {
+            "properties": {"execution_scope": {"const": "project"}},
+            "required": ["execution_scope"]
+          },
+          "then": {
+            "properties": {
+              "branch_key": {"enum": ["material", "lesson_division", "delivery"]}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"execution_scope": {"const": "lesson_unit"}},
+            "required": ["execution_scope"]
+          },
+          "then": {
+            "properties": {
+              "branch_key": {
+                "enum": ["lesson_plan", "intro_options", "ppt", "video"]
+              }
+            }
+          }
+        },
         {
           "if": {
             "properties": {"execution_kind": {"const": "model_generation"}},
             "required": ["execution_kind"]
           },
           "then": {
-            "required": ["model_capability", "generation_template_ref"],
-            "not": {"required": ["executor_ref"]}
+            "required": ["model_capability", "generation_template_ref", "output_persistence"],
+            "not": {
+              "anyOf": [
+                {"required": ["executor_ref"]},
+                {"required": ["quality_report_persistence"]},
+                {"required": ["quality_requirement"]}
+              ]
+            }
           }
         },
         {
@@ -340,7 +733,9 @@
             "not": {
               "anyOf": [
                 {"required": ["model_capability"]},
-                {"required": ["generation_template_ref"]}
+                {"required": ["generation_template_ref"]},
+                {"required": ["output_persistence"]},
+                {"required": ["quality_requirement"]}
               ]
             },
             "properties": {
@@ -358,11 +753,14 @@
             "required": ["execution_kind"]
           },
           "then": {
+            "required": ["quality_requirement"],
             "not": {
               "anyOf": [
                 {"required": ["model_capability"]},
                 {"required": ["generation_template_ref"]},
-                {"required": ["executor_ref"]}
+                {"required": ["executor_ref"]},
+                {"required": ["output_persistence"]},
+                {"required": ["quality_report_persistence"]}
               ]
             },
             "properties": {
