@@ -1,4 +1,10 @@
-import type { MockRuntimeState } from "@/shared/api/mocks/runtime";
+import {
+  getMockNodeState,
+  getMockRuntimeState,
+  saveMockDraft,
+  updateMockNodeState,
+  type MockRuntimeState,
+} from "@/shared/api/mocks/runtime";
 
 export type PlayableVideoMedia = {
   mimeType: string;
@@ -8,6 +14,8 @@ export type PlayableVideoMedia = {
 };
 
 export type SubtitleFormat = "srt" | "vtt";
+
+export type FinalVideoMediaConfirmationStatus = "confirmed" | "pending" | "unavailable";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -102,6 +110,74 @@ export function getPlayableFinalVideo(
 
 export function finalVideoMediaConfirmationKey(projectId: string, lessonId: string) {
   return `project:${projectId}:lesson:${lessonId}:final-video:media-confirmation`;
+}
+
+export function saveFinalVideoMediaConfirmation(
+  projectId: string,
+  lessonId: string,
+  media: PlayableVideoMedia,
+  status: FinalVideoMediaConfirmationStatus,
+) {
+  return saveMockDraft(
+    finalVideoMediaConfirmationKey(projectId, lessonId),
+    {
+      mimeType: media.mimeType,
+      src: media.src,
+      ...(media.subtitleSrc && media.subtitleFormat
+        ? { subtitleFormat: media.subtitleFormat, subtitleSrc: media.subtitleSrc }
+        : {}),
+      status,
+    },
+    { lessonId, nodeKey: "final-video", projectId },
+  );
+}
+
+export function invalidateFinalVideoMedia(
+  projectId: string,
+  lessonId: string,
+  media = getPlayableFinalVideo(getMockRuntimeState(), projectId, lessonId),
+) {
+  if (!media) return;
+  saveFinalVideoMediaConfirmation(projectId, lessonId, media, "unavailable");
+  if (getMockNodeState(projectId, lessonId, "final-video")?.status === "approved") {
+    updateMockNodeState(projectId, lessonId, "final-video", { status: "review_required" });
+  }
+}
+
+const subtitleMimeTypes: Record<SubtitleFormat, readonly string[]> = {
+  srt: ["application/x-subrip", "application/srt", "text/srt", "text/plain"],
+  vtt: ["text/vtt"],
+};
+
+function normalizeMimeType(value: string | null) {
+  return value?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+}
+
+function hasValidSubtitleContent(content: string, format: SubtitleFormat) {
+  const normalized = content.replace(/^\uFEFF/, "").trimStart();
+  if (format === "vtt") return /^WEBVTT(?:[ \t].*)?(?:\r?\n|$)/.test(normalized);
+  return /(?:^|\r?\n)\d+\s*\r?\n\d{2}:\d{2}:\d{2}[,.]\d{3}\s+-->\s+\d{2}:\d{2}:\d{2}[,.]\d{3}/.test(
+    normalized,
+  );
+}
+
+export async function validateSubtitleFile(
+  src: string,
+  format: SubtitleFormat,
+  signal?: AbortSignal,
+) {
+  try {
+    const response = await fetch(src, {
+      headers: { Accept: subtitleMimeTypes[format].join(", ") },
+      signal,
+    });
+    if (!response.ok) return false;
+    const contentType = normalizeMimeType(response.headers.get("content-type"));
+    if (contentType && !subtitleMimeTypes[format].includes(contentType)) return false;
+    return hasValidSubtitleContent(await response.text(), format);
+  } catch {
+    return false;
+  }
 }
 
 export function isFinalVideoMediaConfirmed(

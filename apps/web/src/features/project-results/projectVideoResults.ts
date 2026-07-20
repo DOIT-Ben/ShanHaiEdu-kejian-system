@@ -8,6 +8,34 @@ import {
 import type { MockRuntimeState } from "@/shared/api/mocks/runtime";
 
 const disabledVideoStatuses = new Set<WorkflowStatus>(["disabled", "skipped"]);
+const unresolvedStatusPriority: readonly WorkflowStatus[] = [
+  "failed",
+  "stale",
+  "cancel_requested",
+  "paused",
+  "cancelled",
+  "unknown",
+  "review_required",
+  "partially_completed",
+  "running",
+  "queued",
+  "ready",
+  "draft",
+  "not_ready",
+  "disabled",
+  "skipped",
+  "approved",
+];
+
+const unresolvedStatusDetail: Partial<Record<WorkflowStatus, string>> = {
+  cancel_requested: "有课时视频正在取消",
+  cancelled: "有课时视频已取消",
+  failed: "有课时视频需要重新处理",
+  paused: "有课时视频已暂停",
+  running: "有课时视频正在制作",
+  stale: "有课时视频需要更新",
+  unknown: "有课时视频状态需要处理",
+};
 
 export type ConfirmedProjectVideo = {
   lessonId: string;
@@ -69,11 +97,15 @@ export function getProjectVideoSummary(
         ]
       : [],
   );
+  const unresolvedStatuses = candidates.flatMap<WorkflowStatus>((candidate) => {
+    if (candidate.confirmedMedia) return [];
+    if (candidate.media && candidate.node?.status === "approved") return ["review_required"];
+    return [candidate.node?.status ?? candidate.lesson.videoStatus];
+  });
+  const unresolvedStatus =
+    unresolvedStatusPriority.find((status) => unresolvedStatuses.includes(status)) ?? "not_ready";
   const hasUnconfirmedMedia = candidates.some(
-    (candidate) =>
-      Boolean(candidate.media) &&
-      candidate.node?.status === "approved" &&
-      !candidate.confirmedMedia,
+    (candidate) => candidate.media && !candidate.confirmedMedia,
   );
 
   if (confirmed.length === enabled.length) {
@@ -82,6 +114,14 @@ export function getProjectVideoSummary(
       detail: `${String(confirmed.length)} 个课时视频可播放`,
       enabledCount: enabled.length,
       status: "approved",
+    };
+  }
+  if (unresolvedStatusDetail[unresolvedStatus]) {
+    return {
+      confirmed,
+      detail: unresolvedStatusDetail[unresolvedStatus] ?? "有课时视频需要处理",
+      enabledCount: enabled.length,
+      status: unresolvedStatus,
     };
   }
   if (confirmed.length > 0) {
@@ -101,12 +141,10 @@ export function getProjectVideoSummary(
     };
   }
 
-  const pendingStatus = enabled.find(({ lesson }) => lesson.videoStatus !== "approved")?.lesson
-    .videoStatus;
   return {
     confirmed,
     detail: "关键帧参考已保存，视频尚未生成",
     enabledCount: enabled.length,
-    status: pendingStatus ?? "not_ready",
+    status: unresolvedStatus,
   };
 }

@@ -20,9 +20,11 @@ import {
   getApprovedVideoTitle,
 } from "@/features/workbench/lib/videoWorkflow";
 import {
-  finalVideoMediaConfirmationKey,
   getPlayableFinalVideo,
+  invalidateFinalVideoMedia,
   isFinalVideoMediaConfirmed,
+  saveFinalVideoMediaConfirmation,
+  validateSubtitleFile,
 } from "@/features/workbench/lib/videoMedia";
 import { useWorkbenchUi } from "@/features/workbench/model/workbenchUi";
 import { WorkbenchPageFrame } from "@/features/workbench/components/WorkbenchPageFrame";
@@ -48,20 +50,6 @@ function settledTaskStatus(status: string) {
   return "review_required" as const;
 }
 
-function mediaConfirmationValue(
-  media: NonNullable<ReturnType<typeof getPlayableFinalVideo>>,
-  status: "confirmed" | "pending" | "unavailable",
-) {
-  return {
-    mimeType: media.mimeType,
-    src: media.src,
-    ...(media.subtitleSrc && media.subtitleFormat
-      ? { subtitleFormat: media.subtitleFormat, subtitleSrc: media.subtitleSrc }
-      : {}),
-    status,
-  };
-}
-
 export function FinalVideoStep() {
   const { lessonId = "", projectId = "" } = useParams();
   const runtime = useMockRuntime();
@@ -74,6 +62,9 @@ export function FinalVideoStep() {
   const previewVariant = approvedStyle === "clay" ? 1 : approvedStyle === "clean" ? 2 : 0;
   const playableVideo = getPlayableFinalVideo(runtime, projectId, lessonId);
   const hasVideoSource = playableVideo !== null;
+  const subtitleSrc = playableVideo?.subtitleSrc;
+  const subtitleFormat = playableVideo?.subtitleFormat;
+  const hasSubtitleSource = Boolean(subtitleSrc && subtitleFormat);
   const videoSourceKey = playableVideo
     ? `${playableVideo.src}\n${playableVideo.mimeType}\n${playableVideo.subtitleSrc ?? ""}\n${playableVideo.subtitleFormat ?? ""}`
     : "";
@@ -127,9 +118,22 @@ export function FinalVideoStep() {
   const videoLoadState =
     videoLoad.key === videoSourceKey ? videoLoad.status : hasVideoSource ? "loading" : "idle";
   const videoReady = hasVideoSource && videoLoadState === "ready";
-  const truthfulDisplayStatus = videoReady
+  const [subtitleLoad, setSubtitleLoad] = useState<{
+    key: string;
+    status: "error" | "loading" | "ready";
+  }>({ key: "", status: "loading" });
+  const [subtitleReloadKey, setSubtitleReloadKey] = useState(0);
+  const subtitleSourceKey = `${subtitleSrc ?? ""}\n${subtitleFormat ?? ""}\n${String(subtitleReloadKey)}`;
+  const subtitleLoadState = !hasSubtitleSource
+    ? "ready"
+    : subtitleLoad.key === subtitleSourceKey
+      ? subtitleLoad.status
+      : "loading";
+  const mediaReady = videoReady && subtitleLoadState === "ready";
+  const mediaLoadError = videoLoadState === "error" || subtitleLoadState === "error";
+  const truthfulDisplayStatus = mediaReady
     ? displayStatus
-    : videoLoadState === "error"
+    : mediaLoadError
       ? "failed"
       : rendering || waitingForTask || cancellationPending || synthesisNeedsAction
         ? displayStatus
@@ -144,6 +148,26 @@ export function FinalVideoStep() {
   useEffect(() => {
     if (!rendering) synthesisLock.current = false;
   }, [rendering]);
+
+  useEffect(() => {
+    if (!subtitleSrc || !subtitleFormat) return;
+    let active = true;
+    const controller = new AbortController();
+    setSubtitleLoad({ key: subtitleSourceKey, status: "loading" });
+    void validateSubtitleFile(subtitleSrc, subtitleFormat, controller.signal).then((valid) => {
+      if (!active) return;
+      if (valid) {
+        setSubtitleLoad({ key: subtitleSourceKey, status: "ready" });
+        return;
+      }
+      setSubtitleLoad({ key: subtitleSourceKey, status: "error" });
+      invalidateFinalVideoMedia(projectId, lessonId);
+    });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [lessonId, projectId, subtitleFormat, subtitleSourceKey, subtitleSrc]);
 
   useEffect(() => {
     if (!resolvedTask || rendering || !syncingTaskStatus) return;
@@ -212,12 +236,8 @@ export function FinalVideoStep() {
     }
   };
   const confirmVideo = () => {
-    if (!playableVideo || !videoReady) return;
-    saveMockDraft(
-      finalVideoMediaConfirmationKey(projectId, lessonId),
-      mediaConfirmationValue(playableVideo, "confirmed"),
-      { lessonId, nodeKey: "final-video", projectId },
-    );
+    if (!playableVideo || !mediaReady) return;
+    saveFinalVideoMediaConfirmation(projectId, lessonId, playableVideo, "confirmed");
     updateMockNodeState(projectId, lessonId, "final-video", {
       stale_reason: null,
       status: "approved",
@@ -229,29 +249,26 @@ export function FinalVideoStep() {
     setVideoLoad({ key: videoSourceKey, status: "loading" });
     setVideoReloadKey((current) => current + 1);
   };
+  const retrySubtitle = () => {
+    setSubtitleReloadKey((current) => current + 1);
+  };
   const markVideoError = () => {
     if (!playableVideo) return;
     setVideoLoad({ key: videoSourceKey, status: "error" });
-    saveMockDraft(
-      finalVideoMediaConfirmationKey(projectId, lessonId),
-      mediaConfirmationValue(playableVideo, "unavailable"),
-      { lessonId, nodeKey: "final-video", projectId },
-    );
-    if (nodeApproved) {
-      updateMockNodeState(projectId, lessonId, "final-video", {
-        status: "review_required",
-        title: "生成课堂导入视频",
-      });
-    }
+    invalidateFinalVideoMedia(projectId, lessonId, playableVideo);
   };
   const reviewVideo = videoReady ? playableVideo : null;
   const reviewItems = reviewVideo
     ? [
         [FileCheck2, "画面待确认", "完整播放一遍，确认画面清楚、没有卡顿"],
         [Volume2, "声音待确认", "当前文件可能不含旁白；完整配音属于后续能力"],
-        reviewVideo.subtitleSrc
-          ? [Subtitles, "字幕待确认", "已提供独立字幕文件，请检查停留时间和断句"]
-          : [Subtitles, "字幕文件未提供", "当前阶段不以真实字幕阻塞画面文件确认"],
+        reviewVideo.subtitleSrc && subtitleLoadState === "ready"
+          ? [Subtitles, "字幕文件已验证", "文件地址、类型和字幕格式有效，请继续检查停留时间和断句"]
+          : reviewVideo.subtitleSrc && subtitleLoadState === "error"
+            ? [Subtitles, "字幕文件无法读取", "重新检查字幕文件后才能确认并进入交付"]
+            : reviewVideo.subtitleSrc
+              ? [Subtitles, "正在检查字幕文件", "验证文件地址、类型和字幕格式后才能确认"]
+              : [Subtitles, "字幕文件未提供", "当前阶段不以真实字幕阻塞画面文件确认"],
       ]
     : videoLoadState === "error"
       ? [
@@ -274,15 +291,11 @@ export function FinalVideoStep() {
     <WorkbenchPageFrame>
       <FocusPageHeader
         action={
-          nodeApproved && mediaConfirmed && videoReady ? (
+          nodeApproved && mediaConfirmed && mediaReady ? (
             <Button
               disabled={rendering}
               onClick={() => {
-                saveMockDraft(
-                  finalVideoMediaConfirmationKey(projectId, lessonId),
-                  mediaConfirmationValue(playableVideo, "pending"),
-                  { lessonId, nodeKey: "final-video", projectId },
-                );
+                saveFinalVideoMediaConfirmation(projectId, lessonId, playableVideo, "pending");
                 updateMockNodeState(projectId, lessonId, "final-video", {
                   status: "review_required",
                   title: "生成课堂导入视频",
@@ -309,10 +322,20 @@ export function FinalVideoStep() {
               <LoaderCircle aria-hidden="true" className="animate-spin" />
               {rendering ? "视频生成中" : "正在同步视频"}
             </Button>
-          ) : videoReady ? (
+          ) : videoReady && subtitleLoadState === "error" ? (
+            <Button onClick={retrySubtitle} size="md" variant="secondary">
+              <RotateCcw aria-hidden="true" />
+              重新检查字幕文件
+            </Button>
+          ) : videoReady && subtitleLoadState === "loading" ? (
+            <Button disabled size="md" variant="secondary">
+              <LoaderCircle aria-hidden="true" className="animate-spin" />
+              正在检查字幕文件
+            </Button>
+          ) : mediaReady ? (
             <Button onClick={confirmVideo} size="md">
               <Check aria-hidden="true" />
-              确认画面文件
+              {hasSubtitleSource ? "确认画面与字幕文件" : "确认画面文件"}
             </Button>
           ) : videoLoadState === "error" ? (
             <Button onClick={retryVideo} size="md" variant="secondary">
@@ -332,18 +355,22 @@ export function FinalVideoStep() {
           )
         }
         description={
-          videoReady
-            ? "完整播放一遍，先确认画面文件；声音与字幕按当前可用能力分别检查。"
-            : videoLoadState === "error"
-              ? "视频文件无法读取，请重新加载；若仍失败，请联系管理员检查文件访问权限。"
-              : hasVideoSource
-                ? "正在读取视频信息，确认按钮会在文件可以播放后出现。"
-                : "当前只有关键帧示意。收到可播放的视频文件后，才会开放播放与确认。"
+          videoReady && subtitleLoadState === "error"
+            ? "字幕文件无法读取，请重新检查；文件恢复前不能确认或进入交付。"
+            : videoReady && subtitleLoadState === "loading"
+              ? "画面已经可以播放，正在核对字幕文件的地址、类型和格式。"
+              : mediaReady
+                ? "完整播放一遍，确认画面与当前已验证媒体；声音按当前可用能力单独检查。"
+                : videoLoadState === "error"
+                  ? "视频文件无法读取，请重新加载；若仍失败，请联系管理员检查文件访问权限。"
+                  : hasVideoSource
+                    ? "正在读取视频信息，确认按钮会在文件可以播放后出现。"
+                    : "当前只有关键帧示意。收到可播放的视频文件后，才会开放播放与确认。"
         }
         eyebrow="当前要做：查看课堂导入视频生成状态"
         hideEyebrow
         status={<StatusBadge status={rendering ? "running" : truthfulDisplayStatus} />}
-        title={`${videoTitle} · ${videoReady ? "可播放画面文件" : videoLoadState === "error" ? "视频文件无法读取" : hasVideoSource ? "正在检查视频文件" : adoptedShotCount > 0 ? `${String(adoptedShotCount)} 个关键帧参考` : "关键帧示意"}`}
+        title={`${videoTitle} · ${videoReady && subtitleLoadState === "error" ? "字幕文件无法读取" : videoReady && subtitleLoadState === "loading" ? "正在检查字幕文件" : mediaReady ? "可播放媒体文件" : videoLoadState === "error" ? "视频文件无法读取" : hasVideoSource ? "正在检查视频文件" : adoptedShotCount > 0 ? `${String(adoptedShotCount)} 个关键帧参考` : "关键帧示意"}`}
       />
       {stale ? <StaleContentNotice reason={nodeState.stale_reason?.summary} /> : null}
       <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_280px]">
@@ -472,6 +499,11 @@ export function FinalVideoStep() {
           视频文件无法读取，当前不能确认或交付。请重新加载；若仍失败，请联系管理员检查文件访问权限。
         </p>
       ) : null}
+      {subtitleLoadState === "error" ? (
+        <p className="mt-3 text-sm font-medium text-[var(--sh-danger)]" role="alert">
+          字幕文件无法读取或格式不正确，当前不能确认或交付。请重新检查；若仍失败，请联系管理员检查文件访问权限。
+        </p>
+      ) : null}
       {videoDownloadState === "error" ? (
         <p className="mt-3 text-sm font-medium text-[var(--sh-danger)]" role="alert">
           视频文件暂时无法下载。请稍后重试；若仍失败，请联系管理员检查文件访问权限。
@@ -479,7 +511,7 @@ export function FinalVideoStep() {
       ) : null}
       {message ? (
         <p
-          className={`mt-3 text-sm font-medium ${videoReady ? "text-[var(--sh-success)]" : "text-[var(--sh-warning)]"}`}
+          className={`mt-3 text-sm font-medium ${mediaReady ? "text-[var(--sh-success)]" : "text-[var(--sh-warning)]"}`}
           role="status"
         >
           {message}

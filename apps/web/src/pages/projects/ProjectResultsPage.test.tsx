@@ -1,10 +1,18 @@
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProjectResultsPage } from "@/pages/projects/ProjectResultsPage";
-import { resetMockRuntime, saveMockDraft, updateMockNodeState } from "@/shared/api/mocks/runtime";
+import {
+  getMockRuntimeState,
+  resetMockRuntime,
+  saveMockDraft,
+  updateMockNodeState,
+} from "@/shared/api/mocks/runtime";
 import { finalVideoMediaConfirmationKey } from "@/features/workbench/lib/videoMedia";
+import { getProjectVideoSummary } from "@/features/project-results/projectVideoResults";
+import { buildDeliveryRequirements } from "@/pages/projects/DeliveryPage";
 import { saveMockResult } from "@/shared/api/mocks/savedResults";
 import { demoProjectId, lessons } from "@/shared/data/mockData";
 import { downloadRemoteFile } from "@/shared/lib/downloadRemoteFile";
@@ -125,6 +133,23 @@ describe("ProjectResultsPage previews", () => {
       url: "https://cdn.example.com/final.mp4",
     });
     expect(downloadOptions?.filename).toMatch(/\.mp4$/);
+
+    fireEvent.error(video);
+
+    await waitFor(() =>
+      expect(
+        getMockRuntimeState().drafts[finalVideoMediaConfirmationKey(demoProjectId, lessonId)]
+          ?.value,
+      ).toMatchObject({ status: "unavailable" }),
+    );
+    expect(
+      getMockRuntimeState().nodeStates[`${demoProjectId}:${lessonId}:final-video`]?.status,
+    ).toBe("review_required");
+    expect(
+      buildDeliveryRequirements(getMockRuntimeState(), demoProjectId).find(
+        (requirement) => requirement.key === `${lessonId}:final-video`,
+      ),
+    ).toMatchObject({ status: "not_ready" });
   });
 
   it("多课时只有部分视频确认时显示部分完成", () => {
@@ -171,6 +196,66 @@ describe("ProjectResultsPage previews", () => {
     if (!videoCard) return;
     expect(within(videoCard).getByText("1/2 个课时视频可播放")).toBeVisible();
     expect(within(videoCard).getByText("部分完成")).toBeVisible();
+  });
+
+  it("待确认媒体不会遮蔽其他课时的失败状态", () => {
+    const firstLesson = lessons[0];
+    const secondLesson = lessons[1];
+    expect(firstLesson).toBeDefined();
+    expect(secondLesson).toBeDefined();
+    if (!firstLesson || !secondLesson) return;
+    saveMockDraft(
+      `project:${demoProjectId}:lessons-approved`,
+      [
+        { ...firstLesson, videoStatus: "approved" as const },
+        { ...secondLesson, videoStatus: "failed" as const },
+      ],
+      { projectId: demoProjectId },
+    );
+    updateMockNodeState(demoProjectId, firstLesson.id, "final-video", { status: "approved" });
+    updateMockNodeState(demoProjectId, secondLesson.id, "final-video", { status: "failed" });
+    saveMockDraft(
+      `project:${demoProjectId}:lesson:${firstLesson.id}:final-video:media`,
+      { mimeType: "video/mp4", src: "https://cdn.example.com/pending.mp4" },
+      { lessonId: firstLesson.id, nodeKey: "final-video", projectId: demoProjectId },
+    );
+
+    expect(getProjectVideoSummary(getMockRuntimeState(), demoProjectId)).toMatchObject({
+      detail: "有课时视频需要重新处理",
+      status: "failed",
+    });
+  });
+
+  it("课时筛选从当前批准课时动态生成", async () => {
+    const user = userEvent.setup();
+    const firstLesson = lessons[0];
+    const secondLesson = lessons[1];
+    expect(firstLesson).toBeDefined();
+    expect(secondLesson).toBeDefined();
+    if (!firstLesson || !secondLesson) return;
+    const thirdLesson = {
+      ...secondLesson,
+      id: "01960000-0000-7000-8000-000000000103",
+      title: "第三课时动态筛选",
+    };
+    saveMockDraft(
+      `project:${demoProjectId}:lessons-approved`,
+      [firstLesson, secondLesson, thirdLesson],
+      { projectId: demoProjectId },
+    );
+
+    render(
+      <TooltipProvider>
+        <MemoryRouter initialEntries={[`/app/projects/${demoProjectId}/results`]}>
+          <Routes>
+            <Route element={<ProjectResultsPage />} path="/app/projects/:projectId/results" />
+          </Routes>
+        </MemoryRouter>
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getByRole("combobox", { name: "按课时筛选" }));
+    expect(screen.getByRole("option", { name: "第 3 课时" })).toBeVisible();
   });
 
   it("当前采用版本与素材列表展示各自保存的候选和画幅", () => {
