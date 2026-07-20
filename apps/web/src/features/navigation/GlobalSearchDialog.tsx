@@ -4,33 +4,27 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { IconButton } from "@/shared/ui/IconButton";
 
-const searchEntries = [
-  { label: "认识百分数", detail: "项目", to: "/app/projects/01960000-0000-7000-8000-000000000001" },
-  {
-    label: "第 1 课时 · 百分数的意义",
-    detail: "课时",
-    to: "/app/projects/01960000-0000-7000-8000-000000000001/lessons/01960000-0000-7000-8000-000000000101/work/lesson-plan",
-  },
-  { label: "图片创作台", detail: "创作中心", to: "/app/creation/images" },
-  { label: "视频创作台", detail: "创作中心", to: "/app/creation/videos" },
-  { label: "PPT 创作台", detail: "创作中心", to: "/app/creation/presentations" },
-  { label: "任务中心", detail: "任务", to: "/app/tasks" },
-];
+export type SearchEntry = {
+  detail: string;
+  label: string;
+  to: string;
+};
 
 type GlobalSearchDialogProps = {
+  entries?: readonly SearchEntry[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
 
-export function GlobalSearchDialog({ onOpenChange, open }: GlobalSearchDialogProps) {
+export function GlobalSearchDialog({ entries = [], onOpenChange, open }: GlobalSearchDialogProps) {
   const [query, setQuery] = useState("");
   const results = useMemo(() => {
     const keyword = query.trim().toLowerCase();
-    if (!keyword) return searchEntries;
-    return searchEntries.filter((entry) =>
+    if (!keyword) return entries;
+    return entries.filter((entry) =>
       `${entry.label} ${entry.detail}`.toLowerCase().includes(keyword),
     );
-  }, [query]);
+  }, [entries, query]);
 
   return (
     <Dialog.Root onOpenChange={onOpenChange} open={open}>
@@ -80,7 +74,9 @@ export function GlobalSearchDialog({ onOpenChange, open }: GlobalSearchDialogPro
               </ul>
             ) : (
               <p className="px-3 py-8 text-center text-sm text-[var(--sh-ink-muted)]">
-                没有找到相关内容，请换个关键词。
+                {entries.length > 0
+                  ? "没有找到相关内容，请换个关键词。"
+                  : "当前没有可搜索的项目或功能。"}
               </p>
             )}
           </div>

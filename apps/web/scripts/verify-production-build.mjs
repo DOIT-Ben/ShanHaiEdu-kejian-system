@@ -18,6 +18,11 @@ const forbiddenTexts = [
     label: "Runtime 合同测试入口",
     pattern: /(?:runtime-contract-test|VITE_RUNTIME_CONTRACT_TEST)/,
   },
+  {
+    label: "Mock 演示导航数据",
+    pattern:
+      /(?:01960000-0000-7000-8000-000000000001|01960000-0000-7000-8000-000000000101|教案已完成检查|1 张图片需要处理)/,
+  },
 ];
 
 if (!existsSync(distDirectory)) {

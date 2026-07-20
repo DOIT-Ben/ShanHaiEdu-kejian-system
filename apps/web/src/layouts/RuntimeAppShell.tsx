@@ -5,5 +5,7 @@ import { AppShell } from "@/layouts/AppShell";
  * server cookie; this shell deliberately does not invent a browser session.
  */
 export function RuntimeAppShell() {
-  return <AppShell accountInitial="用" accountLabel="当前用户" />;
+  return (
+    <AppShell accountInitial="用" accountLabel="当前用户" notifications={[]} searchEntries={[]} />
+  );
 }

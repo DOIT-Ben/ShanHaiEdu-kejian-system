@@ -3,20 +3,17 @@ import { Bell, CheckCheck } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-const notifications = [
-  {
-    title: "教案已完成检查",
-    detail: "认识百分数 · 第 1 课时等待你确认",
-    to: "/app/projects/01960000-0000-7000-8000-000000000001/lessons/01960000-0000-7000-8000-000000000101/work/lesson-plan",
-  },
-  {
-    title: "1 张图片需要处理",
-    detail: "已完成内容不受影响，只重新处理未完成内容",
-    to: "/app/tasks",
-  },
-];
+export type NotificationItem = {
+  detail: string;
+  title: string;
+  to: string;
+};
 
-export function NotificationMenu() {
+type NotificationMenuProps = {
+  notifications?: readonly NotificationItem[];
+};
+
+export function NotificationMenu({ notifications = [] }: NotificationMenuProps) {
   const [unread, setUnread] = useState(notifications.length);
 
   return (
@@ -43,27 +40,33 @@ export function NotificationMenu() {
             <DropdownMenu.Label className="font-semibold text-[var(--sh-ink-strong)]">
               通知
             </DropdownMenu.Label>
-            <span className="inline-flex items-center gap-1 text-xs text-[var(--sh-success)]">
-              <CheckCheck aria-hidden="true" className="size-3.5" />
-              已全部读过
-            </span>
+            {notifications.length > 0 ? (
+              <span className="inline-flex items-center gap-1 text-xs text-[var(--sh-success)]">
+                <CheckCheck aria-hidden="true" className="size-3.5" />
+                已全部读过
+              </span>
+            ) : null}
           </div>
           <DropdownMenu.Separator className="my-1 h-px bg-[var(--sh-line-subtle)]" />
-          {notifications.map((item) => (
-            <DropdownMenu.Item asChild key={item.title}>
-              <Link
-                className="block rounded-[var(--sh-radius-sm)] px-3 py-3 outline-none hover:bg-[var(--sh-surface-soft)] focus:bg-[var(--sh-surface-soft)]"
-                to={item.to}
-              >
-                <span className="block text-sm font-semibold text-[var(--sh-ink-strong)]">
-                  {item.title}
-                </span>
-                <span className="mt-1 block text-xs leading-5 text-[var(--sh-ink-muted)]">
-                  {item.detail}
-                </span>
-              </Link>
-            </DropdownMenu.Item>
-          ))}
+          {notifications.length > 0 ? (
+            notifications.map((item) => (
+              <DropdownMenu.Item asChild key={item.title}>
+                <Link
+                  className="block rounded-[var(--sh-radius-sm)] px-3 py-3 outline-none hover:bg-[var(--sh-surface-soft)] focus:bg-[var(--sh-surface-soft)]"
+                  to={item.to}
+                >
+                  <span className="block text-sm font-semibold text-[var(--sh-ink-strong)]">
+                    {item.title}
+                  </span>
+                  <span className="mt-1 block text-xs leading-5 text-[var(--sh-ink-muted)]">
+                    {item.detail}
+                  </span>
+                </Link>
+              </DropdownMenu.Item>
+            ))
+          ) : (
+            <p className="px-3 py-8 text-center text-sm text-[var(--sh-ink-muted)]">暂无新通知</p>
+          )}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

@@ -16,6 +16,13 @@ describe("video media truth boundary", () => {
     expect(
       parsePlayableVideoMedia({ mimeType: "video/mp4", src: "data:video/mp4;base64,AAAA" }),
     ).toBeNull();
+    expect(
+      parsePlayableVideoMedia({
+        mimeType: "video/mp4",
+        src: "https://cdn.example.com/final.mp4",
+        subtitleUrl: "https://cdn.example.com/final.json",
+      }),
+    ).toEqual({ mimeType: "video/mp4", src: "https://cdn.example.com/final.mp4" });
   });
 
   it("只有明确的视频地址才会解锁播放与交付", () => {
@@ -38,6 +45,7 @@ describe("video media truth boundary", () => {
       mimeType: "video/mp4",
       src: "https://cdn.example.com/final.mp4",
       subtitleSrc: "https://cdn.example.com/final.srt",
+      subtitleFormat: "srt",
     });
   });
 
@@ -50,7 +58,11 @@ describe("video media truth boundary", () => {
       project_id: "project-a",
       revision: 1,
       updated_at: "2026-07-20T00:00:00Z",
-      value: { mimeType: "video/mp4", src: "https://cdn.example.com/current.mp4" },
+      value: {
+        mimeType: "video/mp4",
+        src: "https://cdn.example.com/current.mp4",
+        subtitleUrl: "https://cdn.example.com/current.vtt",
+      },
     };
     runtime.drafts[finalVideoMediaConfirmationKey("project-a", "lesson-a")] = {
       key: finalVideoMediaConfirmationKey("project-a", "lesson-a"),
@@ -62,6 +74,8 @@ describe("video media truth boundary", () => {
       value: {
         mimeType: "video/mp4",
         src: "https://cdn.example.com/previous.mp4",
+        subtitleFormat: "vtt",
+        subtitleSrc: "https://cdn.example.com/previous.vtt",
         status: "confirmed",
       },
     };
@@ -74,6 +88,18 @@ describe("video media truth boundary", () => {
     confirmationDraft.value = {
       mimeType: "video/mp4",
       src: "https://cdn.example.com/current.mp4",
+      subtitleFormat: "vtt",
+      subtitleSrc: "https://cdn.example.com/previous.vtt",
+      status: "confirmed",
+    };
+
+    expect(isFinalVideoMediaConfirmed(runtime, "project-a", "lesson-a")).toBe(false);
+
+    confirmationDraft.value = {
+      mimeType: "video/mp4",
+      src: "https://cdn.example.com/current.mp4",
+      subtitleFormat: "vtt",
+      subtitleSrc: "https://cdn.example.com/current.vtt",
       status: "confirmed",
     };
 

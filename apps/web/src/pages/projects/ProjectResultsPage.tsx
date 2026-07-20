@@ -14,7 +14,10 @@ import {
   type ArtifactType,
 } from "@/features/project-results/artifactPreviewRegistry";
 import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
-import { getPlayableFinalVideo } from "@/features/workbench/lib/videoMedia";
+import {
+  getPlayableFinalVideo,
+  isFinalVideoMediaConfirmed,
+} from "@/features/workbench/lib/videoMedia";
 import { saveMockDraft, useMockRuntime } from "@/shared/api/mocks/runtime";
 import {
   listMockSavedResultHistory,
@@ -187,9 +190,13 @@ export function ProjectResultsPage() {
     Object.values(runtime.nodeStates).find(
       (node) => node.project_id === projectId && keys.includes(node.node_key),
     )?.status ?? "not_ready";
-  const hasPlayableVideo = getApprovedProjectLessons(runtime, projectId).some((item) =>
-    Boolean(getPlayableFinalVideo(runtime, projectId, item.id)),
-  );
+  const hasPlayableVideo = getApprovedProjectLessons(runtime, projectId).some((item) => {
+    const media = getPlayableFinalVideo(runtime, projectId, item.id);
+    return (
+      runtime.nodeStates[`${projectId}:${item.id}:final-video`]?.status === "approved" &&
+      isFinalVideoMediaConfirmed(runtime, projectId, item.id, media)
+    );
+  });
   const resultCards = [
     {
       title: "教案",
@@ -207,7 +214,7 @@ export function ProjectResultsPage() {
       title: "课堂导入视频",
       detail: hasPlayableVideo ? "可播放视频与关键帧参考" : "关键帧参考已保存，视频尚未生成",
       icon: Video,
-      status: hasPlayableVideo ? nodeStatus(["final-video"]) : ("not_ready" as const),
+      status: hasPlayableVideo ? ("approved" as const) : ("not_ready" as const),
     },
   ];
   const selectAsset = (assetId: string) => {

@@ -16,6 +16,7 @@ import {
   getPlayableFinalVideo,
   isFinalVideoMediaConfirmed,
   type PlayableVideoMedia,
+  type SubtitleFormat,
 } from "@/features/workbench/lib/videoMedia";
 import { saveMockDraft, type MockRuntimeState, useMockRuntime } from "@/shared/api/mocks/runtime";
 import { listMockSavedResults } from "@/shared/api/mocks/savedResults";
@@ -48,6 +49,15 @@ type DeliveryFile = {
 };
 
 const disabledBranchStatuses = new Set<WorkflowStatus>(["disabled", "skipped"]);
+
+function subtitleDownloadDetails(format: SubtitleFormat) {
+  return format === "vtt"
+    ? { acceptedMimeTypes: ["text/vtt"], extension: "vtt" }
+    : {
+        acceptedMimeTypes: ["application/x-subrip", "application/srt", "text/srt", "text/plain"],
+        extension: "srt",
+      };
+}
 
 function nodeStatus(
   runtime: MockRuntimeState,
@@ -129,11 +139,16 @@ export function createDeliveryFingerprint(runtime: MockRuntimeState, projectId: 
     lessonRevision: runtime.nodeStates[`${projectId}:*:lesson-division`]?.revision ?? 0,
     requirements: requirements.map(({ key, media, revision, status }) => ({
       key,
-      mediaReady: Boolean(media),
-      mimeType: media?.mimeType ?? null,
+      media: media
+        ? {
+            mimeType: media.mimeType,
+            src: media.src,
+            subtitleFormat: media.subtitleFormat ?? null,
+            subtitleSrc: media.subtitleSrc ?? null,
+          }
+        : null,
       revision,
       status,
-      subtitleReady: Boolean(media?.subtitleSrc),
     })),
     savedResults,
   });
@@ -198,12 +213,13 @@ function deliveryFiles(
       icon: Video,
       status: requirement.status,
     };
-    if (!requirement.media.subtitleSrc) return [videoFile];
+    if (!requirement.media.subtitleSrc || !requirement.media.subtitleFormat) return [videoFile];
+    const subtitle = subtitleDownloadDetails(requirement.media.subtitleFormat);
     return [
       videoFile,
       {
-        acceptedMimeTypes: ["application/x-subrip", "text/plain", "text/vtt"],
-        name: `${prefix}_课堂导入字幕.srt`,
+        acceptedMimeTypes: subtitle.acceptedMimeTypes,
+        name: `${prefix}_课堂导入字幕.${subtitle.extension}`,
         detail: `${requirement.label} · 独立字幕文件`,
         downloadUrl: requirement.media.subtitleSrc,
         icon: Subtitles,

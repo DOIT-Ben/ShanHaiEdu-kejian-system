@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FinalVideoStep } from "@/features/workbench/renderers/FinalVideoStep";
+import { finalVideoMediaConfirmationKey } from "@/features/workbench/lib/videoMedia";
 import {
   createMockTask,
   getMockRuntimeState,
@@ -141,6 +142,10 @@ describe("FinalVideoStep synthesis single flight", () => {
     expect(screen.queryByRole("button", { name: "确认画面文件" })).not.toBeInTheDocument();
 
     fireEvent.loadedMetadata(video);
+    expect(screen.getByRole("button", { name: "正在检查视频文件" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "确认画面文件" })).not.toBeInTheDocument();
+
+    fireEvent.canPlay(video);
 
     expect(await screen.findByRole("button", { name: "确认画面文件" })).toBeEnabled();
     expect(screen.getByText("画面待确认")).toBeInTheDocument();
@@ -177,7 +182,35 @@ describe("FinalVideoStep synthesis single flight", () => {
     expect(track).toHaveAttribute("kind", "subtitles");
     expect(track).toHaveAttribute("src", "https://cdn.example.com/final.vtt");
     expect(track).toHaveAttribute("srclang", "zh-CN");
-    fireEvent.loadedMetadata(video);
+    fireEvent.canPlay(video);
+    expect(await screen.findByText("字幕待确认")).toBeInTheDocument();
+  });
+
+  it("SRT 字幕保留为独立文件但不挂载浏览器原生字幕轨", async () => {
+    saveMockDraft(
+      "project:project-a:lesson:lesson-a:final-video:media",
+      {
+        mimeType: "video/mp4",
+        src: "https://cdn.example.com/final.mp4",
+        subtitleMimeType: "application/x-subrip",
+        subtitleUrl: "https://cdn.example.com/final.srt",
+      },
+      { lessonId: "lesson-a", nodeKey: "final-video", projectId: "project-a" },
+    );
+    render(
+      <MemoryRouter initialEntries={["/projects/project-a/lessons/lesson-a/work/final-video"]}>
+        <Routes>
+          <Route
+            element={<FinalVideoStep />}
+            path="/projects/:projectId/lessons/:lessonId/work/final-video"
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const video = screen.getByLabelText("果汁标签侦探课堂导入视频");
+    expect(video.querySelector("track")).toBeNull();
+    fireEvent.canPlay(video);
     expect(await screen.findByText("字幕待确认")).toBeInTheDocument();
   });
 
@@ -208,6 +241,48 @@ describe("FinalVideoStep synthesis single flight", () => {
     expect(screen.getByRole("button", { name: "正在检查视频文件" })).toBeDisabled();
   });
 
+  it("已确认的视频后来读取失败会撤销批准和交付确认", async () => {
+    saveMockDraft(
+      "project:project-a:lesson:lesson-a:final-video:media",
+      { mimeType: "video/mp4", src: "https://cdn.example.com/final.mp4" },
+      { lessonId: "lesson-a", nodeKey: "final-video", projectId: "project-a" },
+    );
+    render(
+      <MemoryRouter initialEntries={["/projects/project-a/lessons/lesson-a/work/final-video"]}>
+        <Routes>
+          <Route
+            element={<FinalVideoStep />}
+            path="/projects/:projectId/lessons/:lessonId/work/final-video"
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const video = screen.getByLabelText("果汁标签侦探课堂导入视频");
+    fireEvent.canPlay(video);
+    fireEvent.click(screen.getByRole("button", { name: "确认画面文件" }));
+
+    await waitFor(() =>
+      expect(getMockRuntimeState().nodeStates["project-a:lesson-a:final-video"]?.status).toBe(
+        "approved",
+      ),
+    );
+    expect(
+      getMockRuntimeState().drafts[finalVideoMediaConfirmationKey("project-a", "lesson-a")]?.value,
+    ).toMatchObject({ status: "confirmed", src: "https://cdn.example.com/final.mp4" });
+
+    fireEvent.error(video);
+
+    await waitFor(() =>
+      expect(getMockRuntimeState().nodeStates["project-a:lesson-a:final-video"]?.status).toBe(
+        "review_required",
+      ),
+    );
+    expect(
+      getMockRuntimeState().drafts[finalVideoMediaConfirmationKey("project-a", "lesson-a")]?.value,
+    ).toMatchObject({ status: "unavailable", src: "https://cdn.example.com/final.mp4" });
+  });
+
   it("跨域视频下载失败后显示原因并保留重试入口", async () => {
     saveMockDraft(
       "project:project-a:lesson:lesson-a:final-video:media",
@@ -227,7 +302,7 @@ describe("FinalVideoStep synthesis single flight", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.loadedMetadata(screen.getByLabelText("果汁标签侦探课堂导入视频"));
+    fireEvent.canPlay(screen.getByLabelText("果汁标签侦探课堂导入视频"));
     fireEvent.click(screen.getByRole("button", { name: "下载视频" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("视频文件暂时无法下载");
