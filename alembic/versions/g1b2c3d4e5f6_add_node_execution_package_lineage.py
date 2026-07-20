@@ -32,13 +32,13 @@ def upgrade() -> None:
             nullable=True,
         ),
     )
-    op.add_column(
-        "node_runs",
-        sa.Column("execution_owner_token", sa.String(length=64), nullable=True),
-    )
-    op.add_column(
-        "node_runs",
-        sa.Column("execution_lease_expires_at", sa.DateTime(timezone=True), nullable=True),
+    op.create_table(
+        "node_execution_leases",
+        sa.Column("node_run_id", sa.Uuid(), nullable=False),
+        sa.Column("owner_token", sa.String(length=64), nullable=False),
+        sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(["node_run_id"], ["node_runs.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("node_run_id"),
     )
     op.create_foreign_key(
         "fk_creation_packages_source_artifact_version",
@@ -79,7 +79,6 @@ def downgrade() -> None:
         type_="foreignkey",
     )
     op.drop_column("creation_package_items", "reference_assets_json")
-    op.drop_column("node_runs", "execution_lease_expires_at")
-    op.drop_column("node_runs", "execution_owner_token")
+    op.drop_table("node_execution_leases")
     op.drop_column("creation_packages", "lesson_unit_id")
     op.drop_column("creation_packages", "source_artifact_version_id")

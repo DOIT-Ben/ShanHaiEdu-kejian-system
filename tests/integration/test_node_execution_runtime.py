@@ -40,7 +40,13 @@ from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.prompt_runtime.models import ContextSnapshot, PromptSnapshot
 from apps.api.uploads.models import SourceMaterial
 from apps.api.workflows.execution_port import WorkflowExecutionPortError
-from apps.api.workflows.models import BranchRun, NodeInputSnapshot, NodeRun, WorkflowRun
+from apps.api.workflows.models import (
+    BranchRun,
+    NodeExecutionLease,
+    NodeInputSnapshot,
+    NodeRun,
+    WorkflowRun,
+)
 from apps.api.workflows.service import WorkflowRuntimeService
 from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
 from tests.fakes.identity import seed_test_actor
@@ -361,9 +367,9 @@ async def test_successful_attempt_before_t2_fails_closed_without_second_attempt(
         audit_context=prepared.audit_context,
     )
     with factory() as session, session.begin():
-        node = session.get(NodeRun, seeded.node_run_id)
-        assert node is not None
-        node.execution_lease_expires_at = utc_now() - timedelta(seconds=1)
+        lease = session.get(NodeExecutionLease, seeded.node_run_id)
+        assert lease is not None
+        lease.lease_expires_at = utc_now() - timedelta(seconds=1)
 
     provider = DeterministicNodeOutputProvider(seeded.output)
     service = NodeExecutionService(

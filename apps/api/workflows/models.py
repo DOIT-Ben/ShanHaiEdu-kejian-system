@@ -242,8 +242,18 @@ class NodeRun(MutableAuditMixin, Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_error_code: Mapped[str | None] = mapped_column(String(160))
-    execution_owner_token: Mapped[str | None] = mapped_column(String(64))
-    execution_lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class NodeExecutionLease(Base):
+    __tablename__ = "node_execution_leases"
+
+    node_run_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("node_runs.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    owner_token: Mapped[str] = mapped_column(String(64), nullable=False)
+    lease_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class NodeInputSnapshot(Base):

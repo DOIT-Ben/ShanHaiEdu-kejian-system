@@ -7,6 +7,7 @@ from typing import Any, cast
 from uuid import UUID
 
 from apps.api.model_gateway.contracts import ModelAuditContext, ModelCapability, TextModelRequest
+from apps.api.runtime_boundary.contract_values import plain_json_value
 from apps.api.runtime_boundary.ports import (
     ArtifactContextVersion,
     ArtifactPort,
@@ -52,7 +53,7 @@ def collect_context_items(
                 source=source,
                 source_id=str(value.artifact_version_id),
                 source_version_id=str(value.artifact_version_id),
-                content=value.content,
+                content=cast(Mapping[str, Any], plain_json_value(value.content)),
             )
             for value in artifacts.list_context_versions(execution.project_id, source)
         )
