@@ -17,6 +17,7 @@ from apps.api.video_preproduction.models import (
     MasterScript,
     ReviewableVideoPreproductionPackage,
     RoughStoryboard,
+    TeacherConfirmation,
     ValidationReport,
     VideoAsset,
 )
@@ -57,12 +58,19 @@ def validate_approval(
     kind: str,
     key: str,
     value: object,
+    confirmation: TeacherConfirmation | None = None,
 ) -> tuple[str, ...]:
     errors: list[str] = []
     if approval.subject_kind != kind or approval.subject_key != key:
         errors.append("approval subject does not match")
     if approval.subject_hash != canonical_fact_hash(value):
         errors.append("approval hash does not match")
+    if kind == "master_script" and (
+        confirmation is None
+        or approval.confirmation_hash != canonical_fact_hash(confirmation)
+        or approval.approved_at < confirmation.confirmed_at
+    ):
+        errors.append("master approval does not match teacher confirmation")
     return tuple(errors)
 
 
@@ -142,6 +150,7 @@ def _approval_errors(package: ReviewableVideoPreproductionPackage) -> tuple[str,
             kind="master_script",
             key=package.master_script.master_script_key,
             value=package.master_script,
+            confirmation=package.teacher_confirmation,
         )
     )
     errors.extend(

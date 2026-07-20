@@ -51,12 +51,13 @@ class VideoPreproductionService:
         self,
         request: VideoPreproductionRequest,
     ) -> ReviewableMasterScriptStage:
-        _require_pricing(request)
-        script = self._text_fake.generate_master_script(request.intro_selection_snapshot)
-        if validate_master_script(request.intro_selection_snapshot, script):
+        validated = _require_valid_request(request)
+        _require_pricing(validated)
+        script = self._text_fake.generate_master_script(validated.intro_selection_snapshot)
+        if validate_master_script(validated.intro_selection_snapshot, script):
             raise VideoPreproductionError("VIDEO_MASTER_SCRIPT_INVALID")
         return ReviewableMasterScriptStage(
-            source_snapshot=request.intro_selection_snapshot,
+            source_snapshot=validated.intro_selection_snapshot,
             master_script=script,
         )
 
@@ -65,10 +66,13 @@ class VideoPreproductionService:
         request: VideoPreproductionRequest,
         master_stage: ReviewableMasterScriptStage,
     ) -> DurationRecommendation:
-        _require_master_source(request, master_stage)
-        pricing = _require_pricing(request)
-        complexity = _story_complexity(request, master_stage)
-        preference_seconds = {"economy": -10, "balanced": 0, "quality": 10}[request.cost_preference]
+        validated = _require_valid_request(request)
+        _require_master_source(validated, master_stage)
+        pricing = _require_pricing(validated)
+        complexity = _story_complexity(validated, master_stage)
+        preference_seconds = {"economy": -10, "balanced": 0, "quality": 10}[
+            validated.cost_preference
+        ]
         price_seconds = -10 if pricing.image_candidate_unit_price > Decimal("1.00") else 0
         raw_duration = (
             complexity.scene_count * 12
@@ -116,6 +120,7 @@ class VideoPreproductionService:
             key=master_stage.master_script.master_script_key,
             value=master_stage.master_script,
             error_code="MASTER_SCRIPT_APPROVAL_REQUIRED",
+            confirmation=confirmed,
         )
         rough = _build_rough_storyboard(master_stage, confirmed.confirmed_duration_seconds)
         if validate_rough_storyboard(master_stage.master_script, rough, expected):
@@ -157,6 +162,17 @@ def _require_master_source(
         raise VideoPreproductionError("VIDEO_PREPRODUCTION_SOURCE_STALE")
     if validate_master_script(master_stage.source_snapshot, master_stage.master_script):
         raise VideoPreproductionError("VIDEO_MASTER_SCRIPT_INVALID")
+
+
+def _require_valid_request(request: VideoPreproductionRequest) -> VideoPreproductionRequest:
+    try:
+        return VideoPreproductionRequest.model_validate(request.model_dump(mode="python"))
+    except ValidationError as exc:
+        pricing_error = any(error["loc"][:1] == ("pricing_snapshot",) for error in exc.errors())
+        code = (
+            "PRICING_SNAPSHOT_REQUIRED" if pricing_error else "VIDEO_PREPRODUCTION_REQUEST_INVALID"
+        )
+        raise VideoPreproductionError(code) from exc
 
 
 def _require_pricing(request: VideoPreproductionRequest) -> PricingSnapshot:
@@ -208,8 +224,15 @@ def _require_approval(
     key: str,
     value: object,
     error_code: str,
+    confirmation: TeacherConfirmation | None = None,
 ) -> ApprovalFact:
-    if approval is None or validate_approval(approval, kind=kind, key=key, value=value):
+    if approval is None or validate_approval(
+        approval,
+        kind=kind,
+        key=key,
+        value=value,
+        confirmation=confirmation,
+    ):
         raise VideoPreproductionError(error_code)
     return approval
 
@@ -230,6 +253,7 @@ def _revalidate_stage(
         key=master_stage.master_script.master_script_key,
         value=master_stage.master_script,
         error_code="MASTER_SCRIPT_APPROVAL_REQUIRED",
+        confirmation=rough_stage.teacher_confirmation,
     )
     if validate_rough_storyboard(
         master_stage.master_script, rough_stage.rough_storyboard, expected

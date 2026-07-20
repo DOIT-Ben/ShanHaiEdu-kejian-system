@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import Any, cast
 
 import pytest
 from pydantic import BaseModel
@@ -73,11 +74,20 @@ def confirmation(recommendation: DurationRecommendation) -> TeacherConfirmation:
     )
 
 
-def approval(subject_kind: ApprovalKind, subject_key: str, value: BaseModel) -> ApprovalFact:
+def approval(
+    subject_kind: ApprovalKind,
+    subject_key: str,
+    value: BaseModel,
+    *,
+    confirmation_fact: TeacherConfirmation | None = None,
+) -> ApprovalFact:
     return ApprovalFact(
         subject_kind=subject_kind,
         subject_key=subject_key,
         subject_hash=canonical_fact_hash(value),
+        confirmation_hash=(
+            canonical_fact_hash(confirmation_fact) if confirmation_fact is not None else None
+        ),
         approved_by="teacher-001",
         approved_at=NOW,
     )
@@ -89,16 +99,18 @@ def build_package(*, payload: VideoPreproductionRequest | None = None):
     service = VideoPreproductionService(fake)
     master_stage = service.generate_master_script(selected)
     recommendation = service.recommend(selected, master_stage)
+    confirmed = confirmation(recommendation)
     master_approval = approval(
         "master_script",
         master_stage.master_script.master_script_key,
         master_stage.master_script,
+        confirmation_fact=confirmed,
     )
     rough_stage = service.generate_rough_storyboard(
         selected,
         master_stage,
         recommendation,
-        confirmation(recommendation),
+        confirmed,
         master_approval,
     )
     rough_approval = approval(
@@ -114,10 +126,8 @@ def test_master_precedes_story_based_recommendation_and_teacher_confirmation() -
     payload = request()
     fake = ScriptedDeterministicTextFake()
     service = VideoPreproductionService(fake)
-
     master_stage = service.generate_master_script(payload)
     recommendation = service.recommend(payload, master_stage)
-
     assert fake.calls == 1
     assert recommendation.story_complexity.scene_count == len(master_stage.master_script.scenes)
     assert recommendation.story_complexity.visible_beat_count == sum(
@@ -142,7 +152,6 @@ def test_master_generation_rejects_missing_or_invalid_pricing_before_fake_call()
             "image_candidate_unit_price": Decimal("0"),
         }
     )
-
     for payload in (
         valid.model_copy(update={"pricing_snapshot": None}),
         valid.model_copy(update={"pricing_snapshot": invalid_pricing}),
@@ -163,7 +172,20 @@ def test_master_generation_rejects_missing_or_invalid_pricing_before_fake_call()
         with pytest.raises(VideoPreproductionError) as caught:
             service.generate_master_script(payload)
         assert caught.value.code == "PRICING_SNAPSHOT_REQUIRED"
-
+    snapshot = valid.intro_selection_snapshot
+    snapshot_data = snapshot.model_dump(mode="python")
+    snapshot_data["must_not_preteach"] = ()
+    invalid_snapshot = cast(Any, IntroSelectionSnapshot.model_construct)(**snapshot_data)
+    invalid_request = VideoPreproductionRequest.model_construct(
+        intro_selection_snapshot=invalid_snapshot,
+        pricing_snapshot=valid.pricing_snapshot,
+        aspect_ratio=valid.aspect_ratio,
+        language=valid.language,
+        cost_preference=valid.cost_preference,
+    )
+    with pytest.raises(VideoPreproductionError) as caught:
+        service.generate_master_script(invalid_request)
+    assert caught.value.code == "VIDEO_PREPRODUCTION_REQUEST_INVALID"
     assert fake.calls == 0
 
 
@@ -172,27 +194,42 @@ def test_rough_storyboard_requires_confirmation_and_master_approval() -> None:
     service = VideoPreproductionService(ScriptedDeterministicTextFake())
     master_stage = service.generate_master_script(payload)
     recommendation = service.recommend(payload, master_stage)
+    confirmed = confirmation(recommendation)
     master_approval = approval(
         "master_script",
         master_stage.master_script.master_script_key,
         master_stage.master_script,
+        confirmation_fact=confirmed,
     )
-
     with pytest.raises(VideoPreproductionError) as missing_confirmation:
         service.generate_rough_storyboard(
             payload, master_stage, recommendation, None, master_approval
         )
     assert missing_confirmation.value.code == "TEACHER_CONFIRMATION_REQUIRED"
-
     with pytest.raises(VideoPreproductionError) as missing_approval:
         service.generate_rough_storyboard(
             payload,
             master_stage,
             recommendation,
-            confirmation(recommendation),
+            confirmed,
             None,
         )
     assert missing_approval.value.code == "MASTER_SCRIPT_APPROVAL_REQUIRED"
+    invalid_approval = master_approval.model_copy(
+        update={
+            "confirmation_hash": "0" * 64,
+            "approved_at": confirmed.confirmed_at - timedelta(seconds=1),
+        }
+    )
+    with pytest.raises(VideoPreproductionError) as caught:
+        service.generate_rough_storyboard(
+            payload,
+            master_stage,
+            recommendation,
+            confirmed,
+            invalid_approval,
+        )
+    assert caught.value.code == "MASTER_SCRIPT_APPROVAL_REQUIRED"
 
 
 def test_final_package_revalidates_recommendation_and_confirmation_facts() -> None:
@@ -217,7 +254,6 @@ def test_final_package_revalidates_recommendation_and_confirmation_facts() -> No
         with pytest.raises(VideoPreproductionError) as caught:
             service.generate_package(payload, tampered_stage, rough_approval)
         assert caught.value.code == "TEACHER_CONFIRMATION_REQUIRED"
-
     recommendation_changes = (
         {"pricing_version": "tampered"},
         {"currency": "USD"},
@@ -235,7 +271,6 @@ def test_final_package_revalidates_recommendation_and_confirmation_facts() -> No
         with pytest.raises(VideoPreproductionError) as caught:
             service.generate_package(payload, tampered_stage, rough_approval)
         assert caught.value.code == "DURATION_RECOMMENDATION_STALE"
-
     assert package.validation_report.valid is True
 
 
@@ -260,7 +295,6 @@ def test_story_structure_and_server_price_facts_change_recommendations() -> None
     )
     expensive_master = service.generate_master_script(expensive_request)
     expensive = service.recommend(expensive_request, expensive_master)
-
     assert complex_story.story_complexity.scene_count > baseline.story_complexity.scene_count
     assert complex_story.story_complexity.visible_beat_count > (
         baseline.story_complexity.visible_beat_count
@@ -283,7 +317,6 @@ def test_scene_and_beat_mapping_is_complete_and_ends_at_handoff() -> None:
         (beat.scene_key, beat.scene_beat_position, beat.main_event)
         for beat in package.rough_storyboard.beats
     ]
-
     assert actual_events == expected_events
     assert package.rough_storyboard.beats[-1].end_state == (package.source_snapshot.handoff_moment)
 
@@ -301,7 +334,6 @@ def test_classified_asset_inventory_and_bidirectional_links_are_exact() -> None:
         for asset in inventory_assets(inventory)
         for beat_key in asset.source_beat_keys
     }
-
     assert inventory.characters
     assert inventory.scenes
     assert inventory.props
@@ -318,7 +350,10 @@ def test_validator_rejects_mapping_link_and_prompt_drift() -> None:
         update={"end_state": "not-handoff", "asset_keys": ("missing-asset",)}
     )
     broken_rough = package.rough_storyboard.model_copy(
-        update={"beats": (*package.rough_storyboard.beats[:-1], last_beat)}
+        update={
+            "beats": (*package.rough_storyboard.beats[:-1], last_beat),
+            "total_duration_seconds": package.rough_storyboard.total_duration_seconds + 1,
+        }
     )
     first_prompt = package.production_plan.image_prompts[0]
     broken_prompt = first_prompt.model_copy(
@@ -333,13 +368,11 @@ def test_validator_rejects_mapping_link_and_prompt_drift() -> None:
             )
         }
     )
-
     report = validate_package(
         package.model_copy(
             update={"rough_storyboard": broken_rough, "production_plan": broken_plan}
         )
     )
-
     assert report.valid is False
     assert "rough storyboard must end at the selected handoff moment" in report.errors
     assert "rough beat references an unknown asset" in report.errors
@@ -347,24 +380,12 @@ def test_validator_rejects_mapping_link_and_prompt_drift() -> None:
     assert "image prompt asset keys must be unique" in report.errors
     assert "image prompts must use the visual plan aspect ratio" in report.errors
     assert "image prompts must retain visual plan negative constraints" in report.errors
-
-
-def test_validator_rejects_declared_rough_duration_drift() -> None:
-    package, *_ = build_package()
-    broken_rough = package.rough_storyboard.model_copy(
-        update={"total_duration_seconds": package.rough_storyboard.total_duration_seconds + 1}
-    )
-
-    report = validate_package(package.model_copy(update={"rough_storyboard": broken_rough}))
-
-    assert report.valid is False
     assert "rough storyboard declared duration must equal beat durations" in report.errors
 
 
 def test_canonical_serialization_bytes_are_stable_and_detect_tampering() -> None:
     package, *_ = build_package()
     round_tripped = package.model_validate_json(package.model_dump_json(indent=2))
-
     assert canonical_package_bytes(round_tripped) == canonical_package_bytes(package)
     assert canonical_package_hash(round_tripped) == package.canonical_hash
 
@@ -372,6 +393,5 @@ def test_canonical_serialization_bytes_are_stable_and_detect_tampering() -> None
         update={"master_script": package.master_script.model_copy(update={"title": "tampered"})}
     )
     report = validate_package(tampered)
-
     assert report.valid is False
     assert "canonical hash does not match package content" in report.errors

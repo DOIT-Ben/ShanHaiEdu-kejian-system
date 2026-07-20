@@ -74,6 +74,7 @@ class ApprovalFact(_FrozenModel):
     subject_kind: ApprovalKind
     subject_key: str = Field(min_length=1, max_length=160)
     subject_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    confirmation_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     approved_by: str = Field(min_length=1, max_length=160)
     approved_at: datetime
 
