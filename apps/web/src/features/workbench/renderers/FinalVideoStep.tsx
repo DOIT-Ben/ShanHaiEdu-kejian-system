@@ -19,7 +19,11 @@ import {
   getApprovedVideoStyle,
   getApprovedVideoTitle,
 } from "@/features/workbench/lib/videoWorkflow";
-import { getPlayableFinalVideo } from "@/features/workbench/lib/videoMedia";
+import {
+  finalVideoMediaConfirmationKey,
+  getPlayableFinalVideo,
+  isFinalVideoMediaConfirmed,
+} from "@/features/workbench/lib/videoMedia";
 import { useWorkbenchUi } from "@/features/workbench/model/workbenchUi";
 import { WorkbenchPageFrame } from "@/features/workbench/components/WorkbenchPageFrame";
 import {
@@ -55,10 +59,12 @@ export function FinalVideoStep() {
   const approvedStyle = getApprovedVideoStyle(runtime, projectId, lessonId)?.selectedId;
   const previewVariant = approvedStyle === "clay" ? 1 : approvedStyle === "clean" ? 2 : 0;
   const playableVideo = getPlayableFinalVideo(runtime, projectId, lessonId);
-  const hasPlayableVideo = playableVideo !== null;
+  const hasVideoSource = playableVideo !== null;
+  const videoSourceKey = playableVideo ? `${playableVideo.src}\n${playableVideo.mimeType}` : "";
+  const mediaConfirmed = isFinalVideoMediaConfirmed(runtime, projectId, lessonId, playableVideo);
   const nodeState = runtime.nodeStates[`${projectId}:${lessonId}:final-video`];
   const stale = nodeState?.status === "stale";
-  const approved = nodeState?.status === "approved";
+  const nodeApproved = nodeState?.status === "approved";
   const nodeRunId = nodeState?.id;
   const taskDraftKey = `project:${projectId}:lesson:${lessonId}:final-video-task`;
   const taskReference = runtime.drafts[taskDraftKey]?.value as { taskId?: unknown } | undefined;
@@ -98,15 +104,26 @@ export function FinalVideoStep() {
   ].includes(displayStatus);
   const cancellationPending = displayStatus === "cancel_requested";
   const waitingForTask = nodeState?.status === "running" && !activeTask && !invalidTaskReference;
-  const truthfulDisplayStatus =
-    hasPlayableVideo || rendering || waitingForTask || cancellationPending || synthesisNeedsAction
-      ? displayStatus
-      : "not_ready";
+  const [videoLoad, setVideoLoad] = useState<{
+    key: string;
+    status: "error" | "idle" | "loading" | "ready";
+  }>({ key: "", status: "idle" });
+  const videoLoadState =
+    videoLoad.key === videoSourceKey ? videoLoad.status : hasVideoSource ? "loading" : "idle";
+  const videoReady = hasVideoSource && videoLoadState === "ready";
+  const truthfulDisplayStatus = videoReady
+    ? displayStatus
+    : videoLoadState === "error"
+      ? "failed"
+      : rendering || waitingForTask || cancellationPending || synthesisNeedsAction
+        ? displayStatus
+        : "not_ready";
   const synthesisLock = useRef(false);
   const [message, setMessage] = useState("");
   const [videoDownloadState, setVideoDownloadState] = useState<"error" | "idle" | "loading">(
     "idle",
   );
+  const [videoReloadKey, setVideoReloadKey] = useState(0);
   const { openContextDrawer } = useWorkbenchUi();
   useEffect(() => {
     if (!rendering) synthesisLock.current = false;
@@ -122,7 +139,7 @@ export function FinalVideoStep() {
     });
     if (nextStatus === "review_required") {
       setMessage(
-        hasPlayableVideo
+        videoReady
           ? "画面文件已准备好，请完整播放后再确认。声音与字幕按当前可用能力分别检查。"
           : "生成任务已结束，但尚未收到可播放的视频文件。当前只显示关键帧示意。",
       );
@@ -135,7 +152,7 @@ export function FinalVideoStep() {
     resolvedTask?.status,
     rendering,
     syncingTaskStatus,
-    hasPlayableVideo,
+    videoReady,
   ]);
 
   const startSynthesis = () => {
@@ -163,7 +180,7 @@ export function FinalVideoStep() {
     setMessage("视频生成已开始，可在处理进度中查看。");
   };
   const downloadVideo = async () => {
-    if (!playableVideo || videoDownloadState === "loading") return;
+    if (!playableVideo || !videoReady || videoDownloadState === "loading") return;
     setVideoDownloadState("loading");
     try {
       const extension = playableVideo.mimeType.toLowerCase().includes("webm") ? "webm" : "mp4";
@@ -178,32 +195,83 @@ export function FinalVideoStep() {
       setVideoDownloadState("error");
     }
   };
-  const reviewItems = hasPlayableVideo
+  const confirmVideo = () => {
+    if (!playableVideo || !videoReady) return;
+    saveMockDraft(
+      finalVideoMediaConfirmationKey(projectId, lessonId),
+      { mimeType: playableVideo.mimeType, src: playableVideo.src, status: "confirmed" },
+      { lessonId, nodeKey: "final-video", projectId },
+    );
+    updateMockNodeState(projectId, lessonId, "final-video", {
+      stale_reason: null,
+      status: "approved",
+      title: "生成课堂导入视频",
+    });
+  };
+  const retryVideo = () => {
+    if (!playableVideo) return;
+    setVideoLoad({ key: videoSourceKey, status: "loading" });
+    setVideoReloadKey((current) => current + 1);
+  };
+  const markVideoError = () => {
+    if (!playableVideo) return;
+    setVideoLoad({ key: videoSourceKey, status: "error" });
+    saveMockDraft(
+      finalVideoMediaConfirmationKey(projectId, lessonId),
+      { mimeType: playableVideo.mimeType, src: playableVideo.src, status: "unavailable" },
+      { lessonId, nodeKey: "final-video", projectId },
+    );
+    if (nodeApproved) {
+      updateMockNodeState(projectId, lessonId, "final-video", {
+        status: "review_required",
+        title: "生成课堂导入视频",
+      });
+    }
+  };
+  const reviewVideo = videoReady ? playableVideo : null;
+  const reviewItems = reviewVideo
     ? [
         [FileCheck2, "画面待确认", "完整播放一遍，确认画面清楚、没有卡顿"],
         [Volume2, "声音待确认", "当前文件可能不含旁白；完整配音属于后续能力"],
-        playableVideo.subtitleSrc
+        reviewVideo.subtitleSrc
           ? [Subtitles, "字幕待确认", "已提供独立字幕文件，请检查停留时间和断句"]
           : [Subtitles, "字幕文件未提供", "当前阶段不以真实字幕阻塞画面文件确认"],
       ]
-    : [
-        [FileCheck2, "画面尚未检查", "视频生成后，再确认画面是否正常"],
-        [Volume2, "声音尚未检查", "视频生成后，再确认声音是否清楚"],
-        [Subtitles, "字幕尚未检查", "视频生成后，再确认字幕是否易读"],
-      ];
+    : videoLoadState === "error"
+      ? [
+          [FileCheck2, "画面文件无法读取", "重新加载后再确认画面；当前不能进入交付"],
+          [Volume2, "声音尚未检查", "画面文件可播放后，再检查当前文件是否包含声音"],
+          [Subtitles, "字幕尚未检查", "画面文件可播放后，再检查独立字幕文件"],
+        ]
+      : hasVideoSource
+        ? [
+            [FileCheck2, "正在检查画面文件", "读取到视频信息后才会开放确认"],
+            [Volume2, "声音等待检查", "先等待画面文件准备完成"],
+            [Subtitles, "字幕等待检查", "先等待画面文件准备完成"],
+          ]
+        : [
+            [FileCheck2, "画面尚未检查", "视频生成后，再确认画面是否正常"],
+            [Volume2, "声音尚未检查", "视频生成后，再确认声音是否清楚"],
+            [Subtitles, "字幕尚未检查", "视频生成后，再确认字幕是否易读"],
+          ];
   return (
     <WorkbenchPageFrame>
       <FocusPageHeader
         action={
-          approved && hasPlayableVideo ? (
+          nodeApproved && mediaConfirmed && videoReady ? (
             <Button
               disabled={rendering}
-              onClick={() =>
+              onClick={() => {
+                saveMockDraft(
+                  finalVideoMediaConfirmationKey(projectId, lessonId),
+                  { mimeType: playableVideo.mimeType, src: playableVideo.src, status: "pending" },
+                  { lessonId, nodeKey: "final-video", projectId },
+                );
                 updateMockNodeState(projectId, lessonId, "final-video", {
                   status: "review_required",
                   title: "生成课堂导入视频",
-                })
-              }
+                });
+              }}
               size="md"
               variant="secondary"
             >
@@ -225,19 +293,20 @@ export function FinalVideoStep() {
               <LoaderCircle aria-hidden="true" className="animate-spin" />
               {rendering ? "视频生成中" : "正在同步视频"}
             </Button>
-          ) : hasPlayableVideo ? (
-            <Button
-              onClick={() =>
-                updateMockNodeState(projectId, lessonId, "final-video", {
-                  stale_reason: null,
-                  status: "approved",
-                  title: "生成课堂导入视频",
-                })
-              }
-              size="md"
-            >
+          ) : videoReady ? (
+            <Button onClick={confirmVideo} size="md">
               <Check aria-hidden="true" />
               确认画面文件
+            </Button>
+          ) : videoLoadState === "error" ? (
+            <Button onClick={retryVideo} size="md" variant="secondary">
+              <RotateCcw aria-hidden="true" />
+              重新加载视频
+            </Button>
+          ) : hasVideoSource ? (
+            <Button disabled size="md" variant="secondary">
+              <LoaderCircle aria-hidden="true" className="animate-spin" />
+              正在检查视频文件
             </Button>
           ) : (
             <Button disabled size="md" variant="secondary">
@@ -247,14 +316,18 @@ export function FinalVideoStep() {
           )
         }
         description={
-          hasPlayableVideo
+          videoReady
             ? "完整播放一遍，先确认画面文件；声音与字幕按当前可用能力分别检查。"
-            : "当前只有关键帧示意。收到可播放的视频文件后，才会开放播放与确认。"
+            : videoLoadState === "error"
+              ? "视频文件无法读取，请重新加载；若仍失败，请联系管理员检查文件访问权限。"
+              : hasVideoSource
+                ? "正在读取视频信息，确认按钮会在文件可以播放后出现。"
+                : "当前只有关键帧示意。收到可播放的视频文件后，才会开放播放与确认。"
         }
         eyebrow="当前要做：查看课堂导入视频生成状态"
         hideEyebrow
         status={<StatusBadge status={rendering ? "running" : truthfulDisplayStatus} />}
-        title={`${videoTitle} · ${hasPlayableVideo ? "可播放画面文件" : adoptedShotCount > 0 ? `${String(adoptedShotCount)} 个关键帧参考` : "关键帧示意"}`}
+        title={`${videoTitle} · ${videoReady ? "可播放画面文件" : videoLoadState === "error" ? "视频文件无法读取" : hasVideoSource ? "正在检查视频文件" : adoptedShotCount > 0 ? `${String(adoptedShotCount)} 个关键帧参考` : "关键帧示意"}`}
       />
       {stale ? <StaleContentNotice reason={nodeState.stale_reason?.summary} /> : null}
       <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_280px]">
@@ -268,6 +341,10 @@ export function FinalVideoStep() {
                 aria-label={`${videoTitle}课堂导入视频`}
                 className="aspect-video size-full rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-player)] object-contain"
                 controls
+                key={`${videoSourceKey}:${String(videoReloadKey)}`}
+                onCanPlay={() => setVideoLoad({ key: videoSourceKey, status: "ready" })}
+                onError={markVideoError}
+                onLoadedMetadata={() => setVideoLoad({ key: videoSourceKey, status: "ready" })}
                 preload="metadata"
               >
                 <source src={playableVideo.src} type={playableVideo.mimeType} />
@@ -313,7 +390,7 @@ export function FinalVideoStep() {
         </aside>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        {playableVideo ? (
+        {playableVideo && videoReady ? (
           <Button
             disabled={videoDownloadState === "loading"}
             onClick={() => void downloadVideo()}
@@ -331,6 +408,15 @@ export function FinalVideoStep() {
                 ? "重新下载视频"
                 : "下载视频"}
           </Button>
+        ) : playableVideo ? (
+          <Button disabled size="sm" variant="secondary">
+            {videoLoadState === "error" ? (
+              <Download aria-hidden="true" />
+            ) : (
+              <LoaderCircle aria-hidden="true" className="animate-spin" />
+            )}
+            {videoLoadState === "error" ? "视频暂不可下载" : "正在检查视频"}
+          </Button>
         ) : (
           <Button
             onClick={() =>
@@ -346,7 +432,7 @@ export function FinalVideoStep() {
             下载关键帧说明
           </Button>
         )}
-        {hasPlayableVideo ? (
+        {videoReady ? (
           <Button onClick={() => openContextDrawer("checks")} size="sm" variant="quiet">
             查看检查项
           </Button>
@@ -366,6 +452,11 @@ export function FinalVideoStep() {
                 : "开始生成视频"}
         </Button>
       </div>
+      {videoLoadState === "error" ? (
+        <p className="mt-3 text-sm font-medium text-[var(--sh-danger)]" role="alert">
+          视频文件无法读取，当前不能确认或交付。请重新加载；若仍失败，请联系管理员检查文件访问权限。
+        </p>
+      ) : null}
       {videoDownloadState === "error" ? (
         <p className="mt-3 text-sm font-medium text-[var(--sh-danger)]" role="alert">
           视频文件暂时无法下载。请稍后重试；若仍失败，请联系管理员检查文件访问权限。
@@ -373,7 +464,7 @@ export function FinalVideoStep() {
       ) : null}
       {message ? (
         <p
-          className={`mt-3 text-sm font-medium ${hasPlayableVideo ? "text-[var(--sh-success)]" : "text-[var(--sh-warning)]"}`}
+          className={`mt-3 text-sm font-medium ${videoReady ? "text-[var(--sh-success)]" : "text-[var(--sh-warning)]"}`}
           role="status"
         >
           {message}
