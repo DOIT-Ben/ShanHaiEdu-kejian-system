@@ -125,7 +125,7 @@ export function CreationComposer({
   return (
     <section
       aria-label="创作输入区"
-      className="relative z-30 shrink-0 bg-[var(--sh-surface-canvas)] px-3 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2"
+      className="relative z-30 shrink-0 bg-[var(--sh-surface-canvas)] px-3 pb-[calc(8px+env(safe-area-inset-bottom))] pt-1.5"
       data-testid="creation-composer"
     >
       <AnimatePresence initial={false} mode="wait">
@@ -175,7 +175,7 @@ export function CreationComposer({
       </AnimatePresence>
 
       <div
-        className="relative mx-auto max-w-[1040px] rounded-[var(--sh-radius-md)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)]/96 p-3 shadow-[var(--sh-shadow-modal)] backdrop-blur-xl transition-[border-color,box-shadow] focus-within:border-[var(--sh-brand-300)] focus-within:shadow-[var(--sh-shadow-focus)]"
+        className="relative mx-auto max-w-[1040px] rounded-[var(--sh-radius-md)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)]/96 p-2.5 shadow-[var(--sh-shadow-modal)] backdrop-blur-xl transition-[border-color,box-shadow] focus-within:border-[var(--sh-brand-300)] focus-within:shadow-[var(--sh-shadow-focus)]"
         data-testid="creation-composer-panel"
       >
         <label className="block min-w-0">
@@ -183,7 +183,7 @@ export function CreationComposer({
           <textarea
             aria-keyshortcuts="Enter"
             aria-label={inputLabel}
-            className="sh-creation-prompt min-h-20 max-h-32 w-full resize-none bg-transparent px-2 py-1.5 text-sm leading-6 text-[var(--sh-ink-default)] outline-none placeholder:text-[var(--sh-ink-faint)] disabled:cursor-wait disabled:opacity-65 sm:min-h-[72px]"
+            className="sh-creation-prompt min-h-20 max-h-32 w-full resize-none bg-transparent px-2 py-1.5 text-sm leading-6 text-[var(--sh-ink-default)] outline-none placeholder:text-[var(--sh-ink-faint)] disabled:cursor-wait disabled:opacity-65 sm:min-h-14 sm:max-h-24"
             disabled={running}
             onChange={(event) => onDescriptionChange(event.target.value)}
             onKeyDown={(event) => {

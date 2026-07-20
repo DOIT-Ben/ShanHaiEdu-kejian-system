@@ -114,6 +114,28 @@ async function captureVisual(page: Page, testInfo: TestInfo, name: string) {
   });
 }
 
+async function holdProjectListRequest(page: Page) {
+  await page.addInitScript(() => {
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+      const url = String(
+        typeof input === "string" ? input : input instanceof Request ? input.url : input,
+      );
+      if (url.includes("/api/v2/projects")) {
+        // Keep the request pending until the test context closes so slow CI cannot miss this state.
+        await new Promise<never>((resolve) => window.setTimeout(resolve, 60 * 60 * 1_000));
+      }
+      return originalFetch(input, init);
+    };
+  });
+}
+
+async function loginWithoutWaitingForHome(page: Page) {
+  await page.goto("/login");
+  await page.getByRole("button", { name: "登录" }).click();
+  await expect(page).toHaveURL(/\/app$/);
+}
+
 test.beforeEach(async ({ page }, testInfo) => {
   // Visual baselines are intentionally Chromium-only; WebKit and Edge remain covered by smoke tests.
   test.skip(testInfo.project.name !== "chromium", "视觉基线只绑定 Chromium");
@@ -179,6 +201,8 @@ for (const viewport of viewports) {
     await loginAsTeacher(page);
     await page.goto("/app/creation/images");
     await expect(page.getByRole("heading", { level: 1, name: "图片创作台" })).toBeVisible();
+    await waitForStablePage(page);
+    await captureVisual(page, testInfo, `creation-${widthLabel}-draft`);
     await page.getByRole("button", { name: "开始创作图片" }).click();
     const output = page.getByRole("region", { name: "创作结果" });
     await expect(output).toHaveAttribute("aria-busy", "true");
@@ -206,6 +230,29 @@ for (const viewport of viewports) {
     await captureVisual(page, testInfo, `creation-${widthLabel}-ready`);
   });
 }
+
+test("首页项目读取中的明确加载态", async ({ page }, testInfo) => {
+  await page.setViewportSize({ height: 900, width: 1280 });
+  await holdProjectListRequest(page);
+  await loginWithoutWaitingForHome(page);
+  await expect(page.getByRole("heading", { level: 1, name: "正在读取课堂项目" })).toBeVisible();
+  await expect(page.getByText("正在读取项目", { exact: true })).toBeVisible();
+  await waitForStablePage(page);
+  await assertPageFrame(page);
+  await captureVisual(page, testInfo, "home-1280-loading");
+});
+
+test("项目列表读取中的明确加载态", async ({ page }, testInfo) => {
+  await page.setViewportSize({ height: 900, width: 1280 });
+  await holdProjectListRequest(page);
+  await loginWithoutWaitingForHome(page);
+  await page.goto("/app/projects");
+  await expect(page.getByRole("heading", { level: 1, name: "我的项目" })).toBeVisible();
+  await expect(page.getByRole("status", { name: "正在读取项目" })).toBeVisible();
+  await waitForStablePage(page);
+  await assertPageFrame(page);
+  await captureVisual(page, testInfo, "projects-1280-loading");
+});
 
 test("创作台选中并保存状态具备可追踪反馈", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1280, height: 900 });

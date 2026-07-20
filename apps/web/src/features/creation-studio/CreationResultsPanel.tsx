@@ -180,18 +180,28 @@ export function CreationResultsPanel({
       ? "w-[min(88vmin,960px)]"
       : "w-[min(92vw,1280px)]"
     : type === "image"
-      ? "w-[min(100%,360px)] md:w-[clamp(480px,56vw,720px)]"
+      ? "w-[min(100%,360px)] md:w-[clamp(480px,45vw,576px)]"
       : "w-full max-w-[960px]";
   const workspaceWidth = type === "image" ? "max-w-[760px]" : "max-w-[1120px]";
   const downloadLabel =
     type === "image" ? "下载这张图片" : type === "video" ? "下载关键帧说明" : "下载课件预览";
   const itemLabel = type === "image" ? "张" : type === "video" ? "张关键帧" : "套";
-  const resultLabel = type === "video" ? "关键帧" : "作品";
   const candidateAriaLabel = type === "video" ? "关键帧参考" : "备选作品";
   const candidateDisplayLabel = type === "video" ? "关键帧" : "作品";
   const currentLabel =
     type === "video" ? "当前关键帧" : type === "presentation" ? "当前课件" : "当前作品";
-  const resultReadyLabel = type === "video" ? "已准备" : "已完成";
+  const primaryAction =
+    stage === "ready" || stage === "adopted" ? (
+      <Button
+        disabled={hasUnappliedChanges}
+        onClick={onAdvance}
+        ref={saveTriggerRef}
+        size="sm"
+        title={hasUnappliedChanges ? "请先按新要求再创作一组" : undefined}
+      >
+        {stage === "ready" ? "就用这张" : "保存到项目"}
+      </Button>
+    ) : null;
   useEffect(() => {
     const handleFullscreenChange = () =>
       setFullscreen(document.fullscreenElement === previewRef.current);
@@ -224,48 +234,41 @@ export function CreationResultsPanel({
       data-generation={generation}
       data-testid="creation-output-region"
     >
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
-        <div className="flex items-center gap-2">
-          <span
-            className={`grid size-8 place-items-center rounded-full ${running ? "bg-[var(--sh-brand-50)] text-[var(--sh-brand-700)]" : "bg-[var(--sh-success-soft)] text-[var(--sh-success-strong)]"}`}
-          >
-            {running ? (
-              <LoaderCircle
-                aria-hidden="true"
-                className="size-4 animate-spin motion-reduce:animate-none"
-              />
-            ) : (
-              <Check aria-hidden="true" className="size-4" />
-            )}
-          </span>
-          <p className="text-sm font-semibold text-[var(--sh-ink-strong)]">
-            {running
-              ? "正在创作新作品"
-              : generation > 1
-                ? `第 ${String(generation)} 轮${resultLabel}${resultReadyLabel}`
-                : `本轮${resultLabel}${resultReadyLabel}`}
-          </p>
-        </div>
-        <span className="text-xs font-medium text-[var(--sh-ink-muted)]">
-          {running
-            ? `正在生成 ${String(candidateCount)} ${itemLabel}`
-            : type === "video"
-              ? `${String(candidateCount)} 张关键帧`
-              : `${String(candidateCount)} 个作品`}
-        </span>
-      </div>
       <div
         className={
           fullscreen
             ? "flex h-screen w-screen flex-col justify-center overflow-auto bg-[var(--sh-surface-elevated)] p-6"
-            : "rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-soft)] p-2.5 shadow-[var(--sh-shadow-card)]"
+            : "rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-soft)] p-2 shadow-[var(--sh-shadow-card)]"
         }
         data-testid="creation-preview-panel"
         ref={previewRef}
       >
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
-          <p className="text-sm font-semibold text-[var(--sh-ink-strong)]">
-            {currentLabel} {String(candidate + 1)} / {String(candidateCount)}
+        <div className="creation-preview-toolbar mb-1.5 flex flex-wrap items-center justify-between gap-2 px-1">
+          <p className="flex min-w-0 items-center gap-2 text-sm font-semibold text-[var(--sh-ink-strong)]">
+            <span
+              className={`grid size-6 shrink-0 place-items-center rounded-full ${running ? "bg-[var(--sh-brand-50)] text-[var(--sh-brand-700)]" : "bg-[var(--sh-success-soft)] text-[var(--sh-success-strong)]"}`}
+            >
+              {running ? (
+                <LoaderCircle
+                  aria-hidden="true"
+                  className="size-3.5 animate-spin motion-reduce:animate-none"
+                />
+              ) : (
+                <Check aria-hidden="true" className="size-3.5" />
+              )}
+            </span>
+            <span className="truncate">
+              {running
+                ? "正在创作新作品"
+                : `${currentLabel} ${String(candidate + 1)} / ${String(candidateCount)}`}
+            </span>
+            <span className="shrink-0 text-xs font-medium text-[var(--sh-ink-muted)]">
+              {running
+                ? `生成 ${String(candidateCount)} ${itemLabel}`
+                : type === "video"
+                  ? `${String(candidateCount)} 张关键帧`
+                  : `${String(candidateCount)} 个作品`}
+            </span>
           </p>
           <div aria-label="预览工具" className="flex flex-wrap items-center justify-end gap-1">
             <IconButton
@@ -310,6 +313,7 @@ export function CreationResultsPanel({
               <Columns3 aria-hidden="true" />
               对比作品
             </Button>
+            {primaryAction}
           </div>
         </div>
         <div
@@ -356,16 +360,6 @@ export function CreationResultsPanel({
             <Download aria-hidden="true" />
             {downloadLabel}
           </Button>
-          {stage === "ready" || stage === "adopted" ? (
-            <Button
-              disabled={hasUnappliedChanges}
-              onClick={onAdvance}
-              ref={saveTriggerRef}
-              title={hasUnappliedChanges ? "请先按新要求再创作一组" : undefined}
-            >
-              {stage === "ready" ? "就用这张" : "保存到项目"}
-            </Button>
-          ) : null}
         </div>
       </div>
       {stage === "saved" ? (

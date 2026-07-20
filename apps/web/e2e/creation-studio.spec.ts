@@ -137,7 +137,7 @@ test("图片结果可修改创作要求并经过稳定运行态重新创作", as
   await expect(page.getByRole("button", { name: "备选作品 2" })).toBeDisabled();
 
   await expect(page.getByRole("button", { name: "就用这张" })).toBeVisible();
-  await expect(page.getByText("本轮作品已完成", { exact: true })).toBeVisible();
+  await expect(page.getByText("当前作品 1 / 3", { exact: true })).toBeVisible();
   await expect(page.locator("body")).not.toContainText(engineeringCopy);
   const visualBefore = await page.getByTestId("creation-main-visual").boundingBox();
   const prompt = page.getByRole("textbox", { name: "创作要求" });
@@ -160,7 +160,7 @@ test("图片结果可修改创作要求并经过稳定运行态重新创作", as
     2,
   );
 
-  await expect(page.getByText("第 2 轮作品已完成")).toBeVisible();
+  await expect(page.getByRole("button", { name: "就用这张" })).toBeEnabled();
   await expect(page.getByTestId("creation-main-visual")).toHaveAttribute(
     "data-render-generation",
     "2",
@@ -211,6 +211,7 @@ test("1440×900 使用上方展示区和底部悬浮输入台", async ({ page })
     page.getByRole("button", { name: "添加参考图" }),
     page.getByRole("button", { name: "创作设置" }),
     page.getByRole("button", { name: "按新要求再画一组" }),
+    page.getByRole("button", { name: "就用这张" }),
   ]) {
     await expect(control).toBeInViewport();
     const box = await control.boundingBox();
@@ -223,7 +224,6 @@ test("1440×900 使用上方展示区和底部悬浮输入台", async ({ page })
   await page.getByRole("button", { name: "创作设置" }).click();
   await workspace.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
   await expect(page.getByRole("button", { name: "备选作品 1" })).toBeInViewport();
-  await expect(page.getByRole("button", { name: "就用这张" })).toBeInViewport();
   await expectNoA11yViolations(page);
 });
 
@@ -250,10 +250,10 @@ test("1280×800 首屏可查看结果并直接在底部调整", async ({ page })
   const visual = await page.getByTestId("creation-main-visual").boundingBox();
   expect(visual?.width ?? 0).toBeGreaterThanOrEqual(480);
   expect(visual?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(720);
+  await expect(page.getByRole("button", { name: "就用这张" })).toBeInViewport();
   const workArea = page.getByRole("region", { name: "创作工作区" });
   await workArea.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
   await expect(page.getByRole("button", { name: "备选作品 1" })).toBeInViewport();
-  await expect(page.getByRole("button", { name: "就用这张" })).toBeInViewport();
 });
 
 test("390px 下输入台固定可用并能按需展开画面细节", async ({ page }) => {

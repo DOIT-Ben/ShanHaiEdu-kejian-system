@@ -31,12 +31,22 @@ describe("CreationResultsPanel", () => {
 
     expect(screen.getByTestId("creation-main-visual")).toHaveClass(
       "w-[min(100%,360px)]",
-      "md:w-[clamp(480px,56vw,720px)]",
+      "md:w-[clamp(480px,45vw,576px)]",
     );
     expect(screen.getByRole("button", { name: "上一张作品" })).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "下一张作品" }));
     expect(onCandidateChange).toHaveBeenCalledWith(1);
+  });
+
+  it("把当前作品的主要采用操作放在预览工具栏", () => {
+    renderResults();
+
+    expect(
+      within(screen.getByTestId("creation-preview-panel")).getByRole("button", {
+        name: "就用这张",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("打开对比视图时并排展示最多三项，并可切换当前作品", () => {

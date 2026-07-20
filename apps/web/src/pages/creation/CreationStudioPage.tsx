@@ -193,7 +193,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
 
       <section
         aria-label="创作工作区"
-        className="min-h-0 flex-1 overflow-y-auto px-4 py-3 md:px-6"
+        className="min-h-0 flex-1 overflow-y-auto px-4 py-2.5 md:px-6"
         ref={mainRef}
       >
         {stage === "draft" ? (

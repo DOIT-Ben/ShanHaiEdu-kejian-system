@@ -210,7 +210,7 @@ test("独立创作按创作、选用、保存顺序推进", async ({ page }) => 
   await page.getByRole("button", { name: "开始创作图片" }).click();
   await expect(page.getByRole("status")).toContainText("正在创作新作品");
   await expect(page.getByRole("button", { name: "就用这张" })).toBeVisible();
-  await expect(page.getByText(/本轮作品已完成/, { exact: true })).toBeVisible();
+  await expect(page.getByText("当前作品 1 / 3", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "就用这张" }).click();
   await expect(page.getByRole("button", { name: "保存到项目" })).toBeVisible();
   await page.getByRole("button", { name: "保存到项目" }).click();

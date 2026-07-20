@@ -207,6 +207,58 @@ test("1024x768 创作结果和采用操作首屏同时可见", async ({ page }) 
   expect(mainDimensions.scrollHeight).toBeLessThanOrEqual(mainDimensions.clientHeight + 1);
 });
 
+test("1280x900 图片主作品与采用操作同屏", async ({ page }) => {
+  await page.setViewportSize({ height: 900, width: 1280 });
+  await loginAsTeacher(page);
+  await page.goto("/app/creation/images");
+  await page.getByRole("button", { name: "开始创作图片" }).click();
+  await expect(page.getByRole("button", { name: "就用这张" })).toBeVisible({ timeout: 10_000 });
+
+  const metrics = await page.evaluate(() => {
+    const workspace = document.querySelector<HTMLElement>('[aria-label="创作工作区"]');
+    const composer = document.querySelector<HTMLElement>('[data-testid="creation-composer"]');
+    const visual = document.querySelector<HTMLElement>('[data-testid="creation-main-visual"]');
+    const adopt = Array.from(document.querySelectorAll<HTMLElement>("button")).find(
+      (button) => button.textContent.trim() === "就用这张",
+    );
+    if (!workspace || !composer || !visual || !adopt) return null;
+    const workspaceRect = workspace.getBoundingClientRect();
+    const visualRect = visual.getBoundingClientRect();
+    const adoptRect = adopt.getBoundingClientRect();
+    const intersectionHeight = (rect: DOMRect) =>
+      Math.max(
+        0,
+        Math.min(rect.bottom, workspaceRect.bottom) - Math.max(rect.top, workspaceRect.top),
+      );
+    return {
+      adoptBottom: adoptRect.bottom,
+      adoptHeight: adoptRect.height,
+      composerTop: composer.getBoundingClientRect().top,
+      visualBottom: visualRect.bottom,
+      visualHeight: visualRect.height,
+      visualIntersectionHeight: intersectionHeight(visualRect),
+      visualWidth: visualRect.width,
+      workspaceBottom: workspaceRect.bottom,
+    };
+  });
+  expect(metrics).not.toBeNull();
+  expect(metrics?.visualWidth ?? 0).toBeGreaterThanOrEqual(480);
+  expect(metrics?.visualWidth ?? 0).toBeLessThanOrEqual(576);
+  expect(metrics?.visualIntersectionHeight ?? 0).toBeGreaterThanOrEqual(
+    (metrics?.visualHeight ?? 0) - 1,
+  );
+  expect(metrics?.visualBottom ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+    (metrics?.workspaceBottom ?? 0) + 1,
+  );
+  expect(metrics?.adoptHeight ?? 0).toBeGreaterThan(0);
+  expect(metrics?.adoptBottom ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+    (metrics?.workspaceBottom ?? 0) + 1,
+  );
+  expect(metrics?.adoptBottom ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+    (metrics?.composerTop ?? 0) + 1,
+  );
+});
+
 test("390x844 三类创作台均可通过窄屏滚轮到达采用操作", async ({ page }) => {
   await page.setViewportSize({ height: 844, width: 390 });
   await loginAsTeacher(page);

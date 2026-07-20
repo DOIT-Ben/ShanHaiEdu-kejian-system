@@ -106,13 +106,19 @@ input {
   min-height: 100vh;
 }
 
+@media (max-width: 767px), (max-height: 560px) {
+  .sh-creation-studio .creation-preview-toolbar {
+    position: sticky;
+    top: -1px;
+    z-index: 10;
+    border-bottom: 1px solid var(--sh-line-subtle);
+    background: var(--sh-surface-soft);
+  }
+}
+
 @media (max-height: 560px) {
   .sh-creation-studio > header {
     min-height: 40px;
-  }
-
-  .sh-creation-studio [data-testid="creation-output-region"] > div:first-child {
-    display: none;
   }
 
   .sh-creation-studio [data-testid="creation-preview-panel"] {
