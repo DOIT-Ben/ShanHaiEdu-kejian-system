@@ -15,6 +15,7 @@ import {
 } from "@/features/project-results/artifactPreviewRegistry";
 import { ConfirmedVideoResult } from "@/features/project-results/ConfirmedVideoResult";
 import { getProjectVideoSummary } from "@/features/project-results/projectVideoResults";
+import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
 import type { PlayableVideoMedia } from "@/features/workbench/lib/videoMedia";
 import { saveMockDraft, useMockRuntime } from "@/shared/api/mocks/runtime";
 import {
@@ -186,6 +187,18 @@ export function ProjectResultsPage() {
       ),
     [assets, filter, lesson],
   );
+  const lessonOptions = useMemo(() => {
+    const lessonLabels = new Set(
+      getApprovedProjectLessons(runtime, projectId).map(
+        (_lesson, index) => `第 ${String(index + 1)} 课时`,
+      ),
+    );
+    assets.forEach((asset) => lessonLabels.add(asset.lesson));
+    return [
+      { label: "全部课时", value: "all" },
+      ...Array.from(lessonLabels, (label) => ({ label, value: label })),
+    ];
+  }, [assets, projectId, runtime]);
   const selected = assets.find((asset) => asset.id === selectedId) ?? assets[0];
   const otherVisible = visible.filter((asset) => asset.id !== selected?.id);
   const history = selected
@@ -327,11 +340,7 @@ export function ProjectResultsPage() {
             ariaLabel="按课时筛选"
             className="w-32"
             onValueChange={setLesson}
-            options={[
-              { label: "全部课时", value: "all" },
-              { label: "第 1 课时", value: "第 1 课时" },
-              { label: "第 2 课时", value: "第 2 课时" },
-            ]}
+            options={lessonOptions}
             value={lesson}
           />
         </div>
@@ -417,6 +426,9 @@ export function ProjectResultsPage() {
                     lessonId={selected.lessonId}
                     media={selected.media}
                     onDownloaded={() => setMessage(`已开始下载“${selected.title}”`)}
+                    onUnavailable={() =>
+                      setMessage("视频文件已失效，请返回成片页重新检查后再交付。")
+                    }
                     projectId={projectId}
                     title={selected.title}
                   />

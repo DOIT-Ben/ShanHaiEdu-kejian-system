@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDefaultMockRuntimeState } from "@/shared/api/mocks/runtime";
 import {
   finalVideoMediaConfirmationKey,
@@ -6,9 +6,14 @@ import {
   getPlayableFinalVideo,
   isFinalVideoMediaConfirmed,
   parsePlayableVideoMedia,
+  validateSubtitleFile,
 } from "@/features/workbench/lib/videoMedia";
 
 describe("video media truth boundary", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("静态图片和没有视频类型的地址都不能冒充成片", () => {
     expect(
       parsePlayableVideoMedia({ mimeType: "image/webp", src: "/assets/keyframe.webp" }),
@@ -123,5 +128,30 @@ describe("video media truth boundary", () => {
       subtitleFormat: "vtt",
       subtitleSrc: "https://cdn.example.com/current.vtt",
     });
+  });
+
+  it("字幕校验拒绝错误 MIME 和伪字幕正文", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response("WEBVTT\n\n00:00.000 --> 00:01.000\n课堂导入", {
+          headers: { "content-type": "video/mp4" },
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response("这不是字幕文件", {
+          headers: { "content-type": "text/vtt" },
+          status: 200,
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(validateSubtitleFile("https://cdn.example.com/wrong.vtt", "vtt")).resolves.toBe(
+      false,
+    );
+    await expect(validateSubtitleFile("https://cdn.example.com/fake.vtt", "vtt")).resolves.toBe(
+      false,
+    );
   });
 });

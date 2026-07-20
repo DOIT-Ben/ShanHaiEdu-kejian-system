@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FinalVideoStep } from "@/features/workbench/renderers/FinalVideoStep";
 import { finalVideoMediaConfirmationKey } from "@/features/workbench/lib/videoMedia";
 import {
@@ -23,6 +23,10 @@ describe("FinalVideoStep synthesis single flight", () => {
   beforeEach(() => {
     resetMockRuntime();
     mockDownloadRemoteFile.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   function finalVideoNodeId() {
@@ -160,7 +164,17 @@ describe("FinalVideoStep synthesis single flight", () => {
     expect(video.querySelector("track")).toBeNull();
   });
 
-  it("有独立字幕文件时挂载真实字幕轨并提示教师检查", async () => {
+  it("有独立字幕文件时通过真实文件校验后才允许确认", async () => {
+    let resolveSubtitle: ((response: Response) => void) | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveSubtitle = resolve;
+          }),
+      ),
+    );
     saveMockDraft(
       "project:project-a:lesson:lesson-a:final-video:media",
       {
@@ -187,10 +201,30 @@ describe("FinalVideoStep synthesis single flight", () => {
     expect(track).toHaveAttribute("src", "https://cdn.example.com/final.vtt");
     expect(track).toHaveAttribute("srclang", "zh-CN");
     fireEvent.canPlay(video);
-    expect(await screen.findByText("字幕待确认")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "正在检查字幕文件" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "确认画面与字幕文件" })).not.toBeInTheDocument();
+
+    resolveSubtitle?.(
+      new Response("WEBVTT\n\n00:00.000 --> 00:01.000\n课堂导入", {
+        headers: { "content-type": "text/vtt" },
+        status: 200,
+      }),
+    );
+
+    expect(await screen.findByRole("button", { name: "确认画面与字幕文件" })).toBeEnabled();
+    expect(screen.getByText("字幕文件已验证")).toBeInTheDocument();
   });
 
-  it("SRT 字幕保留为独立文件但不挂载浏览器原生字幕轨", async () => {
+  it("SRT 字幕通过格式校验后保留为独立交付文件", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response("1\n00:00:00,000 --> 00:00:01,000\n课堂导入\n", {
+          headers: { "content-type": "application/x-subrip" },
+          status: 200,
+        }),
+      ),
+    );
     saveMockDraft(
       "project:project-a:lesson:lesson-a:final-video:media",
       {
@@ -215,7 +249,55 @@ describe("FinalVideoStep synthesis single flight", () => {
     const video = screen.getByLabelText("果汁标签侦探课堂导入视频");
     expect(video.querySelector("track")).toBeNull();
     fireEvent.canPlay(video);
-    expect(await screen.findByText("字幕待确认")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "确认画面与字幕文件" })).toBeEnabled();
+    expect(screen.getByText("字幕文件已验证")).toBeInTheDocument();
+  });
+
+  it("字幕文件不可用时撤销既有确认并锁定交付", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("missing", { status: 404 })));
+    saveMockDraft(
+      "project:project-a:lesson:lesson-a:final-video:media",
+      {
+        mimeType: "video/mp4",
+        src: "https://cdn.example.com/final.mp4",
+        subtitleUrl: "https://cdn.example.com/missing.vtt",
+      },
+      { lessonId: "lesson-a", nodeKey: "final-video", projectId: "project-a" },
+    );
+    saveMockDraft(
+      finalVideoMediaConfirmationKey("project-a", "lesson-a"),
+      {
+        mimeType: "video/mp4",
+        src: "https://cdn.example.com/final.mp4",
+        status: "confirmed",
+        subtitleFormat: "vtt",
+        subtitleSrc: "https://cdn.example.com/missing.vtt",
+      },
+      { lessonId: "lesson-a", nodeKey: "final-video", projectId: "project-a" },
+    );
+    updateMockNodeState("project-a", "lesson-a", "final-video", { status: "approved" });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-a/lessons/lesson-a/work/final-video"]}>
+        <Routes>
+          <Route
+            element={<FinalVideoStep />}
+            path="/projects/:projectId/lessons/:lessonId/work/final-video"
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.canPlay(screen.getByLabelText("果汁标签侦探课堂导入视频"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("字幕文件无法读取");
+    expect(screen.queryByRole("button", { name: "确认画面与字幕文件" })).not.toBeInTheDocument();
+    expect(getMockRuntimeState().nodeStates["project-a:lesson-a:final-video"]?.status).toBe(
+      "review_required",
+    );
+    expect(
+      getMockRuntimeState().drafts[finalVideoMediaConfirmationKey("project-a", "lesson-a")]?.value,
+    ).toMatchObject({ status: "unavailable" });
   });
 
   it("视频文件读取失败时禁止批准并提供重新加载入口", async () => {

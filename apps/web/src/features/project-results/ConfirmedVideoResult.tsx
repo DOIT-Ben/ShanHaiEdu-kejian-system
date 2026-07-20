@@ -1,7 +1,10 @@
 import { Download, LoaderCircle, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import type { PlayableVideoMedia } from "@/features/workbench/lib/videoMedia";
+import {
+  invalidateFinalVideoMedia,
+  type PlayableVideoMedia,
+} from "@/features/workbench/lib/videoMedia";
 import { downloadRemoteFile } from "@/shared/lib/downloadRemoteFile";
 import { Button } from "@/shared/ui/Button";
 
@@ -9,6 +12,7 @@ type ConfirmedVideoResultProps = {
   lessonId: string;
   media: PlayableVideoMedia;
   onDownloaded: () => void;
+  onUnavailable: () => void;
   projectId: string;
   title: string;
 };
@@ -17,6 +21,7 @@ export function ConfirmedVideoResult({
   lessonId,
   media,
   onDownloaded,
+  onUnavailable,
   projectId,
   title,
 }: ConfirmedVideoResultProps) {
@@ -44,6 +49,10 @@ export function ConfirmedVideoResult({
         aria-label={`${title}可播放视频`}
         className="aspect-video w-full rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-player)] object-contain"
         controls
+        onError={() => {
+          invalidateFinalVideoMedia(projectId, lessonId, media);
+          onUnavailable();
+        }}
         preload="metadata"
       >
         <source src={media.src} type={media.mimeType} />
