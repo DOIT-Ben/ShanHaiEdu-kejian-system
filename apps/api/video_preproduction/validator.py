@@ -2,33 +2,53 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from itertools import pairwise
+from typing import Any
 
 from pydantic import BaseModel
 
 from apps.api.video_preproduction.models import (
     ApprovalFact,
+    AssetInventory,
+    DurationRecommendation,
     IntroSelectionSnapshot,
     MasterScript,
     ReviewableVideoPreproductionPackage,
     RoughStoryboard,
     ValidationReport,
+    VideoAsset,
 )
-from workflow.content_package import canonical_json_sha256
+
+
+def _canonical_bytes(value: dict[str, Any]) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
 
 
 def canonical_fact_hash(value: object) -> str:
     if not isinstance(value, BaseModel):
         raise TypeError("canonical facts must be Pydantic models")
-    return canonical_json_sha256(value.model_dump(mode="json"))
+    return hashlib.sha256(_canonical_bytes(value.model_dump(mode="json"))).hexdigest()
+
+
+def canonical_package_bytes(package: ReviewableVideoPreproductionPackage) -> bytes:
+    payload = package.model_dump(mode="json", exclude={"canonical_hash", "validation_report"})
+    return _canonical_bytes(payload)
 
 
 def canonical_package_hash(package: ReviewableVideoPreproductionPackage) -> str:
-    payload = package.model_dump(
-        mode="json",
-        exclude={"canonical_hash", "validation_report"},
-    )
-    return canonical_json_sha256(payload)
+    return hashlib.sha256(canonical_package_bytes(package)).hexdigest()
+
+
+def inventory_assets(inventory: AssetInventory) -> tuple[VideoAsset, ...]:
+    return (*inventory.characters, *inventory.scenes, *inventory.props, *inventory.creatures)
 
 
 def validate_approval(
@@ -68,6 +88,7 @@ def validate_master_script(
 def validate_rough_storyboard(
     master: MasterScript,
     rough: RoughStoryboard,
+    recommendation: DurationRecommendation,
 ) -> tuple[str, ...]:
     errors: list[str] = []
     if rough.source_master_script_key != master.master_script_key:
@@ -77,27 +98,44 @@ def validate_rough_storyboard(
         "rough beat positions must be unique and contiguous",
         errors,
     )
-    scenes = {scene.scene_key: scene for scene in master.scenes}
-    for beat in rough.beats:
-        scene = scenes.get(beat.scene_key)
-        if scene is None:
-            errors.append("rough beat references an unknown scene")
-        elif (beat.start_state, beat.end_state) != (scene.start_state, scene.end_state):
-            errors.append("rough beat states must match the source scene")
-    _validate_continuity(
-        tuple((beat.start_state, beat.end_state) for beat in rough.beats),
-        "rough beat states must be continuous",
-        errors,
-    )
-    if sum(beat.duration_seconds for beat in rough.beats) != master.target_duration_seconds:
-        errors.append("rough storyboard duration must equal the master script duration")
+    if len({beat.beat_key for beat in rough.beats}) != len(rough.beats):
+        errors.append("rough beat keys must be unique")
+    expected = [
+        (scene.scene_key, position, event)
+        for scene in master.scenes
+        for position, event in enumerate(scene.visible_beats, start=1)
+    ]
+    actual = [(beat.scene_key, beat.scene_beat_position, beat.main_event) for beat in rough.beats]
+    if actual != expected:
+        errors.append("rough beats must completely map master visible beats")
+    _validate_scene_beat_states(master, rough, errors)
+    if sum(beat.duration_seconds for beat in rough.beats) != (
+        recommendation.recommended_duration_seconds
+    ):
+        errors.append("rough storyboard duration must equal the confirmed duration")
     return tuple(errors)
 
 
 def validate_package(package: ReviewableVideoPreproductionPackage) -> ValidationReport:
     errors = list(validate_master_script(package.source_snapshot, package.master_script))
-    errors.extend(validate_rough_storyboard(package.master_script, package.rough_storyboard))
     errors.extend(
+        validate_rough_storyboard(
+            package.master_script,
+            package.rough_storyboard,
+            package.duration_recommendation,
+        )
+    )
+    errors.extend(_approval_errors(package))
+    _validate_confirmation(package, errors)
+    _validate_handoff(package, errors)
+    _validate_assets_and_plan(package, errors)
+    if canonical_package_hash(package) != package.canonical_hash:
+        errors.append("canonical hash does not match package content")
+    return ValidationReport(valid=not errors, errors=tuple(dict.fromkeys(errors)))
+
+
+def _approval_errors(package: ReviewableVideoPreproductionPackage) -> tuple[str, ...]:
+    errors = list(
         validate_approval(
             package.master_script_approval,
             kind="master_script",
@@ -113,11 +151,22 @@ def validate_package(package: ReviewableVideoPreproductionPackage) -> Validation
             value=package.rough_storyboard,
         )
     )
-    _validate_duration(package, errors)
-    _validate_assets_and_plan(package, errors)
-    if canonical_package_hash(package) != package.canonical_hash:
-        errors.append("canonical hash does not match package content")
-    return ValidationReport(valid=not errors, errors=tuple(dict.fromkeys(errors)))
+    return tuple(errors)
+
+
+def _validate_confirmation(
+    package: ReviewableVideoPreproductionPackage,
+    errors: list[str],
+) -> None:
+    confirmation = package.teacher_confirmation
+    recommendation = package.duration_recommendation
+    if (
+        confirmation.pricing_version != recommendation.pricing_version
+        or confirmation.currency != recommendation.currency
+        or confirmation.confirmed_duration_seconds != recommendation.recommended_duration_seconds
+        or confirmation.confirmed_estimated_cost != recommendation.estimated_cost
+    ):
+        errors.append("teacher confirmation does not match the recommendation")
 
 
 def _validate_master_structure(
@@ -146,44 +195,69 @@ def _validate_master_structure(
             errors.append(f"master script must not preteach: {forbidden}")
 
 
-def _validate_duration(
+def _validate_scene_beat_states(
+    master: MasterScript,
+    rough: RoughStoryboard,
+    errors: list[str],
+) -> None:
+    for scene in master.scenes:
+        beats = tuple(beat for beat in rough.beats if beat.scene_key == scene.scene_key)
+        if not beats:
+            continue
+        if beats[0].start_state != scene.start_state or beats[-1].end_state != scene.end_state:
+            errors.append("rough beat states must cover the source scene")
+        _validate_continuity(
+            tuple((beat.start_state, beat.end_state) for beat in beats),
+            "rough beat states must be continuous",
+            errors,
+        )
+
+
+def _validate_handoff(
     package: ReviewableVideoPreproductionPackage,
     errors: list[str],
 ) -> None:
-    target = package.master_script.target_duration_seconds
-    if sum(scene.duration_seconds for scene in package.master_script.scenes) != target:
-        errors.append("master scene durations must equal the target duration")
-    if package.rough_storyboard.total_duration_seconds != target:
-        errors.append("rough storyboard duration must equal the master script duration")
+    if package.rough_storyboard.beats[-1].end_state != package.source_snapshot.handoff_moment:
+        errors.append("rough storyboard must end at the selected handoff moment")
 
 
 def _validate_assets_and_plan(
     package: ReviewableVideoPreproductionPackage,
     errors: list[str],
 ) -> None:
-    assets = package.asset_inventory.assets
+    inventory = package.asset_inventory
+    _validate_asset_categories(inventory, errors)
+    assets = inventory_assets(inventory)
     asset_keys = tuple(asset.asset_key for asset in assets)
-    beat_keys = {beat.beat_key for beat in package.rough_storyboard.beats}
-    beat_asset_links = {
+    beat_links = {
         (beat.beat_key, asset_key)
         for beat in package.rough_storyboard.beats
         for asset_key in beat.asset_keys
     }
-    if {asset.asset_type for asset in assets} != {"character", "scene", "prop", "creature"}:
-        errors.append("asset inventory must contain all four asset categories")
+    source_links = {
+        (beat_key, asset.asset_key) for asset in assets for beat_key in asset.source_beat_keys
+    }
     if len(asset_keys) != len(set(asset_keys)):
         errors.append("asset inventory keys must be unique")
-    for asset in assets:
-        if not set(asset.source_beat_keys) <= beat_keys:
-            errors.append("asset source references an unknown beat")
-        if any(
-            (beat_key, asset.asset_key) not in beat_asset_links
-            for beat_key in asset.source_beat_keys
-        ):
-            errors.append("asset source and beat asset references must agree")
-    if any(asset_key not in set(asset_keys) for _, asset_key in beat_asset_links):
+    beat_keys = {beat.beat_key for beat in package.rough_storyboard.beats}
+    if any(beat_key not in beat_keys for beat_key, _ in source_links):
+        errors.append("asset source references an unknown beat")
+    if any(asset_key not in set(asset_keys) for _, asset_key in beat_links):
         errors.append("rough beat references an unknown asset")
+    if beat_links != source_links:
+        errors.append("asset source and beat asset references must match exactly")
     _validate_prompts(package, asset_keys, errors)
+
+
+def _validate_asset_categories(inventory: AssetInventory, errors: list[str]) -> None:
+    categories = (
+        (inventory.characters, "character"),
+        (inventory.scenes, "scene"),
+        (inventory.props, "prop"),
+        (inventory.creatures, "creature"),
+    )
+    if any(asset.asset_type != expected for assets, expected in categories for asset in assets):
+        errors.append("asset category container does not match asset type")
 
 
 def _validate_prompts(

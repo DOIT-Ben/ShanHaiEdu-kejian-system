@@ -46,11 +46,11 @@ class VideoPreproductionRequest(_FrozenModel):
 
 
 class StoryComplexity(_FrozenModel):
-    creative_concept_chars: int = Field(gt=0)
-    course_anchor_chars: int = Field(gt=0)
     scene_count: int = Field(ge=3, le=6)
-    beat_count: int = Field(ge=3, le=6)
-    estimated_asset_count: int = Field(ge=4, le=7)
+    visible_beat_count: int = Field(ge=3, le=24)
+    estimated_shot_count: int = Field(ge=3, le=30)
+    handoff_complexity: int = Field(ge=1, le=3)
+    estimated_asset_count: int = Field(ge=5, le=8)
 
 
 class DurationRecommendation(_FrozenModel):
@@ -83,10 +83,11 @@ class MasterScene(_FrozenModel):
     position: int = Field(ge=1)
     purpose: str
     visible_change: str
+    visible_beats: tuple[str, ...] = Field(min_length=1, max_length=4)
+    estimated_shot_count: int = Field(ge=1, le=6)
     narration: str
     start_state: str
     end_state: str
-    duration_seconds: int = Field(gt=0)
 
 
 class MasterScript(_FrozenModel):
@@ -100,20 +101,18 @@ class MasterScript(_FrozenModel):
     narrative_purpose: str
     complete_story: str
     scenes: tuple[MasterScene, ...] = Field(min_length=1)
-    target_duration_seconds: int = Field(ge=60, le=180)
     ends_at_handoff: bool
 
 
 class ReviewableMasterScriptStage(_FrozenModel):
     source_snapshot: IntroSelectionSnapshot
-    teacher_confirmation: TeacherConfirmation
-    duration_recommendation: DurationRecommendation
     master_script: MasterScript
 
 
 class RoughBeat(_FrozenModel):
     beat_key: str
     scene_key: str
+    scene_beat_position: int = Field(ge=1, le=4)
     position: int = Field(ge=1)
     main_event: str
     start_state: str
@@ -131,6 +130,8 @@ class RoughStoryboard(_FrozenModel):
 
 class ReviewableRoughStoryboardStage(_FrozenModel):
     master_stage: ReviewableMasterScriptStage
+    duration_recommendation: DurationRecommendation
+    teacher_confirmation: TeacherConfirmation
     master_script_approval: ApprovalFact
     rough_storyboard: RoughStoryboard
 
@@ -144,7 +145,10 @@ class VideoAsset(_FrozenModel):
 
 
 class AssetInventory(_FrozenModel):
-    assets: tuple[VideoAsset, ...] = Field(min_length=4)
+    characters: tuple[VideoAsset, ...] = Field(min_length=1)
+    scenes: tuple[VideoAsset, ...] = Field(min_length=1)
+    props: tuple[VideoAsset, ...] = Field(min_length=1)
+    creatures: tuple[VideoAsset, ...] = ()
 
 
 class VisualPlan(_FrozenModel):
