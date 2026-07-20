@@ -18,7 +18,7 @@ export const buttonVariants = cva(
         quiet:
           "bg-transparent text-[var(--sh-brand-600)] hover:bg-[var(--sh-surface-soft)] hover:text-[var(--sh-brand-700)] active:bg-[var(--sh-brand-50)] disabled:text-[var(--sh-ink-disabled)] disabled:opacity-70",
         danger:
-          "border border-[var(--sh-danger-strong)] bg-[var(--sh-danger)] font-semibold text-white shadow-[var(--sh-shadow-card)] hover:-translate-y-px hover:bg-[var(--sh-danger-strong)] hover:shadow-[var(--sh-shadow-hover)] active:translate-y-px active:shadow-none disabled:border-[var(--sh-line-subtle)] disabled:bg-[var(--sh-surface-soft)] disabled:text-[var(--sh-ink-faint)] disabled:opacity-100",
+          "border border-[var(--sh-danger-strong)] bg-[var(--sh-danger)] font-semibold text-[var(--sh-on-accent)] shadow-[var(--sh-shadow-card)] hover:-translate-y-px hover:bg-[var(--sh-danger-strong)] hover:shadow-[var(--sh-shadow-hover)] active:translate-y-px active:shadow-none disabled:border-[var(--sh-line-subtle)] disabled:bg-[var(--sh-surface-soft)] disabled:text-[var(--sh-ink-faint)] disabled:opacity-100",
       },
       size: {
         sm: "sh-control-compact min-h-9 px-3 text-[13px]",

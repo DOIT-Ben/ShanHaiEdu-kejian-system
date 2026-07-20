@@ -129,7 +129,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
           </Tooltip.Trigger>
           <Tooltip.Portal>
             <Tooltip.Content
-              className="z-50 rounded-[var(--sh-radius-control)] bg-[var(--sh-surface-inverse)] px-2.5 py-1.5 text-xs text-white shadow-[var(--sh-shadow-floating)]"
+              className="z-50 rounded-[var(--sh-radius-control)] bg-[var(--sh-surface-inverse)] px-2.5 py-1.5 text-xs text-[var(--sh-on-accent)] shadow-[var(--sh-shadow-floating)]"
               sideOffset={6}
             >
               {currentLabel}

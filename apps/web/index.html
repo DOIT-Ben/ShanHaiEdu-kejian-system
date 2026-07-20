@@ -9,7 +9,7 @@
     <script>
       (() => {
         const key = "shanhaiedu.theme";
-        const allowed = new Set(["eye-care", "day", "night"]);
+        const allowed = new Set(["eye-care", "day", "night", "atelier"]);
         let theme = "eye-care";
         try {
           const saved = localStorage.getItem(key);
@@ -17,7 +17,12 @@
         } catch {}
         document.documentElement.dataset.theme = theme;
         document.documentElement.style.colorScheme = theme === "night" ? "dark" : "light";
-        const colors = { "eye-care": "#f3f7ee", day: "#ffffff", night: "#272b29" };
+        const colors = {
+          "eye-care": "#f3f7ee",
+          day: "#ffffff",
+          night: "#272b29",
+          atelier: "#f3f4f2",
+        };
         document.querySelector('meta[name="theme-color"]').content = colors[theme];
       })();
     </script>

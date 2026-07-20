@@ -201,6 +201,80 @@
   --sh-color-action-inset: oklch(0.08 0.01 160 / 38%);
 }
 
+/* Premium minimal: cool mineral surfaces, ink-green actions, and quiet blue information. */
+:root[data-theme="atelier"] {
+  color-scheme: light;
+  --sh-theme-color: #f3f4f2;
+  --sh-color-brand-50: oklch(0.953 0.011 205);
+  --sh-color-brand-100: oklch(0.904 0.022 204);
+  --sh-color-brand-200: oklch(0.83 0.037 202);
+  --sh-color-brand-300: oklch(0.74 0.052 201);
+  --sh-color-brand-400: oklch(0.65 0.068 200);
+  --sh-color-brand-500: oklch(0.55 0.075 199);
+  --sh-color-brand-600: oklch(0.43 0.064 197);
+  --sh-color-brand-700: oklch(0.36 0.055 197);
+  --sh-color-brand-800: oklch(0.3 0.045 197);
+  --sh-color-brand-900: oklch(0.25 0.037 197);
+  --sh-color-accent-rose: oklch(0.69 0.062 23);
+  --sh-color-accent-rose-soft: oklch(0.94 0.016 23);
+  --sh-color-accent-rose-strong: oklch(0.46 0.07 23);
+  --sh-color-accent-caramel: oklch(0.7 0.082 78);
+  --sh-color-accent-caramel-soft: oklch(0.95 0.02 83);
+  --sh-color-accent-caramel-strong: oklch(0.46 0.07 76);
+  --sh-color-on-accent: oklch(0.985 0.002 245);
+  --sh-color-ink-strong: oklch(0.23 0.012 240);
+  --sh-color-ink-default: oklch(0.34 0.014 240);
+  --sh-color-ink-muted: oklch(0.46 0.015 240);
+  --sh-color-ink-faint: oklch(0.46 0.014 240);
+  --sh-color-ink-disabled: oklch(0.74 0.01 240);
+  --sh-color-ink-placeholder: oklch(0.46 0.014 240);
+  --sh-color-surface-canvas: oklch(0.962 0.007 245);
+  --sh-color-surface-warm: oklch(0.955 0.008 92);
+  --sh-color-surface-base: oklch(0.944 0.009 245);
+  --sh-color-surface-soft: oklch(0.924 0.01 245);
+  --sh-color-surface-elevated: oklch(0.985 0.003 245);
+  --sh-color-surface-paper: oklch(0.993 0.002 245);
+  --sh-color-surface-inverse: oklch(0.268 0.017 195);
+  --sh-color-surface-stage: oklch(0.902 0.012 245);
+  --sh-color-surface-player: oklch(0.225 0.017 200);
+  --sh-color-overlay-scrim: oklch(0.18 0.012 225 / 42%);
+  --sh-color-line-subtle: oklch(0.918 0.006 245);
+  --sh-color-line-default: oklch(0.855 0.009 245);
+  --sh-color-line-strong: oklch(0.75 0.012 245);
+  --sh-color-success-accent: oklch(0.71 0.083 153);
+  --sh-color-success: oklch(0.48 0.085 153);
+  --sh-color-success-soft: oklch(0.932 0.025 153);
+  --sh-color-success-strong: oklch(0.4 0.073 153);
+  --sh-color-warning: oklch(0.46 0.075 84);
+  --sh-color-warning-soft: oklch(0.95 0.026 90);
+  --sh-color-warning-strong: oklch(0.43 0.07 82);
+  --sh-color-danger: oklch(0.5 0.1 22);
+  --sh-color-danger-soft: oklch(0.94 0.022 20);
+  --sh-color-danger-strong: oklch(0.42 0.09 21);
+  --sh-color-info: oklch(0.47 0.07 245);
+  --sh-color-info-soft: oklch(0.94 0.018 245);
+  --sh-color-info-strong: oklch(0.38 0.064 245);
+  --sh-color-action-primary: oklch(0.31 0.035 185);
+  --sh-color-action-hover: oklch(0.36 0.04 185);
+  --sh-color-action-active: oklch(0.27 0.03 185);
+  --sh-color-action-border: oklch(0.24 0.028 185);
+  --sh-color-action-foreground: oklch(0.985 0.002 245);
+  --sh-color-focus-ring: oklch(0.48 0.064 200);
+  --sh-color-shadow-card: oklch(0.22 0.012 225 / 4%);
+  --sh-color-shadow-hover: oklch(0.18 0.012 225 / 9%);
+  --sh-color-shadow-floating: oklch(0.18 0.012 225 / 12%);
+  --sh-color-shadow-modal: oklch(0.14 0.012 225 / 20%);
+  --sh-color-shadow-focus: oklch(0.48 0.064 200 / 28%);
+  --sh-color-shadow-action: oklch(0.16 0.018 190 / 18%);
+  --sh-color-shadow-action-hover: oklch(0.14 0.02 190 / 22%);
+  --sh-color-shadow-action-active: oklch(0.12 0.016 190 / 16%);
+  --sh-color-action-highlight: oklch(1 0 0 / 18%);
+  --sh-color-action-inset: oklch(0.12 0.018 190 / 28%);
+  --sh-radius-control: 5px;
+  --sh-radius-card: 7px;
+  --sh-radius-dialog: 8px;
+}
+
 :root {
   /* Semantic aliases. Components should consume these, not foundation slots. */
   --sh-brand-50: var(--sh-color-brand-50);

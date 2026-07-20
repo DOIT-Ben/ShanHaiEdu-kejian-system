@@ -24,7 +24,7 @@ describe("全局主题控制", () => {
     expect(getThemeMode()).toBe("eye-care");
   });
 
-  it.each(["eye-care", "day", "night"] as const)("切换并持久化 %s", (mode) => {
+  it.each(["eye-care", "day", "night", "atelier"] as const)("切换并持久化 %s", (mode) => {
     setThemeMode(mode);
     expect(document.documentElement.dataset.theme).toBe(mode);
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe(mode);

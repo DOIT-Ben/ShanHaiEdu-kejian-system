@@ -62,15 +62,36 @@ const themeBlocks = [
   ["护眼", cssBlock(":root")],
   ["白天", cssBlock(':root[data-theme="day"]')],
   ["黑夜", cssBlock(':root[data-theme="night"]')],
+  ["高级简约", cssBlock(':root[data-theme="atelier"]')],
 ] as const;
 
-describe("全局三模式视觉令牌", () => {
-  it("保留护眼默认值并为白天和黑夜只覆盖基础色槽", () => {
+describe("全局四模式视觉令牌", () => {
+  it("保留三种既有主题，并为高级简约提供完整基础与控件令牌", () => {
     expect(tokens).toContain(':root[data-theme="eye-care"]');
     expect(tokens).toContain(':root[data-theme="day"]');
     expect(tokens).toContain(':root[data-theme="night"]');
+    expect(tokens).toContain(':root[data-theme="atelier"]');
     expect(cssBlock(':root[data-theme="day"]')).not.toContain("--sh-surface-canvas:");
     expect(cssBlock(':root[data-theme="night"]')).not.toContain("--sh-action-primary:");
+    const atelier = cssBlock(':root[data-theme="atelier"]');
+    for (const token of [
+      "--sh-color-brand-50",
+      "--sh-color-brand-900",
+      "--sh-color-ink-default",
+      "--sh-color-surface-canvas",
+      "--sh-color-surface-elevated",
+      "--sh-color-action-primary",
+      "--sh-color-action-foreground",
+      "--sh-color-success",
+      "--sh-color-warning",
+      "--sh-color-danger",
+      "--sh-color-info",
+      "--sh-color-shadow-card",
+      "--sh-radius-control",
+      "--sh-radius-card",
+    ]) {
+      expect(atelier).toContain(`${token}:`);
+    }
   });
 
   it("基础色槽全部使用 OKLCH", () => {
@@ -88,7 +109,7 @@ describe("全局三模式视觉令牌", () => {
       .filter((line) => !line.includes("--sh-theme-color:"))
       .filter((line) => /#[\da-f]{3,8}\b|rgba?\(/i.test(line));
     expect(offenders).toEqual([]);
-    expect(tokens.match(/--sh-theme-color:\s*#[\da-f]{6}/gi)).toHaveLength(3);
+    expect(tokens.match(/--sh-theme-color:\s*#[\da-f]{6}/gi)).toHaveLength(4);
   });
 
   it("语义层只引用基础色槽", () => {

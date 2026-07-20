@@ -23,6 +23,19 @@ describe("主题切换器", () => {
     expect(screen.getByRole("button", { name: "切换主题，当前黑夜模式" })).toBeVisible();
   });
 
+  it("可切换到高级简约模式并保留清晰的当前状态", async () => {
+    const user = userEvent.setup();
+    render(<ThemeSwitcher />);
+
+    await user.click(screen.getByRole("button", { name: "切换主题，当前护眼模式" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "高级简约模式" }));
+
+    expect(document.documentElement.dataset.theme).toBe("atelier");
+    expect(document.documentElement.style.colorScheme).toBe("light");
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("atelier");
+    expect(screen.getByRole("button", { name: "切换主题，当前高级简约模式" })).toBeVisible();
+  });
+
   it.each([
     ["删除主题键", THEME_STORAGE_KEY],
     ["清空浏览器存储", null],

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-export const THEME_MODES = ["eye-care", "day", "night"] as const;
+export const THEME_MODES = ["eye-care", "day", "night", "atelier"] as const;
 export type ThemeMode = (typeof THEME_MODES)[number];
 
 export const DEFAULT_THEME: ThemeMode = "eye-care";

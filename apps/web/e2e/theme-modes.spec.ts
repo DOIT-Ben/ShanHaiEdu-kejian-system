@@ -20,6 +20,12 @@ const themes = [
     mode: "night",
     themeColor: "#272b29",
   },
+  {
+    canvas: "oklch(0.962 0.007 245)",
+    label: "高级简约",
+    mode: "atelier",
+    themeColor: "#f3f4f2",
+  },
 ] as const;
 
 async function chooseTheme(page: Page, label: string, mode: string) {
@@ -35,12 +41,25 @@ async function expectNoAccessibilityViolations(page: Page) {
     const results = await (window as typeof window & { axe: typeof axe }).axe.run(document, {
       runOnly: { type: "tag", values: ["wcag2a", "wcag2aa"] },
     });
-    return results.violations.map(({ help, id, impact }) => ({ help, id, impact }));
+    return results.violations.map(({ help, id, impact, nodes }) => ({
+      help,
+      id,
+      impact,
+      nodes: nodes.map((node) => node.html),
+    }));
   });
   expect(violations).toEqual([]);
 }
 
-test("教师端三种主题全局切换并持久化", async ({ page }, testInfo: TestInfo) => {
+async function expectNoHorizontalOverflow(page: Page) {
+  const dimensions = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+}
+
+test("教师端四种主题全局切换并持久化", async ({ page }, testInfo: TestInfo) => {
   await page.setViewportSize({ height: 900, width: 1440 });
   await loginAsTeacher(page);
 
@@ -67,12 +86,12 @@ test("教师端三种主题全局切换并持久化", async ({ page }, testInfo:
     });
   }
 
-  await page.getByRole("button", { name: "切换主题，当前黑夜模式" }).click();
+  await page.getByRole("button", { name: "切换主题，当前高级简约模式" }).click();
   await expect(page.locator('[role="menu"]')).toBeVisible();
   await page.screenshot({
     animations: "disabled",
     fullPage: true,
-    path: testInfo.outputPath("teacher-theme-menu-night-1440.png"),
+    path: testInfo.outputPath("teacher-theme-menu-atelier-1440.png"),
   });
   await page.keyboard.press("Escape");
 
@@ -80,11 +99,11 @@ test("教师端三种主题全局切换并持久化", async ({ page }, testInfo:
   await expect(page.getByText("界面主题", { exact: true })).toBeVisible();
   await page.getByRole("menuitemradio", { name: "白天模式" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "day");
-  await chooseTheme(page, "黑夜", "night");
+  await chooseTheme(page, "高级简约", "atelier");
 
   await page.reload();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "night");
-  await expect(page.getByRole("button", { name: "切换主题，当前黑夜模式" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "atelier");
+  await expect(page.getByRole("button", { name: "切换主题，当前高级简约模式" })).toBeVisible();
 
   await unlockWorkbenchStep(page, projectId, lessonId, "ppt-pages");
   await page.goto(`/app/projects/${projectId}/lessons/${lessonId}/work/ppt-pages`);
@@ -97,7 +116,48 @@ test("教师端三种主题全局切换并持久化", async ({ page }, testInfo:
   await page.screenshot({
     animations: "disabled",
     fullPage: true,
-    path: testInfo.outputPath("ppt-artifact-night-1440.png"),
+    path: testInfo.outputPath("ppt-artifact-atelier-1440.png"),
+  });
+});
+
+test("高级简约主题在核心工作页保持统一层级", async ({ page }, testInfo) => {
+  await page.setViewportSize({ height: 900, width: 1280 });
+  await loginAsTeacher(page);
+  await chooseTheme(page, "高级简约", "atelier");
+
+  const pages = [
+    { heading: "认识百分数", name: "atelier-home-1280", path: "/app" },
+    { heading: "我的项目", name: "atelier-projects-1280", path: "/app/projects" },
+    {
+      heading: "百分数的意义",
+      name: "atelier-workbench-1280",
+      path: `/app/projects/${projectId}/lessons/${lessonId}/work/lesson-plan`,
+    },
+    { heading: "图片创作台", name: "atelier-creation-1280", path: "/app/creation/images" },
+  ];
+
+  for (const entry of pages) {
+    await page.goto(entry.path);
+    await expect(page.getByRole("heading", { name: entry.heading }).first()).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "atelier");
+    await expectNoHorizontalOverflow(page);
+    await expectNoAccessibilityViolations(page);
+    await page.screenshot({
+      animations: "disabled",
+      fullPage: true,
+      path: testInfo.outputPath(`${entry.name}.png`),
+    });
+  }
+
+  await page.setViewportSize({ height: 844, width: 390 });
+  await page.goto("/app/creation/images");
+  await expect(page.getByRole("heading", { level: 1, name: "图片创作台" })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await expectNoAccessibilityViolations(page);
+  await page.screenshot({
+    animations: "disabled",
+    fullPage: true,
+    path: testInfo.outputPath("atelier-creation-390.png"),
   });
 });
 

@@ -1,5 +1,5 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Check, Leaf, Moon, Palette, Sun } from "lucide-react";
+import { Check, Leaf, Moon, PanelsTopLeft, Palette, Sun } from "lucide-react";
 import type { ComponentType } from "react";
 import { cn } from "@/shared/lib/cn";
 import {
@@ -26,6 +26,7 @@ const themeOptionDetails: Record<ThemeMode, Omit<ThemeOption, "mode">> = {
   "eye-care": defaultThemeOption,
   day: { icon: Sun, label: "白天" },
   night: { icon: Moon, label: "黑夜" },
+  atelier: { icon: PanelsTopLeft, label: "高级简约" },
 };
 
 const themeOptions: ThemeOption[] = THEME_MODES.map((mode) => ({
