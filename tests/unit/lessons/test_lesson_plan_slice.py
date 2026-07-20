@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from collections.abc import Callable
@@ -115,6 +116,46 @@ def test_slice_rejects_unavailable_material_evidence_and_duration_drift() -> Non
         generator=DeterministicLessonPlanFake(content),
     )
     with pytest.raises(LessonPlanSliceError, match="MATERIAL_SCOPE_MISMATCH"):
+        service.generate(_request())
+
+
+def test_slice_rejects_orphan_objectives_extra_assessments_and_wrong_pairs() -> None:
+    content = _valid_content()
+    objectives = cast(list[dict[str, Any]], content["teaching_objectives"])
+    orphan = copy.deepcopy(objectives[0])
+    orphan["objective_key"] = "OBJ-ORPHAN"
+    objectives.append(orphan)
+    service = LessonPlanSliceService(
+        definition=_published_lesson_plan_definition(),
+        generator=DeterministicLessonPlanFake(content),
+    )
+    with pytest.raises(LessonPlanSliceError, match="OBJECTIVE_REFERENCE_INVALID"):
+        service.generate(_request())
+
+    content = _valid_content()
+    process = cast(list[dict[str, Any]], content["teaching_process"])
+    process[0]["process_assessment_evidence"].append("ASSESSMENT-UNKNOWN")
+    service = LessonPlanSliceService(
+        definition=_published_lesson_plan_definition(),
+        generator=DeterministicLessonPlanFake(content),
+    )
+    with pytest.raises(LessonPlanSliceError, match="ASSESSMENT_REFERENCE_INVALID"):
+        service.generate(_request())
+
+    content = _valid_content()
+    objectives = cast(list[dict[str, Any]], content["teaching_objectives"])
+    second = copy.deepcopy(objectives[0])
+    second["objective_key"] = "OBJ-002"
+    second["assessment_evidence_keys"] = ["ASSESSMENT-002"]
+    objectives.append(second)
+    process = cast(list[dict[str, Any]], content["teaching_process"])
+    process[1]["process_objective_keys"] = ["OBJ-002"]
+    process[1]["process_assessment_evidence"] = ["ASSESSMENT-001"]
+    service = LessonPlanSliceService(
+        definition=_published_lesson_plan_definition(),
+        generator=DeterministicLessonPlanFake(content),
+    )
+    with pytest.raises(LessonPlanSliceError, match="ASSESSMENT_REFERENCE_INVALID"):
         service.generate(_request())
 
     content = _valid_content()

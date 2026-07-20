@@ -77,9 +77,9 @@ class LessonPlanBusinessValidator:
         self._validate_schema(content)
         teaching_content = self._mapping(content, "teaching_content")
         self._validate_teaching_content(scope, teaching_content)
-        objective_keys, assessment_keys = self._validate_objectives(scope, content)
-        self._validate_process(scope, content, objective_keys, assessment_keys)
-        self._validate_homework(content, objective_keys)
+        objective_assessments = self._validate_objectives(scope, content)
+        self._validate_process(scope, content, objective_assessments)
+        self._validate_homework(content, set(objective_assessments))
         return LessonPlanValidationReport(
             valid=True,
             findings=(),
@@ -166,15 +166,14 @@ class LessonPlanBusinessValidator:
         self,
         scope: ApprovedLessonPlanScope,
         content: Mapping[str, Any],
-    ) -> tuple[set[str], set[str]]:
+    ) -> dict[str, frozenset[str]]:
         objectives = self._mappings(content.get("teaching_objectives"), "objectives")
-        objective_keys: set[str] = set()
-        assessment_keys: set[str] = set()
+        objective_assessments: dict[str, frozenset[str]] = {}
         for objective in objectives:
             key = objective.get("objective_key")
             evidence_refs = self._strings(objective.get("objective_evidence_refs"))
             assessments = self._strings(objective.get("assessment_evidence_keys"))
-            if not isinstance(key, str) or not key.strip() or key in objective_keys:
+            if not isinstance(key, str) or not key.strip() or key in objective_assessments:
                 raise LessonPlanSliceError(
                     "OBJECTIVE_REFERENCE_INVALID: objective keys must be unique"
                 )
@@ -186,40 +185,92 @@ class LessonPlanBusinessValidator:
                 raise LessonPlanSliceError(
                     "ASSESSMENT_REFERENCE_INVALID: objective assessment keys are required"
                 )
-            objective_keys.add(key)
-            assessment_keys.update(assessments)
-        return objective_keys, assessment_keys
+            objective_assessments[key] = frozenset(assessments)
+        return objective_assessments
 
     def _validate_process(
         self,
         scope: ApprovedLessonPlanScope,
         content: Mapping[str, Any],
-        objective_keys: set[str],
-        assessment_keys: set[str],
+        objective_assessments: Mapping[str, frozenset[str]],
     ) -> None:
         process = self._mappings(content.get("teaching_process"), "teaching process")
         total_minutes = 0
+        objective_keys = set(objective_assessments)
+        assessment_keys: set[str] = {
+            assessment
+            for assessments in objective_assessments.values()
+            for assessment in assessments
+        }
+        used_objectives: set[str] = set()
         provided_assessments: set[str] = set()
+        paired_references: set[tuple[str, str]] = set()
         for step in process:
             minutes = step.get("process_minutes")
             keys = self._strings(step.get("process_objective_keys"))
-            provided_assessments.update(
-                self._reference_keys(step.get("process_assessment_evidence"))
-            )
+            assessments = self._reference_keys(step.get("process_assessment_evidence"))
             if not isinstance(minutes, int) or isinstance(minutes, bool) or minutes < 0:
                 raise LessonPlanSliceError("PROCESS_DURATION_MISMATCH: process minutes are invalid")
             if not keys or not set(keys) <= objective_keys:
                 raise LessonPlanSliceError(
                     "PROCESS_REFERENCE_INVALID: process references an unknown objective"
                 )
-            total_minutes += minutes
-        if not assessment_keys <= provided_assessments:
-            raise LessonPlanSliceError(
-                "ASSESSMENT_REFERENCE_INVALID: objective references unknown assessment evidence"
+            if not assessments or not set(assessments) <= assessment_keys:
+                raise LessonPlanSliceError(
+                    "ASSESSMENT_REFERENCE_INVALID: process references unknown assessment evidence"
+                )
+            allowed_assessments: set[str] = {
+                assessment for key in keys for assessment in objective_assessments[key]
+            }
+            if not set(assessments) <= allowed_assessments:
+                raise LessonPlanSliceError(
+                    "ASSESSMENT_REFERENCE_INVALID: process mismatches objectives and assessments"
+                )
+            used_objectives.update(keys)
+            provided_assessments.update(assessments)
+            paired_references.update(
+                (key, assessment)
+                for key in keys
+                for assessment in assessments
+                if assessment in objective_assessments[key]
             )
+            total_minutes += minutes
+        self._validate_process_coverage(
+            objective_assessments,
+            used_objectives,
+            provided_assessments,
+            paired_references,
+        )
         if total_minutes != scope.duration_minutes:
             raise LessonPlanSliceError(
                 "PROCESS_DURATION_MISMATCH: process duration differs from lesson duration"
+            )
+
+    @staticmethod
+    def _validate_process_coverage(
+        objective_assessments: Mapping[str, frozenset[str]],
+        used_objectives: set[str],
+        provided_assessments: set[str],
+        paired_references: set[tuple[str, str]],
+    ) -> None:
+        objective_keys = set(objective_assessments)
+        if objective_keys != used_objectives:
+            raise LessonPlanSliceError(
+                "OBJECTIVE_REFERENCE_INVALID: an objective is not used by any process step"
+            )
+        assessment_keys = {
+            assessment
+            for assessments in objective_assessments.values()
+            for assessment in assessments
+        }
+        expected_pairs = {
+            (key, assessment)
+            for key, assessments in objective_assessments.items()
+            for assessment in assessments
+        }
+        if assessment_keys != provided_assessments or expected_pairs != paired_references:
+            raise LessonPlanSliceError(
+                "ASSESSMENT_REFERENCE_INVALID: objective assessment evidence is orphaned"
             )
 
     def _validate_homework(
