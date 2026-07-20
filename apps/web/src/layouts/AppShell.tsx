@@ -3,8 +3,8 @@ import { ChevronDown, Menu, Plus, Search } from "lucide-react";
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import brandMark from "@/assets/brand/brand-mark.svg";
-import { GlobalSearchDialog } from "@/features/navigation/GlobalSearchDialog";
-import { NotificationMenu } from "@/features/navigation/NotificationMenu";
+import { GlobalSearchDialog, type SearchEntry } from "@/features/navigation/GlobalSearchDialog";
+import { NotificationMenu, type NotificationItem } from "@/features/navigation/NotificationMenu";
 import { cn } from "@/shared/lib/cn";
 import { ThemeMenuItems, ThemeSwitcher } from "@/shared/theme/ThemeSwitcher";
 import { IconButton } from "@/shared/ui/IconButton";
@@ -20,14 +20,18 @@ export type AppShellProps = {
   accountInitial?: string;
   accountLabel?: string;
   isAdmin?: boolean;
+  notifications?: readonly NotificationItem[];
   onSignOut?: () => void;
+  searchEntries?: readonly SearchEntry[];
 };
 
 export function AppShell({
   accountInitial = "用",
   accountLabel = "当前用户",
   isAdmin = false,
+  notifications = [],
   onSignOut,
+  searchEntries = [],
 }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -77,7 +81,7 @@ export function AppShell({
             <IconButton label="搜索" onClick={() => setSearchOpen(true)}>
               <Search aria-hidden="true" />
             </IconButton>
-            <NotificationMenu />
+            <NotificationMenu notifications={notifications} />
             <ThemeSwitcher />
             <NavLink
               aria-label="新建课件"
@@ -195,7 +199,7 @@ export function AppShell({
       <main id="main-content">
         <Outlet />
       </main>
-      <GlobalSearchDialog onOpenChange={setSearchOpen} open={searchOpen} />
+      <GlobalSearchDialog entries={searchEntries} onOpenChange={setSearchOpen} open={searchOpen} />
     </div>
   );
 }

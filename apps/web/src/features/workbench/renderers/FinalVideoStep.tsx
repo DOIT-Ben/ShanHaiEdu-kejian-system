@@ -48,6 +48,20 @@ function settledTaskStatus(status: string) {
   return "review_required" as const;
 }
 
+function mediaConfirmationValue(
+  media: NonNullable<ReturnType<typeof getPlayableFinalVideo>>,
+  status: "confirmed" | "pending" | "unavailable",
+) {
+  return {
+    mimeType: media.mimeType,
+    src: media.src,
+    ...(media.subtitleSrc && media.subtitleFormat
+      ? { subtitleFormat: media.subtitleFormat, subtitleSrc: media.subtitleSrc }
+      : {}),
+    status,
+  };
+}
+
 export function FinalVideoStep() {
   const { lessonId = "", projectId = "" } = useParams();
   const runtime = useMockRuntime();
@@ -60,7 +74,9 @@ export function FinalVideoStep() {
   const previewVariant = approvedStyle === "clay" ? 1 : approvedStyle === "clean" ? 2 : 0;
   const playableVideo = getPlayableFinalVideo(runtime, projectId, lessonId);
   const hasVideoSource = playableVideo !== null;
-  const videoSourceKey = playableVideo ? `${playableVideo.src}\n${playableVideo.mimeType}` : "";
+  const videoSourceKey = playableVideo
+    ? `${playableVideo.src}\n${playableVideo.mimeType}\n${playableVideo.subtitleSrc ?? ""}\n${playableVideo.subtitleFormat ?? ""}`
+    : "";
   const mediaConfirmed = isFinalVideoMediaConfirmed(runtime, projectId, lessonId, playableVideo);
   const nodeState = runtime.nodeStates[`${projectId}:${lessonId}:final-video`];
   const stale = nodeState?.status === "stale";
@@ -199,7 +215,7 @@ export function FinalVideoStep() {
     if (!playableVideo || !videoReady) return;
     saveMockDraft(
       finalVideoMediaConfirmationKey(projectId, lessonId),
-      { mimeType: playableVideo.mimeType, src: playableVideo.src, status: "confirmed" },
+      mediaConfirmationValue(playableVideo, "confirmed"),
       { lessonId, nodeKey: "final-video", projectId },
     );
     updateMockNodeState(projectId, lessonId, "final-video", {
@@ -218,7 +234,7 @@ export function FinalVideoStep() {
     setVideoLoad({ key: videoSourceKey, status: "error" });
     saveMockDraft(
       finalVideoMediaConfirmationKey(projectId, lessonId),
-      { mimeType: playableVideo.mimeType, src: playableVideo.src, status: "unavailable" },
+      mediaConfirmationValue(playableVideo, "unavailable"),
       { lessonId, nodeKey: "final-video", projectId },
     );
     if (nodeApproved) {
@@ -264,7 +280,7 @@ export function FinalVideoStep() {
               onClick={() => {
                 saveMockDraft(
                   finalVideoMediaConfirmationKey(projectId, lessonId),
-                  { mimeType: playableVideo.mimeType, src: playableVideo.src, status: "pending" },
+                  mediaConfirmationValue(playableVideo, "pending"),
                   { lessonId, nodeKey: "final-video", projectId },
                 );
                 updateMockNodeState(projectId, lessonId, "final-video", {
@@ -344,11 +360,11 @@ export function FinalVideoStep() {
                 key={`${videoSourceKey}:${String(videoReloadKey)}`}
                 onCanPlay={() => setVideoLoad({ key: videoSourceKey, status: "ready" })}
                 onError={markVideoError}
-                onLoadedMetadata={() => setVideoLoad({ key: videoSourceKey, status: "ready" })}
+                onLoadedData={() => setVideoLoad({ key: videoSourceKey, status: "ready" })}
                 preload="metadata"
               >
                 <source src={playableVideo.src} type={playableVideo.mimeType} />
-                {playableVideo.subtitleSrc ? (
+                {playableVideo.subtitleSrc && playableVideo.subtitleFormat === "vtt" ? (
                   <track
                     default
                     kind="subtitles"

@@ -74,6 +74,7 @@ describe("delivery requirements", () => {
         mimeType: "video/mp4",
         src: "https://cdn.example.com/final.mp4",
         subtitleSrc: "https://cdn.example.com/final.srt",
+        subtitleFormat: "srt",
       },
       { lessonId: demoLessonId, nodeKey: "final-video", projectId: demoProjectId },
     );
@@ -106,6 +107,8 @@ describe("delivery requirements", () => {
       {
         mimeType: "video/mp4",
         src: "https://cdn.example.com/final.mp4",
+        subtitleFormat: "srt",
+        subtitleSrc: "https://cdn.example.com/final.srt",
         status: "confirmed",
       },
       { lessonId: demoLessonId, nodeKey: "final-video", projectId: demoProjectId },
@@ -123,6 +126,95 @@ describe("delivery requirements", () => {
       },
       status: "approved",
     });
+  });
+
+  it("字幕来源或格式变化会让已准备交付失效", () => {
+    store.updateNodeState(demoProjectId, demoLessonId, "final-video", { status: "approved" });
+    const mediaKey = `project:${demoProjectId}:lesson:${demoLessonId}:final-video:media`;
+    store.saveDraft(
+      mediaKey,
+      {
+        mimeType: "video/mp4",
+        src: "https://cdn.example.com/final.mp4",
+        subtitleMimeType: "text/vtt",
+        subtitleUrl: "https://cdn.example.com/first.vtt",
+      },
+      { lessonId: demoLessonId, nodeKey: "final-video", projectId: demoProjectId },
+    );
+    store.saveDraft(
+      finalVideoMediaConfirmationKey(demoProjectId, demoLessonId),
+      {
+        mimeType: "video/mp4",
+        src: "https://cdn.example.com/final.mp4",
+        subtitleFormat: "vtt",
+        subtitleSrc: "https://cdn.example.com/first.vtt",
+        status: "confirmed",
+      },
+      { lessonId: demoLessonId, nodeKey: "final-video", projectId: demoProjectId },
+    );
+
+    const before = createDeliveryFingerprint(store.getState(), demoProjectId);
+    store.saveDraft(
+      mediaKey,
+      {
+        mimeType: "video/mp4",
+        src: "https://cdn.example.com/final.mp4",
+        subtitleMimeType: "application/x-subrip",
+        subtitleUrl: "https://cdn.example.com/second.srt",
+      },
+      { lessonId: demoLessonId, nodeKey: "final-video", projectId: demoProjectId },
+    );
+
+    const after = createDeliveryFingerprint(store.getState(), demoProjectId);
+    const requirement = buildDeliveryRequirements(store.getState(), demoProjectId).find(
+      (item) => item.key === `${demoLessonId}:final-video`,
+    );
+    expect(after).not.toBe(before);
+    expect(requirement).toMatchObject({ status: "not_ready" });
+    expect(requirement?.media).toBeUndefined();
+  });
+
+  it("VTT 字幕在交付清单中保留真实扩展名", () => {
+    updateMockNodeState(demoProjectId, demoLessonId, "final-video", { status: "approved" });
+    saveMockDraft(
+      `project:${demoProjectId}:lesson:${demoLessonId}:final-video:media`,
+      {
+        mimeType: "video/mp4",
+        src: "https://cdn.example.com/final.mp4",
+        subtitleMimeType: "text/vtt",
+        subtitleUrl: "https://cdn.example.com/final.vtt",
+      },
+      { lessonId: demoLessonId, nodeKey: "final-video", projectId: demoProjectId },
+    );
+    saveMockDraft(
+      finalVideoMediaConfirmationKey(demoProjectId, demoLessonId),
+      {
+        mimeType: "video/mp4",
+        src: "https://cdn.example.com/final.mp4",
+        subtitleFormat: "vtt",
+        subtitleSrc: "https://cdn.example.com/final.vtt",
+        status: "confirmed",
+      },
+      { lessonId: demoLessonId, nodeKey: "final-video", projectId: demoProjectId },
+    );
+
+    render(
+      createElement(
+        MemoryRouter,
+        { initialEntries: [`/projects/${demoProjectId}/delivery`] },
+        createElement(
+          Routes,
+          null,
+          createElement(Route, {
+            element: createElement(DeliveryPage),
+            path: "/projects/:projectId/delivery",
+          }),
+        ),
+      ),
+    );
+
+    expect(screen.getByText(/_课堂导入字幕\.vtt$/)).toBeInTheDocument();
+    expect(screen.queryByText(/_课堂导入字幕\.srt$/)).not.toBeInTheDocument();
   });
 
   it("changes the delivery fingerprint when the current saved result changes", () => {
