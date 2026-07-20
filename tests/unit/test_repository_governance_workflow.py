@@ -24,3 +24,10 @@ def test_repository_check_prefers_the_linux_project_virtual_environment() -> Non
     text = CHECK_SCRIPT.read_text(encoding="utf-8")
 
     assert '"$repo_root/.venv/bin/python"' in text
+
+
+def test_repository_check_isolates_its_git_index() -> None:
+    text = CHECK_SCRIPT.read_text(encoding="utf-8")
+
+    assert 'source "$repo_root/scripts/readonly_git_index.sh"' in text
+    assert "prepare_readonly_git_index" in text
