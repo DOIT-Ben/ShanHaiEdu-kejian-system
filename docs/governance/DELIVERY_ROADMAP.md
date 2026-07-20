@@ -96,11 +96,11 @@
 - 三类九套导入作为独立版本化附属成果。
 - 每个节点支持返修、重新生成和保留历史版本。
 - 内容包运行时先支持内置受控包；管理端导入界面可以后置。
-- 首套内置包使用已批准的23节点输入、Prompt、输出和投影合同；黄金Fixture只作为确定性开发基线，阶段出口仍使用真实教材和真实文本模型。
+- 首套内置包使用已批准的47节点目录（22个`model_generation`、13个`deterministic`、12个`human_gate`）及其输入、Prompt、输出、投影和质量/审核合同；黄金Fixture只作为确定性开发基线，阶段出口仍使用真实教材和真实文本模型。
 
 ### 启动依赖与实施波次
 
-阶段2不能从通用执行器直接开工。先关闭Provider、当前合同、内容发布、公共Prompt、关系语义、Attempt恢复和模块边界门禁，再进入跨模块原子执行。每个Issue继续使用独立短分支和Draft PR；同一文件、同一机器合同或同一跨模块事务所有者存在竞争写入时，即使未达到三个任务上限也不得并发。
+阶段2不能从通用执行器直接开工。先关闭Provider、当前合同、内容发布、公共Prompt、关系语义、Attempt恢复、Prompt收窄和#130输出投影门禁，再进入跨模块原子执行。每个Issue继续使用独立短分支和Draft PR；同一文件、同一机器合同或同一跨模块事务所有者存在竞争写入时，即使未达到三个任务上限也不得并发。
 
 1. 首个动作只恢复[Issue #61](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/61)：从最新`main`校准既有Draft PR，确认Provider中立合同、确定性Fake和统一网关边界，不在旧准备提交上继续堆实现。
 2. 第一波最多并行#61、[Issue #85](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/85)和[Issue #88](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/88)。三者分别拥有模型调用基础、当前/规划API分层和黄金ContentRelease发布，禁止跨入彼此所有权。

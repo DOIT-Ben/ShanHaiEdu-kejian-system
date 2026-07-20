@@ -3,9 +3,9 @@
   "package": {
     "package_key": "shanhai.primary_math.courseware",
     "name": "小学数学标准课件生产内容包",
-    "semantic_version": "1.0.0",
+    "semantic_version": "1.1.0",
     "runtime_constraint": ">=0.1.0 <1.0.0",
-    "change_summary": "冻结首套课时、教案、导入、PPT、图片、视频和音频业务生成合同。"
+    "change_summary": "发布显式47节点拓扑、22个模型节点输出持久化、质量报告/人工门禁声明和受限Artifact/CreationPackage投影合同；保留首套课时、教案、导入、PPT、图片、视频和音频业务生成合同。"
   },
   "styles": [
     {

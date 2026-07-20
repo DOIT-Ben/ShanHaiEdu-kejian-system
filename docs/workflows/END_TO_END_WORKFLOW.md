@@ -18,6 +18,8 @@ flowchart TD
     Plan --> Delivery
 ```
 
+上图是业务分支概览，不是完整可执行节点图。可执行拓扑以`WorkflowNodeGenerationBinding v2`与`WorkflowRegistry`解析的发布`graph_json`为准；`dependencies`只表达同`execution_scope/branch_key`内的直接生产者，跨组事实通过输入合同和Context白名单解析。
+
 教案正文和课堂导入设计是课时划分后的兄弟产物。三类九套默认作为教案正文之后的独立附录展示，但两者状态、版本和审核互不阻塞。PPT依赖已批准教案；视频依赖已选择导入方案，不读取教案正文。PPT与视频互不依赖。
 
 ### 节点配置边界
@@ -41,13 +43,15 @@ flowchart TD
 
 ### 首套内置生成基线
 
-`shanhai.primary_math.courseware@1.0.0`是首套可执行业务内容基线。其声明源位于`workflow/builtin/primary_math_courseware/generation-source.json`，确定性构建后为现行目录中的22个`model_generation`节点各提供：
+`shanhai.primary_math.courseware@1.1.0`是当前首套可执行业务内容基线；`1.0.0`已发布Release与既有项目绑定不改写。其声明源位于`workflow/builtin/primary_math_courseware/generation-source.json`，确定性构建后为47节点目录中的22个`model_generation`节点各提供：
 
 - 教师输入、系统补全和Context注入字段；
 - 可编辑业务Prompt与只读方法、质量门；
 - 结构化输出字段、必填/可编辑/可删/重复语义；
 - 教师可读投影和GenerationTemplate引用；
 - 逻辑模型能力和风格预设，不含Provider名称、密钥或私有参数。
+
+每个模型节点还声明不可变Artifact输出投影；非package节点只形成Artifact，package节点在Artifact版本落库取得版本ID后再形成CreationPackage。当前目录同时声明13个`deterministic`节点和12个`human_gate`节点；这些声明不等于#89执行器、真实Provider或业务validator已经实现。
 
 “1～5的认识”黄金项目只提交教材哈希、物理页3～5与印刷页14～16映射、脱敏证据和结构期望。它验证教案、PPT和视频可从各自固定输入独立启动，并明确禁止视频读取教案、教材和PPT。普通CI据此使用确定性Fixture；真实文本、图片和视频调用仍必须在对应适配器任务及阶段出口单独冒烟，不能用内容包通过替代。TTS仅保留未来音频计划数据，待音频Provider可用后独立验收。
 

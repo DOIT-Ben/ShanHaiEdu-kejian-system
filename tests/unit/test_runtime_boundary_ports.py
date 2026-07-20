@@ -64,6 +64,7 @@ def test_generated_artifact_write_carries_immutable_relation_declarations() -> N
 
     write = GeneratedArtifactWrite(
         project_id=uuid4(),
+        lesson_unit_id=None,
         node_run_id=uuid4(),
         context_snapshot_id=uuid4(),
         prompt_snapshot_id=uuid4(),
@@ -127,6 +128,24 @@ def test_generated_relation_accepts_canonical_uuid7_source_id() -> None:
     )
 
     assert relation.from_artifact_version_id == source_id
+
+
+@pytest.mark.parametrize("value", [float("nan"), b"bytes", uuid4(), {"value"}])
+def test_generated_artifact_write_rejects_non_json_content(value: object) -> None:
+    with pytest.raises(ArtifactInvariantError, match="JSON"):
+        GeneratedArtifactWrite(
+            project_id=uuid4(),
+            lesson_unit_id=None,
+            node_run_id=uuid4(),
+            context_snapshot_id=uuid4(),
+            prompt_snapshot_id=uuid4(),
+            artifact_key="lesson.01.plan",
+            artifact_type="lesson_plan",
+            branch_key="lesson_plan",
+            content={"value": value},
+            content_definition_version_id=uuid4(),
+            request_id="req-json",
+        )
 
 
 def test_backend_boundary_document_records_ports_and_live_size_baseline() -> None:

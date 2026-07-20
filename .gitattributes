@@ -2,4 +2,5 @@
 *.sh text eol=lf
 *.sha256 text eol=lf
 /contracts/fixtures/primary-math-courseware-package/** text eol=lf
+/contracts/fixtures/workflow-node-generation-bindings/primary-math-courseware.json text eol=lf
 /docs/workflows/generation-guide/*.md text eol=lf
