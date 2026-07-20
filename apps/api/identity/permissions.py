@@ -63,6 +63,22 @@ class ProjectAccessService:
             )
         return project
 
+    def require_owner(self, project_id: UUID) -> Project:
+        project = self.require(project_id, ProjectAction.REVIEW, for_update=True)
+        role = self._session.scalar(
+            select(ProjectMember.role).where(
+                ProjectMember.project_id == project_id,
+                ProjectMember.user_id == self._actor.user_id,
+            )
+        )
+        if role != ProjectRole.OWNER.value:
+            raise ApiError(
+                status_code=403,
+                code="PERMISSION_DENIED",
+                message="Only a project owner can revoke an approval.",
+            )
+        return project
+
     @staticmethod
     def _not_found() -> ApiError:
         return ApiError(

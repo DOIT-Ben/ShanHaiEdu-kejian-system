@@ -257,7 +257,7 @@ class ArtifactRelation(Base):
         ),
         CheckConstraint(
             "shanhai_is_canonical_impact_scope(impact_scope_json)",
-            name="impact_scope_allowed",
+            name="ck_artifact_relations_impact_scope_allowed",
         ),
         Index(
             "uq_artifact_relations_versions_binding",

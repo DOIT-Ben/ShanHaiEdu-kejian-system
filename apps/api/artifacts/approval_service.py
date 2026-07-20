@@ -48,6 +48,7 @@ class ArtifactApprovalService:
         version, artifact = self._relations.lock_review_target(
             version_id=version.id,
             project_id=artifact.project_id,
+            require_owner=resolved_action is ApprovalAction.REVOKE,
         )
         if resolved_action is ApprovalAction.APPROVE:
             return self._approve(

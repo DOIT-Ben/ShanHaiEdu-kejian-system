@@ -2,6 +2,23 @@
   "version": 1,
   "transitions": [
     {
+      "id": "issue-86-artifact-stale-reason-contract",
+      "issue": 86,
+      "reason": "Apply Decision #135 and publish the strict ArtifactStaleReason contract for Artifact and NodeRun projections.",
+      "base_contract_sha256": "e42900bfc85d262c176669b4aa06cefef5656b5a2594809d702e15e14ae1b580",
+      "current_contract_sha256": "4bf472d4612fc511467e4bb21a0f5ce7123d8db6c322127f1c7f35630041c96a",
+      "breaking_errors_sha256": "31a81a5f8b98c3d10af5e32524d73a6198732e4806746b155349e6adb8356810",
+      "breaking_errors": [
+        "GET /artifacts/{artifact_id} response 200 application/json.data.stale_reason: no backward-compatible schema branch remains",
+        "GET /projects/{project_id}/workflow response 200 application/json.data.node_runs[].stale_reason: no backward-compatible schema branch remains",
+        "POST /projects/{project_id}/artifacts response 201 application/json.data.stale_reason: no backward-compatible schema branch remains",
+        "components.schemas.Artifact.stale_reason: no backward-compatible schema branch remains",
+        "components.schemas.ArtifactEnvelope.data.stale_reason: no backward-compatible schema branch remains",
+        "components.schemas.NodeRun.stale_reason: no backward-compatible schema branch remains",
+        "components.schemas.WorkflowEnvelope.data.node_runs[].stale_reason: no backward-compatible schema branch remains"
+      ]
+    },
+    {
       "id": "issue-51-prompt-preview-public-projection",
       "issue": 51,
       "reason": "Remove private Context, locked layer, and output Schema metadata from the teacher-facing Prompt Preview contract while retaining it in the server-side PromptSnapshot.",

@@ -97,6 +97,21 @@ def test_stale_selection_intersects_keyed_scope_and_preserves_all_scope() -> Non
     )
 
 
+def test_stale_selection_rejects_invalid_runtime_shapes() -> None:
+    with pytest.raises(ArtifactInvariantError, match="mode is invalid"):
+        StaleImpactSelection(mode="bogus")  # type: ignore[arg-type]
+    with pytest.raises(ArtifactInvariantError, match="cannot have dimensions"):
+        StaleImpactSelection(
+            mode="all",
+            dimensions=(StaleImpactDimension(selector=ImpactSelector.LESSON_KEY),),
+        )
+    with pytest.raises(ArtifactInvariantError, match="keys must be non-empty"):
+        StaleImpactDimension(
+            selector=ImpactSelector.LESSON_KEY,
+            changed_keys=(1,),  # type: ignore[arg-type]
+        )
+
+
 def test_relation_type_policy_excludes_supersedes_from_stale_graph() -> None:
     assert ArtifactRelationType.DERIVES_FROM.participates_in_dag is True
     assert ArtifactRelationType.SUPERSEDES.participates_in_dag is False

@@ -41,10 +41,13 @@ class ArtifactRelationService:
         version_id: UUID,
         project_id: UUID,
         action: ProjectAction = ProjectAction.REVIEW,
+        require_owner: bool = False,
     ) -> tuple[ArtifactVersion, Artifact]:
         """Acquire the shared write order before approval mutates an artifact."""
         self._lock_relation_graph()
         self._require_project(project_id, action=action, for_update=True)
+        if require_owner and not self._actor.is_system:
+            ProjectAccessService(self._session, self._actor).require_owner(project_id)
         record = self._repository.get_version(version_id, for_update_artifact=True)
         if record is None or record[1].project_id != project_id:
             raise self._not_found()
@@ -83,8 +86,20 @@ class ArtifactRelationService:
         self._require_project(
             source_artifact.project_id, action=ProjectAction.EDIT, for_update=True
         )
-        locked_source = self._repository.get_version(source_version.id, for_update_artifact=True)
-        locked_target = self._repository.get_version(target_version.id, for_update_artifact=True)
+        if str(source_artifact.id) <= str(target_artifact.id):
+            locked_source = self._repository.get_version(
+                source_version.id, for_update_artifact=True
+            )
+            locked_target = self._repository.get_version(
+                target_version.id, for_update_artifact=True
+            )
+        else:
+            locked_target = self._repository.get_version(
+                target_version.id, for_update_artifact=True
+            )
+            locked_source = self._repository.get_version(
+                source_version.id, for_update_artifact=True
+            )
         if locked_source is None or locked_target is None:
             raise self._not_found()
         source_version, source_artifact = locked_source
