@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from scripts.check_pull_request_status import (
     parse_numstat,
+    validate_minimal_implementation_declaration,
     validate_review_declaration,
     validate_size_declaration,
     validate_status_declaration,
@@ -20,6 +21,10 @@ SIZE_WITHIN = "- [x] `pr-size-within-limit`: within limit"
 SIZE_MAP_REQUIRED = "- [x] `pr-size-review-map-required`: map required"
 SIZE_WITHIN_UNCHECKED = "- [ ] `pr-size-within-limit`: within limit"
 SIZE_MAP_UNCHECKED = "- [ ] `pr-size-review-map-required`: map required"
+MINIMAL_REVIEWED = "- [x] `minimal-implementation-reviewed`: reviewed"
+MINIMAL_EXCEPTION = "- [x] `minimal-implementation-exception`: exception"
+MINIMAL_REVIEWED_UNCHECKED = "- [ ] `minimal-implementation-reviewed`: reviewed"
+MINIMAL_EXCEPTION_UNCHECKED = "- [ ] `minimal-implementation-exception`: exception"
 
 
 def review_section(
@@ -242,3 +247,41 @@ def test_parse_numstat_counts_binary_and_preserves_text_rename() -> None:
     output = "4\t1\tmodule.py\n-\t-\tasset.zip\n0\t0\told.py => new.py\n"
 
     assert parse_numstat(output) == (4, 1, 1)
+
+
+def test_minimal_implementation_declaration_keeps_legacy_pr_body_compatible() -> None:
+    assert validate_minimal_implementation_declaration("legacy PR body") == []
+
+
+def test_minimal_implementation_declaration_requires_block_for_current_prs() -> None:
+    assert validate_minimal_implementation_declaration("PR body", required=True) == [
+        "PR must select exactly one minimal implementation declaration"
+    ]
+
+
+def test_minimal_implementation_declaration_requires_exactly_one_choice() -> None:
+    assert validate_minimal_implementation_declaration(
+        f"{MINIMAL_REVIEWED_UNCHECKED}\n{MINIMAL_EXCEPTION_UNCHECKED}",
+        required=True,
+    ) == ["PR must select exactly one minimal implementation declaration"]
+    assert validate_minimal_implementation_declaration(
+        f"{MINIMAL_REVIEWED}\n{MINIMAL_EXCEPTION}",
+        required=True,
+    ) == ["PR must select exactly one minimal implementation declaration"]
+
+
+def test_minimal_implementation_declaration_accepts_reviewed_or_exception() -> None:
+    assert (
+        validate_minimal_implementation_declaration(
+            f"{MINIMAL_REVIEWED}\n{MINIMAL_EXCEPTION_UNCHECKED}",
+            required=True,
+        )
+        == []
+    )
+    assert (
+        validate_minimal_implementation_declaration(
+            f"{MINIMAL_REVIEWED_UNCHECKED}\n{MINIMAL_EXCEPTION}",
+            required=True,
+        )
+        == []
+    )

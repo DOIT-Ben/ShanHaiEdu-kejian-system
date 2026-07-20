@@ -101,8 +101,10 @@ See `docs/governance/DOCUMENT_POLICY.md` for placement and lifecycle rules.
 - Remove dead code in the same change. Do not keep commented-out implementations, `.old`, `.bak`, `_copy` or `_final` files.
 - A temporary feature flag must link to a removal Issue and target milestone.
 - The third repetition of business logic must be extracted or explicitly justified.
-- Files over 400 lines, functions over 60 lines and React components over 250 lines trigger a split-or-explain review.
-- Pull Requests over 20 business source files or 800 net non-generated lines require a review map and a reason they cannot be divided.
+- Size thresholds are review triggers, not automatic quality conclusions: files over 400 lines, functions over 60 lines and React components over 250 lines trigger a split-or-explain review. The reviewer decides from responsibility cohesion, cognitive complexity and available simpler alternatives whether the boundary should be split or retained.
+- Pull Requests over 20 business source files or 800 net non-generated lines require a review map and a reason they cannot be divided; generated code, schemas, migrations and focused fixtures may be exempt when the review map explains their ownership and necessity.
+- Every substantive PR must declare a minimal-implementation review. The default is the smallest sufficient design using existing patterns. A complexity exception must name the cohesive responsibility, the simpler alternatives considered, and why they would make behavior or ownership worse; speculative extensibility, pass-through wrappers, one-implementation factories/strategies and premature generalization are not valid exceptions.
+- Do not split code solely to satisfy a line count, compress readable code into dense expressions, or move complexity between files and layers. The accepted implementation is the one that removes the most concepts while preserving behavior, contracts, tests and module ownership.
 
 Generated code, schemas, migrations and focused fixtures may exceed size triggers but must remain isolated.
 

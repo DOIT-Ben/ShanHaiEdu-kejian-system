@@ -25,6 +25,12 @@ SIZE_DECLARATION = re.compile(
     r"`(?P<choice>pr-size-(?:within-limit|review-map-required))`",
     re.MULTILINE,
 )
+MINIMAL_MARKER = re.compile(r"`minimal-implementation-(?:reviewed|exception)`")
+MINIMAL_DECLARATION = re.compile(
+    r"^-\s*\[(?P<checked>[ xX])\]\s*"
+    r"`(?P<choice>minimal-implementation-(?:reviewed|exception))`",
+    re.MULTILINE,
+)
 MARKDOWN_H2_SECTION = re.compile(
     r"^##[ \t]+.*?(?=^##[ \t]+|\Z)",
     re.MULTILINE | re.DOTALL,
@@ -144,6 +150,22 @@ def validate_size_declaration(
     return []
 
 
+def validate_minimal_implementation_declaration(body: str, *, required: bool = False) -> list[str]:
+    if MINIMAL_MARKER.search(body) is None:
+        if required:
+            return ["PR must select exactly one minimal implementation declaration"]
+        return []
+
+    choices = [
+        match.group("choice")
+        for match in MINIMAL_DECLARATION.finditer(body)
+        if match.group("checked").lower() == "x"
+    ]
+    if len(choices) != 1:
+        return ["PR must select exactly one minimal implementation declaration"]
+    return []
+
+
 def changed_files(base_sha: str, head_sha: str) -> set[str]:
     result = subprocess.run(
         ["git", "diff", "--name-only", f"{base_sha}...{head_sha}"],
@@ -220,6 +242,12 @@ def main() -> int:
             additions,
             deletions,
             binary_file_count,
+            required=declarations_required,
+        )
+    )
+    errors.extend(
+        validate_minimal_implementation_declaration(
+            args.body,
             required=declarations_required,
         )
     )
