@@ -39,6 +39,8 @@ class NodeExecutionService:
         cancellation: CancellationToken | None = None,
     ) -> CommittedNodeExecution:
         prepared = self._prepare(node_run_id, request_id)
+        if prepared.committed_result is not None:
+            return prepared.committed_result
         try:
             result = await self._model.generate_text(
                 prepared.request,
@@ -71,6 +73,13 @@ class NodeExecutionService:
         try:
             with self._transactions.begin() as transaction:
                 return transaction.commit(prepared, output, result)
+        except NodeExecutionError as exc:
+            if exc.code == "NODE_EXECUTION_CANCEL_REQUESTED":
+                self._terminalize(prepared, exc.code, cancelled=True)
+                raise
+            code = "NODE_EXECUTION_COMMIT_FAILED"
+            self._terminalize(prepared, code, cancelled=False)
+            raise NodeExecutionError(code, "node execution commit failed") from exc
         except Exception as exc:
             code = "NODE_EXECUTION_COMMIT_FAILED"
             self._terminalize(prepared, code, cancelled=False)

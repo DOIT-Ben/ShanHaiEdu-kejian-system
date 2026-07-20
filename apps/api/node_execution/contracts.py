@@ -12,6 +12,14 @@ from apps.api.model_gateway.contracts import (
     TextGatewayResult,
     TextModelRequest,
 )
+from apps.api.runtime_boundary.ports import (
+    ArtifactContextVersion,
+    FrozenSnapshotRefs,
+    ReferenceAssetAuthorization,
+    RuntimeNodeDefinition,
+    TargetSlotAuthorization,
+    WorkflowExecutionContext,
+)
 
 
 class NodeExecutionError(ValueError):
@@ -21,11 +29,24 @@ class NodeExecutionError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class NodeExecutionCommitContext:
+    definition: RuntimeNodeDefinition
+    execution: WorkflowExecutionContext
+    snapshots: FrozenSnapshotRefs
+    upstream_artifacts: dict[str, ArtifactContextVersion]
+    runtime_values: dict[str, Any]
+    target_slot_authorization: TargetSlotAuthorization | None = None
+    reference_asset_authorization: ReferenceAssetAuthorization | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class PreparedNodeExecution:
     node_run_id: UUID
     request: TextModelRequest
     audit_context: ModelAuditContext
     output_schema: dict[str, object]
+    commit_context: NodeExecutionCommitContext | None = None
+    committed_result: CommittedNodeExecution | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +54,8 @@ class CommittedNodeExecution:
     node_run_id: UUID
     artifact_version_id: UUID
     creation_package_id: UUID | None
+    attempt_id: UUID | None = None
+    usage_id: UUID | None = None
 
 
 class NodeExecutionTransaction(Protocol):

@@ -41,6 +41,11 @@ class CreationPackage(Base):
             "source_project_id",
             "source_node_run_id",
         ),
+        Index(
+            "ix_creation_packages_source_artifact_version",
+            "organization_id",
+            "source_artifact_version_id",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
@@ -56,6 +61,12 @@ class CreationPackage(Base):
     )
     source_node_run_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("node_runs.id", ondelete="RESTRICT"), nullable=False
+    )
+    source_artifact_version_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("artifact_versions.id", ondelete="RESTRICT")
+    )
+    lesson_unit_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("lesson_units.id", ondelete="RESTRICT")
     )
     context_snapshot_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("context_snapshots.id", ondelete="RESTRICT"), nullable=False
@@ -103,6 +114,7 @@ class CreationPackageItem(Base):
     business_prompt: Mapped[str] = mapped_column(Text, nullable=False)
     prompt_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     reference_asset_version_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    reference_assets_json: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
     output_spec_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     target_slot_key: Mapped[str] = mapped_column(String(160), nullable=False)
     consistency_key: Mapped[str | None] = mapped_column(String(160))

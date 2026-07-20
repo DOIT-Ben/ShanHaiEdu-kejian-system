@@ -2,9 +2,9 @@
 
 更新时间：2026-07-20
 
-验证基线：`main`；#130与PR #141已经合并，`1.1.0`/v2仍须通过#146安全加固与PostgreSQL前向发布复验后才能成为新项目默认；实现事实以本文件所在提交的代码、迁移和测试为准，任务状态以链接的GitHub Issue和Pull Request为准
+验证基线：`main`；#130与PR #141、#146与PR #148已经合并，`1.1.0`/v2继续保持已发布候选与旧项目绑定不变；实现事实以本文件所在提交的代码、迁移和测试为准，任务状态以链接的GitHub Issue和Pull Request为准
 
-当前阶段：阶段0出口尚未关闭；阶段1通用口径校准、后端轨道、首套业务机器合同和后端治理审计已经关闭，阶段2后端已经合并Prompt公共投影、Attempt恢复、Prompt合同收窄和#130输出投影，当前由#146收口合并后发现的安全与发布固定性缺口；#146合并前#89保持阻塞
+当前阶段：阶段0出口尚未关闭；阶段1通用口径校准、后端轨道、首套业务机器合同和后端治理审计已经关闭，阶段2共享运行时已完成#146安全与发布固定性收口，#89通用节点执行器已在PR #147完成实现与PostgreSQL门禁，待最终独立审查和合并
 
 本文件只描述现在，不保存开发日志。任务细节、负责人、讨论和交接以GitHub Issue与Pull Request为准。
 
@@ -48,20 +48,20 @@
 - [Decision #73](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/73)已经批准：PPT通常推荐10至20页，视频按故事和服务端价格事实推荐60至180秒，教师可以覆盖；TTS延后独立实施。
 - [Issue #48](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/48)：全流程生成节点与可配置模型I/O绑定的父任务当前为`status:in-progress`；黄金内容包`1.0.0`已正式发布，通用执行器由#89承接。
 - [Issue #86](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/86)：已由PR #138合并关闭，统一ArtifactRelation类型、方向与stale影响语义。
-- [Issue #146](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/146)：当前以`status:in-progress`收口#130合并后确认的Plan/DTO不可变性、拓扑消歧、Artifact血缘、旧Release固定性和发布期边界缺口。
-- [Issue #89](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/89)：Draft PR #147曾基于#130合并提交启动，但#146随后确认P0安全缺口；#146合并并在最新`main`完成新鲜门禁复验前，#89不得继续合并或把`9552d0e`视为完整安全基线。
+- [Issue #146](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/146) 与 [PR #148](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/148)：已关闭并合并，P0安全与发布固定性缺口已收口。
+- [Issue #89](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/89) 与 [PR #147](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/147)：通用执行器、两阶段事务、确定性 Fake、血缘、幂等/取消/恢复/回滚/并发和CreationPackage固定条件已完成，当前等待最终审查、Ready 与合并。
 - [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)：与生产前端完成真实合同联调；当前因Issue #4没有开放源码PR而等待，不以本地分支、ZIP或Mock代替。
 
 ## 当前阻塞
 
 - 阶段1整体产品出口仍缺少生产前端的真实API联调；后端轨道通过不代表完整阶段1产品完成。
-- #48已有机器合同和黄金数据，但主线尚无读取数据库已发布GenerationTemplate并完成Prompt/Context冻结、模型调用、结构校验和Artifact原子落库的通用执行器；#130已经合并，#146仍在修复其安全与发布固定性缺口，#89须等待#146合并后在最新`main`重新复验并更新实现基线。
+- #48的机器合同和黄金数据已由#89接入通用执行器；当前只剩PR #147的最终审查、合并后main复验和Issue关闭，不得把确定性Fake冒充真实Provider或媒体出口。
 - ShanHaiEdu已经具备Provider中立媒体基础层和Attempt租约恢复，但真实图片/视频Adapter、供应商私有状态映射与受控真实冒烟仍未实现，不能把确定性Fake或恢复基座描述为真实媒体出口。
 - TTS与实时价格计算当前不实现、不冒烟，也不阻塞教材到教案纵向链；PPTX装配、媒体生成和最终交付仍需独立Issue与真实阶段验收。
 
 ## 下一个阶段出口
 
-通用口径校准、首套业务内容合同、#100课程驱动纠偏、#88黄金内容发布、阶段1后端轨道、#51 Prompt公共投影、#90 Attempt恢复、#86关系语义、#123 Prompt合同收窄和#130输出投影已经合并；当前关闭#146安全门禁，再从最新`main`复验并恢复#89。阶段0前端联调出口继续独立等待生产前端源码交接。
+通用口径校准、首套业务内容合同、#100课程驱动纠偏、#88黄金内容发布、阶段1后端轨道、#51 Prompt公共投影、#90 Attempt恢复、#86关系语义、#123 Prompt合同收窄、#130输出投影和#146安全收口已经合并；当前完成PR #147的最终审查与合并。合并后下一项为[#125](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/125)课时划分三节点与LessonUnit原子同步，#126继续在冻结运行时端口上受控并行。阶段0前端联调出口继续独立等待生产前端源码交接。
 
 口径校准门禁必须按顺序满足：
 
@@ -82,7 +82,7 @@
 - 生产前端工程达到Issue #4的阶段0范围并通过前端门禁，源码通过PR进入`main`。
 - 前端通过#11消费当前OpenAPI、JSON Schema和SSE合同，完成真实API联调；Mock不能作为出口。
 
-进入阶段2“教材到教案纵向链路”时，#51、#88、#90、#112、#86、#123和#130已经完成或合并，当前按[交付路线](docs/governance/DELIVERY_ROADMAP.md)推进#146。任一时刻后端主任务不超过三个，修改同一合同或跨模块事务的任务不得并发。#89通用执行器必须在#146合并后从最新`main`重新复验、rebase并继续作为唯一跨模块事务owner。随后基于已发布黄金输入交付课时/教案与三类九套/选择快照；PPT/图片和视频在阶段2运行时稳定后使用独立短分支并行推进。TTS继续延后，#11等待生产前端达到联调条件。所有新任务使用仓库外隔离短worktree；同一Issue只保留一个任务分支和一个活动现场。
+进入阶段2“教材到教案纵向链路”时，#51、#88、#90、#112、#86、#123、#130和#146已经完成或合并，当前按[交付路线](docs/governance/DELIVERY_ROADMAP.md)完成PR #147并转入#125。任一时刻后端主任务不超过三个，修改同一合同或跨模块事务的任务不得并发。#125消费#89冻结端口推进课时划分与LessonUnit同步；#126仅实现教案业务校验，不复制执行器、DTO、迁移或事务边界。随后基于已发布黄金输入交付课时/教案与三类九套/选择快照；PPT/图片和视频在阶段2运行时稳定后使用独立短分支并行推进。TTS继续延后，#11等待生产前端达到联调条件。所有新任务使用仓库外隔离短worktree；同一Issue只保留一个任务分支和一个活动现场。
 
 ## 接手提示
 
@@ -94,4 +94,4 @@
 4. 被分配的Issue和PR
 5. 与任务直接相关的模块文档、合同、代码和测试
 
-新对话继续接手#146唯一任务分支和活动worktree，不恢复已撤销的云端或#130现场；#89与PR #147须等待#146合并后重新绑定最新`main`。#88正式发布的`1.0.0`及既有项目绑定必须保持不变；`1.1.0`/v2在#146与PostgreSQL前向发布复验完成前仍是候选。当前API客户端只从runtime合同生成，planned合同不可用于联调。不得从外部旧Skill恢复七部分教案、固定50秒视频、视频读取教案/PPT、第二套DTO或把TemplateDraft编译器当成模型执行运行时。
+新对话先接手PR #147的最终审查与合并证据，再进入#125的独立任务分支；不恢复已撤销的云端或#130现场。#88正式发布的`1.0.0`及既有项目绑定必须保持不变；`1.1.0`/v2继续是候选。当前API客户端只从runtime合同生成，planned合同不可用于联调。不得从外部旧Skill恢复七部分教案、固定50秒视频、视频读取教案/PPT、第二套DTO或把TemplateDraft编译器当成模型执行运行时。

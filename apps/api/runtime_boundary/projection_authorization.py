@@ -13,6 +13,7 @@ from apps.api.runtime_boundary.ports import (
 )
 from apps.api.runtime_boundary.projection_values import (
     OutputProjectionError,
+    plain_json_value,
     require_mapping,
     require_text_sequence,
 )
@@ -115,10 +116,11 @@ def validate_reference_asset_projection(package: Mapping[str, Any]) -> None:
         item_mapping.get("reference_assets"),
         "OUTPUT_PROJECTION_REFERENCE_ASSET_SOURCE_INVALID",
     )
-    allowed = reference_assets == {
+    normalized = plain_json_value(reference_assets)
+    allowed = normalized == {
         "source": "runtime",
         "pointer": "/reference_assets",
-    } or reference_assets == {"source": "constant", "value": []}
+    } or normalized == {"source": "constant", "value": []}
     if not allowed:
         raise OutputProjectionError(
             "OUTPUT_PROJECTION_REFERENCE_ASSET_SOURCE_INVALID",
