@@ -4,18 +4,18 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from apps.api.artifacts.repository import ArtifactRepository
 from apps.api.artifacts.models import ArtifactRelation
+from apps.api.artifacts.repository import ArtifactRepository
 from apps.api.artifacts.service import ArtifactService
 from apps.api.content_runtime.registry import BUILTIN_CONTENT_DEFINITION_VERSION_ID
 from apps.api.creation.models import CreationPackage
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import ApiError
+from apps.api.ids import new_uuid7
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.reliability.models import EventStreamEntry
 from apps.api.workflows.models import NodeRun
-from apps.api.ids import new_uuid7
 from tests.fakes.identity import seed_test_actor
 from tests.integration.test_creation_lifecycle import seed_project_package
 
@@ -295,3 +295,12 @@ def test_revoking_an_upstream_approval_marks_real_downstream_stale(
         assert downstream.stale_reason_json is not None
         assert downstream.stale_reason_json["reason_code"] == "UPSTREAM_APPROVAL_REVOKED"
         assert downstream.stale_reason_json["replacement_version_id"] is None
+        stale_event = session.scalar(
+            select(EventStreamEntry).where(
+                EventStreamEntry.event_type == "workflow.downstream_stale.propagated"
+            )
+        )
+        assert stale_event is not None
+        assert stale_event.summary_json["payload"]["reason_code"] == (
+            "UPSTREAM_APPROVAL_REVOKED"
+        )

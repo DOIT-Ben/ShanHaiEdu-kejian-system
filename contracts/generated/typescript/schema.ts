@@ -965,7 +965,7 @@ export interface components {
             run_no?: number;
             status: components["schemas"]["workflow-node-status.schema"];
             title?: string;
-            stale_reason?: Record<string, never> | null;
+            stale_reason?: components["schemas"]["artifact-stale-reason.schema"] | null;
             /** Format: date-time */
             started_at?: string | null;
             /** Format: date-time */
@@ -1377,7 +1377,7 @@ export interface components {
             content_definition_version_id: string;
             /** @enum {unknown} */
             status: "draft" | "in_review" | "approved" | "stale" | "archived";
-            stale_reason: Record<string, never> | null;
+            stale_reason: components["schemas"]["artifact-stale-reason.schema"] | null;
             lock_version: number;
             current_draft: components["schemas"]["ArtifactDraft"] | null;
             current_submitted_version: components["schemas"]["ArtifactVersion"] | null;
@@ -1437,6 +1437,54 @@ export interface components {
          * @enum {string}
          */
         "workflow-node-status.schema": "disabled" | "not_ready" | "ready" | "draft" | "queued" | "running" | "review_required" | "approved" | "partially_completed" | "failed" | "paused" | "cancel_requested" | "cancelled" | "stale" | "skipped";
+        all_scope: {
+            /** @constant */
+            mode: "all";
+        };
+        keyed_scope: {
+            /** @constant */
+            mode: "keyed";
+            /** @constant */
+            selector: "lesson_key";
+            keys: string[];
+        };
+        impact_scope: components["schemas"]["all_scope"] | components["schemas"]["keyed_scope"];
+        binding: {
+            /** @enum {unknown} */
+            relation_type: "derives_from" | "references" | "constrains";
+            binding_key: string;
+            impact_scope: components["schemas"]["impact_scope"];
+        };
+        /** ArtifactStaleReason */
+        "artifact-stale-reason.schema": {
+            /** @enum {unknown} */
+            reason_code: "UPSTREAM_APPROVED_VERSION_CHANGED" | "UPSTREAM_APPROVAL_REVOKED";
+            /** Format: uuid */
+            replaced_upstream_version_id: string;
+            /** Format: uuid */
+            replacement_version_id: string | null;
+            bindings: components["schemas"]["binding"][];
+            $defs: {
+                impact_scope: components["schemas"]["all_scope"] | components["schemas"]["keyed_scope"];
+                all_scope: {
+                    /** @constant */
+                    mode: "all";
+                };
+                keyed_scope: {
+                    /** @constant */
+                    mode: "keyed";
+                    /** @constant */
+                    selector: "lesson_key";
+                    keys: string[];
+                };
+                binding: {
+                    /** @enum {unknown} */
+                    relation_type: "derives_from" | "references" | "constrains";
+                    binding_key: string;
+                    impact_scope: components["schemas"]["impact_scope"];
+                };
+            };
+        } & unknown;
         /** @enum {unknown} */
         tendency: "science" | "application" | "story";
         option: {

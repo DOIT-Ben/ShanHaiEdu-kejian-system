@@ -145,7 +145,13 @@ class ArtifactApprovalService:
             },
             request_id,
         )
-        self._append_stale_event(artifact, version.id, stale_ids, request_id)
+        self._append_stale_event(
+            artifact,
+            version.id,
+            stale_ids,
+            "UPSTREAM_APPROVED_VERSION_CHANGED",
+            request_id,
+        )
         return approval
 
     def _accept_stale(
@@ -234,7 +240,13 @@ class ArtifactApprovalService:
             },
             request_id,
         )
-        self._append_stale_event(artifact, version.id, stale_ids, request_id)
+        self._append_stale_event(
+            artifact,
+            version.id,
+            stale_ids,
+            "UPSTREAM_APPROVAL_REVOKED",
+            request_id,
+        )
         return approval
 
     def _record(
@@ -295,6 +307,7 @@ class ArtifactApprovalService:
         artifact: Artifact,
         source_version_id: UUID,
         stale_ids: list[UUID],
+        reason_code: str,
         request_id: str | None,
     ) -> None:
         if not stale_ids:
@@ -306,7 +319,7 @@ class ArtifactApprovalService:
             payload={
                 "source_version_id": str(source_version_id),
                 "affected_resource_ids": [str(item) for item in stale_ids],
-                "reason_code": "UPSTREAM_APPROVED_VERSION_CHANGED",
+                "reason_code": reason_code,
             },
             request_id=request_id,
         )
