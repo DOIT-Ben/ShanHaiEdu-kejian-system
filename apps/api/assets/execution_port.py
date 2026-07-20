@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any, cast
 from uuid import UUID
 
@@ -18,6 +18,7 @@ from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.permissions import ProjectAccessService
 from apps.api.runtime_boundary.ports import (
     AssetContextItem,
+    ReferenceAssetAuthorization,
     RuntimeNodeDefinition,
     TargetSlotAuthorization,
     WorkflowExecutionContext,
@@ -141,7 +142,61 @@ class SqlAlchemyAssetPort:
             slots=slots,
         )
 
+    def freeze_reference_assets(
+        self,
+        definition: RuntimeNodeDefinition,
+        execution: WorkflowExecutionContext,
+    ) -> ReferenceAssetAuthorization | None:
+        raw_policy = cast(object, definition.node_binding.get("reference_asset_policy"))
+        if not isinstance(raw_policy, Mapping):
+            raise AssetExecutionPortError(
+                "NODE_EXECUTION_REFERENCE_ASSET_POLICY_INVALID",
+                "the published reference asset policy is invalid",
+            )
+        policy = cast(Mapping[str, Any], raw_policy)
+        mode = policy.get("mode")
+        roles = policy.get("roles")
+        if mode == "none" and roles in ([], ()):
+            return None
+        if mode not in {"optional", "required"} or not isinstance(roles, (list, tuple)):
+            raise AssetExecutionPortError(
+                "NODE_EXECUTION_REFERENCE_ASSET_POLICY_INVALID",
+                "the published reference asset policy is invalid",
+            )
+        typed_roles = cast(Sequence[object], roles)
+        if mode == "required" or any(_role_requires_asset(role) for role in typed_roles):
+            raise AssetExecutionPortError(
+                "NODE_EXECUTION_REFERENCE_ASSETS_MISSING",
+                "required reference assets were not fixed before execution",
+            )
+        assert execution.branch_key is not None
+        return ReferenceAssetAuthorization(
+            content_release_id=definition.content_release_id,
+            workflow_definition_version_id=definition.workflow_definition_version_id,
+            project_id=execution.project_id,
+            node_key=execution.node_key,
+            branch_key=execution.branch_key,
+            lesson_unit_id=execution.lesson_unit_id,
+            assets=(),
+        )
+
 
 def _hash_json(value: object) -> str:
     payload = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _role_requires_asset(value: object) -> bool:
+    if not isinstance(value, Mapping):
+        raise AssetExecutionPortError(
+            "NODE_EXECUTION_REFERENCE_ASSET_POLICY_INVALID",
+            "the published reference asset role is invalid",
+        )
+    role = cast(Mapping[str, object], value)
+    minimum = role.get("min_items")
+    if type(minimum) is not int:
+        raise AssetExecutionPortError(
+            "NODE_EXECUTION_REFERENCE_ASSET_POLICY_INVALID",
+            "the published reference asset role minimum is invalid",
+        )
+    return minimum > 0

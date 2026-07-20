@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Generator, Mapping, Sequence
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
-from typing import Any, cast
-from uuid import UUID
+from typing import Any
+from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -14,13 +14,8 @@ from apps.api.assets.execution_port import SqlAlchemyAssetPort
 from apps.api.content_runtime.runtime_port import SqlAlchemyRuntimeDefinitionReader
 from apps.api.creation.execution_port import SqlAlchemyCreationPackagePort
 from apps.api.identity.context import ActorContext
-from apps.api.model_gateway.contracts import (
-    ModelAuditContext,
-    ModelCapability,
-    TextGatewayResult,
-    TextModelRequest,
-)
-from apps.api.model_gateway.execution_port import SqlAlchemyAttemptExecutionPort
+from apps.api.model_gateway.contracts import TextGatewayResult
+from apps.api.model_gateway.execution_port import AttemptEvidence, SqlAlchemyAttemptExecutionPort
 from apps.api.node_execution.contracts import (
     CommittedNodeExecution,
     NodeExecutionCommitContext,
@@ -29,19 +24,19 @@ from apps.api.node_execution.contracts import (
     NodeExecutionTransactionFactory,
     PreparedNodeExecution,
 )
-from apps.api.node_execution.prompt_plan import CompiledNodePrompt, compile_node_prompt
+from apps.api.node_execution.materials import (
+    audit_context,
+    collect_context_items,
+    collect_upstream_artifacts,
+    execution_snapshot,
+    placeholder_request,
+)
+from apps.api.node_execution.prompt_plan import compile_node_prompt
 from apps.api.prompt_runtime.execution_port import SqlAlchemyPromptSnapshotPort
 from apps.api.runtime_boundary.output_projection import compile_output_projection
-from apps.api.runtime_boundary.ports import (
-    ArtifactContextVersion,
-    AssetContextItem,
-    FrozenSnapshotRefs,
-    PromptSnapshotPort,
-    WorkflowExecutionContext,
-)
+from apps.api.runtime_boundary.ports import PromptSnapshotPort, WorkflowExecutionContext
 from apps.api.workflows.execution_port import SqlAlchemyWorkflowExecutionPort
 from workflow.node_state import NodeStatus
-from workflow.prompt_runtime import ContextItem
 
 
 class SqlAlchemyNodeExecutionTransactionFactory(NodeExecutionTransactionFactory):
@@ -115,8 +110,8 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
         )
         return PreparedNodeExecution(
             node_run_id=node_run_id,
-            request=_placeholder_request(request),
-            audit_context=_audit_context(execution, self._actor.user_id),
+            request=placeholder_request(request),
+            audit_context=audit_context(execution, self._actor.user_id),
             output_schema={},
             committed_result=CommittedNodeExecution(
                 node_run_id=node_run_id,
@@ -133,44 +128,47 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
         node_run_id: UUID,
         request_id: str,
     ) -> PreparedNodeExecution:
-        materials = self._definitions.resolve_materials(node_run_id)
-        binding = materials.definition.node_binding
-        context_items = self._context_items(execution, binding)
-        upstream = self._upstream_artifacts(execution, binding)
-        model_request_id = self._attempts.next_model_request_id(node_run_id)
-        compiled = compile_node_prompt(
-            definition=materials.definition,
-            execution=execution,
-            prompt_template=materials.prompt_template,
-            output_schema=materials.output_schema,
-            context_items=context_items,
-            request_id=model_request_id,
-            user_id=self._actor.user_id,
-        )
-        snapshots = self._snapshots.freeze(
-            node_run_id,
-            context=compiled.context,
-            prompt=compiled.prompt,
-        )
-        runtime_values: dict[str, Any] = {}
-        target_auth = self._assets.authorize_target_slots(materials.definition, execution)
-        newly_frozen = self._workflow.freeze_execution(
+        (
+            materials,
+            compiled,
+            snapshots,
+            upstream,
+            runtime_values,
+            target_auth,
+            reference_auth,
+            succeeded,
+            frozen_reference_assets,
+        ) = self._compile_inputs(execution, node_run_id)
+        self._workflow.freeze_execution(
             execution,
             request_id=request_id,
-            snapshot=_execution_snapshot(execution, compiled, snapshots, upstream),
+            snapshot=execution_snapshot(
+                execution,
+                compiled,
+                snapshots,
+                upstream,
+                frozen_reference_assets,
+            ),
         )
-        if not newly_frozen and execution.status == NodeStatus.RUNNING.value:
-            if self._attempts.has_active_attempt(node_run_id):
-                raise NodeExecutionError(
-                    "NODE_EXECUTION_IN_FLIGHT",
-                    "another worker already owns the frozen node execution",
-                )
+        if self._attempts.has_active_attempt(node_run_id):
+            raise NodeExecutionError(
+                "NODE_EXECUTION_IN_FLIGHT",
+                "another worker already owns the frozen node execution",
+            )
+        owner_token = self._claim_owner(node_run_id)
         self._workflow.start(node_run_id)
         return PreparedNodeExecution(
             node_run_id=node_run_id,
             request=compiled.request,
             audit_context=compiled.audit_context,
             output_schema=materials.output_schema,
+            execution_owner_token=owner_token,
+            pre_model_error_code=(
+                "NODE_EXECUTION_RESULT_UNAVAILABLE" if succeeded is not None else None
+            ),
+            pre_model_error_message=(
+                "the successful model result was lost before T2" if succeeded is not None else None
+            ),
             commit_context=NodeExecutionCommitContext(
                 definition=materials.definition,
                 execution=execution,
@@ -178,8 +176,64 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
                 upstream_artifacts=upstream,
                 runtime_values=runtime_values,
                 target_slot_authorization=target_auth,
-                reference_asset_authorization=None,
+                reference_asset_authorization=reference_auth,
             ),
+        )
+
+    def _claim_owner(self, node_run_id: UUID) -> str:
+        owner_token = str(uuid4())
+        try:
+            self._workflow.claim_execution_owner(node_run_id, owner_token)
+        except Exception as exc:
+            raise NodeExecutionError(
+                getattr(exc, "code", "NODE_EXECUTION_IN_FLIGHT"),
+                str(exc),
+            ) from exc
+        return owner_token
+
+    def _compile_inputs(self, execution: WorkflowExecutionContext, node_run_id: UUID):
+        materials = self._definitions.resolve_materials(node_run_id)
+        binding = materials.definition.node_binding
+        context_items = collect_context_items(self._artifacts, self._assets, execution, binding)
+        upstream = collect_upstream_artifacts(self._artifacts, execution, binding)
+        succeeded = self._attempts.succeeded_attempt(
+            node_run_id=node_run_id,
+            project_id=execution.project_id,
+        )
+        request_id = (
+            succeeded.request_id
+            if succeeded is not None
+            else self._attempts.next_model_request_id(node_run_id)
+        )
+        compiled = compile_node_prompt(
+            definition=materials.definition,
+            execution=execution,
+            prompt_template=materials.prompt_template,
+            output_schema=materials.output_schema,
+            context_items=context_items,
+            request_id=request_id,
+            user_id=self._actor.user_id,
+        )
+        snapshots = self._snapshots.freeze(
+            node_run_id,
+            context=compiled.context,
+            prompt=compiled.prompt,
+        )
+        reference_auth = self._assets.freeze_reference_assets(materials.definition, execution)
+        frozen_reference_assets = [
+            {"asset_version_id": str(asset.asset_version_id), "role": asset.role}
+            for asset in (reference_auth.assets if reference_auth is not None else ())
+        ]
+        return (
+            materials,
+            compiled,
+            snapshots,
+            upstream,
+            {"reference_assets": frozen_reference_assets},
+            self._assets.authorize_target_slots(materials.definition, execution),
+            reference_auth,
+            succeeded,
+            frozen_reference_assets,
         )
 
     def commit(
@@ -193,6 +247,14 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
             raise NodeExecutionError(
                 "NODE_EXECUTION_CONTEXT_MISSING",
                 "the prepared execution has no commit context",
+            )
+        owner_token = execution.execution_owner_token
+        if owner_token is None or not self._workflow.owns_execution_owner(
+            execution.node_run_id, owner_token
+        ):
+            raise NodeExecutionError(
+                "NODE_EXECUTION_OWNER_LOST",
+                "the worker no longer owns the node execution",
             )
         current = self._workflow.require_context(execution.node_run_id, for_update=True)
         if current.status == NodeStatus.CANCEL_REQUESTED.value:
@@ -211,6 +273,17 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
             project_id=current.project_id,
             request_id=execution.request.request_id,
         )
+        return self._persist_outputs(execution, current, context, output, evidence, owner_token)
+
+    def _persist_outputs(
+        self,
+        execution: PreparedNodeExecution,
+        current: WorkflowExecutionContext,
+        context: NodeExecutionCommitContext,
+        output: dict[str, Any],
+        evidence: AttemptEvidence,
+        owner_token: str,
+    ) -> CommittedNodeExecution:
         plan = compile_output_projection(
             definition=context.definition,
             execution=current,
@@ -232,6 +305,7 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
             package_result = self._packages.publish(package)
         self._fault_injector("after_package")
         self._fault_injector("before_transition")
+        self._workflow.release_execution_owner(execution.node_run_id, owner_token)
         self._workflow.complete(execution.node_run_id, artifact_result.artifact_version_id)
         return CommittedNodeExecution(
             node_run_id=execution.node_run_id,
@@ -250,115 +324,16 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
         code: str,
         cancelled: bool,
     ) -> None:
+        owner_token = execution.execution_owner_token
+        if owner_token is not None:
+            if not self._workflow.owns_execution_owner(execution.node_run_id, owner_token):
+                return
+            self._workflow.release_execution_owner(execution.node_run_id, owner_token)
         self._workflow.terminalize(
             execution.node_run_id,
             code=code,
             cancelled=cancelled,
         )
-
-    def _context_items(
-        self,
-        execution: WorkflowExecutionContext,
-        binding: Mapping[str, Any],
-    ) -> tuple[ContextItem, ...]:
-        policy = cast(object, binding.get("context_policy"))
-        if not isinstance(policy, Mapping):
-            raise NodeExecutionError(
-                "NODE_EXECUTION_CONTEXT_POLICY_INVALID",
-                "the published context policy is invalid",
-            )
-        typed_policy = cast(Mapping[str, Any], policy)
-        allowed = cast(object, typed_policy.get("allowed_sources"))
-        if not isinstance(allowed, Sequence) or isinstance(allowed, (str, bytes, bytearray)):
-            raise NodeExecutionError(
-                "NODE_EXECUTION_CONTEXT_POLICY_INVALID",
-                "the published context policy has no source allowlist",
-            )
-        items: list[ContextItem] = []
-        for source in cast(Sequence[object], allowed):
-            if type(source) is not str:
-                raise NodeExecutionError(
-                    "NODE_EXECUTION_CONTEXT_POLICY_INVALID",
-                    "the published context source is invalid",
-                )
-            for value in self._artifacts.list_context_versions(execution.project_id, source):
-                items.append(
-                    ContextItem(
-                        source=source,
-                        source_id=str(value.artifact_version_id),
-                        source_version_id=str(value.artifact_version_id),
-                        content=value.content,
-                    )
-                )
-            for value in self._assets.list_context_items(execution.project_id, source):
-                items.append(_asset_context_item(source, value))
-        return tuple(items)
-
-    def _upstream_artifacts(
-        self,
-        execution: WorkflowExecutionContext,
-        binding: Mapping[str, Any],
-    ) -> dict[str, ArtifactContextVersion]:
-        refs = binding.get("input_contract_refs")
-        if not isinstance(refs, Sequence) or isinstance(refs, (str, bytes, bytearray)):
-            raise NodeExecutionError(
-                "NODE_EXECUTION_INPUT_CONTRACT_INVALID",
-                "the published input contract list is invalid",
-            )
-        upstream: dict[str, ArtifactContextVersion] = {}
-        for raw in cast(Sequence[object], refs):
-            if type(raw) is not str:
-                continue
-            values = self._artifacts.list_context_versions(execution.project_id, raw)
-            if len(values) == 1:
-                upstream[raw] = values[0]
-        return upstream
-
-
-def _asset_context_item(source: str, value: AssetContextItem) -> ContextItem:
-    return ContextItem(
-        source=source,
-        source_id=str(value.source_id),
-        source_version_id=str(value.source_version_id),
-        content=value.facts,
-    )
-
-
-def _execution_snapshot(
-    execution: WorkflowExecutionContext,
-    compiled: CompiledNodePrompt,
-    snapshots: FrozenSnapshotRefs,
-    upstream: Mapping[str, ArtifactContextVersion],
-) -> dict[str, Any]:
-    return {
-        "content_release_id": str(execution.content_release_id),
-        "workflow_definition_version_id": str(execution.workflow_definition_version_id),
-        "node_key": execution.node_key,
-        "context_hash": snapshots.context_hash,
-        "prompt_hash": snapshots.prompt_hash,
-        "context": list(compiled.context.bindings),
-        "upstream_artifacts": {
-            key: str(value.artifact_version_id) for key, value in upstream.items()
-        },
-    }
-
-
-def _audit_context(execution: WorkflowExecutionContext, user_id: UUID | None) -> ModelAuditContext:
-    return ModelAuditContext(
-        organization_id=execution.organization_id,
-        user_id=user_id,
-        project_id=execution.project_id,
-        node_run_id=execution.node_run_id,
-        generation_job_id=None,
-    )
-
-
-def _placeholder_request(request_id: str) -> TextModelRequest:
-    return TextModelRequest(
-        capability=ModelCapability.TEXT_SMOKE,
-        request_id=f"node-execution:committed:{request_id}"[:160],
-        prompt="committed node execution",
-    )
 
 
 def _ignore_fault_stage(_stage: str) -> None:

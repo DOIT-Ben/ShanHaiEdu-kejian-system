@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
+from datetime import timedelta
 from typing import Any, cast
 from uuid import UUID
 
@@ -31,6 +32,7 @@ from workflow.node_state import NodeStatus
 from workflow.registry import BUILTIN_WORKFLOW_REGISTRY
 
 _EXECUTION_INPUT_KEY = "runtime.execution"
+_EXECUTION_LEASE_SECONDS = 300
 
 
 class WorkflowExecutionPortError(ValueError):
@@ -205,6 +207,41 @@ class SqlAlchemyWorkflowExecutionPort:
         )
         self._session.flush()
         return True
+
+    def claim_execution_owner(self, node_run_id: UUID, owner_token: str) -> None:
+        node = self._repository.get_node(node_run_id, for_update=True)
+        if node is None:
+            raise WorkflowExecutionPortError("NODE_EXECUTION_NOT_FOUND", "node run not found")
+        now = utc_now()
+        if (
+            node.execution_owner_token is not None
+            and node.execution_lease_expires_at is not None
+            and node.execution_lease_expires_at > now
+        ):
+            raise WorkflowExecutionPortError(
+                "NODE_EXECUTION_IN_FLIGHT",
+                "another worker already owns the frozen node execution",
+            )
+        node.execution_owner_token = owner_token
+        node.execution_lease_expires_at = now + timedelta(seconds=_EXECUTION_LEASE_SECONDS)
+        self._session.flush()
+
+    def owns_execution_owner(self, node_run_id: UUID, owner_token: str) -> bool:
+        node = self._repository.get_node(node_run_id, for_update=True)
+        return bool(node is not None and node.execution_owner_token == owner_token)
+
+    def release_execution_owner(self, node_run_id: UUID, owner_token: str) -> None:
+        node = self._repository.get_node(node_run_id, for_update=True)
+        if node is None:
+            raise WorkflowExecutionPortError("NODE_EXECUTION_NOT_FOUND", "node run not found")
+        if node.execution_owner_token != owner_token:
+            raise WorkflowExecutionPortError(
+                "NODE_EXECUTION_OWNER_LOST",
+                "the worker no longer owns the node execution",
+            )
+        node.execution_owner_token = None
+        node.execution_lease_expires_at = None
+        self._session.flush()
 
     def require_execution_request(self, node_run_id: UUID, request_id: str) -> None:
         existing = self._session.scalar(

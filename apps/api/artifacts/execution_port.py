@@ -22,6 +22,21 @@ from apps.api.runtime_boundary.ports import (
     GeneratedArtifactWrite,
 )
 
+_CONTEXT_SOURCE_ARTIFACT_TYPES: dict[str, tuple[str, ...]] = {
+    "intro_selection.snapshot": ("intro_selection",),
+    "lesson_division.approved_version": ("lesson_division",),
+    "lesson_plan.approved_version": ("lesson_plan",),
+    "ppt_outline.approved_version": ("ppt_outline",),
+    "ppt_page_spec.current_version": ("ppt_page_specs", "ppt_page_spec_set"),
+    "ppt_style.approved_version": ("ppt_style",),
+    "video.asset_inventory.current_version": ("video_asset_inventory",),
+    "video.assets.approved_versions": ("video_asset_generation_batch",),
+    "video.clips.approved_versions": ("video_shot_generation",),
+    "video.master_script.approved_version": ("video_master_script",),
+    "video.rough_storyboard.approved_version": ("video_rough_storyboard",),
+    "video.style.approved_version": ("video_style_master_image_candidates",),
+}
+
 
 class ArtifactExecutionPortError(ValueError):
     def __init__(self, code: str, message: str) -> None:
@@ -51,9 +66,12 @@ class SqlAlchemyArtifactPort:
             ),
             None,
         )
-        if prefix is None:
+        artifact_types = _CONTEXT_SOURCE_ARTIFACT_TYPES.get(source)
+        if prefix is None and artifact_types is None:
             return ()
-        artifact_type = source.removeprefix(prefix)
+        if artifact_types is None:
+            assert prefix is not None
+            artifact_types = (source.removeprefix(prefix),)
         rows = self._session.execute(
             select(ArtifactVersion, Artifact)
             .join(Artifact, Artifact.id == ArtifactVersion.artifact_id)
@@ -61,7 +79,7 @@ class SqlAlchemyArtifactPort:
                 Artifact.organization_id == self._actor.organization_id,
                 Artifact.project_id == project_id,
                 Artifact.deleted_at.is_(None),
-                Artifact.artifact_type == artifact_type,
+                Artifact.artifact_type.in_(artifact_types),
                 Artifact.current_approved_version_id == ArtifactVersion.id,
                 ArtifactVersion.organization_id == self._actor.organization_id,
             )

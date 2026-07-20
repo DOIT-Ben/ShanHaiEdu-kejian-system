@@ -5,6 +5,7 @@ from uuid import UUID
 
 import pytest
 
+from apps.api.assets.execution_port import AssetExecutionPortError, SqlAlchemyAssetPort
 from apps.api.node_execution.boundaries import (
     NodeExecutionBoundaryError,
     validate_execution_boundary,
@@ -137,3 +138,43 @@ def test_rejects_untrusted_or_incomplete_definition_before_model_call(
         validate_execution_boundary(current, execution())
 
     assert caught.value.code == code
+
+
+def test_reference_asset_policy_freezes_empty_or_fails_closed_without_selection() -> None:
+    port = object.__new__(SqlAlchemyAssetPort)
+    current = definition()
+    none_binding = dict(current.node_binding)
+    none_binding["reference_asset_policy"] = {"mode": "none", "roles": []}
+    assert (
+        port.freeze_reference_assets(replace(current, node_binding=none_binding), execution())
+        is None
+    )
+
+    optional_binding = dict(current.node_binding)
+    optional_binding["reference_asset_policy"] = {
+        "mode": "optional",
+        "roles": [
+            {
+                "role_key": "style_reference",
+                "min_items": 0,
+            }
+        ],
+    }
+    authorization = port.freeze_reference_assets(
+        replace(current, node_binding=optional_binding), execution()
+    )
+    assert authorization is not None and authorization.assets == ()
+
+    required_binding = dict(current.node_binding)
+    required_binding["reference_asset_policy"] = {
+        "mode": "required",
+        "roles": [
+            {
+                "role_key": "style_reference",
+                "min_items": 1,
+            }
+        ],
+    }
+    with pytest.raises(AssetExecutionPortError) as caught:
+        port.freeze_reference_assets(replace(current, node_binding=required_binding), execution())
+    assert caught.value.code == "NODE_EXECUTION_REFERENCE_ASSETS_MISSING"

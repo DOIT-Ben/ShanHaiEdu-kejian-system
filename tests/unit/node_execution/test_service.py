@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -54,6 +54,14 @@ def prepared() -> PreparedNodeExecution:
             generation_job_id=None,
         ),
         output_schema=SCHEMA,
+    )
+
+
+def prepared_recovery_failure() -> PreparedNodeExecution:
+    return replace(
+        prepared(),
+        pre_model_error_code="NODE_EXECUTION_RESULT_UNAVAILABLE",
+        pre_model_error_message="the successful model result was lost before T2",
     )
 
 
@@ -132,6 +140,27 @@ class FakeTransactionFactory:
             self.events.append(f"tx{self.transactions}:commit")
 
 
+class RecoveryFailureTransaction(FakeTransaction):
+    def prepare(self, node_run_id: UUID, request_id: str) -> PreparedNodeExecution:
+        self.events.append("prepare")
+        return prepared_recovery_failure()
+
+
+class RecoveryFailureTransactionFactory(FakeTransactionFactory):
+    @contextmanager
+    def begin(self) -> Iterator[FakeTransaction]:
+        self.transactions += 1
+        self.events.append(f"tx{self.transactions}:open")
+        transaction = RecoveryFailureTransaction(self.events)
+        try:
+            yield transaction
+        except Exception:
+            self.events.append(f"tx{self.transactions}:rollback")
+            raise
+        else:
+            self.events.append(f"tx{self.transactions}:commit")
+
+
 class FakeModel:
     def __init__(
         self,
@@ -196,6 +225,26 @@ async def test_model_failure_uses_a_separate_short_terminal_transaction() -> Non
         "model",
         "tx2:open",
         "terminal:GENERATION_REJECTED:False",
+        "tx2:commit",
+    ]
+
+
+async def test_lost_successful_result_fails_closed_without_reinvoking_model() -> None:
+    events: list[str] = []
+    model = FakeModel(events)
+    service = NodeExecutionService(RecoveryFailureTransactionFactory(events), model)
+
+    with pytest.raises(NodeExecutionError) as caught:
+        await service.execute(NODE_RUN_ID, request_id="request-89")
+
+    assert caught.value.code == "NODE_EXECUTION_RESULT_UNAVAILABLE"
+    assert model.calls == 0
+    assert events == [
+        "tx1:open",
+        "prepare",
+        "tx1:commit",
+        "tx2:open",
+        "terminal:NODE_EXECUTION_RESULT_UNAVAILABLE:False",
         "tx2:commit",
     ]
 

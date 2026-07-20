@@ -32,6 +32,14 @@ def upgrade() -> None:
             nullable=True,
         ),
     )
+    op.add_column(
+        "node_runs",
+        sa.Column("execution_owner_token", sa.String(length=64), nullable=True),
+    )
+    op.add_column(
+        "node_runs",
+        sa.Column("execution_lease_expires_at", sa.DateTime(timezone=True), nullable=True),
+    )
     op.create_foreign_key(
         "fk_creation_packages_source_artifact_version",
         "creation_packages",
@@ -71,5 +79,7 @@ def downgrade() -> None:
         type_="foreignkey",
     )
     op.drop_column("creation_package_items", "reference_assets_json")
+    op.drop_column("node_runs", "execution_lease_expires_at")
+    op.drop_column("node_runs", "execution_owner_token")
     op.drop_column("creation_packages", "lesson_unit_id")
     op.drop_column("creation_packages", "source_artifact_version_id")

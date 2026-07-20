@@ -242,6 +242,8 @@ class NodeRun(MutableAuditMixin, Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_error_code: Mapped[str | None] = mapped_column(String(160))
+    execution_owner_token: Mapped[str | None] = mapped_column(String(64))
+    execution_lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class NodeInputSnapshot(Base):

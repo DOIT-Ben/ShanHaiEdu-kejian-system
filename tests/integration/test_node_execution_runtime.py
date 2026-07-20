@@ -5,6 +5,7 @@ import json
 from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 from uuid import UUID
 
@@ -13,15 +14,13 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.artifacts.domain import canonical_content_hash
-from apps.api.artifacts.execution_port import SqlAlchemyArtifactPort
 from apps.api.artifacts.models import Artifact, ArtifactRelation, ArtifactVersion
 from apps.api.artifacts.relation_service import ArtifactRelationService
 from apps.api.assets.models import FileAsset, FileAssetVersion, MaterialParseVersion
+from apps.api.assets.project_models import ProjectAssetSlot
 from apps.api.content_runtime.models import ContentDefinitionVersion
 from apps.api.content_runtime.package_source import load_builtin_courseware_release
 from apps.api.content_runtime.publication_service import ContentReleasePublisher
-from apps.api.content_runtime.runtime_port import SqlAlchemyRuntimeDefinitionReader
-from apps.api.creation.execution_port import SqlAlchemyCreationPackagePort
 from apps.api.creation.models import CreationPackage, CreationPackageItem
 from apps.api.database import build_engine, build_session_factory, utc_now
 from apps.api.identity.context import ActorContext
@@ -39,17 +38,8 @@ from apps.api.node_execution.sqlalchemy import SqlAlchemyNodeExecutionTransactio
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.prompt_runtime.models import ContextSnapshot, PromptSnapshot
-from apps.api.runtime_boundary.output_projection import (
-    OutputProjectionError,
-    compile_output_projection,
-)
-from apps.api.runtime_boundary.ports import FrozenSnapshotRefs, TargetSlotAuthorization
-from apps.api.runtime_boundary.projection_package import materialize_creation_package
 from apps.api.uploads.models import SourceMaterial
-from apps.api.workflows.execution_port import (
-    SqlAlchemyWorkflowExecutionPort,
-    WorkflowExecutionPortError,
-)
+from apps.api.workflows.execution_port import WorkflowExecutionPortError
 from apps.api.workflows.models import BranchRun, NodeInputSnapshot, NodeRun, WorkflowRun
 from apps.api.workflows.service import WorkflowRuntimeService
 from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
@@ -145,6 +135,7 @@ async def test_published_golden_text_node_commits_complete_lineage_once(
         assert artifact_version.prompt_snapshot_id == prompt.id
         assert frozen is not None
         assert frozen.snapshot_json["request_id"] == "issue-89-golden-delivery"
+        assert frozen.snapshot_json["reference_assets"] == []
         assert attempt is not None
         assert attempt.status == "succeeded"
         assert attempt.node_run_id == seeded.node_run_id
@@ -348,6 +339,67 @@ async def test_worker_recovery_after_t1_does_not_repeat_provider_call(
         assert _count(session, UsageRecord, "node_run_id", seeded.node_run_id) == 1
 
 
+async def test_successful_attempt_before_t2_fails_closed_without_second_attempt(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_runtime(factory)
+    transactions = SqlAlchemyNodeExecutionTransactionFactory(factory, seeded.actor)
+    with transactions.begin() as transaction:
+        prepared = transaction.prepare(seeded.node_run_id, "issue-89-lost-t2")
+
+    gateway = ModelGateway(
+        {
+            ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: DeterministicNodeOutputProvider(
+                seeded.output
+            )
+        },
+        audit_sink=SqlAlchemyAttemptAuditSink(factory),
+    )
+    await gateway.generate_text(
+        prepared.request,
+        audit_context=prepared.audit_context,
+    )
+    with factory() as session, session.begin():
+        node = session.get(NodeRun, seeded.node_run_id)
+        assert node is not None
+        node.execution_lease_expires_at = utc_now() - timedelta(seconds=1)
+
+    provider = DeterministicNodeOutputProvider(seeded.output)
+    service = NodeExecutionService(
+        transactions,
+        ModelGateway(
+            {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: provider},
+            audit_sink=SqlAlchemyAttemptAuditSink(factory),
+        ),
+    )
+    with pytest.raises(NodeExecutionError) as caught:
+        await service.execute(seeded.node_run_id, request_id="issue-89-lost-t2")
+
+    assert caught.value.code == "NODE_EXECUTION_RESULT_UNAVAILABLE"
+    assert provider.calls == 0
+    with factory() as session:
+        assert _count(session, GenerationAttempt, "node_run_id", seeded.node_run_id) == 1
+        assert _count(session, UsageRecord, "node_run_id", seeded.node_run_id) == 1
+
+
+async def test_prepare_claims_one_worker_before_attempt_start(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_runtime(factory)
+    transactions = SqlAlchemyNodeExecutionTransactionFactory(factory, seeded.actor)
+    with transactions.begin() as transaction:
+        first = transaction.prepare(seeded.node_run_id, "issue-89-owner")
+        assert first.committed_result is None
+
+    with pytest.raises(NodeExecutionError) as caught:
+        with transactions.begin() as transaction:
+            transaction.prepare(seeded.node_run_id, "issue-89-owner")
+
+    assert caught.value.code == "NODE_EXECUTION_IN_FLIGHT"
+
+
 async def test_failed_attempt_can_retry_with_same_frozen_inputs(
     migrated_database_url: str,
 ) -> None:
@@ -523,36 +575,7 @@ async def test_creation_package_publish_is_bound_to_fixed_source_and_target(
         )
         session.add(node)
         session.flush()
-        context = ContextSnapshot(
-            id=new_uuid7(),
-            organization_id=seeded.actor.organization_id,
-            project_id=seeded.project_id,
-            node_run_id=node.id,
-            bindings_json={"bindings": []},
-            content_hash="c" * 64,
-            created_by=seeded.actor.principal_id,
-        )
-        session.add(context)
-        session.flush()
-        prompt = PromptSnapshot(
-            id=new_uuid7(),
-            organization_id=seeded.actor.organization_id,
-            project_id=seeded.project_id,
-            node_run_id=node.id,
-            context_snapshot_id=context.id,
-            template_refs_json={},
-            layers_json={"layers": []},
-            editable_prompt="fixed prompt",
-            user_diff_json={},
-            compiled_prompt="fixed compiled prompt",
-            request_schema_json={},
-            preview_json={},
-            content_hash="d" * 64,
-            created_by=seeded.actor.principal_id,
-        )
-        session.add(prompt)
-        session.flush()
-        page_specs = _seed_approved_artifact(
+        _seed_approved_artifact(
             session,
             seeded.actor,
             seeded.project_id,
@@ -562,7 +585,7 @@ async def test_creation_package_publish_is_bound_to_fixed_source_and_target(
             branch_key="ppt",
             lesson_unit_id=lesson.id,
         )
-        lesson_plan = _seed_approved_artifact(
+        _seed_approved_artifact(
             session,
             seeded.actor,
             seeded.project_id,
@@ -572,13 +595,16 @@ async def test_creation_package_publish_is_bound_to_fixed_source_and_target(
             branch_key="lesson_plan",
             lesson_unit_id=lesson.id,
         )
-        workflow = SqlAlchemyWorkflowExecutionPort(session, seeded.actor)
-        execution = workflow.require_context(node.id, for_update=True)
-        definition = SqlAlchemyRuntimeDefinitionReader(
+        _seed_approved_artifact(
             session,
             seeded.actor,
-            workflow,
-        ).resolve(node.id)
+            seeded.project_id,
+            definition_row.id,
+            artifact_key="ppt-style:LESSON-001",
+            artifact_type="ppt_style",
+            branch_key="ppt",
+            lesson_unit_id=lesson.id,
+        )
         output = deepcopy(
             build_golden_branch_source_outputs(
                 json.loads(GOLDEN_CASE_PATH.read_text(encoding="utf-8"))
@@ -587,57 +613,37 @@ async def test_creation_package_publish_is_bound_to_fixed_source_and_target(
         for item in output["body_asset_items"]:
             item["body_target_slot"] = item["body_target_slot"].lower()
         slots = tuple(item["body_target_slot"] for item in output["body_asset_items"])
-        artifact_port = SqlAlchemyArtifactPort(session, seeded.actor)
-        upstream = {
-            "artifact:ppt_page_specs": artifact_port.list_context_versions(
-                seeded.project_id, "artifact:ppt_page_specs"
-            )[0],
-            "approval:lesson_plan": artifact_port.list_context_versions(
-                seeded.project_id, "approval:lesson_plan"
-            )[0],
-        }
-        assert upstream["artifact:ppt_page_specs"].artifact_version_id == page_specs.id
-        assert upstream["approval:lesson_plan"].artifact_version_id == lesson_plan.id
-        plan = compile_output_projection(
-            definition=definition,
-            execution=execution,
-            snapshots=FrozenSnapshotRefs(
-                context_snapshot_id=context.id,
-                prompt_snapshot_id=prompt.id,
-                context_hash=context.content_hash,
-                prompt_hash=prompt.content_hash,
-            ),
-            validated_output=output,
-            upstream_artifacts=upstream,
-            request_id="issue-89-package-source",
-            target_slot_authorization=TargetSlotAuthorization(
-                content_release_id=execution.content_release_id,
-                workflow_definition_version_id=execution.workflow_definition_version_id,
-                project_id=seeded.project_id,
-                node_key=node.node_key,
-                branch_key="ppt",
-                lesson_unit_id=lesson.id,
-                slots=slots,
-            ),
-        )
-        artifact_result = artifact_port.persist_generated(plan.artifact_write)
-        unbound_plan = compile_output_projection(
-            definition=definition,
-            execution=execution,
-            snapshots=plan.snapshots,
-            validated_output=output,
-            upstream_artifacts=upstream,
-            request_id="issue-89-package-source",
-        )
-        with pytest.raises(OutputProjectionError) as unbound:
-            materialize_creation_package(unbound_plan, artifact_result=artifact_result)
-        assert unbound.value.code == "OUTPUT_PROJECTION_TARGET_SLOTS_MISSING"
-        spec = materialize_creation_package(plan, artifact_result=artifact_result)
-        assert spec is not None
-        package_port = SqlAlchemyCreationPackagePort(session, seeded.actor)
-        first = package_port.publish(spec)
-        replay = package_port.publish(spec)
-        assert replay == first
+        for slot_key in slots:
+            session.add(
+                ProjectAssetSlot(
+                    id=new_uuid7(),
+                    organization_id=seeded.actor.organization_id,
+                    project_id=seeded.project_id,
+                    lesson_unit_id=lesson.id,
+                    slot_key=slot_key,
+                    asset_type="image",
+                    cardinality="one",
+                    required=True,
+                    status="empty",
+                    target_contract_json={},
+                    created_by=seeded.actor.principal_id,
+                    updated_by=seeded.actor.principal_id,
+                )
+            )
+        session.flush()
+
+    provider = DeterministicNodeOutputProvider(output)
+    service = NodeExecutionService(
+        SqlAlchemyNodeExecutionTransactionFactory(factory, seeded.actor),
+        ModelGateway(
+            {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: provider},
+            audit_sink=SqlAlchemyAttemptAuditSink(factory),
+        ),
+    )
+    first = await service.execute(node.id, request_id="issue-89-package-source")
+    replay = await service.execute(node.id, request_id="issue-89-package-source")
+    assert replay == first
+    assert provider.calls == 1
 
     with factory() as session:
         package = session.get(CreationPackage, first.creation_package_id)
@@ -649,7 +655,12 @@ async def test_creation_package_publish_is_bound_to_fixed_source_and_target(
             )
         )
         assert package is not None
-        assert package.source_artifact_version_id == artifact_result.artifact_version_id
+        context = session.scalar(
+            select(ContextSnapshot).where(ContextSnapshot.node_run_id == node.id)
+        )
+        prompt = session.scalar(select(PromptSnapshot).where(PromptSnapshot.node_run_id == node.id))
+        assert context is not None and prompt is not None
+        assert package.source_artifact_version_id == first.artifact_version_id
         assert package.source_node_run_id == node.id
         assert package.source_workflow_run_id == seeded.workflow_run_id
         assert package.lesson_unit_id == lesson.id

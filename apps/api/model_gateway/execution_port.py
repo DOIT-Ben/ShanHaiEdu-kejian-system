@@ -25,6 +25,12 @@ class AttemptEvidence:
     attempt_no: int
 
 
+@dataclass(frozen=True, slots=True)
+class SucceededAttempt:
+    request_id: str
+    evidence: AttemptEvidence
+
+
 class SqlAlchemyAttemptExecutionPort:
     def __init__(self, session: Session, actor: ActorContext) -> None:
         self._session = session
@@ -58,6 +64,41 @@ class SqlAlchemyAttemptExecutionPort:
                 )
             )
             is not None
+        )
+
+    def succeeded_attempt(self, *, node_run_id: UUID, project_id: UUID) -> SucceededAttempt | None:
+        attempt = self._session.scalar(
+            select(GenerationAttempt)
+            .where(
+                GenerationAttempt.organization_id == self._actor.organization_id,
+                GenerationAttempt.project_id == project_id,
+                GenerationAttempt.node_run_id == node_run_id,
+                GenerationAttempt.status == "succeeded",
+            )
+            .order_by(GenerationAttempt.attempt_no.desc())
+        )
+        if attempt is None:
+            return None
+        usage = self._session.scalar(
+            select(UsageRecord).where(
+                UsageRecord.organization_id == self._actor.organization_id,
+                UsageRecord.project_id == project_id,
+                UsageRecord.node_run_id == node_run_id,
+                UsageRecord.generation_attempt_id == attempt.id,
+            )
+        )
+        if usage is None:
+            raise AttemptExecutionPortError(
+                "NODE_EXECUTION_USAGE_MISSING",
+                "a successful attempt has no usage record",
+            )
+        return SucceededAttempt(
+            request_id=attempt.request_id,
+            evidence=AttemptEvidence(
+                attempt_id=attempt.id,
+                usage_id=usage.id,
+                attempt_no=attempt.attempt_no,
+            ),
         )
 
     def require_succeeded(

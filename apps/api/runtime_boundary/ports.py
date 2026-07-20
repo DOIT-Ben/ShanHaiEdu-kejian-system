@@ -287,6 +287,12 @@ class WorkflowExecutionPort(Protocol):
 
     def transition(self, node_run_id: UUID, target: NodeStatus) -> None: ...
 
+    def claim_execution_owner(self, node_run_id: UUID, owner_token: str) -> None: ...
+
+    def owns_execution_owner(self, node_run_id: UUID, owner_token: str) -> bool: ...
+
+    def release_execution_owner(self, node_run_id: UUID, owner_token: str) -> None: ...
+
 
 class ArtifactPort(Protocol):
     def list_context_versions(
@@ -298,6 +304,12 @@ class ArtifactPort(Protocol):
 
 class AssetPort(Protocol):
     def list_context_items(self, project_id: UUID, source: str) -> tuple[AssetContextItem, ...]: ...
+
+    def freeze_reference_assets(
+        self,
+        definition: RuntimeNodeDefinition,
+        execution: WorkflowExecutionContext,
+    ) -> ReferenceAssetAuthorization | None: ...
 
 
 class PromptSnapshotPort(Protocol):

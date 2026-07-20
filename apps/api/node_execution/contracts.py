@@ -45,6 +45,9 @@ class PreparedNodeExecution:
     request: TextModelRequest
     audit_context: ModelAuditContext
     output_schema: dict[str, object]
+    execution_owner_token: str | None = None
+    pre_model_error_code: str | None = None
+    pre_model_error_message: str | None = None
     commit_context: NodeExecutionCommitContext | None = None
     committed_result: CommittedNodeExecution | None = None
 

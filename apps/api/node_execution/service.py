@@ -41,6 +41,10 @@ class NodeExecutionService:
         prepared = self._prepare(node_run_id, request_id)
         if prepared.committed_result is not None:
             return prepared.committed_result
+        if prepared.pre_model_error_code is not None:
+            message = prepared.pre_model_error_message or "node execution cannot invoke the model"
+            self._terminalize(prepared, prepared.pre_model_error_code, cancelled=False)
+            raise NodeExecutionError(prepared.pre_model_error_code, message)
         try:
             result = await self._model.generate_text(
                 prepared.request,

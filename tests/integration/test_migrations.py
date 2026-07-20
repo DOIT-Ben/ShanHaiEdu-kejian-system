@@ -187,6 +187,13 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
         column["name"] for column in database_inspector.get_columns("creation_package_items")
     }
     assert "reference_assets_json" in package_item_columns
+    node_run_columns = {
+        column["name"] for column in database_inspector.get_columns("node_runs")
+    }
+    assert {
+        "execution_owner_token",
+        "execution_lease_expires_at",
+    }.issubset(node_run_columns)
     assert ScriptDirectory.from_config(config).get_current_head() == "g1b2c3d4e5f6"
     previous = os.environ.get("SHANHAI_DATABASE_URL")
     os.environ["SHANHAI_DATABASE_URL"] = postgres_database_url
