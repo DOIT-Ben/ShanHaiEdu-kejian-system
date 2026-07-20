@@ -144,6 +144,15 @@ describe("video media truth boundary", () => {
           headers: { "content-type": "text/vtt" },
           status: 200,
         }),
+      )
+      .mockResolvedValueOnce(
+        new Response("WEBVTT\n\n00:00.000 --> 00:01.000\n课堂导入", { status: 200 }),
+      )
+      .mockResolvedValueOnce(
+        new Response("WEBVTT\n", {
+          headers: { "content-type": "text/vtt" },
+          status: 200,
+        }),
       );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -151,6 +160,12 @@ describe("video media truth boundary", () => {
       false,
     );
     await expect(validateSubtitleFile("https://cdn.example.com/fake.vtt", "vtt")).resolves.toBe(
+      false,
+    );
+    await expect(
+      validateSubtitleFile("https://cdn.example.com/missing-mime.vtt", "vtt"),
+    ).resolves.toBe(false);
+    await expect(validateSubtitleFile("https://cdn.example.com/empty.vtt", "vtt")).resolves.toBe(
       false,
     );
   });

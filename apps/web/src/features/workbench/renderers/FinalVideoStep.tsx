@@ -122,13 +122,29 @@ export function FinalVideoStep() {
     key: string;
     status: "error" | "loading" | "ready";
   }>({ key: "", status: "loading" });
+  const [subtitleTrackLoad, setSubtitleTrackLoad] = useState<{
+    key: string;
+    status: "error" | "loading" | "ready";
+  }>({ key: "", status: "loading" });
   const [subtitleReloadKey, setSubtitleReloadKey] = useState(0);
   const subtitleSourceKey = `${subtitleSrc ?? ""}\n${subtitleFormat ?? ""}\n${String(subtitleReloadKey)}`;
-  const subtitleLoadState = !hasSubtitleSource
+  const subtitleFileLoadState = !hasSubtitleSource
     ? "ready"
     : subtitleLoad.key === subtitleSourceKey
       ? subtitleLoad.status
       : "loading";
+  const hasNativeSubtitleTrack = hasSubtitleSource && subtitleFormat === "vtt";
+  const subtitleTrackLoadState = !hasNativeSubtitleTrack
+    ? "ready"
+    : subtitleTrackLoad.key === subtitleSourceKey
+      ? subtitleTrackLoad.status
+      : "loading";
+  const subtitleLoadState =
+    subtitleFileLoadState === "error" || subtitleTrackLoadState === "error"
+      ? "error"
+      : subtitleFileLoadState === "ready" && subtitleTrackLoadState === "ready"
+        ? "ready"
+        : "loading";
   const mediaReady = videoReady && subtitleLoadState === "ready";
   const mediaLoadError = videoLoadState === "error" || subtitleLoadState === "error";
   const truthfulDisplayStatus = mediaReady
@@ -255,6 +271,11 @@ export function FinalVideoStep() {
   const markVideoError = () => {
     if (!playableVideo) return;
     setVideoLoad({ key: videoSourceKey, status: "error" });
+    invalidateFinalVideoMedia(projectId, lessonId, playableVideo);
+  };
+  const markSubtitleTrackError = () => {
+    if (!playableVideo || subtitleFormat !== "vtt") return;
+    setSubtitleTrackLoad({ key: subtitleSourceKey, status: "error" });
     invalidateFinalVideoMedia(projectId, lessonId, playableVideo);
   };
   const reviewVideo = videoReady ? playableVideo : null;
@@ -394,7 +415,10 @@ export function FinalVideoStep() {
                   <track
                     default
                     kind="subtitles"
+                    key={subtitleSourceKey}
                     label="中文字幕"
+                    onError={markSubtitleTrackError}
+                    onLoad={() => setSubtitleTrackLoad({ key: subtitleSourceKey, status: "ready" })}
                     src={playableVideo.subtitleSrc}
                     srcLang="zh-CN"
                   />

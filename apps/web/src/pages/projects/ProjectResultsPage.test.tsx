@@ -226,6 +226,23 @@ describe("ProjectResultsPage previews", () => {
     });
   });
 
+  it("节点已批准但媒体缺失时不会显示为已完成", () => {
+    const firstLesson = lessons[0];
+    expect(firstLesson).toBeDefined();
+    if (!firstLesson) return;
+    saveMockDraft(
+      `project:${demoProjectId}:lessons-approved`,
+      [{ ...firstLesson, videoStatus: "approved" as const }],
+      { projectId: demoProjectId },
+    );
+    updateMockNodeState(demoProjectId, firstLesson.id, "final-video", { status: "approved" });
+
+    expect(getProjectVideoSummary(getMockRuntimeState(), demoProjectId)).toMatchObject({
+      detail: "关键帧参考已保存，视频尚未生成",
+      status: "not_ready",
+    });
+  });
+
   it("课时筛选从当前批准课时动态生成", async () => {
     const user = userEvent.setup();
     const firstLesson = lessons[0];
