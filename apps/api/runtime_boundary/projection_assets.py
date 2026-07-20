@@ -48,14 +48,14 @@ def compile_reference_assets(
 def _reference_assets_are_authorized(
     assets: Sequence[CreationPackageReferenceAssetSpec], runtime: Mapping[str, Any]
 ) -> bool:
-    raw_allowed = runtime.get("reference_asset_version_ids")
+    raw_allowed = runtime.get("reference_assets")
     if not isinstance(raw_allowed, Sequence) or isinstance(raw_allowed, (str, bytes, bytearray)):
         return False
     try:
-        allowed = {UUID(str(value)) for value in cast(Sequence[object], raw_allowed)}
-    except (TypeError, ValueError):
+        allowed = {_compile_reference_asset(value) for value in cast(Sequence[object], raw_allowed)}
+    except OutputProjectionError:
         return False
-    return {asset.asset_version_id for asset in assets} <= allowed
+    return set(assets) <= allowed
 
 
 def _compile_reference_asset(raw: object) -> CreationPackageReferenceAssetSpec:

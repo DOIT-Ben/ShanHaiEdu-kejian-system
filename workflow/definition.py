@@ -329,8 +329,7 @@ def build_workflow_indexes(graph: WorkflowGraph) -> WorkflowIndexes:
         for key, values in producers.items()
     }
     scoped_values = {
-        key: scoped[key]
-        for key in sorted(scoped, key=lambda item: (item[0], item[1], item[2]))
+        key: scoped[key] for key in sorted(scoped, key=lambda item: (item[0], item[1], item[2]))
     }
     output_values = {key: output_entries[key] for key in sorted(output_entries)}
     return WorkflowIndexes(

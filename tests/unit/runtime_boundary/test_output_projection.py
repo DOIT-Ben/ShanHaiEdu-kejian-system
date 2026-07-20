@@ -15,7 +15,9 @@ from apps.api.runtime_boundary.output_projection import (
 from apps.api.runtime_boundary.ports import (
     ArtifactContextVersion,
     ArtifactWriteResult,
+    CreationPackageReferenceAssetSpec,
     FrozenSnapshotRefs,
+    ReferenceAssetAuthorization,
     RuntimeNodeDefinition,
     TargetSlotAuthorization,
     WorkflowExecutionContext,
@@ -206,10 +208,12 @@ def _compile(
     execution: WorkflowExecutionContext | None = None,
     runtime_values: dict[str, Any] | None = None,
     target_slot_authorization: TargetSlotAuthorization | None = None,
+    reference_asset_authorization: ReferenceAssetAuthorization | None = None,
 ):
+    execution = execution or _execution(scope=scope)
     return compile_output_projection(
         definition=_definition(binding),
-        execution=execution or _execution(scope=scope),
+        execution=execution,
         snapshots=_snapshots(),
         validated_output=output or _output(),
         upstream_artifacts=_upstream(),
@@ -221,10 +225,35 @@ def _compile(
             TargetSlotAuthorization(
                 content_release_id=RELEASE_ID,
                 workflow_definition_version_id=WORKFLOW_ID,
+                project_id=execution.project_id,
+                node_key=execution.node_key,
+                branch_key=execution.branch_key or "",
+                lesson_unit_id=execution.lesson_unit_id,
                 slots=("ppt.page-01.main-visual", "ppt.page-02.main-visual"),
             )
             if binding.get("output_persistence", {}).get("creation_package")
             else None
+        ),
+        reference_asset_authorization=reference_asset_authorization,
+    )
+
+
+def _reference_asset_authorization(
+    *, asset_version_id: UUID, role: str = "style"
+) -> ReferenceAssetAuthorization:
+    execution = _execution()
+    return ReferenceAssetAuthorization(
+        content_release_id=RELEASE_ID,
+        workflow_definition_version_id=WORKFLOW_ID,
+        project_id=execution.project_id,
+        node_key=execution.node_key,
+        branch_key=execution.branch_key or "",
+        lesson_unit_id=execution.lesson_unit_id,
+        assets=(
+            CreationPackageReferenceAssetSpec(
+                asset_version_id=asset_version_id,
+                role=role,
+            ),
         ),
     )
 
@@ -459,10 +488,20 @@ def test_nonempty_reference_assets_require_trusted_runtime_authorization() -> No
         )
     assert caught.value.code == "OUTPUT_PROJECTION_REFERENCE_ASSETS_UNAUTHORIZED"
 
+    with pytest.raises(OutputProjectionError) as caught:
+        _compile(
+            _binding(package=True),
+            output=output,
+            runtime_values={"reference_asset_version_ids": [asset_id]},
+        )
+    assert caught.value.code == "OUTPUT_PROJECTION_REFERENCE_ASSETS_UNAUTHORIZED"
+
     plan = _compile(
         _binding(package=True),
         output=output,
-        runtime_values={"reference_asset_version_ids": [asset_id]},
+        reference_asset_authorization=_reference_asset_authorization(
+            asset_version_id=UUID(asset_id)
+        ),
     )
     package = materialize_creation_package(
         plan,
@@ -476,6 +515,32 @@ def test_nonempty_reference_assets_require_trusted_runtime_authorization() -> No
     assert package.items[0].reference_assets[0].asset_version_id == UUID(asset_id)
 
 
+def test_reference_asset_authorization_requires_the_same_role() -> None:
+    output = _output()
+    asset_id = UUID("10000000-0000-4000-8000-000000000013")
+    output["items"][0]["reference_assets"] = [
+        {"asset_version_id": str(asset_id), "role": "character"}
+    ]
+    plan = _compile(
+        _binding(package=True),
+        output=output,
+        reference_asset_authorization=_reference_asset_authorization(
+            asset_version_id=asset_id,
+            role="style",
+        ),
+    )
+    with pytest.raises(OutputProjectionError) as caught:
+        materialize_creation_package(
+            plan,
+            artifact_result=ArtifactWriteResult(
+                artifact_id=ARTIFACT_ID,
+                artifact_version_id=ARTIFACT_VERSION_ID,
+                content_hash="artifact-hash",
+            ),
+        )
+    assert caught.value.code == "OUTPUT_PROJECTION_REFERENCE_ASSETS_UNAUTHORIZED"
+
+
 def test_reference_asset_uuid_cannot_be_reused_with_a_different_role() -> None:
     output = _output()
     asset_id = "10000000-0000-4000-8000-000000000013"
@@ -486,7 +551,9 @@ def test_reference_asset_uuid_cannot_be_reused_with_a_different_role() -> None:
     plan = _compile(
         _binding(package=True),
         output=output,
-        runtime_values={"reference_asset_version_ids": [asset_id]},
+        reference_asset_authorization=_reference_asset_authorization(
+            asset_version_id=UUID(asset_id)
+        ),
     )
     with pytest.raises(OutputProjectionError) as caught:
         materialize_creation_package(
@@ -539,6 +606,10 @@ def test_package_declaration_matches_exactly_one_package_output(
             target_slot_authorization=TargetSlotAuthorization(
                 content_release_id=RELEASE_ID,
                 workflow_definition_version_id=WORKFLOW_ID,
+                project_id=PROJECT_ID,
+                node_key="example.generate",
+                branch_key="ppt",
+                lesson_unit_id=LESSON_UNIT_ID,
                 slots=("ppt.page-01.main-visual",),
             ),
         )

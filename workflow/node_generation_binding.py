@@ -184,9 +184,7 @@ def _descriptor_identity(value: dict[str, Any]) -> tuple[str, str, str]:
     )
 
 
-def _validate_validator_descriptors(
-    catalog: dict[str, Any], nodes: list[dict[str, Any]]
-) -> None:
+def _validate_validator_descriptors(catalog: dict[str, Any], nodes: list[dict[str, Any]]) -> None:
     raw_descriptors = cast(list[dict[str, Any]], catalog["validator_descriptors"])
     identities = [_descriptor_identity(item) for item in raw_descriptors]
     if len(identities) != len(set(identities)):
@@ -291,9 +289,7 @@ def _validate_topology(catalog: dict[str, Any], nodes: list[dict[str, Any]]) -> 
 def _validate_contract_refs(catalog: dict[str, Any], nodes: list[dict[str, Any]]) -> None:
     external = set(cast(list[str], catalog["external_input_contract_refs"]))
     produced = {
-        output_ref
-        for node in nodes
-        for output_ref in cast(list[str], node["output_contract_refs"])
+        output_ref for node in nodes for output_ref in cast(list[str], node["output_contract_refs"])
     }
     for node in nodes:
         missing = set(cast(list[str], node["input_contract_refs"])) - external - produced
@@ -377,10 +373,7 @@ def _validate_value_projection(value: dict[str, Any], *, item: bool = False) -> 
 
 
 def _is_allowed_runtime_pointer(pointer: str) -> bool:
-    return (
-        pointer in {"/lesson_key", "/reference_assets"}
-        or pointer.startswith("/relation_keys/")
-    )
+    return pointer in {"/lesson_key", "/reference_assets"} or pointer.startswith("/relation_keys/")
 
 
 def _validate_projection_declarations(node: dict[str, Any]) -> None:
@@ -395,9 +388,7 @@ def _validate_projection_declarations(node: dict[str, Any]) -> None:
         artifact = cast(dict[str, Any], output_persistence["artifact"])
         scope = cast(str, node["execution_scope"])
         identity = cast(dict[str, Any], artifact["identity"])
-        expected_strategy = (
-            "project_singleton" if scope == "project" else "lesson_unit_singleton"
-        )
+        expected_strategy = "project_singleton" if scope == "project" else "lesson_unit_singleton"
         if identity["strategy"] != expected_strategy:
             raise NodeGenerationBindingError(
                 "NODE_BINDING_ARTIFACT_IDENTITY_INVALID",
@@ -465,14 +456,21 @@ def _validate_projection_declarations(node: dict[str, Any]) -> None:
                             "NODE_BINDING_REFERENCE_ASSETS_INVALID",
                             "constant reference_assets must be an array",
                         )
-                    for asset in value:
+                    for raw_asset in cast(list[object], value):
+                        if not isinstance(raw_asset, dict):
+                            raise NodeGenerationBindingError(
+                                "NODE_BINDING_REFERENCE_ASSETS_INVALID",
+                                "constant reference assets must contain an ID and role",
+                            )
+                        asset = cast(dict[str, object], raw_asset)
+                        asset_version_id = asset.get("asset_version_id")
+                        role = asset.get("role")
                         if (
-                            not isinstance(asset, dict)
-                            or set(asset) != {"asset_version_id", "role"}
-                            or not isinstance(asset.get("asset_version_id"), str)
-                            or not isinstance(asset.get("role"), str)
-                            or not asset["asset_version_id"].strip()
-                            or not asset["role"].strip()
+                            set(asset) != {"asset_version_id", "role"}
+                            or not isinstance(asset_version_id, str)
+                            or not isinstance(role, str)
+                            or not asset_version_id.strip()
+                            or not role.strip()
                         ):
                             raise NodeGenerationBindingError(
                                 "NODE_BINDING_REFERENCE_ASSETS_INVALID",
@@ -484,7 +482,8 @@ def _validate_quality_contracts(nodes: list[dict[str, Any]]) -> None:
     report_producers: dict[str, dict[str, Any]] = {}
     for node in nodes:
         reports = [
-            ref for ref in cast(list[str], node["output_contract_refs"])
+            ref
+            for ref in cast(list[str], node["output_contract_refs"])
             if ref.startswith("report:")
         ]
         persistence = node.get("quality_report_persistence")
@@ -546,6 +545,8 @@ def _validate_quality_contracts(nodes: list[dict[str, Any]]) -> None:
                     "NODE_BINDING_QUALITY_REPORT_UNRESOLVED",
                     f"quality gate references an undeclared report: {report_ref}",
                 )
+
+
 def _validate_node(node: dict[str, Any]) -> None:
     _validate_prompt_exposure(node)
     _validate_unique_strings(node, "input_contract_refs", "NODE_BINDING_CONTRACT_REF_DUPLICATE")

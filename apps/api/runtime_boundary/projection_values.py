@@ -20,7 +20,7 @@ _CANONICAL_INDEX = re.compile(r"^(?:0|[1-9][0-9]*)$")
 _TRUSTED_RUNTIME_ROOTS = frozenset(
     {"lesson_key", "lesson_unit_id", "project_id", "workflow_run_id", "node_run_id"}
 )
-_ALLOWED_RUNTIME_VALUE_ROOTS = frozenset({"relation_keys", "reference_asset_version_ids"})
+_ALLOWED_RUNTIME_VALUE_ROOTS = frozenset({"relation_keys", "reference_assets"})
 
 
 class OutputProjectionError(ValueError):
@@ -81,10 +81,7 @@ def resolve_projection(
 
 
 def _is_allowed_runtime_pointer(pointer: str) -> bool:
-    return (
-        pointer in {"/lesson_key", "/reference_assets"}
-        or pointer.startswith("/relation_keys/")
-    )
+    return pointer in {"/lesson_key", "/reference_assets"} or pointer.startswith("/relation_keys/")
 
 
 def _resolve_intrinsic(declaration: Mapping[str, Any], runtime: Mapping[str, Any]) -> object:

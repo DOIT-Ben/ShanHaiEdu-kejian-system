@@ -114,9 +114,7 @@ def test_schema_and_complete_primary_math_catalog_are_valid() -> None:
     assert validated.catalog == catalog
     assert len(validated.content_hash) == 64
     assert len(validated.indexes.output_definition_index) == 22
-    lesson_plan_index = validated.indexes.output_definition_index[
-        "lesson_plan.generate.output"
-    ]
+    lesson_plan_index = validated.indexes.output_definition_index["lesson_plan.generate.output"]
     assert lesson_plan_index.producer_node_key == "lesson_plan.generate"
     assert lesson_plan_index.quality_validate_node_key == "lesson_plan.validate"
     assert lesson_plan_index.quality_gate_node_key == "lesson_plan.approve"
@@ -213,9 +211,9 @@ def test_output_contract_and_content_definition_mappings_are_unambiguous() -> No
     catalog = load_catalog()
     node_by_key(catalog, "intro.generate_options")["output_persistence"]["artifact"][
         "content_definition_ref"
-    ]["item_key"] = node_by_key(catalog, "lesson_plan.generate")["output_persistence"][
-        "artifact"
-    ]["content_definition_ref"]["item_key"]
+    ]["item_key"] = node_by_key(catalog, "lesson_plan.generate")["output_persistence"]["artifact"][
+        "content_definition_ref"
+    ]["item_key"]
     assert_rejected(catalog, "NODE_BINDING_OUTPUT_DEFINITION_DUPLICATE")
 
 

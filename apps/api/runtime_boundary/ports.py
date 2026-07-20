@@ -6,7 +6,6 @@ import math
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from types import MappingProxyType
 from typing import Any, Protocol, cast
 from uuid import UUID
 
@@ -38,14 +37,14 @@ class _FrozenDict(dict[str, Any]):
     def _immutable(*args: object, **kwargs: object) -> None:
         raise TypeError("immutable JSON mapping")
 
-    __setitem__ = _immutable
-    __delitem__ = _immutable
-    clear = _immutable
-    pop = _immutable
-    popitem = _immutable
-    setdefault = _immutable
-    update = _immutable
-    __ior__ = _immutable
+    __setitem__: Any = _immutable
+    __delitem__: Any = _immutable
+    clear: Any = _immutable
+    pop: Any = _immutable
+    popitem: Any = _immutable
+    setdefault: Any = _immutable
+    update: Any = _immutable
+    __ior__: Any = _immutable
 
 
 def _freeze_json_value(value: object) -> Any:
@@ -57,7 +56,7 @@ def _freeze_json_value(value: object) -> Any:
                 raise ArtifactInvariantError("JSON mapping keys must be strings")
             frozen[key] = _freeze_json_value(child)
         result = _FrozenDict()
-        dict.__init__(result, frozen)
+        dict.__init__(result, frozen)  # type: ignore[reportUnknownMemberType]
         return result
     if isinstance(value, (list, tuple)):
         values = cast(Sequence[object], value)
@@ -371,7 +370,11 @@ class TargetSlotAuthorization:
         _require_uuid(self.project_id, "target-slot project is invalid")
         if type(self.node_key) is not str or not self.node_key.strip() or len(self.node_key) > 160:
             raise ArtifactInvariantError("target-slot node is invalid")
-        if type(self.branch_key) is not str or not self.branch_key.strip() or len(self.branch_key) > 80:
+        if (
+            type(self.branch_key) is not str
+            or not self.branch_key.strip()
+            or len(self.branch_key) > 80
+        ):
             raise ArtifactInvariantError("target-slot branch is invalid")
         if self.lesson_unit_id is not None:
             _require_uuid(self.lesson_unit_id, "target-slot lesson unit is invalid")
@@ -410,7 +413,11 @@ class ReferenceAssetAuthorization:
             _require_uuid(value, message)
         if type(self.node_key) is not str or not self.node_key.strip() or len(self.node_key) > 160:
             raise ArtifactInvariantError("reference asset node is invalid")
-        if type(self.branch_key) is not str or not self.branch_key.strip() or len(self.branch_key) > 80:
+        if (
+            type(self.branch_key) is not str
+            or not self.branch_key.strip()
+            or len(self.branch_key) > 80
+        ):
             raise ArtifactInvariantError("reference asset branch is invalid")
         if self.lesson_unit_id is not None:
             _require_uuid(self.lesson_unit_id, "reference asset lesson unit is invalid")

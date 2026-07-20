@@ -229,9 +229,10 @@ def test_forward_publication_preserves_legacy_release_and_project_bindings(
         == "1.0.0"
     )
     assert legacy.package_checksum == canonical_json_sha256(legacy.manifest)
-    assert legacy.workflow_checksum == hashlib.sha256(
-        canonical_catalog_json(legacy.workflow_catalog)
-    ).hexdigest()
+    assert (
+        legacy.workflow_checksum
+        == hashlib.sha256(canonical_catalog_json(legacy.workflow_catalog)).hexdigest()
+    )
     assert legacy.package_checksum != source.package_checksum
     assert legacy.workflow_checksum != source.workflow_checksum
 
@@ -308,8 +309,7 @@ def test_forward_publication_preserves_legacy_release_and_project_bindings(
         assert current_workflow.checksum == source.workflow_checksum
         assert old_result.content_release_id == old_project.content_release_id
         assert (
-            old_result.workflow_definition_version_id
-            == old_project.workflow_definition_version_id
+            old_result.workflow_definition_version_id == old_project.workflow_definition_version_id
         )
         assert new_project.content_release_id == current_result.content_release_id
         assert (

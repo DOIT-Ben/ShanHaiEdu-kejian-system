@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
@@ -108,7 +109,7 @@ def load_builtin_courseware_release(root: Path) -> BuiltinCoursewareReleaseSourc
 
 def _validate_catalog_content_definitions(
     catalog: dict[str, Any],
-    items: dict[str, dict[str, Any]],
+    items: Mapping[str, dict[str, Any]],
     manifest_entries: dict[str, dict[str, Any]],
 ) -> None:
     for node in cast(list[dict[str, Any]], catalog["nodes"]):
@@ -128,10 +129,7 @@ def _validate_catalog_content_definitions(
                 f"artifact output definition disagrees with generation template: {node['node_key']}"
             )
         output_key = cast(str, artifact_ref["item_key"])
-        if (
-            output_key not in items
-            or manifest_entries[output_key]["kind"] != "content_definition"
-        ):
+        if output_key not in items or manifest_entries[output_key]["kind"] != "content_definition":
             raise ContentPublicationConflict(
                 f"content definition is missing from the published package: {output_key}"
             )

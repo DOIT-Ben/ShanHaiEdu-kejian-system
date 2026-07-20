@@ -14,14 +14,14 @@ from apps.api.runtime_boundary.ports import (
     FrozenSnapshotRefs,
     GeneratedArtifactRelation,
     GeneratedArtifactWrite,
-    RuntimeNodeDefinition,
     ReferenceAssetAuthorization,
+    RuntimeNodeDefinition,
     TargetSlotAuthorization,
     WorkflowExecutionContext,
 )
 from apps.api.runtime_boundary.projection_authorization import (
-    validate_reference_asset_authorization,
     validate_package_contract,
+    validate_reference_asset_authorization,
     validate_target_slot_authorization,
 )
 from apps.api.runtime_boundary.projection_package import (
@@ -98,7 +98,7 @@ def compile_output_projection(
         execution=execution,
         snapshots=snapshots,
         request_id=validated_request_id,
-        runtime_values=runtime_values or {},
+        runtime_values=normalized_runtime_values,
         target_slot_authorization=normalized_authorization,
     )
 
@@ -113,7 +113,13 @@ def _normalize_runtime_values(
             "OUTPUT_PROJECTION_RUNTIME_CONTEXT_INVALID",
         )
     )
-    supplied = raw.get("reference_assets")
+    supplied = raw.pop("reference_assets", None)
+    legacy = raw.pop("reference_asset_version_ids", None)
+    if legacy is not None:
+        raise OutputProjectionError(
+            "OUTPUT_PROJECTION_REFERENCE_ASSETS_UNAUTHORIZED",
+            "reference assets require a trusted authorization DTO",
+        )
     if supplied is not None and authorization is None:
         raise OutputProjectionError(
             "OUTPUT_PROJECTION_REFERENCE_ASSETS_UNAUTHORIZED",

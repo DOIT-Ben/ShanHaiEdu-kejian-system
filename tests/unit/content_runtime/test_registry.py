@@ -98,8 +98,7 @@ def test_registry_loads_the_published_catalog_with_one_deterministic_order() -> 
     assert len(registered.output_definition_index) == 22
     assert registered.output_definition_index is registered.indexes.output_definition_index
     assert {
-        producer.node_key
-        for producer in registered.producers_by_contract["asset:image_candidates"]
+        producer.node_key for producer in registered.producers_by_contract["asset:image_candidates"]
     } == {
         "ppt.cover.image.generate",
         "video.style_master.image.generate",
