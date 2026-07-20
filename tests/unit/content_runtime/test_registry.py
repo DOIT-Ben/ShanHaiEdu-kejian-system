@@ -107,15 +107,16 @@ def test_registry_loads_the_published_catalog_with_one_deterministic_order() -> 
 
 def test_registry_reads_legacy_release_without_granting_v2_projection_capabilities() -> None:
     legacy = {
+        "api_version": "shanhai.workflow-node-generation-binding/v1",
         "nodes": [
             {
                 "node_key": "generate",
-                "branch_key": "lesson_plan",
-                "dependencies": [],
+                "execution_kind": "model_generation",
                 "input_contract_refs": ["content:lesson_plan"],
-                "output_contract_refs": [],
+                "output_contract_refs": ["package:creation_image"],
+                "validator_refs": ["validator.lesson_plan.schema"],
             }
-        ]
+        ],
     }
 
     registered = BUILTIN_WORKFLOW_REGISTRY.load(legacy)
@@ -123,6 +124,8 @@ def test_registry_reads_legacy_release_without_granting_v2_projection_capabiliti
     assert registered.topological_order == ("generate",)
     assert registered.node_by_key["generate"].binding == legacy["nodes"][0]
     assert registered.output_definition_index == {}
+    assert registered.producer_index == {}
+    assert registered.validator_descriptor_index == {}
 
 
 @pytest.mark.parametrize(
@@ -164,6 +167,49 @@ def test_registered_indexes_are_immutable() -> None:
         registered.output_definition_index["new.output"] = object()
     with pytest.raises(TypeError):
         registered.producer_index[("lesson_unit", "ppt", "asset:new")] = object()
+    with pytest.raises(TypeError):
+        registered.validator_descriptor_index[("validator.test", "1.0.0")] = object()
+
+
+def test_registry_indexes_versioned_validator_descriptors_and_rejects_drift() -> None:
+    registered = BUILTIN_WORKFLOW_REGISTRY.load(minimal_v2_catalog())
+    descriptor = registered.validator_descriptor_index[("validator.test", "1.0.0")]
+    assert descriptor["implementation_digest"] == "a" * 64
+    with pytest.raises(TypeError):
+        descriptor["implementation_digest"] = "b" * 64
+
+    empty = minimal_v2_catalog()
+    empty["validator_descriptors"] = []
+    with pytest.raises(WorkflowDefinitionError):
+        BUILTIN_WORKFLOW_REGISTRY.load(empty)
+
+
+@pytest.mark.parametrize("reference_location", ["node", "report", "gate"])
+def test_registry_rejects_validator_reference_digest_drift(
+    reference_location: str,
+) -> None:
+    catalog = load_catalog()
+    nodes = cast(list[dict[str, Any]], catalog["nodes"])
+    if reference_location == "report":
+        node = next(node for node in nodes if "quality_report_persistence" in node)
+        refs = cast(
+            list[dict[str, Any]],
+            node["quality_report_persistence"]["validator_refs"],
+        )
+    else:
+        execution_kind = "human_gate" if reference_location == "gate" else "model_generation"
+        node = next(
+            node
+            for node in nodes
+            if node["execution_kind"] == execution_kind and node["validator_refs"]
+        )
+        refs = cast(list[dict[str, Any]], node["validator_refs"])
+    refs[0]["implementation_digest"] = "f" * 64
+
+    with pytest.raises(WorkflowDefinitionError) as caught:
+        BUILTIN_WORKFLOW_REGISTRY.load(catalog)
+
+    assert caught.value.code == "WORKFLOW_VALIDATOR_DESCRIPTOR_UNRESOLVED"
 
 
 def test_registry_rejects_duplicate_contract_producers_in_one_branch() -> None:

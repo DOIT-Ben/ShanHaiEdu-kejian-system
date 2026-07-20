@@ -20,6 +20,7 @@ from workflow.definition import (
 )
 
 WORKFLOW_CATALOG_API_VERSION = "shanhai.workflow-node-generation-binding/v2"
+LEGACY_WORKFLOW_CATALOG_API_VERSION = "shanhai.workflow-node-generation-binding/v1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +31,7 @@ class RegisteredWorkflow:
     producers_by_contract: Mapping[str, tuple[WorkflowProducerRef, ...]]
     producer_index: Mapping[tuple[str, str, str], WorkflowProducerRef]
     output_definition_index: Mapping[str, WorkflowOutputDefinitionBinding]
+    validator_descriptor_index: Mapping[tuple[str, str], Mapping[str, object]]
 
     @property
     def indexes(self) -> WorkflowIndexes:
@@ -54,7 +56,7 @@ class WorkflowRegistry:
     available_contract_refs: frozenset[str] | None = None
 
     def load(self, payload: dict[str, Any]) -> RegisteredWorkflow:
-        if "api_version" not in payload:
+        if payload.get("api_version") in {None, LEGACY_WORKFLOW_CATALOG_API_VERSION}:
             return self._load_legacy(payload)
         self._require_v2_catalog(payload)
         external_refs = self._parse_string_array(
@@ -76,6 +78,9 @@ class WorkflowRegistry:
                 code="WORKFLOW_CATALOG_DECLARATION_INVALID",
             )
         nodes = tuple(self._parse_node(raw) for raw in cast(list[object], raw_nodes))
+        validator_index = self._build_validator_descriptor_index(
+            cast(list[object], raw_descriptors), nodes
+        )
         graph = WorkflowGraph(nodes=nodes)
         produced_refs = frozenset(
             output_ref for node in nodes for output_ref in node.output_contract_refs
@@ -96,6 +101,7 @@ class WorkflowRegistry:
             producers_by_contract=indexes.producers_by_contract,
             producer_index=indexes.producer_index,
             output_definition_index=indexes.output_definition_index,
+            validator_descriptor_index=validator_index,
         )
 
     def _load_legacy(self, payload: Mapping[str, object]) -> RegisteredWorkflow:
@@ -120,6 +126,7 @@ class WorkflowRegistry:
             producers_by_contract=MappingProxyType({}),
             producer_index=MappingProxyType({}),
             output_definition_index=MappingProxyType({}),
+            validator_descriptor_index=MappingProxyType({}),
         )
 
     @staticmethod
@@ -143,7 +150,7 @@ class WorkflowRegistry:
                 code="WORKFLOW_LEGACY_DECLARATION_INVALID",
             )
         dependencies = WorkflowRegistry._parse_string_array(
-            values, "dependencies", required=True, error_code="WORKFLOW_LEGACY_DECLARATION_INVALID"
+            values, "dependencies", error_code="WORKFLOW_LEGACY_DECLARATION_INVALID"
         )
         return WorkflowNodeDefinition(
             node_key=node_key,
@@ -166,6 +173,71 @@ class WorkflowRegistry:
             ),
             binding=copy.deepcopy(values),
         )
+
+    @staticmethod
+    def _build_validator_descriptor_index(
+        raw_descriptors: list[object],
+        nodes: tuple[WorkflowNodeDefinition, ...],
+    ) -> Mapping[tuple[str, str], Mapping[str, object]]:
+        if not raw_descriptors:
+            raise WorkflowDefinitionError(
+                "workflow catalog validator_descriptors cannot be empty",
+                code="WORKFLOW_VALIDATOR_DESCRIPTOR_INVALID",
+            )
+        index: dict[tuple[str, str], Mapping[str, object]] = {}
+        for raw in raw_descriptors:
+            if not isinstance(raw, dict):
+                raise WorkflowDefinitionError(
+                    "workflow validator descriptor must be an object",
+                    code="WORKFLOW_VALIDATOR_DESCRIPTOR_INVALID",
+                )
+            descriptor = cast(dict[str, object], raw)
+            key = descriptor.get("key")
+            version = descriptor.get("semantic_version")
+            digest = descriptor.get("implementation_digest")
+            if (
+                not isinstance(key, str)
+                or not key.strip()
+                or not isinstance(version, str)
+                or not version.strip()
+                or not isinstance(digest, str)
+                or len(digest) != 64
+            ):
+                raise WorkflowDefinitionError(
+                    "workflow validator descriptor identity is invalid",
+                    code="WORKFLOW_VALIDATOR_DESCRIPTOR_INVALID",
+                )
+            identity = (key, version)
+            if identity in index:
+                raise WorkflowDefinitionError(
+                    "workflow validator descriptor version is duplicated",
+                    code="WORKFLOW_VALIDATOR_DESCRIPTOR_INVALID",
+                )
+            index[identity] = MappingProxyType(copy.deepcopy(descriptor))
+        for node in nodes:
+            binding = cast(Mapping[str, object], node.binding)
+            refs = list(cast(list[object], binding.get("validator_refs", [])))
+            report = binding.get("quality_report_persistence")
+            if isinstance(report, Mapping):
+                report_values = cast(Mapping[str, object], report)
+                refs.extend(cast(list[object], report_values.get("validator_refs", [])))
+            for raw_ref in refs:
+                if not isinstance(raw_ref, Mapping):
+                    raise WorkflowDefinitionError(
+                        "workflow validator reference is invalid",
+                        code="WORKFLOW_VALIDATOR_DESCRIPTOR_UNRESOLVED",
+                    )
+                ref = cast(Mapping[str, object], raw_ref)
+                identity = (ref.get("key"), ref.get("semantic_version"))
+                descriptor = index.get(cast(tuple[str, str], identity))
+                if descriptor is None or descriptor["implementation_digest"] != ref.get(
+                    "implementation_digest"
+                ):
+                    raise WorkflowDefinitionError(
+                        "workflow validator reference does not resolve exactly",
+                        code="WORKFLOW_VALIDATOR_DESCRIPTOR_UNRESOLVED",
+                    )
+        return MappingProxyType(index)
 
     @staticmethod
     def _legacy_topological_order(

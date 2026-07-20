@@ -174,6 +174,23 @@ def _upstream() -> dict[str, ArtifactContextVersion]:
     }
 
 
+def _artifact_result(**changes: Any) -> ArtifactWriteResult:
+    values: dict[str, Any] = {
+        "artifact_id": ARTIFACT_ID,
+        "artifact_version_id": ARTIFACT_VERSION_ID,
+        "content_hash": "artifact-hash",
+        "project_id": PROJECT_ID,
+        "node_run_id": NODE_RUN_ID,
+        "artifact_key": "ppt-body-prompts:LESSON-001",
+        "artifact_type": "ppt_body_asset_prompt_package",
+        "branch_key": "ppt",
+        "lesson_unit_id": LESSON_UNIT_ID,
+        "content_definition_version_id": CONTENT_DEFINITION_ID,
+    }
+    values.update(changes)
+    return ArtifactWriteResult(**values)
+
+
 def _output() -> dict[str, Any]:
     return {
         "summary": {"points": ["one"]},
@@ -406,11 +423,7 @@ def test_materializes_creation_package_after_artifact_persistence() -> None:
     binding["output_persistence"]["creation_package"]["items_pointer"] = "/missing"
     package = materialize_creation_package(
         plan,
-        artifact_result=ArtifactWriteResult(
-            artifact_id=ARTIFACT_ID,
-            artifact_version_id=ARTIFACT_VERSION_ID,
-            content_hash="artifact-hash",
-        ),
+        artifact_result=_artifact_result(),
     )
 
     assert package is not None
@@ -432,6 +445,30 @@ def test_materializes_creation_package_after_artifact_persistence() -> None:
     }
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("project_id", ARTIFACT_ID),
+        ("node_run_id", ARTIFACT_ID),
+        ("artifact_key", "wrong"),
+        ("artifact_type", "wrong"),
+        ("branch_key", "video"),
+        ("lesson_unit_id", None),
+        ("content_definition_version_id", ARTIFACT_ID),
+    ],
+)
+def test_creation_package_rejects_artifact_result_provenance_mismatch(
+    field: str, value: object
+) -> None:
+    plan = _compile(_binding(package=True))
+    with pytest.raises(OutputProjectionError) as caught:
+        materialize_creation_package(
+            plan,
+            artifact_result=_artifact_result(**{field: value}),
+        )
+    assert caught.value.code == "OUTPUT_PROJECTION_ARTIFACT_RESULT_MISMATCH"
+
+
 @pytest.mark.parametrize("duplicate", ["key", "position", "slot"])
 def test_rejects_duplicate_creation_package_coordinates(duplicate: str) -> None:
     binding = _binding(package=True)
@@ -447,11 +484,7 @@ def test_rejects_duplicate_creation_package_coordinates(duplicate: str) -> None:
     with pytest.raises(OutputProjectionError) as caught:
         materialize_creation_package(
             plan,
-            artifact_result=ArtifactWriteResult(
-                artifact_id=ARTIFACT_ID,
-                artifact_version_id=ARTIFACT_VERSION_ID,
-                content_hash="artifact-hash",
-            ),
+            artifact_result=_artifact_result(),
         )
     assert caught.value.code == "OUTPUT_PROJECTION_PACKAGE_DUPLICATE"
 
@@ -463,11 +496,7 @@ def test_rejects_target_slots_outside_declared_namespace() -> None:
     with pytest.raises(OutputProjectionError) as caught:
         materialize_creation_package(
             plan,
-            artifact_result=ArtifactWriteResult(
-                artifact_id=ARTIFACT_ID,
-                artifact_version_id=ARTIFACT_VERSION_ID,
-                content_hash="artifact-hash",
-            ),
+            artifact_result=_artifact_result(),
         )
     assert caught.value.code == "OUTPUT_PROJECTION_TARGET_SLOT_UNAUTHORIZED"
 
@@ -480,11 +509,7 @@ def test_nonempty_reference_assets_require_trusted_runtime_authorization() -> No
     with pytest.raises(OutputProjectionError) as caught:
         materialize_creation_package(
             plan,
-            artifact_result=ArtifactWriteResult(
-                artifact_id=ARTIFACT_ID,
-                artifact_version_id=ARTIFACT_VERSION_ID,
-                content_hash="artifact-hash",
-            ),
+            artifact_result=_artifact_result(),
         )
     assert caught.value.code == "OUTPUT_PROJECTION_REFERENCE_ASSETS_UNAUTHORIZED"
 
@@ -505,11 +530,7 @@ def test_nonempty_reference_assets_require_trusted_runtime_authorization() -> No
     )
     package = materialize_creation_package(
         plan,
-        artifact_result=ArtifactWriteResult(
-            artifact_id=ARTIFACT_ID,
-            artifact_version_id=ARTIFACT_VERSION_ID,
-            content_hash="artifact-hash",
-        ),
+        artifact_result=_artifact_result(),
     )
     assert package is not None
     assert package.items[0].reference_assets[0].asset_version_id == UUID(asset_id)
@@ -532,11 +553,7 @@ def test_reference_asset_authorization_requires_the_same_role() -> None:
     with pytest.raises(OutputProjectionError) as caught:
         materialize_creation_package(
             plan,
-            artifact_result=ArtifactWriteResult(
-                artifact_id=ARTIFACT_ID,
-                artifact_version_id=ARTIFACT_VERSION_ID,
-                content_hash="artifact-hash",
-            ),
+            artifact_result=_artifact_result(),
         )
     assert caught.value.code == "OUTPUT_PROJECTION_REFERENCE_ASSETS_UNAUTHORIZED"
 
@@ -558,11 +575,7 @@ def test_reference_asset_uuid_cannot_be_reused_with_a_different_role() -> None:
     with pytest.raises(OutputProjectionError) as caught:
         materialize_creation_package(
             plan,
-            artifact_result=ArtifactWriteResult(
-                artifact_id=ARTIFACT_ID,
-                artifact_version_id=ARTIFACT_VERSION_ID,
-                content_hash="artifact-hash",
-            ),
+            artifact_result=_artifact_result(),
         )
     assert caught.value.code == "OUTPUT_PROJECTION_REFERENCE_ASSETS_INVALID"
 
@@ -579,11 +592,7 @@ def test_package_requires_an_authorized_target_slot_set() -> None:
     with pytest.raises(OutputProjectionError) as caught:
         materialize_creation_package(
             plan,
-            artifact_result=ArtifactWriteResult(
-                artifact_id=ARTIFACT_ID,
-                artifact_version_id=ARTIFACT_VERSION_ID,
-                content_hash="artifact-hash",
-            ),
+            artifact_result=_artifact_result(),
         )
     assert caught.value.code == "OUTPUT_PROJECTION_TARGET_SLOTS_MISSING"
 

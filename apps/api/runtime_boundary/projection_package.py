@@ -69,7 +69,7 @@ def materialize_creation_package(
     declaration = plan.package_declaration
     if declaration is None:
         return None
-    artifact_version_id = _require_artifact_version_id(artifact_result)
+    artifact_version_id = _require_artifact_result(plan, artifact_result)
     package_type = _require_package_type(declaration.get("package_type"))
     package_key = _compile_package_key(declaration.get("package_key"), artifact_version_id)
     raw_items = _resolve_package_items(declaration, plan.output)
@@ -104,12 +104,26 @@ def materialize_creation_package(
     )
 
 
-def _require_artifact_version_id(result: ArtifactWriteResult) -> UUID:
+def _require_artifact_result(plan: OutputProjectionPlan, result: ArtifactWriteResult) -> UUID:
     value = cast(object, result.artifact_version_id)
     if not isinstance(value, UUID):
         raise OutputProjectionError(
             "OUTPUT_PROJECTION_ARTIFACT_RESULT_INVALID",
             "artifact result version ID is invalid",
+        )
+    expected = plan.artifact_write
+    if (
+        result.project_id != expected.project_id
+        or result.node_run_id != expected.node_run_id
+        or result.artifact_key != expected.artifact_key
+        or result.artifact_type != expected.artifact_type
+        or result.branch_key != expected.branch_key
+        or result.lesson_unit_id != expected.lesson_unit_id
+        or result.content_definition_version_id != expected.content_definition_version_id
+    ):
+        raise OutputProjectionError(
+            "OUTPUT_PROJECTION_ARTIFACT_RESULT_MISMATCH",
+            "artifact result provenance does not match the compiled write",
         )
     return value
 
