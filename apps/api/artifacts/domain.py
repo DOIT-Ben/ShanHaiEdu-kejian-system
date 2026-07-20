@@ -96,10 +96,10 @@ class StaleImpactDimension:
         archived = tuple(self.archived_keys)
         object.__setattr__(self, "changed_keys", changed)
         object.__setattr__(self, "archived_keys", archived)
-        if not isinstance(self.selector, ImpactSelector):
+        if type(self.selector) is not ImpactSelector:
             raise ArtifactInvariantError("stale impact selector is invalid")
         for values in (changed, archived):
-            if any(not isinstance(key, str) or not key.strip() for key in values):
+            if any(type(key) is not str or not key.strip() for key in values):
                 raise ArtifactInvariantError("stale impact keys must be non-empty")
             if len(set(values)) != len(values) or list(values) != sorted(values):
                 raise ArtifactInvariantError("stale impact keys must be unique and sorted")
@@ -123,7 +123,7 @@ class StaleImpactSelection:
             raise ArtifactInvariantError("stale impact selection mode is invalid")
         if self.mode == "all" and dimensions:
             raise ArtifactInvariantError("all stale impact selection cannot have dimensions")
-        if any(not isinstance(item, StaleImpactDimension) for item in dimensions):
+        if any(type(item) is not StaleImpactDimension for item in dimensions):
             raise ArtifactInvariantError("stale impact selection dimensions are invalid")
 
     @classmethod
