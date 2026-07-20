@@ -446,7 +446,10 @@ def test_output_persistence_forbids_implicit_or_extra_targets() -> None:
         "source": "output",
         "pointer": "/body_asset_items",
     }
-    assert_rejected(catalog, "NODE_BINDING_CREATION_PACKAGE_CONTENT_INVALID")
+    assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
+    with pytest.raises(NodeGenerationBindingError) as caught:
+        validate_workflow_node_catalog_semantics(catalog)
+    assert caught.value.code == "NODE_BINDING_ARTIFACT_CONTENT_INVALID"
 
 
 def test_semantic_validator_rejects_reference_asset_schema_bypasses() -> None:
@@ -590,7 +593,7 @@ def test_catalog_hash_is_deterministic_for_semantically_identical_objects() -> N
     assert first_validated.canonical_json == second_validated.canonical_json
     assert first_validated.content_hash == second_validated.content_hash
     assert first_validated.content_hash == (
-        "60b997dfedb4aab3b3af0ae012655546fcb41aa8184d869c2cffe501598bfb45"
+        "205a7c2c2e7053269f52f9c2a8f138c77d02f039f37cb19d8d19f11a5e405f9a"
     )
 
 

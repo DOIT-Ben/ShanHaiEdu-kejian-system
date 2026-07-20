@@ -18,7 +18,7 @@ flowchart TD
     Plan --> Delivery
 ```
 
-上图是业务分支概览，不是完整可执行节点图。#130任务分支候选使用`WorkflowNodeGenerationBinding v2`声明可执行拓扑；只有合并并通过PostgreSQL前向发布验证后，运行时才从对应的已发布`graph_json`通过`WorkflowRegistry`解析该版本。`dependencies`只表达同`execution_scope/branch_key`内的直接生产者，跨组事实通过输入合同和Context白名单解析。
+上图是业务分支概览，不是完整可执行节点图。#130与PR #141已经把`WorkflowNodeGenerationBinding v2`候选拓扑合入主线，#146继续加固其发布和运行时安全边界；只有#146合并并通过PostgreSQL前向发布复验后，运行时才把对应`graph_json`作为新项目默认。`dependencies`只表达同`execution_scope/branch_key`内的直接生产者，跨组事实通过输入合同和Context白名单解析。
 
 教案正文和课堂导入设计是课时划分后的兄弟产物。三类九套默认作为教案正文之后的独立附录展示，但两者状态、版本和审核互不阻塞。PPT依赖已批准教案；视频依赖已选择导入方案，不读取教案正文。PPT与视频互不依赖。
 
@@ -43,7 +43,7 @@ flowchart TD
 
 ### 首套内置生成基线
 
-`shanhai.primary_math.courseware@1.1.0`是#130任务分支的前向候选；合并并通过PostgreSQL前向发布验证前，当前正式发布基线仍是`1.0.0`，既有项目绑定不改写。候选声明源位于`workflow/builtin/primary_math_courseware/generation-source.json`，确定性构建后为47节点目录中的22个`model_generation`节点各提供：
+`shanhai.primary_math.courseware@1.1.0`是#130合入主线、由#146继续加固的前向候选；#146合并并通过PostgreSQL前向发布复验前，当前正式发布基线仍是`1.0.0`，既有项目绑定不改写。候选声明源位于`workflow/builtin/primary_math_courseware/generation-source.json`，确定性构建后为47节点目录中的22个`model_generation`节点各提供：
 
 - 教师输入、系统补全和Context注入字段；
 - 可编辑业务Prompt与只读方法、质量门；

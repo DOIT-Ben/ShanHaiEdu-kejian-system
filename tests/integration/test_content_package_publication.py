@@ -57,6 +57,11 @@ from workflow.registry import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
+LEGACY_RELEASE_FIXTURE_ROOT = (
+    ROOT / "tests/fixtures/content_runtime/primary_math_courseware_1_0"
+)
+LEGACY_PACKAGE_CHECKSUM = "894771a7472723cb70a4586a7905af480e04f5baee636351a4cc0597c6c9712f"
+LEGACY_WORKFLOW_CHECKSUM = "268f503e9e7e455aab936e885d1c67b1934384d45c2ef0e4d0399683e579e7ea"
 
 
 @pytest.fixture(scope="module")
@@ -409,6 +414,113 @@ def test_creation_package_non_field_projection_must_have_a_compatible_type(
     )
 
 
+def load_json_object(path: Path) -> dict[str, Any]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(value, dict)
+    return value
+
+
+@pytest.mark.parametrize(
+    ("mapping_name", "value"),
+    [
+        ("item_key", ""),
+        ("item_key", " " * 3),
+        ("item_key", "a" * 161),
+        ("title", "a" * 256),
+        ("business_prompt", "a" * 50_001),
+        ("consistency_key", "a" * 161),
+    ],
+    ids=(
+        "empty-item-key",
+        "blank-item-key",
+        "long-item-key",
+        "long-title",
+        "long-business-prompt",
+        "long-consistency-key",
+    ),
+)
+def test_creation_package_constant_strings_must_fit_runtime_bounds(
+    builtin_courseware_source: BuiltinCoursewareReleaseSource,
+    mapping_name: str,
+    value: str,
+) -> None:
+    catalog = deepcopy(builtin_courseware_source.workflow_catalog)
+    node = package_node(catalog, "ppt.body_asset_prompts.generate")
+    node["output_persistence"]["creation_package"]["item_mapping"][mapping_name] = {
+        "source": "constant",
+        "value": value,
+    }
+
+    with pytest.raises(ContentPublicationConflict) as caught:
+        validate_catalog_source(builtin_courseware_source, catalog)
+
+    assert str(caught.value) == (
+        "creation package string mapping bounds are unsafe: "
+        f"ppt.body_asset_prompts.generate {mapping_name} constant <constant>"
+    )
+
+
+@pytest.mark.parametrize("value", ["PPT.page-01.main-visual", "ppt..main-visual"])
+def test_creation_package_constant_target_slot_must_be_semantic(
+    builtin_courseware_source: BuiltinCoursewareReleaseSource,
+    value: str,
+) -> None:
+    catalog = deepcopy(builtin_courseware_source.workflow_catalog)
+    node = package_node(catalog, "ppt.body_asset_prompts.generate")
+    node["output_persistence"]["creation_package"]["item_mapping"]["target_slot"] = {
+        "source": "constant",
+        "value": value,
+    }
+
+    with pytest.raises(ContentPublicationConflict) as caught:
+        validate_catalog_source(builtin_courseware_source, catalog)
+
+    assert str(caught.value) == (
+        "creation package target_slot mapping lacks the required semantic pattern: "
+        "ppt.body_asset_prompts.generate constant <constant>"
+    )
+
+
+@pytest.mark.parametrize("value", [0, 101])
+def test_creation_package_constant_position_must_fit_package_bounds(
+    builtin_courseware_source: BuiltinCoursewareReleaseSource,
+    value: int,
+) -> None:
+    catalog = deepcopy(builtin_courseware_source.workflow_catalog)
+    node = package_node(catalog, "ppt.body_asset_prompts.generate")
+    node["output_persistence"]["creation_package"]["item_mapping"]["position"] = {
+        "source": "constant",
+        "value": value,
+    }
+
+    with pytest.raises(ContentPublicationConflict) as caught:
+        validate_catalog_source(builtin_courseware_source, catalog)
+
+    assert str(caught.value) == (
+        "creation package constant position is outside package bounds: "
+        f"ppt.body_asset_prompts.generate {value}"
+    )
+
+
+def test_creation_package_runtime_string_mapping_requires_static_bounds(
+    builtin_courseware_source: BuiltinCoursewareReleaseSource,
+) -> None:
+    catalog = deepcopy(builtin_courseware_source.workflow_catalog)
+    node = package_node(catalog, "ppt.body_asset_prompts.generate")
+    node["output_persistence"]["creation_package"]["item_mapping"]["title"] = {
+        "source": "runtime",
+        "pointer": "/lesson_key",
+    }
+
+    with pytest.raises(ContentPublicationConflict) as caught:
+        validate_catalog_source(builtin_courseware_source, catalog)
+
+    assert str(caught.value) == (
+        "creation package string mapping bounds are unsafe: "
+        "ppt.body_asset_prompts.generate title runtime /lesson_key"
+    )
+
+
 def test_creation_package_non_field_sources_and_valid_output_pointer_are_not_rejected(
     builtin_courseware_source: BuiltinCoursewareReleaseSource,
 ) -> None:
@@ -427,47 +539,38 @@ def test_creation_package_non_field_sources_and_valid_output_pointer_are_not_rej
 def legacy_courseware_release(
     source: BuiltinCoursewareReleaseSource,
 ) -> BuiltinCoursewareReleaseSource:
-    manifest = deepcopy(source.manifest)
-    manifest["semantic_version"] = "1.0.0"
-    manifest["change_summary"] = "冻结首套课时、教案、导入、PPT、图片、视频和音频业务生成合同。"
-    v1_node_fields = (
-        "node_key",
-        "title",
-        "phase",
-        "execution_kind",
-        "executor_ref",
-        "model_capability",
-        "generation_template_ref",
-        "input_contract_refs",
-        "output_contract_refs",
-        "prompt_exposure_policy",
-        "instruction_policy",
-        "context_policy",
-        "reference_asset_policy",
-        "validator_refs",
-        "repair_policy",
-        "approval_policy",
-    )
-    nodes: list[dict[str, Any]] = []
-    for current in source.workflow_catalog["nodes"]:
-        node = {key: deepcopy(current[key]) for key in v1_node_fields if key in current}
-        node["validator_refs"] = [
-            ref["key"] if isinstance(ref, dict) else ref for ref in node["validator_refs"]
-        ]
-        nodes.append(node)
-    catalog = {
-        "api_version": LEGACY_WORKFLOW_CATALOG_API_VERSION,
-        "catalog_key": source.workflow_catalog["catalog_key"],
-        "workflow_key": source.workflow_catalog["workflow_key"],
-        "semantic_version": "1.0.0",
-        "nodes": nodes,
+    manifest = load_json_object(LEGACY_RELEASE_FIXTURE_ROOT / "manifest.json")
+    catalog = load_json_object(LEGACY_RELEASE_FIXTURE_ROOT / "workflow.json")
+    entries = {
+        entry["item_key"]: entry
+        for entry in manifest["items"]
+        if isinstance(entry, dict) and isinstance(entry.get("item_key"), str)
     }
+    items = deepcopy(source.items)
+    for entry in entries.values():
+        fixture_path = LEGACY_RELEASE_FIXTURE_ROOT / entry["path"]
+        if fixture_path.exists():
+            items[entry["item_key"]] = load_json_object(fixture_path)
+    if set(items) != set(entries):
+        raise AssertionError("legacy package item inventory differs from the published snapshot")
+    for item_key, entry in entries.items():
+        if canonical_json_sha256(items[item_key]) != entry["sha256"]:
+            raise AssertionError(f"legacy package item drifted: {item_key}")
+    package_checksum = canonical_json_sha256(manifest)
+    workflow_checksum = hashlib.sha256(canonical_catalog_json(catalog)).hexdigest()
+    if (
+        package_checksum != LEGACY_PACKAGE_CHECKSUM
+        or workflow_checksum != LEGACY_WORKFLOW_CHECKSUM
+    ):
+        raise AssertionError("legacy release checksum differs from the published snapshot")
     return replace(
         source,
         manifest=manifest,
+        items=items,
+        manifest_entries=entries,
         workflow_catalog=catalog,
-        package_checksum=canonical_json_sha256(manifest),
-        workflow_checksum=hashlib.sha256(canonical_catalog_json(catalog)).hexdigest(),
+        package_checksum=package_checksum,
+        workflow_checksum=workflow_checksum,
     )
 
 
@@ -476,6 +579,8 @@ def test_legacy_courseware_release_uses_v1_shape_and_fails_projection_closed(
 ) -> None:
     legacy = legacy_courseware_release(builtin_courseware_source)
 
+    assert legacy.package_checksum == LEGACY_PACKAGE_CHECKSUM
+    assert legacy.workflow_checksum == LEGACY_WORKFLOW_CHECKSUM
     assert legacy.workflow_catalog["api_version"] == LEGACY_WORKFLOW_CATALOG_API_VERSION
     assert "external_input_contract_refs" not in legacy.workflow_catalog
     assert "validator_descriptors" not in legacy.workflow_catalog
@@ -654,10 +759,12 @@ def test_forward_publication_preserves_legacy_release_and_project_bindings(
         == "1.0.0"
     )
     assert legacy.package_checksum == canonical_json_sha256(legacy.manifest)
+    assert legacy.package_checksum == LEGACY_PACKAGE_CHECKSUM
     assert (
         legacy.workflow_checksum
         == hashlib.sha256(canonical_catalog_json(legacy.workflow_catalog)).hexdigest()
     )
+    assert legacy.workflow_checksum == LEGACY_WORKFLOW_CHECKSUM
     assert legacy.package_checksum != source.package_checksum
     assert legacy.workflow_checksum != source.workflow_checksum
 
