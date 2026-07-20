@@ -211,6 +211,8 @@ describe("FinalVideoStep synthesis single flight", () => {
       }),
     );
 
+    expect(screen.getByRole("button", { name: "正在检查字幕文件" })).toBeDisabled();
+    fireEvent.load(track as HTMLTrackElement);
     expect(await screen.findByRole("button", { name: "确认画面与字幕文件" })).toBeEnabled();
     expect(screen.getByText("字幕文件已验证")).toBeInTheDocument();
   });
@@ -292,6 +294,62 @@ describe("FinalVideoStep synthesis single flight", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("字幕文件无法读取");
     expect(screen.queryByRole("button", { name: "确认画面与字幕文件" })).not.toBeInTheDocument();
+    expect(getMockRuntimeState().nodeStates["project-a:lesson-a:final-video"]?.status).toBe(
+      "review_required",
+    );
+    expect(
+      getMockRuntimeState().drafts[finalVideoMediaConfirmationKey("project-a", "lesson-a")]?.value,
+    ).toMatchObject({ status: "unavailable" });
+  });
+
+  it("VTT 原生字幕轨加载失败时撤销确认", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response("WEBVTT\n\n00:00.000 --> 00:01.000\n课堂导入", {
+          headers: { "content-type": "text/vtt" },
+          status: 200,
+        }),
+      ),
+    );
+    saveMockDraft(
+      "project:project-a:lesson:lesson-a:final-video:media",
+      {
+        mimeType: "video/mp4",
+        src: "https://cdn.example.com/final.mp4",
+        subtitleUrl: "https://cdn.example.com/final.vtt",
+      },
+      { lessonId: "lesson-a", nodeKey: "final-video", projectId: "project-a" },
+    );
+    saveMockDraft(
+      finalVideoMediaConfirmationKey("project-a", "lesson-a"),
+      {
+        mimeType: "video/mp4",
+        src: "https://cdn.example.com/final.mp4",
+        status: "confirmed",
+        subtitleFormat: "vtt",
+        subtitleSrc: "https://cdn.example.com/final.vtt",
+      },
+      { lessonId: "lesson-a", nodeKey: "final-video", projectId: "project-a" },
+    );
+    updateMockNodeState("project-a", "lesson-a", "final-video", { status: "approved" });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-a/lessons/lesson-a/work/final-video"]}>
+        <Routes>
+          <Route
+            element={<FinalVideoStep />}
+            path="/projects/:projectId/lessons/:lessonId/work/final-video"
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const video = screen.getByLabelText("果汁标签侦探课堂导入视频");
+    fireEvent.canPlay(video);
+    fireEvent.error(video.querySelector("track") as HTMLTrackElement);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("字幕文件无法读取");
     expect(getMockRuntimeState().nodeStates["project-a:lesson-a:final-video"]?.status).toBe(
       "review_required",
     );

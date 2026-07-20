@@ -155,8 +155,15 @@ function normalizeMimeType(value: string | null) {
 
 function hasValidSubtitleContent(content: string, format: SubtitleFormat) {
   const normalized = content.replace(/^\uFEFF/, "").trimStart();
-  if (format === "vtt") return /^WEBVTT(?:[ \t].*)?(?:\r?\n|$)/.test(normalized);
-  return /(?:^|\r?\n)\d+\s*\r?\n\d{2}:\d{2}:\d{2}[,.]\d{3}\s+-->\s+\d{2}:\d{2}:\d{2}[,.]\d{3}/.test(
+  if (format === "vtt") {
+    return (
+      /^WEBVTT(?:[ \t].*)?(?:\r?\n|$)/.test(normalized) &&
+      /(?:^|\r?\n)(?:\d{2}:)?\d{2}:\d{2}\.\d{3}[ \t]+-->[ \t]+(?:\d{2}:)?\d{2}:\d{2}\.\d{3}(?:[ \t]+[^\r\n]*)?\r?\n[^\r\n]*\S/.test(
+        normalized,
+      )
+    );
+  }
+  return /(?:^|\r?\n)\d+\s*\r?\n\d{2}:\d{2}:\d{2}[,.]\d{3}\s+-->\s+\d{2}:\d{2}:\d{2}[,.]\d{3}(?:[ \t]+[^\r\n]*)?\r?\n[^\r\n]*\S/.test(
     normalized,
   );
 }
@@ -173,7 +180,7 @@ export async function validateSubtitleFile(
     });
     if (!response.ok) return false;
     const contentType = normalizeMimeType(response.headers.get("content-type"));
-    if (contentType && !subtitleMimeTypes[format].includes(contentType)) return false;
+    if (!contentType || !subtitleMimeTypes[format].includes(contentType)) return false;
     return hasValidSubtitleContent(await response.text(), format);
   } catch {
     return false;

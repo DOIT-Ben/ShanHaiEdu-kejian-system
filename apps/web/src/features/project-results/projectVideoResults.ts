@@ -99,7 +99,9 @@ export function getProjectVideoSummary(
   );
   const unresolvedStatuses = candidates.flatMap<WorkflowStatus>((candidate) => {
     if (candidate.confirmedMedia) return [];
-    if (candidate.media && candidate.node?.status === "approved") return ["review_required"];
+    if (candidate.node?.status === "approved") {
+      return [candidate.media ? "review_required" : "not_ready"];
+    }
     return [candidate.node?.status ?? candidate.lesson.videoStatus];
   });
   const unresolvedStatus =
