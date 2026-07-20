@@ -71,7 +71,7 @@ def test_stale_propagates_only_along_real_relations_and_accept_stale_clears_it(
                 to_version_id=downstream_v1.id,
                 relation_type="derives_from",
                 binding_key="lesson_scope",
-                impact_scope={"fields": ["value"]},
+                impact_scope={"mode": "all"},
             )
             package, _ = seed_project_package(
                 session,
@@ -110,9 +110,16 @@ def test_stale_propagates_only_along_real_relations_and_accept_stale_clears_it(
         session.refresh(unrelated)
         assert downstream.status == "stale"
         assert downstream.stale_reason_json == {
+            "reason_code": "UPSTREAM_APPROVED_VERSION_CHANGED",
             "replaced_upstream_version_id": str(upstream_v1.id),
             "replacement_version_id": str(upstream_v2.id),
-            "bindings": [{"binding_key": "lesson_scope", "impact_scope": {"fields": ["value"]}}],
+            "bindings": [
+                {
+                    "relation_type": "derives_from",
+                    "binding_key": "lesson_scope",
+                    "impact_scope": {"mode": "all"},
+                }
+            ],
         }
         assert unrelated.status == "approved"
         refreshed_package = session.get(CreationPackage, package.id)
@@ -160,7 +167,7 @@ def test_relation_cycle_and_cross_tenant_visibility_are_rejected(
             to_version_id=second_v.id,
             relation_type="references",
             binding_key="first-to-second",
-            impact_scope={},
+            impact_scope={"mode": "all"},
         )
         with pytest.raises(ApiError) as cycle:
             service.add_relation(
@@ -168,7 +175,7 @@ def test_relation_cycle_and_cross_tenant_visibility_are_rejected(
                 to_version_id=first_v.id,
                 relation_type="references",
                 binding_key="second-to-first",
-                impact_scope={},
+                impact_scope={"mode": "all"},
             )
         assert cycle.value.code == "ARTIFACT_RELATION_CYCLE"
 
@@ -202,7 +209,7 @@ def test_revoking_an_upstream_approval_marks_real_downstream_stale(
             to_version_id=downstream_version.id,
             relation_type="derives_from",
             binding_key="revoked-source",
-            impact_scope={"fields": ["value"]},
+            impact_scope={"mode": "all"},
         )
         service.review(
             upstream_version.id,
@@ -213,4 +220,5 @@ def test_revoking_an_upstream_approval_marks_real_downstream_stale(
 
         assert downstream.status == "stale"
         assert downstream.stale_reason_json is not None
+        assert downstream.stale_reason_json["reason_code"] == "UPSTREAM_APPROVAL_REVOKED"
         assert downstream.stale_reason_json["replacement_version_id"] is None

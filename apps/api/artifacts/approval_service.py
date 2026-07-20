@@ -43,7 +43,11 @@ class ArtifactApprovalService:
         resolved_action, version, artifact = self.require_access(
             version_id,
             action=action,
-            for_update=True,
+            for_update=False,
+        )
+        version, artifact = self._relations.lock_review_target(
+            version_id=version.id,
+            project_id=artifact.project_id,
         )
         if resolved_action is ApprovalAction.APPROVE:
             return self._approve(
