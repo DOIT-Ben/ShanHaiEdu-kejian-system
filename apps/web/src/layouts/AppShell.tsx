@@ -1,5 +1,5 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ChevronDown, Menu, Plus, Search } from "lucide-react";
+import { ChevronDown, Menu, Search } from "lucide-react";
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import brandMark from "@/assets/brand/brand-mark.svg";
@@ -83,22 +83,14 @@ export function AppShell({
             </IconButton>
             <NotificationMenu notifications={notifications} />
             <ThemeSwitcher />
-            <NavLink
-              aria-label="新建课件"
-              className="hidden min-h-10 items-center gap-1.5 rounded-[var(--sh-radius-md)] bg-[image:var(--sh-action-gradient)] px-3.5 text-sm font-semibold text-white shadow-[var(--sh-shadow-card)] transition-[box-shadow,transform] duration-[var(--sh-duration-fast)] hover:-translate-y-0.5 hover:bg-[image:var(--sh-action-gradient-hover)] hover:shadow-[var(--sh-shadow-hover)] sm:inline-flex"
-              to="/app/projects/new"
-            >
-              <Plus aria-hidden="true" className="size-4" />
-              新建课件
-            </NavLink>
             <DropdownMenu.Root>
               <DropdownMenu.Trigger asChild>
                 <button
                   aria-label="打开个人菜单"
-                  className="ml-1 flex min-h-10 items-center gap-2 rounded-[var(--sh-radius-sm)] px-2 hover:bg-[var(--sh-surface-soft)]"
+                  className="ml-1 flex min-h-10 items-center gap-2 rounded-[var(--sh-radius-sm)] px-2 hover:bg-[var(--sh-surface-soft)] max-[359px]:hidden"
                   type="button"
                 >
-                  <span className="grid size-8 place-items-center rounded-full bg-[var(--sh-warning-soft)] text-sm font-semibold text-[var(--sh-warning)]">
+                  <span className="grid size-8 place-items-center rounded-full bg-[var(--sh-brand-50)] text-sm font-semibold text-[var(--sh-brand-700)]">
                     {accountInitial}
                   </span>
                   <ChevronDown aria-hidden="true" className="size-4 text-[var(--sh-ink-faint)]" />

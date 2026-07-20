@@ -41,30 +41,30 @@ export function MarkdownPreview({ markdown }: { markdown: string }) {
       const content = inlineText(heading[2] ?? "");
       if (level === 1) {
         blocks.push(
-          <h1
-            className="font-serif text-3xl font-semibold leading-tight text-[var(--sh-ink-strong)] md:text-4xl"
-            key={`heading-${String(index)}`}
-          >
-            {content}
-          </h1>,
-        );
-      } else if (level === 2) {
-        blocks.push(
           <h2
-            className="mt-8 border-b border-[var(--sh-line-subtle)] pb-2 text-xl font-semibold text-[var(--sh-ink-strong)] first:mt-0"
+            className="sh-display-type text-3xl font-semibold leading-tight text-[var(--sh-ink-strong)] md:text-4xl"
             key={`heading-${String(index)}`}
           >
             {content}
           </h2>,
         );
-      } else {
+      } else if (level === 2) {
         blocks.push(
           <h3
-            className="mt-5 text-base font-semibold text-[var(--sh-brand-700)]"
+            className="mt-8 border-b border-[var(--sh-line-subtle)] pb-2 text-xl font-semibold text-[var(--sh-ink-strong)] first:mt-0"
             key={`heading-${String(index)}`}
           >
             {content}
           </h3>,
+        );
+      } else {
+        blocks.push(
+          <h4
+            className="mt-5 text-base font-semibold text-[var(--sh-brand-700)]"
+            key={`heading-${String(index)}`}
+          >
+            {content}
+          </h4>,
         );
       }
       index += 1;

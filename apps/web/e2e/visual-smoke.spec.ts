@@ -180,13 +180,7 @@ test("1440 首页无横向溢出且用户文案纯净", async ({ page }, testInf
   await page.setViewportSize({ height: 900, width: 1440 });
   await loginAsTeacher(page);
   await page.goto("/app");
-  await captureVisiblePage(
-    page,
-    testInfo,
-    "home-1440",
-    "从一份教材，到一节孩子愿意听的好课",
-    "继续当前课件",
-  );
+  await captureVisiblePage(page, testInfo, "home-1440", "认识百分数", "继续制作");
   await expect(page.getByRole("heading", { name: "也可以直接创作一件作品" })).toBeInViewport();
 });
 
@@ -194,22 +188,10 @@ test("1024 品牌首页保持单主轴且无横向溢出", async ({ page }, test
   await page.setViewportSize({ height: 768, width: 1024 });
   await loginAsTeacher(page);
   await page.goto("/app");
-  await captureVisiblePage(
-    page,
-    testInfo,
-    "home-1024",
-    "从一份教材，到一节孩子愿意听的好课",
-    "继续当前课件",
-  );
+  await captureVisiblePage(page, testInfo, "home-1024", "认识百分数", "继续制作");
   await expect(page.getByLabel("创作向导")).toHaveCount(0);
-  const heroPreview = await page.getByTestId("brand-hero-preview").boundingBox();
-  expect(heroPreview?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(560);
-  expect(heroPreview?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(300);
-  const verticalFit = await page.evaluate(() => ({
-    clientHeight: document.documentElement.clientHeight,
-    scrollHeight: document.documentElement.scrollHeight,
-  }));
-  expect(verticalFit.scrollHeight).toBeLessThanOrEqual(verticalFit.clientHeight + 1);
+  await expect(page.getByText("下一件事", { exact: true })).toBeInViewport();
+  await expect(page.getByRole("heading", { name: "待确认或失败" })).toBeInViewport();
   await expect(page.getByRole("heading", { name: "也可以直接创作一件作品" })).toBeInViewport();
 });
 
@@ -217,13 +199,7 @@ test("390 品牌首页按任务顺序自然下滑", async ({ page }, testInfo) =
   await page.setViewportSize({ height: 844, width: 390 });
   await loginAsTeacher(page);
   await page.goto("/app");
-  await captureVisiblePage(
-    page,
-    testInfo,
-    "home-390",
-    "从一份教材，到一节孩子愿意听的好课",
-    "继续当前课件",
-  );
+  await captureVisiblePage(page, testInfo, "home-390", "认识百分数", "继续制作");
   await expect(page.getByLabel("创作向导")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "继续完成这节课" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "也可以直接创作一件作品" })).toBeVisible();
@@ -330,6 +306,8 @@ test("844×390 短屏核心预览保持可用尺寸", async ({ page }) => {
   expect(styleBox?.height ?? 0).toBeGreaterThanOrEqual(130);
 
   await page.goto("/app/creation/videos");
+  await page.getByRole("button", { name: "开始创作视频" }).click();
+  await expect(page.getByRole("region", { name: "创作结果" })).toBeVisible();
   const creationBox = await page.getByTestId("creation-main-visual").boundingBox();
   expect(creationBox?.width ?? 0).toBeGreaterThanOrEqual(220);
   expect(creationBox?.height ?? 0).toBeGreaterThanOrEqual(120);
@@ -353,8 +331,8 @@ test("390 核心页面优先展示下一步与可操作内容", async ({ page })
   expect((await firstAsset.boundingBox())?.y ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(900);
 
   await page.goto("/app/creation/images");
-  await waitForStablePage(page, "图片创作台", "画一张教学图片");
-  await page.getByRole("button", { name: "调整模型、比例和画面细节" }).click();
+  await waitForStablePage(page, "图片创作台", "画面内容");
+  await page.getByRole("button", { name: "创作设置" }).click();
   const parameterBar = page.getByTestId("creation-parameter-bar");
   expect(
     await parameterBar
@@ -363,7 +341,11 @@ test("390 核心页面优先展示下一步与可操作内容", async ({ page })
         controls.slice(0, 4).map((control) => control.getAttribute("aria-label")),
       ),
   ).toEqual(["创作模型", "比例", "画面风格", "一次生成数量"]);
-  await expect(page.getByTestId("creation-parameter-overflow-hint")).toBeVisible();
+  const settingsDimensions = await parameterBar.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(settingsDimensions.scrollWidth).toBeLessThanOrEqual(settingsDimensions.clientWidth + 1);
 
   await page.goto("/app/projects/new");
   await waitForStablePage(page, "从教材开始一套课堂作品", "项目信息");
@@ -398,7 +380,7 @@ test("1024 通用创作中心无横向溢出且用户文案纯净", async ({ pag
   await page.setViewportSize({ height: 900, width: 1024 });
   await loginAsTeacher(page);
   await page.goto("/app/creation/images");
-  await captureVisiblePage(page, testInfo, "creation-images-1024", "图片创作台", "画一张教学图片");
+  await captureVisiblePage(page, testInfo, "creation-images-1024", "图片创作台", "画面内容");
 });
 
 test("1024 创作中心最近作品保持紧凑", async ({ page }) => {
@@ -421,8 +403,9 @@ test("1024 视频创作参数完整可达", async ({ page }) => {
   await page.setViewportSize({ height: 900, width: 1024 });
   await loginAsTeacher(page);
   await page.goto("/app/creation/videos");
-  await waitForStablePage(page, "视频创作台", "完整要求");
-  const fullPrompt = page.getByRole("button", { name: "查看完整创作要求" });
+  await waitForStablePage(page, "视频创作台", "创作设置");
+  await page.getByRole("button", { name: "创作设置" }).click();
+  const fullPrompt = page.getByRole("button", { name: "完整要求" });
   await expect(fullPrompt).toBeInViewport();
   const fullPromptBox = await fullPrompt.boundingBox();
   expect((fullPromptBox?.x ?? 1024) + (fullPromptBox?.width ?? 0)).toBeLessThanOrEqual(1024);

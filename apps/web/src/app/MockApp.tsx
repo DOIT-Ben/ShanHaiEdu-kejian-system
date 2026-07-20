@@ -128,7 +128,43 @@ export function MockApp() {
             <Route element={<LoginPage />} path="/login" />
             <Route element={<RequireSession />}>
               <Route element={<GlobalAppShell />} path="/app">
-                <Route element={<HomePage />} index />
+                <Route
+                  element={
+                    <HomePage
+                      attentionItems={[
+                        {
+                          detail: "认识百分数 · 第 1 课时",
+                          label: "教案待确认",
+                          status: "review",
+                          to: "/app/tasks",
+                        },
+                      ]}
+                      recentResults={[
+                        {
+                          label: "果汁标签观察图",
+                          ratio: "4:3",
+                          to: "/app/creation/images",
+                          type: "image",
+                          variant: 0,
+                        },
+                        {
+                          label: "百分数百格图",
+                          page: 2,
+                          to: "/app/creation/presentations",
+                          type: "presentation",
+                          variant: 0,
+                        },
+                        {
+                          label: "课堂首问关键帧",
+                          to: "/app/creation/videos",
+                          type: "video",
+                          variant: 1,
+                        },
+                      ]}
+                    />
+                  }
+                  index
+                />
                 <Route element={<ProjectsPage />} path="projects" />
                 <Route element={<NewProjectPage />} path="projects/new" />
                 <Route

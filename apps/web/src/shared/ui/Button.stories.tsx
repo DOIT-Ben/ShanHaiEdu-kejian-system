@@ -35,3 +35,16 @@ export const LongChinese: Story = {
   },
 };
 export const Disabled: Story = { args: { disabled: true, children: "正在准备交付包" } };
+export const Focused: Story = { args: { autoFocus: true, children: "键盘焦点" } };
+export const Pressed: Story = {
+  args: { "aria-pressed": true, children: "按下状态" },
+};
+export const Loading: Story = {
+  args: { children: "保存修改", loading: true, loadingText: "正在保存" },
+};
+export const Success: Story = {
+  args: { children: "保存修改", success: true, successText: "保存成功" },
+};
+export const Error: Story = {
+  args: { children: "保存修改", error: true, errorText: "保存失败" },
+};

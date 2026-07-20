@@ -20,6 +20,8 @@ type SelectProps = {
   options: SelectOption[];
   placeholder?: string;
   size?: "sm" | "md" | "lg";
+  status?: "default" | "success" | "error";
+  statusMessage?: string;
   value?: string;
 };
 
@@ -41,6 +43,8 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
     options,
     placeholder = "请选择",
     size = "md",
+    status = "default",
+    statusMessage,
     value,
   },
   ref,
@@ -61,9 +65,15 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
         className={cn(
           "group inline-flex min-w-0 items-center justify-between gap-2 rounded-[var(--sh-radius-sm)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)] text-left text-[var(--sh-ink-default)] shadow-[var(--sh-shadow-card)] outline-none transition-[border-color,background-color,box-shadow] duration-[var(--sh-duration-fast)] hover:border-[var(--sh-brand-300)] hover:bg-[var(--sh-brand-50)] focus-visible:border-[var(--sh-brand-500)] focus-visible:shadow-[var(--sh-shadow-focus)] data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50",
           sizeClasses[size],
+          status === "success" &&
+            "border-[var(--sh-success)] bg-[var(--sh-success-soft)] focus-visible:border-[var(--sh-success)]",
+          status === "error" &&
+            "border-[var(--sh-danger)] bg-[var(--sh-danger-soft)] focus-visible:border-[var(--sh-danger)]",
           className,
         )}
+        aria-invalid={status === "error" ? true : undefined}
         data-slot="select-trigger"
+        data-validation-state={status}
         onBlur={onBlur}
         ref={ref}
       >
@@ -83,6 +93,16 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
         </SelectPrimitive.Icon>
       </SelectPrimitive.Trigger>
 
+      {statusMessage ? (
+        <span
+          aria-live={status === "error" ? "assertive" : "polite"}
+          className="sr-only"
+          role={status === "error" ? "alert" : "status"}
+        >
+          {statusMessage}
+        </span>
+      ) : null}
+
       <SelectPrimitive.Portal>
         <SelectPrimitive.Content
           align="start"
@@ -93,7 +113,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
           <SelectPrimitive.Viewport>
             {options.map((option) => (
               <SelectPrimitive.Item
-                className="sh-control-compact relative flex min-h-9 cursor-default select-none items-center rounded-md py-2 pl-3 pr-9 text-sm text-[var(--sh-ink-default)] outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-[var(--sh-brand-50)] data-[highlighted]:text-[var(--sh-brand-900)] data-[state=checked]:font-semibold"
+                className="sh-control-compact relative flex min-h-9 cursor-default select-none items-center rounded-[var(--sh-radius-control)] py-2 pl-3 pr-9 text-sm text-[var(--sh-ink-default)] outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-[var(--sh-brand-50)] data-[highlighted]:text-[var(--sh-brand-900)] data-[state=checked]:font-semibold"
                 disabled={option.disabled}
                 key={option.value}
                 value={option.value}

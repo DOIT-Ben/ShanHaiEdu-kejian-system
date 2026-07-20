@@ -9,7 +9,7 @@ import {
   Subtitles,
   Volume2,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { VideoScenePreview } from "@/features/home/components/VideoScenePreview";
 import { StaleContentNotice } from "@/features/workbench/components/StaleContentNotice";
@@ -126,6 +126,7 @@ export function FinalVideoStep() {
     key: string;
     status: "error" | "loading" | "ready";
   }>({ key: "", status: "loading" });
+  const subtitleTrackRef = useRef<HTMLTrackElement | null>(null);
   const [subtitleReloadKey, setSubtitleReloadKey] = useState(0);
   const subtitleSourceKey = `${subtitleSrc ?? ""}\n${subtitleFormat ?? ""}\n${String(subtitleReloadKey)}`;
   const subtitleFileLoadState = !hasSubtitleSource
@@ -273,11 +274,24 @@ export function FinalVideoStep() {
     setVideoLoad({ key: videoSourceKey, status: "error" });
     invalidateFinalVideoMedia(projectId, lessonId, playableVideo);
   };
-  const markSubtitleTrackError = () => {
-    if (!playableVideo || subtitleFormat !== "vtt") return;
+  const markSubtitleTrackReady = useCallback(() => {
+    setSubtitleTrackLoad({ key: subtitleSourceKey, status: "ready" });
+  }, [subtitleSourceKey]);
+  const markSubtitleTrackError = useCallback(() => {
+    if (!hasNativeSubtitleTrack) return;
     setSubtitleTrackLoad({ key: subtitleSourceKey, status: "error" });
-    invalidateFinalVideoMedia(projectId, lessonId, playableVideo);
-  };
+    invalidateFinalVideoMedia(projectId, lessonId);
+  }, [hasNativeSubtitleTrack, lessonId, projectId, subtitleSourceKey]);
+  useEffect(() => {
+    const track = subtitleTrackRef.current;
+    if (!track || !hasNativeSubtitleTrack) return;
+    track.addEventListener("load", markSubtitleTrackReady);
+    track.addEventListener("error", markSubtitleTrackError);
+    return () => {
+      track.removeEventListener("load", markSubtitleTrackReady);
+      track.removeEventListener("error", markSubtitleTrackError);
+    };
+  }, [hasNativeSubtitleTrack, markSubtitleTrackError, markSubtitleTrackReady]);
   const reviewVideo = videoReady ? playableVideo : null;
   const reviewItems = reviewVideo
     ? [
@@ -417,8 +431,9 @@ export function FinalVideoStep() {
                     kind="subtitles"
                     key={subtitleSourceKey}
                     label="中文字幕"
+                    ref={subtitleTrackRef}
                     onError={markSubtitleTrackError}
-                    onLoad={() => setSubtitleTrackLoad({ key: subtitleSourceKey, status: "ready" })}
+                    onLoad={markSubtitleTrackReady}
                     src={playableVideo.subtitleSrc}
                     srcLang="zh-CN"
                   />

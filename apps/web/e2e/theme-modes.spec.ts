@@ -8,14 +8,14 @@ const lessonId = "01960000-0000-7000-8000-000000000101";
 
 const themes = [
   {
-    background: "rgb(243, 247, 238)",
+    canvas: "oklch(0.9706 0.0126 126.4)",
     label: "护眼",
     mode: "eye-care",
     themeColor: "#f3f7ee",
   },
-  { background: "rgb(255, 255, 255)", label: "白天", mode: "day", themeColor: "#ffffff" },
+  { canvas: "oklch(1 0 0)", label: "白天", mode: "day", themeColor: "#ffffff" },
   {
-    background: "rgb(39, 43, 41)",
+    canvas: "oklch(0.2843 0.0067 164.5)",
     label: "黑夜",
     mode: "night",
     themeColor: "#272b29",
@@ -46,7 +46,15 @@ test("教师端三种主题全局切换并持久化", async ({ page }, testInfo:
 
   for (const theme of themes) {
     await chooseTheme(page, theme.label, theme.mode);
-    await expect(page.locator("body")).toHaveCSS("background-color", theme.background);
+    await expect
+      .poll(() =>
+        page
+          .locator("html")
+          .evaluate((element) =>
+            getComputedStyle(element).getPropertyValue("--sh-surface-canvas").trim(),
+          ),
+      )
+      .toBe(theme.canvas);
     await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute(
       "content",
       theme.themeColor,
@@ -83,9 +91,9 @@ test("教师端三种主题全局切换并持久化", async ({ page }, testInfo:
   await page.getByRole("button", { name: /^2\. 生活中的百分数$/ }).click();
   await expect(page.getByLabel("第 2 页正文").locator("..")).toHaveCSS(
     "background-color",
-    "rgb(255, 255, 255)",
+    "oklch(1 0 0)",
   );
-  await expect(page.getByLabel("第 2 页正文")).toHaveCSS("color", "rgb(92, 82, 72)");
+  await expect(page.getByLabel("第 2 页正文")).toHaveCSS("color", "oklch(0.4453 0.0207 67.3)");
   await page.screenshot({
     animations: "disabled",
     fullPage: true,
@@ -214,8 +222,13 @@ test("首屏、跨标签重置与夜间遮罩使用同一主题事实", async ({
   await loginAsTeacher(page);
   await chooseTheme(page, "黑夜", "night");
   await page.getByRole("button", { name: "搜索" }).click();
-  await expect(page.getByTestId("global-search-overlay")).toHaveCSS(
-    "background-color",
-    "rgba(8, 10, 9, 0.58)",
-  );
+  await expect
+    .poll(() =>
+      page
+        .locator("html")
+        .evaluate((element) =>
+          getComputedStyle(element).getPropertyValue("--sh-overlay-scrim").trim(),
+        ),
+    )
+    .toBe("oklch(0.16 0.008 160 / 58%)");
 });

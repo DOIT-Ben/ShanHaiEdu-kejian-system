@@ -6,7 +6,6 @@
 }
 
 html {
-  min-width: 320px;
   background: var(--sh-surface-canvas);
   color-scheme: light;
 }
@@ -17,11 +16,10 @@ html[data-theme="night"] {
 
 body {
   margin: 0;
-  min-width: 320px;
   min-height: 100vh;
   color: var(--sh-ink-default);
   background: var(--sh-surface-canvas);
-  font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  font-family: var(--sh-font-interface);
   font-size: 14px;
   line-height: 1.65;
   letter-spacing: 0;
@@ -30,6 +28,10 @@ body {
   transition:
     color var(--sh-duration-normal) var(--sh-ease-standard),
     background-color var(--sh-duration-normal) var(--sh-ease-standard);
+}
+
+.sh-display-type {
+  font-family: var(--sh-font-display);
 }
 
 button,
@@ -43,6 +45,12 @@ select {
 input::placeholder,
 textarea::placeholder {
   color: var(--sh-ink-placeholder);
+}
+
+.sh-creation-prompt:focus-visible {
+  outline: 2px solid var(--sh-focus-ring-color);
+  outline-offset: 2px;
+  box-shadow: var(--sh-shadow-focus);
 }
 
 select,
@@ -65,9 +73,8 @@ button {
 }
 
 :focus-visible {
-  outline: 2px solid var(--sh-brand-600);
+  outline: 2px solid var(--sh-focus-ring-color);
   outline-offset: 2px;
-  box-shadow: var(--sh-shadow-focus);
 }
 
 ::selection {
@@ -104,8 +111,18 @@ input {
     min-height: 40px;
   }
 
+  .sh-creation-studio [data-testid="creation-output-region"] > div:first-child {
+    display: none;
+  }
+
+  .sh-creation-studio [data-testid="creation-preview-panel"] {
+    border: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+
   .sh-creation-studio [data-testid="creation-composer"] {
-    padding-bottom: max(2px, env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     padding-top: 2px;
   }
 
@@ -114,47 +131,22 @@ input {
     padding: 4px;
   }
 
-  .sh-creation-studio .sh-creation-status-line {
-    display: none;
-  }
-
   .sh-creation-studio .sh-creation-prompt {
     min-height: 44px;
     max-height: 44px;
     padding-bottom: 6px;
     padding-top: 6px;
   }
+}
 
-  .sh-creation-studio .sh-creation-mobile-toggle {
-    display: none !important;
+/* Keep wide media inspectable while reserving the fixed composer and actions on short desktops. */
+@media (min-width: 768px) and (min-height: 680px) and (max-height: 820px) {
+  .sh-creation-studio [data-testid="creation-main-visual"][data-creation-type="video"] {
+    width: min(100%, max(360px, calc((100dvh - 484px) * 1.777778)));
   }
 
-  .sh-creation-studio .sh-creation-short-settings {
-    display: inline-grid !important;
-  }
-
-  .sh-creation-studio .sh-creation-details.hidden {
-    display: none !important;
-  }
-
-  .sh-creation-studio .sh-creation-details.flex {
-    position: absolute;
-    bottom: calc(100% - 2px);
-    left: 50%;
-    z-index: 45;
-    display: flex !important;
-    width: min(760px, calc(100vw - 16px));
-    max-height: min(44dvh, 180px);
-    flex-direction: column;
-    align-items: stretch;
-    gap: 6px;
-    overflow-y: auto;
-    transform: translateX(-50%);
-    border: 1px solid var(--sh-line-default);
-    border-radius: var(--sh-radius-md);
-    background: var(--sh-surface-elevated);
-    padding: 8px;
-    box-shadow: var(--sh-shadow-modal);
+  .sh-creation-studio [data-testid="creation-main-visual"][data-creation-type="presentation"] {
+    width: min(100%, max(320px, calc((100dvh - 571px) * 1.777778)));
   }
 }
 

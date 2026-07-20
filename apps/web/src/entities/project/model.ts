@@ -17,6 +17,8 @@ export type ProjectSummary = {
   progressLabel?: string;
   status?: "draft" | "active" | "archived";
   updatedAt: string;
+  /** Raw timestamp retained for recent-activity ordering; never shown directly. */
+  updatedAtIso?: string;
 };
 
 export type LessonSummary = {

@@ -4,9 +4,7 @@ export async function loginAsTeacher(page: Page) {
   await page.goto("/login");
   await page.getByRole("button", { name: "登录" }).click();
   await expect(page).toHaveURL(/\/app$/);
-  await expect(
-    page.getByRole("heading", { name: "从一份教材，到一节孩子愿意听的好课" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "认识百分数" })).toBeVisible();
 }
 
 export async function loginAsAdmin(page: Page) {

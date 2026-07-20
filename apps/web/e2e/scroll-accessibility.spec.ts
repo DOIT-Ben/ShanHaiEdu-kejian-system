@@ -86,7 +86,7 @@ for (const studio of studios) {
     await expect(page.getByRole("button", { name: /就用这张|选择这个关键帧/ })).toBeVisible();
 
     const regions = await page.evaluate(() => {
-      const main = document.querySelector<HTMLElement>('[data-testid="creation-studio"] > main');
+      const main = document.querySelector<HTMLElement>('[aria-label="创作工作区"]');
       const composer = document.querySelector<HTMLElement>('[data-testid="creation-composer"]');
       if (!main || !composer) return null;
       const mainRect = main.getBoundingClientRect();
@@ -108,11 +108,11 @@ for (const studio of studios) {
       await visibleHeightWithin(
         page,
         '[data-testid="creation-main-visual"]',
-        '[data-testid="creation-studio"] > main',
+        '[aria-label="创作工作区"]',
       ),
     ).toBeGreaterThanOrEqual(120);
 
-    const main = page.locator('[data-testid="creation-studio"] > main');
+    const main = page.getByRole("region", { name: "创作工作区" });
     await main.hover();
     await page.mouse.wheel(0, 2_000);
     await expect
@@ -171,18 +171,18 @@ test("1440x600 课堂导入详情滚动后保持在工作台顶栏下方", async
   await expect(details.getByRole("button", { name: "编辑方案" })).toBeInViewport();
 });
 
-test("844x390 创作参数与画面细节保持互斥", async ({ page }) => {
+test("844x390 创作设置与画面细节保持互斥", async ({ page }) => {
   await page.setViewportSize({ height: 390, width: 844 });
   await loginAsTeacher(page);
   await page.goto("/app/creation/videos");
 
-  await page.getByRole("button", { name: "调整创作参数" }).click();
+  await page.getByRole("button", { name: "创作设置" }).click();
   await expect(page.getByTestId("creation-parameter-bar")).toBeVisible();
   await page.getByRole("button", { name: "画面细节" }).click();
   await expect(page.getByRole("button", { name: "关闭画面细节" })).toBeVisible();
   await expect(page.getByTestId("creation-parameter-bar")).not.toBeVisible();
 
-  await page.getByRole("button", { name: "调整创作参数" }).click();
+  await page.getByRole("button", { name: "创作设置" }).click();
   await expect(page.getByRole("button", { name: "关闭画面细节" })).not.toBeVisible();
   await expect(page.getByTestId("creation-parameter-bar")).toBeVisible();
 });
@@ -199,7 +199,7 @@ test("1024x768 创作结果和采用操作首屏同时可见", async ({ page }) 
   await expect(page.getByRole("button", { name: /就用这张|选择这个关键帧/ })).toBeInViewport();
 
   const mainDimensions = await page
-    .locator('[data-testid="creation-studio"] > main')
+    .getByRole("region", { name: "创作工作区" })
     .evaluate((element) => ({
       clientHeight: element.clientHeight,
       scrollHeight: element.scrollHeight,
@@ -215,7 +215,7 @@ test("390x844 三类创作台均可通过窄屏滚轮到达采用操作", async 
     await page.goto(studio.path);
     await page.getByRole("button", { name: studio.startLabel }).click();
     await expect(page.getByRole("button", { name: /就用这张|选择这个关键帧/ })).toBeVisible();
-    const main = page.locator('[data-testid="creation-studio"] > main');
+    const main = page.getByRole("region", { name: "创作工作区" });
     const dimensions = await main.evaluate((element) => ({
       clientHeight: element.clientHeight,
       scrollHeight: element.scrollHeight,

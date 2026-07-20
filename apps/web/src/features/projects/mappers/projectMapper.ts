@@ -16,5 +16,6 @@ export function mapProjectSummary(project: ProjectDto): ProjectSummary {
     updatedAt: new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric" }).format(
       new Date(project.updated_at),
     ),
+    updatedAtIso: project.updated_at,
   };
 }

@@ -18,7 +18,7 @@ describe("useMockRuntime", () => {
     }
 
     render(<ProjectCount />);
-    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("8")).toBeInTheDocument();
     expect(renderCount).toBe(1);
     const task = mockRuntime.getState().tasks[0];
     expect(task).toBeDefined();

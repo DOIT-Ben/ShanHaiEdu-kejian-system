@@ -8,7 +8,7 @@ function PresentationResult({ variation }: { variation: number }) {
   const [page, setPage] = useState(2);
   return (
     <div className="flex flex-col gap-3">
-      <div className="mx-auto w-full max-w-[480px]">
+      <div className="mx-auto w-full max-w-[960px]">
         <CreativeResultVisual page={page} type="presentation" variant={variation} />
         <p className="mt-2 text-center text-xs text-[var(--sh-ink-muted)]">
           第 {page + 1} 页 · {presentationPreviewPages[page]}
@@ -80,7 +80,7 @@ function RenderingVisual({
         <motion.div
           animate={{ x: ["-130%", "260%"] }}
           aria-hidden="true"
-          className="absolute inset-y-0 left-0 w-1/3 -skew-x-12 bg-gradient-to-r from-transparent via-white/45 to-transparent"
+          className="absolute inset-y-0 left-0 w-1/3 -skew-x-12 bg-white/35"
           transition={{ duration: 1.45, ease: "easeInOut", repeat: Infinity }}
         />
       ) : null}

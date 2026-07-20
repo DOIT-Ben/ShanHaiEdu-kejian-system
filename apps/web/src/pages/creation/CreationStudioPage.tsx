@@ -1,4 +1,4 @@
-import { Check, ChevronLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { CreationAdvancedPanel } from "@/features/creation-studio/CreationAdvancedPanel";
@@ -175,40 +175,29 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
     title: `${config.title} · 作品 ${String(candidate + 1)}`,
     type: type === "presentation" ? "ppt_page" : type,
   };
-  const saveStatus = {
-    adopted: "已选中，保存后进入项目",
-    draft: "本地草稿已保存",
-    ready: type === "video" ? "关键帧已准备" : "作品已完成",
-    running: "正在创作",
-    saved: type === "video" ? "关键帧已保存到项目" : "已保存到项目",
-  }[stage];
-
   return (
     <div
       className="sh-creation-studio flex h-[calc(100dvh-var(--sh-topbar-height))] flex-col overflow-hidden bg-[var(--sh-surface-canvas)]"
       data-testid="creation-studio"
     >
-      <header className="flex min-h-12 shrink-0 flex-wrap items-center gap-3 border-b border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)]/88 px-4 shadow-[var(--sh-shadow-card)] backdrop-blur-sm md:px-6">
+      <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)]/88 px-4 backdrop-blur-sm md:px-6">
         <Link
           aria-label="返回创作中心"
-          className="grid size-10 place-items-center rounded-[var(--sh-radius-sm)] text-[var(--sh-ink-muted)] hover:bg-[var(--sh-surface-soft)]"
+          className="grid size-9 place-items-center rounded-[var(--sh-radius-sm)] text-[var(--sh-ink-muted)] hover:bg-[var(--sh-surface-soft)]"
           to="/app/creation"
         >
           <ChevronLeft aria-hidden="true" className="size-5" />
         </Link>
-        <div className="min-w-0">
-          <p className="text-xs text-[var(--sh-ink-muted)]">我的创作桌 · 独立作品</p>
-          <h1 className="truncate font-semibold text-[var(--sh-ink-strong)]">{config.title}</h1>
-        </div>
-        <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-[var(--sh-success-soft)] px-2.5 py-1 text-xs font-medium text-[var(--sh-success-strong)]">
-          <Check aria-hidden="true" className="size-3.5" />
-          {saveStatus}
-        </span>
+        <h1 className="truncate font-semibold text-[var(--sh-ink-strong)]">{config.title}</h1>
       </header>
 
-      <main className="min-h-0 flex-1 overflow-y-auto px-4 py-3 md:px-6" ref={mainRef}>
+      <section
+        aria-label="创作工作区"
+        className="min-h-0 flex-1 overflow-y-auto px-4 py-3 md:px-6"
+        ref={mainRef}
+      >
         {stage === "draft" ? (
-          <CreationSetupPanel config={config} settings={settings} type={type} />
+          <CreationSetupPanel settings={settings} type={type} />
         ) : (
           <CreationResultsPanel
             candidate={candidate}
@@ -232,7 +221,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
             type={type}
           />
         )}
-      </main>
+      </section>
 
       <CreationComposer
         advancedOpen={advancedOpen}
@@ -251,7 +240,6 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
         config={config}
         description={description}
         descriptionLabel={descriptionLabel}
-        hasUnappliedChanges={hasUnappliedChanges}
         onAdvancedOpenChange={setAdvancedOpen}
         onDescriptionChange={(nextDescription) =>
           updateCreation({ description: nextDescription, ...changedOutputPatch })

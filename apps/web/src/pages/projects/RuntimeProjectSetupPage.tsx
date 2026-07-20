@@ -126,7 +126,7 @@ export function RuntimeProjectSetupPage() {
             aria-valuemax={100}
             aria-valuemin={0}
             aria-valuenow={progress}
-            className="h-full rounded-r-full bg-[image:var(--sh-action-gradient)] transition-[width] duration-[var(--sh-duration-normal)] motion-reduce:transition-none"
+            className="h-full rounded-r-full bg-[var(--sh-action-primary)] transition-[width] duration-[var(--sh-duration-normal)] motion-reduce:transition-none"
             role="progressbar"
             style={{ width: String(progress) + "%" }}
           />

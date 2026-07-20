@@ -293,7 +293,7 @@ export function RuntimeNewProjectPage() {
   });
 
   const inputClass =
-    "mt-1.5 min-h-10 w-full rounded-[var(--sh-radius-sm)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)] px-3 text-sm text-[var(--sh-ink-strong)] outline-none transition focus:border-[var(--sh-brand-400)] focus:shadow-[var(--sh-shadow-focus)]";
+    "mt-1.5 min-h-10 w-full rounded-[var(--sh-radius-sm)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)] px-3 text-sm text-[var(--sh-ink-strong)] outline-none transition focus:border-[var(--sh-brand-300)] focus:shadow-[var(--sh-shadow-focus)]";
   const hasPendingProject = Boolean(recovery.projectId);
   const canContinueJob = Boolean(recovery.projectId && recovery.jobId);
   const writeReady = isCsrfTokenAvailable();

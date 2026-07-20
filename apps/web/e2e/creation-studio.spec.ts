@@ -14,7 +14,11 @@ async function openReadyImageStudio(page: Page) {
 }
 
 async function chooseSelect(page: Page, label: string, option: string) {
-  await page.getByRole("combobox", { name: label }).click();
+  const combobox = page.getByRole("combobox", { name: label });
+  if (!(await combobox.isVisible())) {
+    await page.getByRole("button", { name: "创作设置" }).click();
+  }
+  await combobox.click();
   await page.getByRole("option", { name: option }).click();
 }
 
@@ -63,25 +67,26 @@ async function expectNoA11yViolations(page: Page) {
   expect(violations).toEqual([]);
 }
 
-test("新老师可按首页引导进入并用课堂建议补全要求", async ({ page }) => {
+test("新老师可按首页引导进入并在需要时调整创作设置", async ({ page }) => {
   await loginAsTeacher(page);
   await page.goto("/app/creation");
   await expect(page.locator("body")).not.toContainText(engineeringCopy);
   await expect(page.getByText("第一次使用？建议先画一张教学图片")).toBeVisible();
   await page.getByRole("link", { name: "去画一张" }).click();
   await expect(page.getByText("正在打开课堂作品")).toBeHidden({ timeout: 15_000 });
-  await expect(page.getByText("先从这一步开始 · 画一张教学图片", { exact: true })).toBeVisible({
-    timeout: 30_000,
-  });
+  await expect(page.getByRole("heading", { name: "图片创作台" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("等待开始创作", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("本地草稿已保存", { exact: true })).toHaveCount(0);
 
   const description = page.getByLabel("画面内容");
+  await expect(page.getByRole("combobox", { name: "创作模型" })).toHaveCount(0);
+  await description.fill("三瓶果汁摆在木桌上，画面右侧保留课堂提问空间。");
   await chooseSelect(page, "创作模型", "细节增强");
-  await page.getByRole("button", { name: "留出板书区" }).click();
-  await page.getByRole("button", { name: "留出板书区" }).click();
   const value = await description.inputValue();
-  expect(value.match(/画面右侧留出干净的提问或板书空间。/g)).toHaveLength(1);
   await page.reload();
   await expect(page.getByLabel("画面内容")).toHaveValue(value);
+  await expect(page.getByRole("combobox", { name: "创作模型" })).toHaveCount(0);
+  await page.getByRole("button", { name: "创作设置" }).click();
   await expect(page.getByRole("combobox", { name: "创作模型" })).toContainText("细节增强");
 });
 
@@ -103,14 +108,21 @@ test("图片、视频和 PPT 共用上下式创作布局", async ({ page }) => {
     { input: "课件主题与课堂用途", path: "/app/creation/presentations" },
   ]) {
     await page.goto(studio.path);
+    await expect(page.locator("main")).toHaveCount(1);
+    await expect(page.locator("h1")).toHaveCount(1);
     const outputBox = await page.getByTestId("creation-output-region").boundingBox();
     const composerBox = await page.getByTestId("creation-composer-panel").boundingBox();
     expect(outputBox).not.toBeNull();
     expect(composerBox).not.toBeNull();
     expect(composerBox?.y ?? 0).toBeGreaterThan(outputBox?.y ?? 0);
     await expect(page.getByRole("textbox", { name: studio.input })).toBeInViewport();
+    await expect(page.getByRole("button", { name: "添加参考图" })).toBeInViewport();
+    await expect(page.getByRole("button", { name: "创作设置" })).toBeInViewport();
+    await expect(page.getByRole("combobox", { name: "创作模型" })).toHaveCount(0);
+    await page.getByRole("button", { name: "创作设置" }).click();
     await expect(page.getByLabel("创作模型")).toBeInViewport();
     await expect(page.getByLabel("比例")).toBeInViewport();
+    await page.getByRole("button", { name: "创作设置" }).click();
   }
 });
 
@@ -122,21 +134,15 @@ test("图片结果可修改创作要求并经过稳定运行态重新创作", as
   const workspace = page.getByRole("region", { name: "创作结果" });
   await expect(workspace).toHaveAttribute("aria-busy", "true");
   await expect(page.getByRole("status")).toContainText("正在创作新作品");
-  await expect(page.locator("header").getByText("正在创作", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "备选作品 2" })).toBeDisabled();
 
   await expect(page.getByRole("button", { name: "就用这张" })).toBeVisible();
-  await expect(page.getByText("作品已完成", { exact: true })).toBeVisible();
+  await expect(page.getByText("本轮作品已完成", { exact: true })).toBeVisible();
   await expect(page.locator("body")).not.toContainText(engineeringCopy);
-  await expect(page.getByText(/满意就选用；还想调整/)).toBeVisible();
   const visualBefore = await page.getByTestId("creation-main-visual").boundingBox();
   const prompt = page.getByRole("textbox", { name: "创作要求" });
-  await page.getByRole("button", { name: "留出板书区" }).click();
-  await expect(prompt).toHaveValue(/画面右侧留出干净的提问或板书空间/);
   const revisedPrompt = "三瓶果汁靠近主视觉中央，使用柔和晨光，背景留出课堂提问空间。";
   await prompt.fill(revisedPrompt);
-  await expect(page.getByText("有修改，重新创作后生效")).toBeVisible();
-  await expect(page.getByText(/下方要求已有修改/)).toBeVisible();
   await expect(page.getByRole("button", { name: "就用这张" })).toBeDisabled();
 
   await page.getByRole("button", { name: "按新要求再画一组" }).click();
@@ -173,45 +179,51 @@ test("1440×900 使用上方展示区和底部悬浮输入台", async ({ page })
   await page.setViewportSize({ height: 900, width: 1440 });
   await openReadyImageStudio(page);
 
-  const outputRegion = page.getByTestId("creation-output-region");
+  const workspace = page.getByRole("region", { name: "创作工作区" });
   const previewPanel = page.getByTestId("creation-preview-panel");
   const mainVisual = page.getByTestId("creation-main-visual");
   const composerPanel = page.getByTestId("creation-composer-panel");
   const prompt = page.getByRole("textbox", { name: "创作要求" });
-  const outputBox = await outputRegion.boundingBox();
+  const workspaceBox = await workspace.boundingBox();
   const previewBox = await previewPanel.boundingBox();
   const visualBox = await mainVisual.boundingBox();
   const composerBox = await composerPanel.boundingBox();
   const promptBox = await prompt.boundingBox();
-  expect(outputBox).not.toBeNull();
+  expect(workspaceBox).not.toBeNull();
   expect(previewBox).not.toBeNull();
   expect(composerBox).not.toBeNull();
   expect(promptBox?.width ?? 0).toBeGreaterThanOrEqual(700);
   expect(previewBox?.width ?? 0).toBeGreaterThanOrEqual(620);
   expect(previewBox?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(760);
-  expect(visualBox?.height ?? 0).toBeGreaterThanOrEqual(180);
-  expect(visualBox?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(260);
+  expect(visualBox?.width ?? 0).toBeGreaterThanOrEqual(480);
+  expect(visualBox?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(720);
+  expect(visualBox?.height ?? 0).toBeGreaterThanOrEqual(480);
+  expect(visualBox?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(720);
   expect((visualBox?.width ?? 0) / (visualBox?.height ?? 1)).toBeCloseTo(1, 2);
-  expect(promptBox?.y ?? 0).toBeGreaterThan((visualBox?.y ?? 0) + (visualBox?.height ?? 0));
-  expect(composerBox?.y ?? 0).toBeGreaterThanOrEqual(
-    (outputBox?.y ?? 0) + (outputBox?.height ?? 0) - 1,
+  expect(workspaceBox?.y ?? 0).toBeLessThan(composerBox?.y ?? 0);
+  expect((workspaceBox?.y ?? 0) + (workspaceBox?.height ?? 0)).toBeLessThanOrEqual(
+    (composerBox?.y ?? 0) + 1,
   );
   expect((composerBox?.y ?? 900) + (composerBox?.height ?? 0)).toBeLessThanOrEqual(900);
 
   for (const control of [
-    page.getByRole("button", { name: "备选作品 1" }),
-    page.getByRole("button", { name: "备选作品 2" }),
-    page.getByRole("button", { name: "备选作品 3" }),
     prompt,
-    page.getByLabel("创作模型"),
-    page.getByLabel("比例"),
+    page.getByRole("button", { name: "添加参考图" }),
+    page.getByRole("button", { name: "创作设置" }),
     page.getByRole("button", { name: "按新要求再画一组" }),
-    page.getByRole("button", { name: "就用这张" }),
   ]) {
     await expect(control).toBeInViewport();
     const box = await control.boundingBox();
     expect((box?.y ?? 900) + (box?.height ?? 0)).toBeLessThanOrEqual(900);
   }
+  await expect(page.getByRole("combobox", { name: "创作模型" })).toHaveCount(0);
+  await page.getByRole("button", { name: "创作设置" }).click();
+  await expect(page.getByLabel("创作模型")).toBeInViewport();
+  await expect(page.getByLabel("比例")).toBeInViewport();
+  await page.getByRole("button", { name: "创作设置" }).click();
+  await workspace.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+  await expect(page.getByRole("button", { name: "备选作品 1" })).toBeInViewport();
+  await expect(page.getByRole("button", { name: "就用这张" })).toBeInViewport();
   await expectNoA11yViolations(page);
 });
 
@@ -220,14 +232,10 @@ test("1280×800 首屏可查看结果并直接在底部调整", async ({ page })
   await openReadyImageStudio(page);
 
   for (const control of [
-    page.getByRole("button", { name: "备选作品 1" }),
-    page.getByRole("button", { name: "备选作品 2" }),
-    page.getByRole("button", { name: "备选作品 3" }),
     page.getByRole("textbox", { name: "创作要求" }),
-    page.getByLabel("创作模型"),
-    page.getByLabel("比例"),
+    page.getByRole("button", { name: "添加参考图" }),
+    page.getByRole("button", { name: "创作设置" }),
     page.getByRole("button", { name: "按新要求再画一组" }),
-    page.getByRole("button", { name: "就用这张" }),
   ]) {
     await expect(control).toBeInViewport();
   }
@@ -238,16 +246,23 @@ test("1280×800 首屏可查看结果并直接在底部调整", async ({ page })
     scrollHeight: document.documentElement.scrollHeight,
     scrollWidth: document.documentElement.scrollWidth,
   }));
-  expect(dimensions.scrollHeight).toBeLessThanOrEqual(dimensions.clientHeight + 1);
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+  const visual = await page.getByTestId("creation-main-visual").boundingBox();
+  expect(visual?.width ?? 0).toBeGreaterThanOrEqual(480);
+  expect(visual?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(720);
+  const workArea = page.getByRole("region", { name: "创作工作区" });
+  await workArea.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+  await expect(page.getByRole("button", { name: "备选作品 1" })).toBeInViewport();
+  await expect(page.getByRole("button", { name: "就用这张" })).toBeInViewport();
 });
 
-test("390px 下输入台固定可用并能展开画面细节", async ({ page }) => {
+test("390px 下输入台固定可用并能按需展开画面细节", async ({ page }) => {
   await page.setViewportSize({ height: 844, width: 390 });
   await openReadyImageStudio(page);
   const visualBox = await page.getByTestId("creation-main-visual").boundingBox();
   expect(visualBox?.y ?? 0).toBeGreaterThanOrEqual(128);
-  expect(visualBox?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(280);
+  expect(visualBox?.width ?? 0).toBeGreaterThanOrEqual(300);
+  expect(visualBox?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(360);
   const composerBox = await page.getByTestId("creation-composer-panel").boundingBox();
   expect((composerBox?.y ?? 844) + (composerBox?.height ?? 0)).toBeLessThanOrEqual(844);
   const prompt = page.getByRole("textbox", { name: "创作要求" });
@@ -257,7 +272,12 @@ test("390px 下输入台固定可用并能展开画面细节", async ({ page }) 
     scrollHeight: element.scrollHeight,
   }));
   expect(promptHeight.scrollHeight).toBeLessThanOrEqual(promptHeight.clientHeight);
-  await page.getByRole("button", { name: "调整模型、比例和画面细节" }).click();
+  const settingsTrigger = page.getByRole("button", { name: "创作设置" });
+  await expect(settingsTrigger).toContainText("课堂插画");
+  await expect(settingsTrigger).toContainText("1:1");
+  await expect(settingsTrigger).toContainText("纸艺微缩");
+  await expect(settingsTrigger).toContainText("3 张");
+  await settingsTrigger.click();
   await page.getByRole("button", { name: "画面细节" }).click();
   await expect(page.getByRole("complementary", { name: "画面细节调整" })).toBeVisible();
   await expect(page.getByLabel("画面安排")).toBeInViewport();
@@ -289,6 +309,28 @@ test("图片比例同步应用到预览并下载当前真实素材", async ({ pa
   expect(download.suggestedFilename()).toMatch(/\.webp$/);
   expect(webpDimensions(content)).toEqual({ height: 900, width: 1600 });
   expect(content.byteLength).toBeGreaterThan(50_000);
+});
+
+test("创作结果可前后切换、放大并对比候选", async ({ page }) => {
+  await openReadyImageStudio(page);
+
+  await page.getByRole("button", { name: "下一张作品" }).click();
+  await expect(page.getByRole("button", { name: "备选作品 2" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
+  await page.getByRole("button", { name: "放大查看" }).click();
+  await expect(page.getByRole("dialog", { name: "放大查看" })).toBeVisible();
+  await expect(page.getByTestId("creation-enlarged-visual")).toBeVisible();
+  await page.getByRole("button", { name: "关闭放大查看" }).click();
+
+  await page.getByRole("button", { name: "对比作品" }).click();
+  const comparison = page.getByRole("dialog", { name: "对比作品" });
+  await expect(comparison).toBeVisible();
+  await expect(comparison.getByRole("button", { name: /查看作品/ })).toHaveCount(3);
+  await comparison.getByRole("button", { name: "关闭作品对比" }).click();
+  await expect(page.getByRole("button", { name: "全屏查看" })).toBeVisible();
 });
 
 test("PPT 候选会同步切换当前课件预览", async ({ page }) => {

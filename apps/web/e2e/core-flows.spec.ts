@@ -8,9 +8,7 @@ const lessonId = "01960000-0000-7000-8000-000000000101";
 test("首页先进入真实项目，再由项目恢复课时工作台", async ({ page }) => {
   await loginAsTeacher(page);
   await page.goto("/app");
-  await expect(
-    page.getByRole("heading", { name: "从一份教材，到一节孩子愿意听的好课" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "认识百分数" })).toBeVisible();
   await page.getByRole("link", { name: "继续制作" }).click();
   await expect(page).toHaveURL(new RegExp(`/projects/${projectId}$`));
   await expect(page.getByRole("heading", { name: "认识百分数" }).first()).toBeVisible();
@@ -212,9 +210,9 @@ test("独立创作按创作、选用、保存顺序推进", async ({ page }) => 
   await page.getByRole("button", { name: "开始创作图片" }).click();
   await expect(page.getByRole("status")).toContainText("正在创作新作品");
   await expect(page.getByRole("button", { name: "就用这张" })).toBeVisible();
-  await expect(page.getByText("作品已完成", { exact: true })).toBeVisible();
+  await expect(page.getByText(/本轮作品已完成/, { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "就用这张" }).click();
-  await expect(page.getByText("已选中，保存后进入项目", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "保存到项目" })).toBeVisible();
   await page.getByRole("button", { name: "保存到项目" }).click();
   await expect(page.getByRole("dialog", { name: "保存到项目" })).toBeVisible();
 });
@@ -259,6 +257,11 @@ test("手机端可以从流程抽屉切换步骤", async ({ page }) => {
   await loginAsTeacher(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/app/projects/${projectId}/lessons/${lessonId}/work/lesson-plan`);
+  const workbenchHeader = page.locator('[data-testid="project-workbench"] > header');
+  await expect(workbenchHeader).toContainText("认识百分数");
+  await expect(workbenchHeader).toContainText("第 1 课时");
+  await expect(workbenchHeader).toContainText("编写并确认教案");
+  await expect(page.getByRole("button", { name: "打开课时流程" })).toContainText("流程");
   await expect(page.getByRole("link", { name: /项需要你处理 · 查看任务/ })).toBeVisible();
   await page.getByRole("button", { name: "打开课时流程" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();

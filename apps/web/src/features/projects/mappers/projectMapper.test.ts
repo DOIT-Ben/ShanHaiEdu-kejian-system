@@ -22,6 +22,7 @@ describe("mapProjectSummary", () => {
       knowledgePoint: "百分数的意义",
       progressLabel: "草稿",
       status: "draft",
+      updatedAtIso: "2026-07-20T00:00:00Z",
     });
     expect(mapProjectSummary(project).currentLesson).toBeUndefined();
     expect(mapProjectSummary(project).nextAction).toBeUndefined();

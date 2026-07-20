@@ -1,6 +1,7 @@
 import { Component, type PropsWithChildren } from "react";
 import { RefreshCcw } from "lucide-react";
 import { useLocation } from "react-router-dom";
+import { Button } from "@/shared/ui/Button";
 
 type AppErrorBoundaryState = { failed: boolean };
 
@@ -33,19 +34,12 @@ export class AppErrorBoundary extends Component<PropsWithChildren, AppErrorBound
             已保存的内容不会受到影响。可以重新加载当前页面，或先返回工作台首页继续其他内容。
           </p>
           <div className="mt-7 flex flex-wrap justify-center gap-3">
-            <button
-              className="min-h-11 rounded-[var(--sh-radius-sm)] bg-[var(--sh-brand-600)] px-5 text-sm font-semibold text-white"
-              onClick={() => window.location.reload()}
-              type="button"
-            >
+            <Button size="lg" onClick={() => window.location.reload()}>
               重新加载
-            </button>
-            <a
-              className="inline-flex min-h-11 items-center rounded-[var(--sh-radius-sm)] border border-[var(--sh-line-default)] px-5 text-sm font-semibold text-[var(--sh-brand-700)]"
-              href="/app"
-            >
-              返回工作台首页
-            </a>
+            </Button>
+            <Button asChild size="lg" variant="secondary">
+              <a href="/app">返回工作台首页</a>
+            </Button>
           </div>
         </section>
       </main>

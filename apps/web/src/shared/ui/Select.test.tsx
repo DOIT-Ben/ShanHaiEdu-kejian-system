@@ -96,6 +96,39 @@ describe("Select", () => {
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 
+  it("用语义状态和可访问文本表达成功与错误", () => {
+    const { rerender } = render(
+      <Select
+        ariaLabel="选择年级"
+        onValueChange={() => undefined}
+        options={options}
+        status="success"
+        statusMessage="年级已保存"
+        value="grade-6"
+      />,
+    );
+
+    const trigger = screen.getByRole("combobox", { name: "选择年级" });
+    expect(trigger).toHaveAttribute("data-validation-state", "success");
+    expect(screen.getByRole("status")).toHaveTextContent("年级已保存");
+
+    rerender(
+      <Select
+        ariaLabel="选择年级"
+        onValueChange={() => undefined}
+        options={options}
+        status="error"
+        statusMessage="请选择年级"
+        value="grade-6"
+      />,
+    );
+    expect(screen.getByRole("combobox", { name: "选择年级" })).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent("请选择年级");
+  });
+
   it("拒绝 Radix 不支持的空字符串选项值", () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     expect(() =>

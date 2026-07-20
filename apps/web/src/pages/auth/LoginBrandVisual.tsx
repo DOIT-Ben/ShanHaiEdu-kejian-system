@@ -22,7 +22,6 @@ export function LoginBrandLockup({ className }: { className?: string }) {
 export function LoginVisualPanel() {
   return (
     <section className="relative hidden min-h-screen overflow-hidden bg-[var(--sh-surface-inverse)] px-8 py-7 text-[var(--sh-artifact-on-dark)] lg:flex lg:items-center xl:px-12">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_12%,rgba(212,147,85,0.2),transparent_34%),radial-gradient(circle_at_92%_82%,rgba(154,166,143,0.18),transparent_32%)]" />
       <div className="relative mx-auto w-full max-w-[680px]">
         <div className="flex items-center gap-3">
           <span className="grid size-11 place-items-center rounded-[var(--sh-radius-md)] bg-[var(--sh-artifact-paper)]/92 p-1.5 shadow-[var(--sh-shadow-floating)]">
@@ -32,16 +31,16 @@ export function LoginVisualPanel() {
             <strong className="block text-sm font-semibold text-[var(--sh-artifact-on-dark)]">
               山海教育
             </strong>
-            <span className="mt-0.5 block text-xs text-[var(--sh-artifact-on-dark-muted)]/75">
+            <span className="mt-0.5 block text-xs text-[var(--sh-artifact-on-dark-muted)]">
               课堂创作台
             </span>
           </span>
         </div>
 
-        <p className="mt-6 max-w-xl text-[clamp(2rem,3.3vw,2.7rem)] font-semibold leading-[1.18] text-[var(--sh-artifact-on-dark)]">
+        <p className="sh-display-type mt-6 max-w-xl text-[clamp(2rem,3.3vw,2.7rem)] font-semibold leading-[1.18] text-[var(--sh-artifact-on-dark)]">
           把教材变成完整的课堂作品
         </p>
-        <p className="mt-3 max-w-lg text-sm leading-6 text-[var(--sh-artifact-on-dark-muted)]/82">
+        <p className="mt-3 max-w-lg text-sm leading-6 text-[var(--sh-artifact-on-dark-muted)]">
           在同一处准备课时、教案、课件和课堂素材，把更多时间留给孩子。
         </p>
 

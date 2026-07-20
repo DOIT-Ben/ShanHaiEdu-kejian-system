@@ -6,6 +6,8 @@ export default defineConfig({
   fullyParallel: false,
   workers: 2,
   retries: 0,
+  outputDir: "test-results/e2e",
+  snapshotPathTemplate: "{testDir}/__screenshots__/{projectName}/{testFileName}/{arg}{ext}",
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: "http://127.0.0.1:4175",

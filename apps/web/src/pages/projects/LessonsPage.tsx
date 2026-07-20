@@ -2,6 +2,7 @@ import { ArrowRight, BookOpen, Clock3 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
 import { useMockRuntime } from "@/shared/api/mocks/runtime";
+import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 
@@ -36,13 +37,12 @@ export function LessonsPage() {
                   {lesson.duration} 分钟
                 </p>
               </div>
-              <Link
-                className="inline-flex min-h-10 items-center gap-2 rounded-[var(--sh-radius-sm)] bg-[var(--sh-brand-700)] px-4 text-sm font-semibold text-white shadow-[var(--sh-shadow-card)] hover:bg-[var(--sh-brand-900)]"
-                to={`/app/projects/${projectId}/lessons/${lesson.id}/work/lesson-plan`}
-              >
-                进入课时
-                <ArrowRight aria-hidden="true" className="size-4" />
-              </Link>
+              <Button asChild>
+                <Link to={`/app/projects/${projectId}/lessons/${lesson.id}/work/lesson-plan`}>
+                  进入课时
+                  <ArrowRight aria-hidden="true" className="size-4" />
+                </Link>
+              </Button>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[var(--sh-line-subtle)] pt-3">
               {(

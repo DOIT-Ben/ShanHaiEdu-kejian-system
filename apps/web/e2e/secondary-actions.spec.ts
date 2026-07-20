@@ -3,7 +3,11 @@ import { loginAsTeacher } from "./support/auth";
 import { unlockWorkbenchStep } from "./support/runtime";
 
 async function chooseSelect(page: Page, label: string, option: string) {
-  await page.getByRole("combobox", { name: label }).click();
+  const combobox = page.getByRole("combobox", { name: label });
+  if (!(await combobox.isVisible())) {
+    await page.getByRole("button", { name: "创作设置" }).click();
+  }
+  await combobox.click();
   await page.getByRole("option", { name: option }).click();
 }
 
@@ -16,7 +20,7 @@ test("创作设置、参考图和创作要求刷新后保留", async ({ page }) 
   await page.goto("/app/creation/images");
   await page.getByLabel("画面内容").fill("三瓶果汁摆在木桌上，保留清晰前后层次和课堂观察空间。");
   await chooseSelect(page, "画面风格", "清透插画");
-  await page.getByLabel("添加参考图").setInputFiles({
+  await page.getByTestId("reference-image-input").setInputFiles({
     name: "果汁参考图.png",
     mimeType: "image/png",
     buffer: Buffer.from("image-reference"),
@@ -24,15 +28,17 @@ test("创作设置、参考图和创作要求刷新后保留", async ({ page }) 
   await page.getByRole("button", { name: "画面细节" }).click();
   await page.getByLabel("画面安排").fill("主体居中，前景保留一块课堂提问空间。");
   await page.getByRole("button", { name: "关闭画面细节" }).click();
-  await page.getByRole("button", { name: "查看完整创作要求" }).click();
+  await page.getByRole("button", { name: "创作设置" }).click();
+  await page.getByRole("button", { name: "完整要求" }).click();
   await page.getByLabel("你想要的作品").fill("使用真实课堂光线，三瓶果汁标签不出现准确文字。");
   await page.getByRole("button", { name: "保存创作要求" }).click();
   await page.reload();
   await expect(page.getByLabel("画面内容")).toHaveValue(
     "使用真实课堂光线，三瓶果汁标签不出现准确文字。",
   );
+  await page.getByRole("button", { name: "创作设置" }).click();
   await expect(page.getByRole("combobox", { name: "画面风格" })).toContainText("清透插画");
-  await expect(page.getByText("果汁参考图.png")).toBeVisible();
+  await expect(page.getByTestId("creation-parameter-bar")).toContainText("果汁参考图.png");
   await page.getByRole("button", { name: "画面细节" }).click();
   await expect(page.getByLabel("画面安排")).toHaveValue("主体居中，前景保留一块课堂提问空间。");
   await page.getByRole("button", { name: "关闭画面细节" }).click();

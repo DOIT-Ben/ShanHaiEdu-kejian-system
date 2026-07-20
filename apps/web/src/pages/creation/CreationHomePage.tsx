@@ -16,7 +16,7 @@ const studios = [
 
 export function CreationHomePage() {
   return (
-    <div className="min-h-[calc(100vh-var(--sh-topbar-height))] bg-[image:var(--sh-workspace-gradient)] px-4 py-5 md:px-5">
+    <div className="min-h-[calc(100vh-var(--sh-topbar-height))] bg-[var(--sh-surface-canvas)] px-4 py-5 md:px-5">
       <div className="mx-auto grid max-w-[1540px] gap-5 xl:grid-cols-[240px_minmax(0,1fr)_300px]">
         <CreatorRail className="sticky top-[calc(var(--sh-topbar-height)+20px)] hidden h-[calc(100vh-var(--sh-topbar-height)-40px)] xl:block" />
 
@@ -60,7 +60,7 @@ export function CreationHomePage() {
                     type={config.type}
                     variant={variant}
                   />
-                  <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-[var(--sh-surface-inverse)]/90 via-[var(--sh-surface-inverse)]/42 to-transparent px-4 pb-4 pt-14 text-white">
+                  <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-[var(--sh-surface-inverse)]/88 px-4 py-3 text-white backdrop-blur-sm">
                     <span className="flex min-w-0 items-center gap-3">
                       <span className="grid size-10 shrink-0 place-items-center rounded-[var(--sh-radius-md)] bg-white/18 backdrop-blur-sm">
                         <Icon aria-hidden="true" className="size-5" />

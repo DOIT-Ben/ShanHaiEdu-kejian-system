@@ -36,7 +36,7 @@ describe("mock runtime persistence", () => {
     saveMockDraft(`lesson-plan:${project.id}`, { objective: "理解百分数" });
 
     const restored = createMockRuntimeStore({ storage: localStorage });
-    expect(restored.getState().projects).toHaveLength(4);
+    expect(restored.getState().projects).toHaveLength(9);
     expect(getMockProject(project.id, restored)).toMatchObject({ title: "百分数" });
     expect(restored.getState().textbookFiles[project.id]?.[0]).toMatchObject({
       name: "百分数.pdf",
@@ -90,7 +90,7 @@ describe("mock runtime persistence", () => {
       JSON.stringify({ schemaVersion: 1, projects: [], textbookFiles: {}, nodeStates: {} }),
     );
     const store = createMockRuntimeStore({ storage: localStorage });
-    expect(store.getState().projects).toHaveLength(3);
+    expect(store.getState().projects).toHaveLength(8);
     expect(store.getState().session).toBeNull();
   });
 
@@ -121,7 +121,7 @@ describe("mock runtime persistence", () => {
 
     const store = createMockRuntimeStore({ storage: localStorage });
     expect(store.getState().session).toBeNull();
-    expect(store.getState().projects).toHaveLength(3);
+    expect(store.getState().projects).toHaveLength(8);
   });
 
   it("clears a stale reason when an explicit null patch is supplied", () => {

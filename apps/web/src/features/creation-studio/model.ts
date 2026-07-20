@@ -23,6 +23,30 @@ export type CreationSettings = {
   style: string;
 };
 
+const modelSummaryLabels: Record<StudioType, Record<string, string>> = {
+  image: { balanced: "课堂插画", detail: "细节增强", fast: "快速草图" },
+  video: { balanced: "课堂视频", detail: "动作稳定", fast: "快速预览" },
+  presentation: { balanced: "课堂课件", detail: "图文增强", fast: "快速排版" },
+};
+
+const styleSummaryLabels: Record<string, string> = {
+  clay: "柔和黏土",
+  illustration: "清透插画",
+  paper: "纸艺微缩",
+};
+
+export function getCreationSettingsSummary(type: StudioType, settings: CreationSettings) {
+  const itemLabel = type === "image" ? "张" : type === "video" ? "段" : "套";
+  const parts = [
+    modelSummaryLabels[type][settings.model] ?? settings.model,
+    settings.ratio,
+    styleSummaryLabels[settings.style] ?? settings.style,
+    `${settings.candidateCount} ${itemLabel}`,
+  ];
+  if (type === "video") parts.push(`${settings.duration} 秒`);
+  return parts.join(" · ");
+}
+
 export const presentationPreviewPages = [
   "封面",
   "生活中的百分数",

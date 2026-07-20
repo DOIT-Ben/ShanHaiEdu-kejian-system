@@ -307,7 +307,7 @@ test("保存到项目的候选会出现在素材与成果并保留版本历史",
   await page.getByRole("button", { name: "就用这张" }).click();
   await page.getByRole("button", { name: "保存到项目" }).click();
   await page.getByRole("button", { name: "保存到这个位置" }).click();
-  await expect(page.getByText("已保存到项目", { exact: true })).toBeVisible();
+  await expect(page.getByText(/已放进“.*”/, { exact: false })).toBeVisible();
   await page.goto(`/app/projects/${projectId}/results`);
   await expect(page.getByText("三瓶果汁主视觉", { exact: true })).toHaveCount(1);
   await expect(page.getByText("图片创作台 · 作品 1")).toBeVisible();
