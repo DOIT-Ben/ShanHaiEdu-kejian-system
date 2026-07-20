@@ -307,3 +307,44 @@ def test_creation_lifecycle_events_embed_the_canonical_sse_envelope() -> None:
 
     for key in ("type", "additionalProperties", "required", "properties"):
         assert embedded[key] == canonical[key]
+
+
+def test_artifact_stale_reason_contract_is_strict_and_supports_revoke() -> None:
+    schema = resolve_external_refs(load_json(CONTRACTS / "artifact-stale-reason.schema.json"))
+    reason = {
+        "reason_code": "UPSTREAM_APPROVED_VERSION_CHANGED",
+        "replaced_upstream_version_id": UUIDS["project"],
+        "replacement_version_id": UUIDS["item"],
+        "bindings": [
+            {
+                "relation_type": "derives_from",
+                "binding_key": "lesson-scope",
+                "impact_scope": {"mode": "all"},
+            }
+        ],
+    }
+    validate(reason, schema)
+
+    revoke = deepcopy(reason)
+    revoke["reason_code"] = "UPSTREAM_APPROVAL_REVOKED"
+    revoke["replacement_version_id"] = None
+    validate(revoke, schema)
+
+    invalid = deepcopy(reason)
+    invalid["bindings"][0]["impact_scope"] = {
+        "mode": "keyed",
+        "selector": "lesson_unit_key",
+        "keys": ["LESSON-001"],
+    }
+    assert_invalid(invalid, schema)
+
+    invalid = deepcopy(reason)
+    invalid["bindings"][0]["impact_scope"] = {
+        "mode": "all",
+        "extra": True,
+    }
+    assert_invalid(invalid, schema)
+
+    invalid = deepcopy(reason)
+    invalid["reason_code"] = "UPSTREAM_APPROVAL_REVOKED"
+    assert_invalid(invalid, schema)

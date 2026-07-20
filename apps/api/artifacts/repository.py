@@ -27,7 +27,9 @@ class ArtifactRepository:
     def get(self, artifact_id: UUID, *, for_update: bool = False) -> Artifact | None:
         statement = self._visible_artifacts().where(Artifact.id == artifact_id)
         if for_update:
-            statement = statement.with_for_update(of=Artifact)
+            statement = statement.execution_options(populate_existing=True).with_for_update(
+                of=Artifact
+            )
         return self._session.scalar(statement)
 
     def get_by_key(self, project_id: UUID, artifact_key: str) -> Artifact | None:
@@ -80,7 +82,9 @@ class ArtifactRepository:
         )
         statement = self._scope_to_member(statement)
         if for_update_artifact:
-            statement = statement.with_for_update(of=Artifact)
+            statement = statement.execution_options(populate_existing=True).with_for_update(
+                of=Artifact
+            )
         row = self._session.execute(statement).one_or_none()
         return None if row is None else (row[0], row[1])
 

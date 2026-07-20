@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
+from apps.api.artifacts.models import ArtifactRelation
 from apps.api.artifacts.repository import ArtifactRepository
 from apps.api.artifacts.service import ArtifactService
 from apps.api.content_runtime.registry import BUILTIN_CONTENT_DEFINITION_VERSION_ID
 from apps.api.creation.models import CreationPackage
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import ApiError
+from apps.api.ids import new_uuid7
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.reliability.models import EventStreamEntry
@@ -71,7 +74,7 @@ def test_stale_propagates_only_along_real_relations_and_accept_stale_clears_it(
                 to_version_id=downstream_v1.id,
                 relation_type="derives_from",
                 binding_key="lesson_scope",
-                impact_scope={"fields": ["value"]},
+                impact_scope={"mode": "all"},
             )
             package, _ = seed_project_package(
                 session,
@@ -110,9 +113,16 @@ def test_stale_propagates_only_along_real_relations_and_accept_stale_clears_it(
         session.refresh(unrelated)
         assert downstream.status == "stale"
         assert downstream.stale_reason_json == {
+            "reason_code": "UPSTREAM_APPROVED_VERSION_CHANGED",
             "replaced_upstream_version_id": str(upstream_v1.id),
             "replacement_version_id": str(upstream_v2.id),
-            "bindings": [{"binding_key": "lesson_scope", "impact_scope": {"fields": ["value"]}}],
+            "bindings": [
+                {
+                    "relation_type": "derives_from",
+                    "binding_key": "lesson_scope",
+                    "impact_scope": {"mode": "all"},
+                }
+            ],
         }
         assert unrelated.status == "approved"
         refreshed_package = session.get(CreationPackage, package.id)
@@ -143,6 +153,60 @@ def test_stale_propagates_only_along_real_relations_and_accept_stale_clears_it(
         assert downstream.stale_reason_json is None
 
 
+def test_supersedes_is_same_artifact_ordered_and_non_stale(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session, session.begin():
+        actor = seed_test_actor(session)
+        project = ProjectRepository(session, actor).create(
+            CreateProjectRequest(title="Fractions", knowledge_point="One half")
+        )
+        artifact, version_one = create_approved(
+            session, actor, project.id, "supersedes", {"value": 1}
+        )
+        draft = ArtifactRepository(session, actor).get_draft(artifact.id, "main")
+        assert draft is not None
+        saved = ArtifactService(session, actor).save_draft(
+            artifact.id,
+            "main",
+            expected_lock_version=draft.lock_version,
+            content={"value": 2},
+            request_id="req-supersedes-save",
+        )
+        version_two = ArtifactService(session, actor).submit(
+            artifact.id,
+            "main",
+            expected_lock_version=saved.lock_version,
+            source_kind="manual",
+            request_id="req-supersedes-submit",
+        )
+        ArtifactService(session, actor).review(
+            version_two.id,
+            action="approve",
+            comment="approved",
+            request_id="req-supersedes-approve",
+        )
+        service = ArtifactService(session, actor)
+        relation = service.add_relation(
+            from_version_id=version_one.id,
+            to_version_id=version_two.id,
+            relation_type="supersedes",
+            binding_key="version-order",
+            impact_scope={"mode": "all"},
+        )
+        assert relation.relation_type == "supersedes"
+        with pytest.raises(ApiError) as reverse:
+            service.add_relation(
+                from_version_id=version_two.id,
+                to_version_id=version_one.id,
+                relation_type="supersedes",
+                binding_key="reverse-order",
+                impact_scope={"mode": "all"},
+            )
+        assert reverse.value.code == "ARTIFACT_SUPERSEDES_VERSION_ORDER"
+
+
 def test_relation_cycle_and_cross_tenant_visibility_are_rejected(
     migrated_database_url: str,
 ) -> None:
@@ -160,7 +224,7 @@ def test_relation_cycle_and_cross_tenant_visibility_are_rejected(
             to_version_id=second_v.id,
             relation_type="references",
             binding_key="first-to-second",
-            impact_scope={},
+            impact_scope={"mode": "all"},
         )
         with pytest.raises(ApiError) as cycle:
             service.add_relation(
@@ -168,7 +232,7 @@ def test_relation_cycle_and_cross_tenant_visibility_are_rejected(
                 to_version_id=first_v.id,
                 relation_type="references",
                 binding_key="second-to-first",
-                impact_scope={},
+                impact_scope={"mode": "all"},
             )
         assert cycle.value.code == "ARTIFACT_RELATION_CYCLE"
 
@@ -179,6 +243,88 @@ def test_relation_cycle_and_cross_tenant_visibility_are_rejected(
             actor_type="system",
         )
         assert ArtifactRepository(session, foreign_actor).get(first.id) is None
+
+
+def test_relation_impact_scope_database_constraint_accepts_only_current_shapes(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session, session.begin():
+        actor = seed_test_actor(session)
+        project = ProjectRepository(session, actor).create(
+            CreateProjectRequest(title="Fractions", knowledge_point="One half")
+        )
+        _source, source_version = create_approved(
+            session, actor, project.id, "scope-source", {"value": 1}
+        )
+        _target, target_version = create_approved(
+            session, actor, project.id, "scope-target", {"value": 2}
+        )
+        service = ArtifactService(session, actor)
+        service.add_relation(
+            from_version_id=source_version.id,
+            to_version_id=target_version.id,
+            relation_type="references",
+            binding_key="scope-all",
+            impact_scope={"mode": "all"},
+        )
+        service.add_relation(
+            from_version_id=source_version.id,
+            to_version_id=target_version.id,
+            relation_type="references",
+            binding_key="scope-keyed",
+            impact_scope={
+                "mode": "keyed",
+                "selector": "lesson_key",
+                "keys": ["LESSON-001"],
+            },
+        )
+        session.flush()
+
+        invalid_scopes = [
+            {},
+            {"mode": "keyed", "selector": "lesson_key", "keys": []},
+            {
+                "mode": "keyed",
+                "selector": "lesson_unit_key",
+                "keys": ["LESSON-001"],
+            },
+            {
+                "mode": "keyed",
+                "selector": "lesson_key",
+                "keys": ["LESSON-001"],
+                "extra": True,
+            },
+            {"mode": "all", "extra": True},
+            {"mode": "keyed", "selector": "lesson_key", "keys": [1]},
+            {"mode": "keyed", "selector": "lesson_key", "keys": [""]},
+            {
+                "mode": "keyed",
+                "selector": "lesson_key",
+                "keys": ["LESSON-001", "LESSON-001"],
+            },
+            {
+                "mode": "keyed",
+                "selector": "lesson_key",
+                "keys": ["LESSON-002", "LESSON-001"],
+            },
+        ]
+        for index, impact_scope in enumerate(invalid_scopes):
+            with pytest.raises(IntegrityError):
+                with session.begin_nested():
+                    session.add(
+                        ArtifactRelation(
+                            id=new_uuid7(),
+                            organization_id=actor.organization_id,
+                            from_artifact_version_id=source_version.id,
+                            to_artifact_version_id=target_version.id,
+                            relation_type="constrains",
+                            binding_key=f"invalid-scope-{index}",
+                            impact_scope_json=impact_scope,
+                            created_by=actor.principal_id,
+                        )
+                    )
+                    session.flush()
 
 
 def test_revoking_an_upstream_approval_marks_real_downstream_stale(
@@ -202,7 +348,7 @@ def test_revoking_an_upstream_approval_marks_real_downstream_stale(
             to_version_id=downstream_version.id,
             relation_type="derives_from",
             binding_key="revoked-source",
-            impact_scope={"fields": ["value"]},
+            impact_scope={"mode": "all"},
         )
         service.review(
             upstream_version.id,
@@ -213,4 +359,12 @@ def test_revoking_an_upstream_approval_marks_real_downstream_stale(
 
         assert downstream.status == "stale"
         assert downstream.stale_reason_json is not None
+        assert downstream.stale_reason_json["reason_code"] == "UPSTREAM_APPROVAL_REVOKED"
         assert downstream.stale_reason_json["replacement_version_id"] is None
+        stale_event = session.scalar(
+            select(EventStreamEntry).where(
+                EventStreamEntry.event_type == "workflow.downstream_stale.propagated"
+            )
+        )
+        assert stale_event is not None
+        assert stale_event.summary_json["payload"]["reason_code"] == ("UPSTREAM_APPROVAL_REVOKED")

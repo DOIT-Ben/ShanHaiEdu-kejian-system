@@ -27,6 +27,7 @@ class CreationPackageStalenessService:
                     CreationPackage.source_node_run_id.in_(node_run_ids),
                     CreationPackage.source_stale_at.is_(None),
                 )
+                .order_by(CreationPackage.id)
                 .with_for_update()
             )
         )

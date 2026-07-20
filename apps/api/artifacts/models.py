@@ -255,6 +255,10 @@ class ArtifactRelation(Base):
             "from_artifact_version_id <> to_artifact_version_id",
             name="no_self_relation",
         ),
+        CheckConstraint(
+            "shanhai_is_canonical_impact_scope(impact_scope_json)",
+            name="ck_artifact_relations_impact_scope_allowed",
+        ),
         Index(
             "uq_artifact_relations_versions_binding",
             "from_artifact_version_id",

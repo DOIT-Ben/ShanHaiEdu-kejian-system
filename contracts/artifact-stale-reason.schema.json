@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shanhaiedu.local/contracts/artifact-stale-reason.schema.json",
+  "title": "ArtifactStaleReason",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "reason_code",
+    "replaced_upstream_version_id",
+    "replacement_version_id",
+    "bindings"
+  ],
+  "properties": {
+    "reason_code": {
+      "enum": [
+        "UPSTREAM_APPROVED_VERSION_CHANGED",
+        "UPSTREAM_APPROVAL_REVOKED"
+      ]
+    },
+    "replaced_upstream_version_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "replacement_version_id": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "bindings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/binding"}
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "reason_code": {"const": "UPSTREAM_APPROVAL_REVOKED"}
+        }
+      },
+      "then": {
+        "properties": {"replacement_version_id": {"type": "null"}}
+      },
+      "else": {
+        "properties": {
+          "replacement_version_id": {"type": "string", "format": "uuid"}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "impact_scope": {
+      "oneOf": [
+        {"$ref": "#/$defs/all_scope"},
+        {"$ref": "#/$defs/keyed_scope"}
+      ]
+    },
+    "all_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {"mode": {"const": "all"}}
+    },
+    "keyed_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "selector", "keys"],
+      "properties": {
+        "mode": {"const": "keyed"},
+        "selector": {"const": "lesson_key"},
+        "keys": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relation_type", "binding_key", "impact_scope"],
+      "properties": {
+        "relation_type": {
+          "enum": ["derives_from", "references", "constrains"]
+        },
+        "binding_key": {"type": "string", "minLength": 1, "maxLength": 160},
+        "impact_scope": {"$ref": "#/$defs/impact_scope"}
+      }
+    }
+  }
+}

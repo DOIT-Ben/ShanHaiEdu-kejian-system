@@ -52,6 +52,7 @@
   ],
   "oversized_files": [
     {"path": "apps/api/artifacts/router.py", "line_count": 422, "owner": "area:asset", "reason": "Existing artifact routing and presentation responsibilities require a separate split task.", "exit_issue": "#92"},
+    {"path": "apps/api/artifacts/relation_service.py", "line_count": 423, "owner": "area:asset", "reason": "Issue #86 adds locked relation ordering and owner reauthorization; split remains assigned to #92.", "exit_issue": "#92"},
     {"path": "apps/api/assets/project_service.py", "line_count": 419, "owner": "area:asset", "reason": "Existing project asset validation responsibilities require a separate split task.", "exit_issue": "#92"},
     {"path": "apps/api/uploads/confirmation_service.py", "line_count": 422, "owner": "area:asset", "reason": "Existing upload confirmation transaction requires a separate split task.", "exit_issue": "#92"}
   ],
@@ -77,6 +78,8 @@
     {"path": "apps/api/uploads/confirmation_service.py", "qualname": "UploadConfirmationService.confirm", "line_count": 82, "owner": "area:asset", "reason": "Existing upload confirmation flow requires a focused split.", "exit_issue": "#92"},
     {"path": "apps/api/uploads/session_service.py", "qualname": "UploadSessionService.create_session", "line_count": 79, "owner": "area:asset", "reason": "Existing upload session transaction requires a focused split.", "exit_issue": "#92"},
     {"path": "workers/material_parse.py", "qualname": "MaterialParseJobRunner.run", "line_count": 96, "owner": "area:asset", "reason": "Existing material parse worker flow requires a focused split.", "exit_issue": "#92"},
-    {"path": "workers/tasks.py", "qualname": "run_deterministic_job", "line_count": 66, "owner": "area:workflow", "reason": "Existing deterministic worker flow requires a focused split.", "exit_issue": "#92"}
+    {"path": "workers/tasks.py", "qualname": "run_deterministic_job", "line_count": 66, "owner": "area:workflow", "reason": "Existing deterministic worker flow requires a focused split.", "exit_issue": "#92"},
+    {"path": "apps/api/artifacts/relation_service.py", "qualname": "ArtifactRelationService.add", "line_count": 95, "owner": "area:asset", "reason": "Issue #86 adds deterministic relation row locking; split remains assigned to #92.", "exit_issue": "#92"},
+    {"path": "apps/api/artifacts/relation_service.py", "qualname": "ArtifactRelationService.propagate_stale", "line_count": 67, "owner": "area:asset", "reason": "Artifact stale propagation requires a focused split.", "exit_issue": "#92"}
   ]
 }

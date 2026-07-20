@@ -1411,7 +1411,10 @@ components:
         run_no: {type: integer, minimum: 1}
         status: {$ref: './workflow-node-status.schema.json'}
         title: {type: string}
-        stale_reason: {type: [object, 'null']}
+        stale_reason:
+          oneOf:
+            - {$ref: './artifact-stale-reason.schema.json'}
+            - {type: 'null'}
         started_at: {type: [string, 'null'], format: date-time}
         finished_at: {type: [string, 'null'], format: date-time}
     WorkflowRun:
@@ -1976,7 +1979,10 @@ components:
         artifact_type: {type: string}
         content_definition_version_id: {type: string, format: uuid}
         status: {enum: [draft, in_review, approved, stale, archived]}
-        stale_reason: {type: [object, 'null']}
+        stale_reason:
+          oneOf:
+            - {$ref: './artifact-stale-reason.schema.json'}
+            - {type: 'null'}
         lock_version: {type: integer, minimum: 1}
         current_draft:
           oneOf:

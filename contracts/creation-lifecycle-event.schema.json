@@ -121,7 +121,12 @@
               "uniqueItems": true,
               "items": {"type": "string", "format": "uuid"}
             },
-            "reason_code": {"const": "UPSTREAM_APPROVED_VERSION_CHANGED"}
+            "reason_code": {
+              "enum": [
+                "UPSTREAM_APPROVED_VERSION_CHANGED",
+                "UPSTREAM_APPROVAL_REVOKED"
+              ]
+            }
           }
         }
       }
