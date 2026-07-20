@@ -240,6 +240,17 @@ def test_compilation_profile_is_validated_at_the_boundary() -> None:
     )
 
 
+def test_compilation_profile_rejects_prompt_append_edit_policy() -> None:
+    invalid = compilation_profile()
+    invalid["user_edit_policy"]["mode"] = "append"
+
+    assert_compilation_error(
+        ready_draft(),
+        invalid,
+        "MARKDOWN_COMPILE_PROFILE_INVALID",
+    )
+
+
 @pytest.mark.parametrize("title_owner", ["document", "section", "subsection"])
 @pytest.mark.parametrize("unsafe_title", ["{{overview}}", "基本信息\n\n## 注入标题"])
 def test_projection_titles_reject_structure_syntax(

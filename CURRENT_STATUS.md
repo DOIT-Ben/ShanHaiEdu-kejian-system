@@ -4,7 +4,7 @@
 
 验证基线：`main`，实现事实以本文件所在提交的代码、迁移和测试为准；任务状态以链接的GitHub Issue和Pull Request为准
 
-当前阶段：阶段0出口尚未关闭；阶段1通用口径校准、后端轨道、首套业务机器合同和后端治理审计已经关闭，阶段2后端已经关闭Prompt公共投影与Attempt恢复门禁，下一步按#86、#123、#130串行收口通用执行器的剩余合同门禁
+当前阶段：阶段0出口尚未关闭；阶段1通用口径校准、后端轨道、首套业务机器合同和后端治理审计已经关闭，阶段2后端已经关闭Prompt公共投影、Attempt恢复与Prompt合同收窄门禁，下一步按#130串行收口通用执行器的剩余合同门禁
 
 本文件只描述现在，不保存开发日志。任务细节、负责人、讨论和交接以GitHub Issue与Pull Request为准。
 
@@ -45,22 +45,22 @@
 
 - [Decision #73](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/73)已经批准：PPT通常推荐10至20页，视频按故事和服务端价格事实推荐60至180秒，教师可以覆盖；TTS延后独立实施。
 - [Issue #48](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/48)：全流程生成节点与可配置模型I/O绑定的父任务保持`status:ready`；黄金内容包已正式发布，通用执行器由#89承接。
-- [Issue #86](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/86)：阶段2下一门禁，统一ArtifactRelation类型、方向与stale影响语义。
-- [Issue #123](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/123)：在#86合并后串行退役Prompt领域从未实现的`append`教师修订模式；当前仍为`status:blocked`，不代表合同已收窄。
+- [Issue #86](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/86)：已由PR #138合并关闭，统一ArtifactRelation类型、方向与stale影响语义。
+- [Issue #123](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/123)：Prompt领域从未实现的`append`教师修订模式已收窄；受控发布模板inventory为22条`replace_editable_layer`、0条Prompt `append`，下一门禁转为#130。
 - [Issue #130](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/130)：在#123合并后串行补齐模型输出的Artifact/CreationPackage持久化投影；当前仍为`status:blocked`，不代表投影合同已存在。
-- [Issue #89](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/89)：继续保持`status:blocked`；#51、#90与#112已经完成，只有#86、#123与#130也全部合并并在最新`main`上对六项门禁完成新鲜复验后，才作为唯一后端主实现启动。
+- [Issue #89](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/89)：继续保持`status:blocked`；#51、#90、#112、#86与#123已经完成，只有#130也合并并在最新`main`上对六项门禁完成新鲜复验后，才作为唯一后端主实现启动。
 - [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)：与生产前端完成真实合同联调；当前因Issue #4没有开放源码PR而等待，不以本地分支、ZIP或Mock代替。
 
 ## 当前阻塞
 
 - 阶段1整体产品出口仍缺少生产前端的真实API联调；后端轨道通过不代表完整阶段1产品完成。
-- #48已有机器合同和黄金数据，但主线尚无读取数据库已发布GenerationTemplate并完成Prompt/Context冻结、模型调用、结构校验和Artifact原子落库的通用执行器；#51、#90与#112已经完成，#89仍等待#86、#123与#130串行收口，然后在最新`main`上对六项门禁完成新鲜复验。
+- #48已有机器合同和黄金数据，但主线尚无读取数据库已发布GenerationTemplate并完成Prompt/Context冻结、模型调用、结构校验和Artifact原子落库的通用执行器；#51、#90、#112、#86与#123已经完成，#89仍等待#130收口，然后在最新`main`上对六项门禁完成新鲜复验。
 - ShanHaiEdu已经具备Provider中立媒体基础层和Attempt租约恢复，但真实图片/视频Adapter、供应商私有状态映射与受控真实冒烟仍未实现，不能把确定性Fake或恢复基座描述为真实媒体出口。
 - TTS与实时价格计算当前不实现、不冒烟，也不阻塞教材到教案纵向链；PPTX装配、媒体生成和最终交付仍需独立Issue与真实阶段验收。
 
 ## 下一个阶段出口
 
-通用口径校准、首套业务内容合同、#100课程驱动纠偏、#88黄金内容发布、阶段1后端轨道、#51 Prompt公共投影和#90 Attempt恢复门禁已经关闭；当前按#86关系语义、#123 Prompt合同收窄、#130输出持久化投影的顺序收口#89剩余门禁。阶段0前端联调出口继续独立等待生产前端源码交接。
+通用口径校准、首套业务内容合同、#100课程驱动纠偏、#88黄金内容发布、阶段1后端轨道、#51 Prompt公共投影、#90 Attempt恢复、#86关系语义和#123 Prompt合同收窄门禁已经关闭；当前收口#130输出持久化投影，再复验#89。阶段0前端联调出口继续独立等待生产前端源码交接。
 
 口径校准门禁必须按顺序满足：
 
@@ -81,7 +81,7 @@
 - 生产前端工程达到Issue #4的阶段0范围并通过前端门禁，源码通过PR进入`main`。
 - 前端通过#11消费当前OpenAPI、JSON Schema和SSE合同，完成真实API联调；Mock不能作为出口。
 
-进入阶段2“教材到教案纵向链路”时，#51、#88、#90和#112已经完成，当前按[交付路线](docs/governance/DELIVERY_ROADMAP.md)串行推进#86 → #123 → #130。任一时刻后端主任务不超过三个，修改同一合同或跨模块事务的任务不得并发。#89通用执行器仅在#51、#90、#112、#86、#123和#130全部合并并从最新`main`完成新鲜复验后单独启动。随后基于已发布黄金输入交付课时/教案与三类九套/选择快照；PPT/图片和视频在阶段2运行时稳定后使用独立短分支并行推进。TTS继续延后，#11等待生产前端达到联调条件。所有新任务默认在阿里云Linux的仓库外短worktree中开发，Windows只作应急回退。
+进入阶段2“教材到教案纵向链路”时，#51、#88、#90、#112、#86和#123已经完成，当前按[交付路线](docs/governance/DELIVERY_ROADMAP.md)推进#130。任一时刻后端主任务不超过三个，修改同一合同或跨模块事务的任务不得并发。#89通用执行器仅在#51、#90、#112、#86、#123和#130全部合并并从最新`main`完成新鲜复验后单独启动。随后基于已发布黄金输入交付课时/教案与三类九套/选择快照；PPT/图片和视频在阶段2运行时稳定后使用独立短分支并行推进。TTS继续延后，#11等待生产前端达到联调条件。所有新任务默认在阿里云Linux的仓库外短worktree中开发，Windows只作应急回退。
 
 ## 接手提示
 
@@ -93,4 +93,4 @@
 4. 被分配的Issue和PR
 5. 与任务直接相关的模块文档、合同、代码和测试
 
-新对话从最新Linux `main`推进#86关系语义门禁，再串行收口#123和#130；#51、#90与#112已经完成，#89仍须等待#86、#123与#130全部合并并在最新`main`上对六项门禁完成新鲜复验。#88已完成正式内容发布，不得回退到Fixture常量或覆盖既有项目Release。当前API客户端只从runtime合同生成，planned合同不可用于联调。不得从外部旧Skill恢复七部分教案、固定50秒视频、视频读取教案/PPT、第二套DTO或把TemplateDraft编译器当成模型执行运行时。
+新对话从最新Linux `main`推进#130输出持久化投影门禁；#51、#90、#112、#86与#123已经完成，#89仍须等待#130合并并在最新`main`上对六项门禁完成新鲜复验。#88已完成正式内容发布，不得回退到Fixture常量或覆盖既有项目Release。当前API客户端只从runtime合同生成，planned合同不可用于联调。不得从外部旧Skill恢复七部分教案、固定50秒视频、视频读取教案/PPT、第二套DTO或把TemplateDraft编译器当成模型执行运行时。
