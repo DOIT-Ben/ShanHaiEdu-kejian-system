@@ -109,9 +109,10 @@ def validate_rough_storyboard(
     if actual != expected:
         errors.append("rough beats must completely map master visible beats")
     _validate_scene_beat_states(master, rough, errors)
-    if sum(beat.duration_seconds for beat in rough.beats) != (
-        recommendation.recommended_duration_seconds
-    ):
+    beat_duration = sum(beat.duration_seconds for beat in rough.beats)
+    if rough.total_duration_seconds != beat_duration:
+        errors.append("rough storyboard declared duration must equal beat durations")
+    if beat_duration != recommendation.recommended_duration_seconds:
         errors.append("rough storyboard duration must equal the confirmed duration")
     return tuple(errors)
 

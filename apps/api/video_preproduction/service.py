@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from decimal import Decimal
 
 from apps.api.video_preproduction.fake import ScriptedDeterministicTextFake
@@ -49,6 +50,7 @@ class VideoPreproductionService:
         self,
         request: VideoPreproductionRequest,
     ) -> ReviewableMasterScriptStage:
+        _require_pricing(request)
         script = self._text_fake.generate_master_script(request.intro_selection_snapshot)
         if validate_master_script(request.intro_selection_snapshot, script):
             raise VideoPreproductionError("VIDEO_MASTER_SCRIPT_INVALID")
@@ -157,9 +159,15 @@ def _require_master_source(
 
 
 def _require_pricing(request: VideoPreproductionRequest) -> PricingSnapshot:
-    if request.pricing_snapshot is None or not request.pricing_snapshot.version:
+    pricing = request.pricing_snapshot
+    if (
+        pricing is None
+        or not pricing.version
+        or re.fullmatch(r"[A-Z]{3}", pricing.currency) is None
+        or pricing.image_candidate_unit_price <= 0
+    ):
         raise VideoPreproductionError("PRICING_SNAPSHOT_REQUIRED")
-    return request.pricing_snapshot
+    return pricing
 
 
 def _story_complexity(

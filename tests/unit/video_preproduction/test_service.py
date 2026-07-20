@@ -130,6 +130,30 @@ def test_master_precedes_story_based_recommendation_and_teacher_confirmation() -
     assert 60 <= recommendation.recommended_duration_seconds <= 180
 
 
+def test_master_generation_rejects_missing_or_invalid_pricing_before_fake_call() -> None:
+    fake = ScriptedDeterministicTextFake()
+    service = VideoPreproductionService(fake)
+    valid = request()
+    assert valid.pricing_snapshot is not None
+    invalid_pricing = valid.pricing_snapshot.model_copy(
+        update={
+            "version": "",
+            "currency": "usd",
+            "image_candidate_unit_price": Decimal("0"),
+        }
+    )
+
+    for payload in (
+        valid.model_copy(update={"pricing_snapshot": None}),
+        valid.model_copy(update={"pricing_snapshot": invalid_pricing}),
+    ):
+        with pytest.raises(VideoPreproductionError) as caught:
+            service.generate_master_script(payload)
+        assert caught.value.code == "PRICING_SNAPSHOT_REQUIRED"
+
+    assert fake.calls == 0
+
+
 def test_rough_storyboard_requires_confirmation_and_master_approval() -> None:
     payload = request()
     service = VideoPreproductionService(ScriptedDeterministicTextFake())
@@ -310,6 +334,18 @@ def test_validator_rejects_mapping_link_and_prompt_drift() -> None:
     assert "image prompt asset keys must be unique" in report.errors
     assert "image prompts must use the visual plan aspect ratio" in report.errors
     assert "image prompts must retain visual plan negative constraints" in report.errors
+
+
+def test_validator_rejects_declared_rough_duration_drift() -> None:
+    package, *_ = build_package()
+    broken_rough = package.rough_storyboard.model_copy(
+        update={"total_duration_seconds": package.rough_storyboard.total_duration_seconds + 1}
+    )
+
+    report = validate_package(package.model_copy(update={"rough_storyboard": broken_rough}))
+
+    assert report.valid is False
+    assert "rough storyboard declared duration must equal beat durations" in report.errors
 
 
 def test_canonical_serialization_bytes_are_stable_and_detect_tampering() -> None:
