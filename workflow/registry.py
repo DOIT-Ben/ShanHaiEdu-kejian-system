@@ -54,6 +54,8 @@ class WorkflowRegistry:
     available_contract_refs: frozenset[str] | None = None
 
     def load(self, payload: dict[str, Any]) -> RegisteredWorkflow:
+        if "api_version" not in payload:
+            return self._load_legacy(payload)
         self._require_v2_catalog(payload)
         external_refs = self._parse_string_array(
             payload,
@@ -95,6 +97,108 @@ class WorkflowRegistry:
             producer_index=indexes.producer_index,
             output_definition_index=indexes.output_definition_index,
         )
+
+    def _load_legacy(self, payload: Mapping[str, object]) -> RegisteredWorkflow:
+        raw_nodes = payload.get("nodes")
+        if not isinstance(raw_nodes, list):
+            raise WorkflowDefinitionError(
+                "legacy workflow graph nodes must be an array",
+                code="WORKFLOW_LEGACY_DECLARATION_INVALID",
+            )
+        nodes = tuple(self._parse_legacy_node(raw) for raw in cast(list[object], raw_nodes))
+        graph = WorkflowGraph(nodes=nodes)
+        node_by_key = {node.node_key: node for node in nodes}
+        if len(node_by_key) != len(nodes):
+            raise WorkflowDefinitionError(
+                "legacy workflow graph contains duplicate node_key values",
+                code="WORKFLOW_LEGACY_DECLARATION_INVALID",
+            )
+        return RegisteredWorkflow(
+            graph=graph,
+            topological_order=self._legacy_topological_order(node_by_key),
+            node_by_key=MappingProxyType(node_by_key),
+            producers_by_contract=MappingProxyType({}),
+            producer_index=MappingProxyType({}),
+            output_definition_index=MappingProxyType({}),
+        )
+
+    @staticmethod
+    def _parse_legacy_node(raw: object) -> WorkflowNodeDefinition:
+        if not isinstance(raw, dict):
+            raise WorkflowDefinitionError(
+                "legacy workflow nodes must be objects",
+                code="WORKFLOW_LEGACY_DECLARATION_INVALID",
+            )
+        values = cast(dict[str, object], raw)
+        node_key = values.get("node_key")
+        if not isinstance(node_key, str) or not node_key.strip():
+            raise WorkflowDefinitionError(
+                "legacy workflow node_key must be a non-empty string",
+                code="WORKFLOW_LEGACY_DECLARATION_INVALID",
+            )
+        branch_key = values.get("branch_key")
+        if branch_key is not None and not isinstance(branch_key, str):
+            raise WorkflowDefinitionError(
+                "legacy workflow branch_key must be a string or null",
+                code="WORKFLOW_LEGACY_DECLARATION_INVALID",
+            )
+        dependencies = WorkflowRegistry._parse_string_array(
+            values, "dependencies", required=True, error_code="WORKFLOW_LEGACY_DECLARATION_INVALID"
+        )
+        return WorkflowNodeDefinition(
+            node_key=node_key,
+            execution_kind="deterministic",
+            execution_scope="project",
+            branch_key=branch_key,
+            entrypoint=not dependencies,
+            dependencies=dependencies,
+            input_contract_refs=WorkflowRegistry._parse_string_array(
+                values,
+                "input_contract_refs",
+                required=True,
+                error_code="WORKFLOW_LEGACY_DECLARATION_INVALID",
+            ),
+            output_contract_refs=WorkflowRegistry._parse_string_array(
+                values,
+                "output_contract_refs",
+                required=True,
+                error_code="WORKFLOW_LEGACY_DECLARATION_INVALID",
+            ),
+            binding=copy.deepcopy(values),
+        )
+
+    @staticmethod
+    def _legacy_topological_order(
+        nodes: Mapping[str, WorkflowNodeDefinition],
+    ) -> tuple[str, ...]:
+        ordered: list[str] = []
+        visiting: set[str] = set()
+        visited: set[str] = set()
+
+        def visit(node_key: str) -> None:
+            if node_key in visited:
+                return
+            if node_key in visiting:
+                raise WorkflowDefinitionError(
+                    "legacy workflow graph contains a dependency cycle",
+                    code="WORKFLOW_LEGACY_DECLARATION_INVALID",
+                )
+            node = nodes.get(node_key)
+            if node is None:
+                raise WorkflowDefinitionError(
+                    f"legacy workflow has missing dependency: {node_key}",
+                    code="WORKFLOW_LEGACY_DECLARATION_INVALID",
+                )
+            visiting.add(node_key)
+            for dependency in node.dependencies:
+                visit(dependency)
+            visiting.remove(node_key)
+            visited.add(node_key)
+            ordered.append(node_key)
+
+        for node_key in nodes:
+            visit(node_key)
+        return tuple(ordered)
 
     @staticmethod
     def _require_v2_catalog(payload: Mapping[str, object]) -> None:

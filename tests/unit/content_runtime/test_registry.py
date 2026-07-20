@@ -105,7 +105,7 @@ def test_registry_loads_the_published_catalog_with_one_deterministic_order() -> 
     }
 
 
-def test_registry_rejects_legacy_release_instead_of_guessing_missing_declarations() -> None:
+def test_registry_reads_legacy_release_without_granting_v2_projection_capabilities() -> None:
     legacy = {
         "nodes": [
             {
@@ -118,9 +118,11 @@ def test_registry_rejects_legacy_release_instead_of_guessing_missing_declaration
         ]
     }
 
-    with pytest.raises(WorkflowDefinitionError, match="unsupported release") as caught:
-        BUILTIN_WORKFLOW_REGISTRY.load(legacy)
-    assert caught.value.code == "WORKFLOW_RELEASE_UNSUPPORTED"
+    registered = BUILTIN_WORKFLOW_REGISTRY.load(legacy)
+
+    assert registered.topological_order == ("generate",)
+    assert registered.node_by_key["generate"].binding == legacy["nodes"][0]
+    assert registered.output_definition_index == {}
 
 
 @pytest.mark.parametrize(
