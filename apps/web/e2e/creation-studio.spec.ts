@@ -335,12 +335,12 @@ test("创作结果可前后切换、放大并对比候选", async ({ page }) => 
 
 test("全屏预览退出后再打开保存对话框", async ({ page }) => {
   await openReadyImageStudio(page);
+  await page.getByRole("button", { name: "就用这张" }).click();
   await page.getByRole("button", { name: "全屏查看" }).click();
   await expect.poll(() => page.evaluate(() => document.fullscreenElement !== null)).toBe(true);
 
-  await page.getByRole("button", { name: "就用这张" }).click();
-  await expect.poll(() => page.evaluate(() => document.fullscreenElement === null)).toBe(true);
   await page.getByRole("button", { name: "保存到项目" }).click();
+  await expect.poll(() => page.evaluate(() => document.fullscreenElement === null)).toBe(true);
   await expect(page.getByRole("dialog", { name: "保存到项目" })).toBeInViewport();
 });
 
