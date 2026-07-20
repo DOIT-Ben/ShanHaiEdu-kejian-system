@@ -7,6 +7,7 @@ from uuid import uuid4
 import pytest
 
 from apps.api.artifacts.domain import ArtifactInvariantError, ArtifactRelationType
+from apps.api.ids import new_uuid7
 from apps.api.runtime_boundary.ports import (
     ArtifactPort,
     AssetPort,
@@ -113,6 +114,19 @@ def test_generated_relation_rejects_invalid_source_id() -> None:
             binding_key="lesson-scope",
             impact_scope={"mode": "all"},
         )
+
+
+def test_generated_relation_accepts_canonical_uuid7_source_id() -> None:
+    source_id = new_uuid7()
+
+    relation = GeneratedArtifactRelation(
+        from_artifact_version_id=source_id,
+        relation_type=ArtifactRelationType.DERIVES_FROM,
+        binding_key="lesson-scope",
+        impact_scope={"mode": "all"},
+    )
+
+    assert relation.from_artifact_version_id == source_id
 
 
 def test_backend_boundary_document_records_ports_and_live_size_baseline() -> None:
