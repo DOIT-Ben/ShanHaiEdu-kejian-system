@@ -8,6 +8,7 @@ from typing import Any, cast
 
 from workflow.content_package import canonical_json_sha256, validate_content_package
 from workflow.node_generation_binding import load_workflow_node_catalog
+from workflow.registry import BUILTIN_WORKFLOW_REGISTRY
 
 
 class ContentPublicationConflict(ValueError):
@@ -75,10 +76,16 @@ def load_builtin_courseware_release(root: Path) -> BuiltinCoursewareReleaseSourc
         contracts_root / "fixtures/workflow-node-generation-bindings/primary-math-courseware.json",
         schema_path=contracts_root / "workflow-node-generation-binding.schema.json",
     )
+    # Publication and execution must validate the exact same graph shape.  The
+    # binding validator checks package-local semantics; the runtime registry
+    # additionally proves that the persisted graph is executable without
+    # falling back to a legacy catalog or hard-coded contract list.
+    BUILTIN_WORKFLOW_REGISTRY.load(catalog.catalog)
     manifest_entries = {
         cast(str, entry["item_key"]): entry
         for entry in cast(list[dict[str, Any]], package.manifest["items"])
     }
+    _validate_catalog_content_definitions(catalog.catalog, package.items, manifest_entries)
     entrypoints = set(cast(list[str], package.manifest["entrypoints"]))
     model_template_refs = {
         cast(str, node["generation_template_ref"]["item_key"])
@@ -97,3 +104,34 @@ def load_builtin_courseware_release(root: Path) -> BuiltinCoursewareReleaseSourc
         package_checksum=canonical_json_sha256(package.manifest),
         workflow_checksum=catalog.content_hash,
     )
+
+
+def _validate_catalog_content_definitions(
+    catalog: dict[str, Any],
+    items: dict[str, dict[str, Any]],
+    manifest_entries: dict[str, dict[str, Any]],
+) -> None:
+    for node in cast(list[dict[str, Any]], catalog["nodes"]):
+        if node["execution_kind"] != "model_generation":
+            continue
+        template_key = cast(str, node["generation_template_ref"]["item_key"])
+        template = items.get(template_key)
+        if template is None or manifest_entries[template_key]["kind"] != "generation_template":
+            raise ContentPublicationConflict(
+                f"generation template is missing from the published package: {template_key}"
+            )
+        spec = cast(dict[str, Any], template.get("spec", {}))
+        output_ref = spec.get("output_definition_ref")
+        artifact_ref = node["output_persistence"]["artifact"]["content_definition_ref"]
+        if output_ref != artifact_ref:
+            raise ContentPublicationConflict(
+                f"artifact output definition disagrees with generation template: {node['node_key']}"
+            )
+        output_key = cast(str, artifact_ref["item_key"])
+        if (
+            output_key not in items
+            or manifest_entries[output_key]["kind"] != "content_definition"
+        ):
+            raise ContentPublicationConflict(
+                f"content definition is missing from the published package: {output_key}"
+            )

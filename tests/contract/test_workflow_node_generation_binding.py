@@ -16,6 +16,7 @@ from workflow.node_generation_binding import (
     NodeGenerationBindingError,
     validate_workflow_node_catalog,
 )
+from workflow.registry import BUILTIN_WORKFLOW_REGISTRY
 
 
 def test_workflow_and_gateway_share_one_model_capability_registry() -> None:
@@ -68,7 +69,33 @@ def test_schema_and_complete_primary_math_catalog_are_valid() -> None:
     validated = validate_workflow_node_catalog(catalog, schema=schema)
 
     node_keys = {node["node_key"] for node in catalog["nodes"]}
-    assert len(node_keys) >= 45
+    assert catalog["api_version"] == "shanhai.workflow-node-generation-binding/v2"
+    assert catalog["semantic_version"] == "1.1.0"
+    assert len(node_keys) == 47
+    assert {
+        "project": 7,
+        "lesson_unit": 40,
+    } == {
+        scope: sum(node["execution_scope"] == scope for node in catalog["nodes"])
+        for scope in ("project", "lesson_unit")
+    }
+    assert {
+        "model_generation": 22,
+        "deterministic": 13,
+        "human_gate": 12,
+    } == {
+        kind: sum(node["execution_kind"] == kind for node in catalog["nodes"])
+        for kind in ("model_generation", "deterministic", "human_gate")
+    }
+    assert all(
+        {"execution_scope", "branch_key", "entrypoint", "dependencies"} <= node.keys()
+        for node in catalog["nodes"]
+    )
+    assert sum("output_persistence" in node for node in catalog["nodes"]) == 22
+    assert all(
+        ("output_persistence" in node) == (node["execution_kind"] == "model_generation")
+        for node in catalog["nodes"]
+    )
     assert {
         "material.parse",
         "lesson.division.generate",
@@ -86,6 +113,137 @@ def test_schema_and_complete_primary_math_catalog_are_valid() -> None:
     }.issubset(node_keys)
     assert validated.catalog == catalog
     assert len(validated.content_hash) == 64
+    assert len(validated.indexes.output_definition_index) == 22
+    lesson_plan_index = validated.indexes.output_definition_index[
+        "lesson_plan.generate.output"
+    ]
+    assert lesson_plan_index.producer_node_key == "lesson_plan.generate"
+    assert lesson_plan_index.quality_validate_node_key == "lesson_plan.validate"
+    assert lesson_plan_index.quality_gate_node_key == "lesson_plan.approve"
+    assert lesson_plan_index.quality_requirement_mode == "reports"
+    assert all(
+        entry.quality_requirement_mode == "none"
+        for key, entry in validated.indexes.output_definition_index.items()
+        if key.startswith(("ppt.", "video.", "audio."))
+    )
+    for contract_ref, expected in {
+        "prompt:image_request": {
+            "ppt.cover.prompt.generate",
+            "video.style_master.prompt.generate",
+        },
+        "asset:image_candidates": {
+            "ppt.cover.image.generate",
+            "video.style_master.image.generate",
+        },
+        "package:creation_image": {
+            "ppt.body_asset_prompts.generate",
+            "video.asset_prompts.generate",
+        },
+    }.items():
+        assert {
+            producer.node_key for producer in validated.indexes.producers_by_contract[contract_ref]
+        } == expected
+
+    registered = BUILTIN_WORKFLOW_REGISTRY.load(catalog)
+    assert registered.indexes == validated.indexes
+
+
+def test_catalog_declares_versioned_validator_descriptors() -> None:
+    catalog = load_catalog()
+    descriptors = catalog["validator_descriptors"]
+    identities = {
+        (item["key"], item["semantic_version"], item["implementation_digest"])
+        for item in descriptors
+    }
+
+    assert len(descriptors) == 68
+    assert len(identities) == len(descriptors)
+    assert all(len(item["implementation_digest"]) == 64 for item in descriptors)
+    assert all(
+        {"key", "semantic_version", "implementation_digest"} <= ref.keys()
+        for node in catalog["nodes"]
+        for ref in node["validator_refs"]
+    )
+
+
+def test_topology_rejects_missing_cycles_and_implicit_entrypoints() -> None:
+    catalog = load_catalog()
+    node_by_key(catalog, "lesson_plan.validate")["dependencies"] = ["missing.node"]
+    assert_rejected(catalog, "NODE_BINDING_DEPENDENCY_MISSING")
+
+    catalog = load_catalog()
+    node_by_key(catalog, "lesson_plan.generate")["dependencies"] = ["lesson_plan.validate"]
+    node_by_key(catalog, "lesson_plan.generate")["entrypoint"] = False
+    assert_rejected(catalog, "NODE_BINDING_DEPENDENCY_CYCLE")
+
+    catalog = load_catalog()
+    node_by_key(catalog, "lesson_plan.generate")["entrypoint"] = False
+    assert_rejected(catalog, "NODE_BINDING_ENTRYPOINT_INVALID")
+
+
+def test_topology_rejects_cross_scope_and_cross_branch_dependencies() -> None:
+    catalog = load_catalog()
+    node_by_key(catalog, "lesson_plan.generate")["dependencies"] = ["material.scope_review"]
+    node_by_key(catalog, "lesson_plan.generate")["entrypoint"] = False
+    assert_rejected(catalog, "NODE_BINDING_DEPENDENCY_SCOPE_INVALID")
+
+    catalog = load_catalog()
+    node_by_key(catalog, "ppt.content_analyze")["dependencies"] = ["lesson_plan.approve"]
+    node_by_key(catalog, "ppt.content_analyze")["entrypoint"] = False
+    assert_rejected(catalog, "NODE_BINDING_DEPENDENCY_BRANCH_INVALID")
+
+
+def test_topology_requires_one_entrypoint_per_scope_branch_group() -> None:
+    catalog = load_catalog()
+    duplicate = copy.deepcopy(node_by_key(catalog, "lesson_plan.generate"))
+    duplicate["node_key"] = "lesson_plan.generate_duplicate"
+    catalog["nodes"].append(duplicate)
+
+    assert_rejected(catalog, "NODE_BINDING_ENTRYPOINT_GROUP_INVALID")
+
+
+def test_output_contract_and_content_definition_mappings_are_unambiguous() -> None:
+    catalog = load_catalog()
+    node_by_key(catalog, "ppt.content_analyze")["output_contract_refs"] = [
+        "content:ppt_analysis",
+        "artifact:extra",
+    ]
+    assert_rejected(catalog, "NODE_BINDING_OUTPUT_CONTRACT_AMBIGUOUS")
+
+    catalog = load_catalog()
+    node_by_key(catalog, "intro.generate_options")["output_persistence"]["artifact"][
+        "content_definition_ref"
+    ]["item_key"] = node_by_key(catalog, "lesson_plan.generate")["output_persistence"][
+        "artifact"
+    ]["content_definition_ref"]["item_key"]
+    assert_rejected(catalog, "NODE_BINDING_OUTPUT_DEFINITION_DUPLICATE")
+
+
+def test_quality_gate_report_refs_must_be_unique() -> None:
+    catalog = load_catalog()
+    requirement = node_by_key(catalog, "lesson_plan.approve")["quality_requirement"]
+    requirement["report_refs"].append(requirement["report_refs"][0])
+
+    assert_rejected(catalog, "NODE_BINDING_QUALITY_GATE_INVALID")
+
+
+def test_output_persistence_forbids_implicit_or_extra_targets() -> None:
+    catalog = load_catalog()
+    node_by_key(catalog, "lesson_plan.generate").pop("output_persistence")
+    assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
+
+    catalog = load_catalog()
+    node_by_key(catalog, "lesson_plan.validate")["output_persistence"] = copy.deepcopy(
+        node_by_key(catalog, "lesson_plan.generate")["output_persistence"]
+    )
+    assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
+
+    catalog = load_catalog()
+    relation = node_by_key(catalog, "lesson_plan.generate")["output_persistence"]["artifact"][
+        "relations"
+    ][0]
+    relation["to_artifact_version_id"] = "00000000-0000-0000-0000-000000000000"
+    assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
 
 
 def test_catalog_encodes_context_and_reference_asset_boundaries() -> None:
@@ -154,7 +312,7 @@ def test_catalog_hash_is_deterministic_for_semantically_identical_objects() -> N
     assert first_validated.canonical_json == second_validated.canonical_json
     assert first_validated.content_hash == second_validated.content_hash
     assert first_validated.content_hash == (
-        "268f503e9e7e455aab936e885d1c67b1934384d45c2ef0e4d0399683e579e7ea"
+        "17d5855448addeed58fbc0044236b7b278768ff8ea222d5d7bfa32d02988f584"
     )
 
 
