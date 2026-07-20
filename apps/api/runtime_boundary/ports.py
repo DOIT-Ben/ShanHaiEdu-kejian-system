@@ -4,10 +4,15 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, Protocol
 from uuid import UUID
 
-from apps.api.artifacts.domain import ArtifactRelationType
+from apps.api.artifacts.domain import (
+    ArtifactImpactScope,
+    ArtifactInvariantError,
+    ArtifactRelationType,
+)
 from apps.api.model_gateway.contracts import (
     ModelAuditContext,
     TextGatewayResult,
@@ -65,6 +70,27 @@ class GeneratedArtifactRelation:
     binding_key: str
     impact_scope: Mapping[str, Any]
 
+    def __post_init__(self) -> None:
+        raw_source_id: object = self.from_artifact_version_id
+        if type(raw_source_id) is not UUID:
+            raise ArtifactInvariantError("generated relation source version is invalid")
+        raw_relation_type: object = self.relation_type
+        if type(raw_relation_type) is not ArtifactRelationType:
+            raise ArtifactInvariantError("generated relation type is invalid")
+        raw_binding_key: object = self.binding_key
+        if (
+            type(raw_binding_key) is not str
+            or not raw_binding_key.strip()
+            or len(raw_binding_key) > 160
+        ):
+            raise ArtifactInvariantError("generated relation binding_key is invalid")
+        scope = ArtifactImpactScope.from_mapping(self.impact_scope)
+        canonical: dict[str, Any] = {"mode": scope.mode}
+        if scope.mode == "keyed":
+            assert scope.selector is not None
+            canonical.update(selector=scope.selector.value, keys=scope.keys)
+        object.__setattr__(self, "impact_scope", MappingProxyType(canonical))
+
 
 @dataclass(frozen=True, slots=True)
 class GeneratedArtifactWrite:
@@ -79,6 +105,12 @@ class GeneratedArtifactWrite:
     content: Mapping[str, Any]
     request_id: str
     relations: tuple[GeneratedArtifactRelation, ...] = ()
+
+    def __post_init__(self) -> None:
+        relations: tuple[object, ...] = tuple(self.relations)
+        if any(type(item) is not GeneratedArtifactRelation for item in relations):
+            raise ArtifactInvariantError("generated artifact relations are invalid")
+        object.__setattr__(self, "relations", relations)
 
 
 @dataclass(frozen=True, slots=True)
