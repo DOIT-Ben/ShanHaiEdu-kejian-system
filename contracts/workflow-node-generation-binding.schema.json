@@ -44,11 +44,27 @@
     },
     "contractRef": {
       "type": "string",
+      "maxLength": 160,
       "pattern": "^[a-z][a-z0-9_.-]{1,79}:[a-z][a-z0-9_.-]{1,159}$"
     },
     "semanticVersion": {
       "type": "string",
       "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "artifactType": {
+      "type": "string",
+      "maxLength": 80,
+      "pattern": "^[a-z][a-z0-9_.-]+$"
+    },
+    "creationPackageKeyPrefix": {
+      "type": "string",
+      "maxLength": 120,
+      "pattern": "^[a-z][a-z0-9_.-]+$"
+    },
+    "lessonArtifactKeyPrefix": {
+      "type": "string",
+      "maxLength": 79,
+      "pattern": "^[a-z][a-z0-9_.-]+$"
     },
     "digest": {
       "type": "string",
@@ -313,6 +329,15 @@
         "pointer": {"type": "string", "maxLength": 2048}
       }
     },
+    "outputPointerProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "pointer"],
+      "properties": {
+        "source": {"const": "output"},
+        "pointer": {"type": "string", "maxLength": 2048}
+      }
+    },
     "constantProjection": {
       "type": "object",
       "additionalProperties": false,
@@ -338,6 +363,15 @@
         {"$ref": "#/$defs/intrinsicProjection"}
       ]
     },
+    "rootOutputProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "pointer"],
+      "properties": {
+        "source": {"const": "output"},
+        "pointer": {"const": ""}
+      }
+    },
     "artifactIdentity": {
       "oneOf": [
         {
@@ -355,7 +389,7 @@
           "required": ["strategy", "artifact_key_prefix"],
           "properties": {
             "strategy": {"const": "lesson_unit_singleton"},
-            "artifact_key_prefix": {"$ref": "#/$defs/key"}
+            "artifact_key_prefix": {"$ref": "#/$defs/lessonArtifactKeyPrefix"}
           }
         }
       ]
@@ -404,10 +438,10 @@
       ],
       "properties": {
         "identity": {"$ref": "#/$defs/artifactIdentity"},
-        "artifact_type": {"$ref": "#/$defs/key"},
+        "artifact_type": {"$ref": "#/$defs/artifactType"},
         "branch_key": {"$ref": "#/$defs/key"},
         "content_definition_ref": {"$ref": "#/$defs/contentDefinitionRef"},
-        "content": {"$ref": "#/$defs/valueProjection"},
+        "content": {"$ref": "#/$defs/rootOutputProjection"},
         "relations": {
           "type": "array",
           "maxItems": 100,
@@ -421,7 +455,7 @@
       "required": ["strategy", "prefix"],
       "properties": {
         "strategy": {"const": "source_artifact_version"},
-        "prefix": {"$ref": "#/$defs/key"}
+        "prefix": {"$ref": "#/$defs/creationPackageKeyPrefix"}
       }
     },
     "authorizedReferenceAssetsProjection": {
@@ -433,15 +467,6 @@
         "pointer": {"const": "/reference_assets"}
       }
     },
-    "itemReferenceAssetsProjection": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["source", "pointer"],
-      "properties": {
-        "source": {"const": "item"},
-        "pointer": {"type": "string", "maxLength": 2048}
-      }
-    },
     "constantReferenceAssetsProjection": {
       "type": "object",
       "additionalProperties": false,
@@ -450,7 +475,7 @@
         "source": {"const": "constant"},
         "value": {
           "type": "array",
-          "maxItems": 100,
+          "maxItems": 0,
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -466,8 +491,7 @@
     "referenceAssetsProjection": {
       "oneOf": [
         {"$ref": "#/$defs/constantReferenceAssetsProjection"},
-        {"$ref": "#/$defs/authorizedReferenceAssetsProjection"},
-        {"$ref": "#/$defs/itemReferenceAssetsProjection"}
+        {"$ref": "#/$defs/authorizedReferenceAssetsProjection"}
       ]
     },
     "creationPackageItemMapping": {
@@ -508,7 +532,8 @@
         "allow_download": {"type": "boolean"},
         "target_slot_prefix": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9_.-]*\\.$"
+          "maxLength": 159,
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*\\.$"
         }
       }
     },
@@ -550,6 +575,7 @@
           "type": "array",
           "minItems": 1,
           "maxItems": 100,
+          "uniqueItems": true,
           "items": {"$ref": "#/$defs/validatorRef"}
         },
         "mapping": {
@@ -557,9 +583,9 @@
           "additionalProperties": false,
           "required": ["conclusion", "findings", "evidence"],
           "properties": {
-            "conclusion": {"$ref": "#/$defs/valueProjection"},
-            "findings": {"$ref": "#/$defs/valueProjection"},
-            "evidence": {"$ref": "#/$defs/valueProjection"}
+            "conclusion": {"$ref": "#/$defs/outputPointerProjection"},
+            "findings": {"$ref": "#/$defs/outputPointerProjection"},
+            "evidence": {"$ref": "#/$defs/outputPointerProjection"}
           }
         }
       }
@@ -582,6 +608,7 @@
               "type": "array",
               "minItems": 1,
               "maxItems": 20,
+              "uniqueItems": true,
               "items": {"$ref": "#/$defs/contractRef"}
             },
             "accepted_conclusions": {

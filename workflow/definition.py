@@ -20,6 +20,25 @@ class WorkflowDefinitionError(ValueError):
         self.code = code
 
 
+def freeze_workflow_value(value: object) -> object:
+    """Recursively freeze a validated JSON workflow snapshot."""
+
+    if isinstance(value, Mapping):
+        entries = cast(Mapping[object, object], value)
+        frozen: dict[str, object] = {}
+        for key, child in entries.items():
+            if type(key) is not str:
+                raise WorkflowDefinitionError(
+                    "workflow binding keys must be strings",
+                    code="WORKFLOW_NODE_DECLARATION_INVALID",
+                )
+            frozen[key] = freeze_workflow_value(child)
+        return MappingProxyType(frozen)
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return tuple(freeze_workflow_value(child) for child in cast(Sequence[object], value))
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class WorkflowNodeDefinition:
     node_key: str
@@ -185,6 +204,7 @@ def validate_workflow_graph(
     for node in graph.nodes:
         visit(node.node_key)
     _validate_entrypoint_groups(graph.nodes)
+    _validate_input_dependency_closure(graph.nodes, node_by_key)
     return tuple(ordered)
 
 
@@ -208,6 +228,63 @@ def _validate_entrypoint_groups(nodes: tuple[WorkflowNodeDefinition, ...]) -> No
                 f"found {entries}",
                 code="WORKFLOW_ENTRYPOINT_GROUP_INVALID",
             )
+
+
+def _validate_input_dependency_closure(
+    nodes: tuple[WorkflowNodeDefinition, ...],
+    node_by_key: Mapping[str, WorkflowNodeDefinition],
+) -> None:
+    producers: dict[tuple[str, str | None, str], list[str]] = defaultdict(list)
+    producers_by_contract: dict[str, list[str]] = defaultdict(list)
+    for node in nodes:
+        for output_ref in node.output_contract_refs:
+            producers[(node.execution_scope, node.branch_key, output_ref)].append(node.node_key)
+            producers_by_contract[output_ref].append(node.node_key)
+
+    closure_by_node: dict[str, frozenset[str]] = {}
+
+    def dependency_closure(node_key: str) -> frozenset[str]:
+        cached = closure_by_node.get(node_key)
+        if cached is not None:
+            return cached
+        closure: set[str] = set()
+        for dependency in node_by_key[node_key].dependencies:
+            closure.add(dependency)
+            closure.update(dependency_closure(dependency))
+        result = frozenset(closure)
+        closure_by_node[node_key] = result
+        return result
+
+    for node in nodes:
+        closure = dependency_closure(node.node_key)
+        for input_ref in node.input_contract_refs:
+            matches = producers.get((node.execution_scope, node.branch_key, input_ref), [])
+            global_matches = producers_by_contract.get(input_ref, [])
+            if len(matches) > 1:
+                raise WorkflowDefinitionError(
+                    f"contract {input_ref} has multiple producers in "
+                    f"{node.execution_scope}/{node.branch_key}",
+                    code="WORKFLOW_OUTPUT_PRODUCER_DUPLICATE",
+                )
+            if not matches and len(global_matches) > 1:
+                raise WorkflowDefinitionError(
+                    f"workflow node {node.node_key} has an ambiguous cross-branch "
+                    f"input producer for {input_ref}",
+                    code="WORKFLOW_INPUT_PRODUCER_AMBIGUOUS",
+                )
+            if matches and matches[0] not in closure:
+                code = "WORKFLOW_INPUT_DEPENDENCY_MISSING"
+                binding = _mapping(node.binding)
+                requirement = _mapping(
+                    binding.get("quality_requirement") if binding is not None else None
+                )
+                if node.execution_kind == "human_gate" and requirement is not None:
+                    code = "WORKFLOW_OUTPUT_QUALITY_GATE_INVALID"
+                raise WorkflowDefinitionError(
+                    f"workflow node {node.node_key} consumes {input_ref} before its "
+                    f"producer {matches[0]} is in the dependency closure",
+                    code=code,
+                )
 
 
 def build_workflow_indexes(graph: WorkflowGraph) -> WorkflowIndexes:
@@ -250,6 +327,7 @@ def build_workflow_indexes(graph: WorkflowGraph) -> WorkflowIndexes:
             producers[contract_ref].append(producer)
 
     output_entries: dict[str, WorkflowOutputDefinitionBinding] = {}
+    identity_declarations: list[tuple[str, str, str]] = []
     for node in graph.nodes:
         if node.execution_kind != "model_generation":
             continue
@@ -270,6 +348,56 @@ def build_workflow_indexes(graph: WorkflowGraph) -> WorkflowIndexes:
             raise WorkflowDefinitionError(
                 f"model node {node.node_key} has an invalid output persistence",
                 code="WORKFLOW_OUTPUT_INDEX_INVALID",
+            )
+        identity = _mapping(artifact.get("identity"))
+        if identity is None:
+            raise WorkflowDefinitionError(
+                f"model node {node.node_key} has no artifact identity",
+                code="WORKFLOW_OUTPUT_IDENTITY_INVALID",
+            )
+        expected_strategy = (
+            "project_singleton"
+            if node.execution_scope == "project"
+            else "lesson_unit_singleton"
+        )
+        strategy = _text(identity, "strategy")
+        if strategy != expected_strategy:
+            raise WorkflowDefinitionError(
+                f"model node {node.node_key} has an identity incompatible with its scope",
+                code="WORKFLOW_OUTPUT_IDENTITY_INVALID",
+            )
+        identity_value = _text(
+            identity,
+            "artifact_key" if strategy == "project_singleton" else "artifact_key_prefix",
+        )
+        for previous_strategy, previous_value, previous_node in identity_declarations:
+            if _artifact_identities_overlap(
+                strategy,
+                identity_value,
+                previous_strategy,
+                previous_value,
+            ):
+                raise WorkflowDefinitionError(
+                    f"artifact identity for {node.node_key} overlaps {previous_node}",
+                    code="WORKFLOW_OUTPUT_IDENTITY_DUPLICATE",
+                )
+        identity_declarations.append((strategy, identity_value, node.node_key))
+        expected_artifact_branch = (
+            "project" if node.execution_scope == "project" else node.branch_key
+        )
+        if artifact.get("branch_key") != expected_artifact_branch:
+            raise WorkflowDefinitionError(
+                f"model node {node.node_key} has an invalid artifact branch",
+                code="WORKFLOW_OUTPUT_ARTIFACT_BRANCH_INVALID",
+            )
+        package = _mapping(persistence.get("creation_package"))
+        package_outputs = tuple(
+            ref for ref in node.output_contract_refs if ref.startswith("package:")
+        )
+        if (package is None) != (not package_outputs) or len(package_outputs) > 1:
+            raise WorkflowDefinitionError(
+                f"model node {node.node_key} has an inconsistent package declaration",
+                code="WORKFLOW_OUTPUT_PACKAGE_INVALID",
             )
         content_ref = _mapping(artifact.get("content_definition_ref"))
         generation_ref = _mapping(binding.get("generation_template_ref"))
@@ -339,6 +467,28 @@ def build_workflow_indexes(graph: WorkflowGraph) -> WorkflowIndexes:
     )
 
 
+def _artifact_identities_overlap(
+    strategy: str,
+    value: str,
+    other_strategy: str,
+    other_value: str,
+) -> bool:
+    if strategy == other_strategy == "project_singleton":
+        return value == other_value
+    if strategy == other_strategy == "lesson_unit_singleton":
+        return (
+            value == other_value
+            or value.startswith(f"{other_value}:")
+            or other_value.startswith(f"{value}:")
+        )
+    project_key, lesson_prefix = (
+        (value, other_value)
+        if strategy == "project_singleton"
+        else (other_value, value)
+    )
+    return project_key.startswith(f"{lesson_prefix}:")
+
+
 def _resolve_quality_binding(
     producer: WorkflowNodeDefinition,
     nodes: tuple[WorkflowNodeDefinition, ...],
@@ -373,49 +523,74 @@ def _resolve_quality_binding(
             code="WORKFLOW_OUTPUT_QUALITY_AMBIGUOUS",
         )
 
-    direct_gates = [
+    gates = [
         node
         for node in nodes
         if (
             node.execution_kind == "human_gate"
             and node.execution_scope == producer.execution_scope
             and node.branch_key == producer.branch_key
-            and producer.node_key in node.dependencies
         )
     ]
-    if len(direct_gates) > 1:
-        raise WorkflowDefinitionError(
-            f"content definition producer {producer.node_key} has ambiguous quality gates",
-            code="WORKFLOW_OUTPUT_QUALITY_AMBIGUOUS",
-        )
 
     if candidates:
         validate_node, quality = candidates[0]
+        source_ref = _text(quality, "source_input_ref")
         report_ref = _text(quality, "report_ref")
+        if (
+            source_ref not in validate_node.input_contract_refs
+            or report_ref not in validate_node.output_contract_refs
+        ):
+            raise WorkflowDefinitionError(
+                f"quality validator {validate_node.node_key} has inconsistent contracts",
+                code="WORKFLOW_OUTPUT_QUALITY_INVALID",
+            )
         report_refs = (report_ref,)
         validator_refs = tuple(
             _descriptor_identity(ref)
             for ref in _sequence(quality.get("validator_refs"), "validator_refs")
         )
-        gate = direct_gates[0] if direct_gates else None
-        if gate is None:
+        if not validator_refs:
+            raise WorkflowDefinitionError(
+                f"quality validator {validate_node.node_key} has no validator descriptors",
+                code="WORKFLOW_OUTPUT_QUALITY_INVALID",
+            )
+        matching: list[tuple[WorkflowNodeDefinition, tuple[str, ...]]] = []
+        for gate in gates:
+            gate_binding = _mapping(gate.binding)
+            requirement = _mapping(
+                gate_binding.get("quality_requirement") if gate_binding is not None else None
+            )
+            if requirement is None or requirement.get("mode") != "reports":
+                continue
+            gate_reports = tuple(
+                _text_value(item, "report_ref")
+                for item in _sequence(requirement.get("report_refs"), "report_refs")
+            )
+            if report_ref not in gate_reports:
+                continue
+            if (
+                producer.node_key not in gate.dependencies
+                or validate_node.node_key not in gate.dependencies
+                or source_ref not in gate.input_contract_refs
+                or report_ref not in gate.input_contract_refs
+            ):
+                raise WorkflowDefinitionError(
+                    f"quality gate {gate.node_key} bypasses the declared validation chain",
+                    code="WORKFLOW_OUTPUT_QUALITY_GATE_INVALID",
+                )
+            matching.append((gate, gate_reports))
+        if not matching:
             raise WorkflowDefinitionError(
                 f"quality report {report_ref} has no human gate for {producer.node_key}",
                 code="WORKFLOW_OUTPUT_QUALITY_GATE_MISSING",
             )
-        gate_binding = _mapping(gate.binding)
-        requirement = _mapping(
-            gate_binding.get("quality_requirement") if gate_binding is not None else None
-        )
-        if requirement is None or requirement.get("mode") != "reports":
+        if len(matching) > 1:
             raise WorkflowDefinitionError(
-                f"quality gate {gate.node_key} does not require the declared report",
-                code="WORKFLOW_OUTPUT_QUALITY_GATE_INVALID",
+                f"content definition producer {producer.node_key} has ambiguous quality gates",
+                code="WORKFLOW_OUTPUT_QUALITY_AMBIGUOUS",
             )
-        gate_reports = tuple(
-            _text_value(item, "report_ref")
-            for item in _sequence(requirement.get("report_refs"), "report_refs")
-        )
+        gate, gate_reports = matching[0]
         if len(gate_reports) != len(set(gate_reports)):
             raise WorkflowDefinitionError(
                 f"quality gate {gate.node_key} contains duplicate report refs",
@@ -434,6 +609,12 @@ def _resolve_quality_binding(
             "reports",
         )
 
+    direct_gates = [gate for gate in gates if producer.node_key in gate.dependencies]
+    if len(direct_gates) > 1:
+        raise WorkflowDefinitionError(
+            f"content definition producer {producer.node_key} has ambiguous quality gates",
+            code="WORKFLOW_OUTPUT_QUALITY_AMBIGUOUS",
+        )
     gate = direct_gates[0] if direct_gates else None
     if gate is None:
         return (None, (), (), None, "none")
@@ -450,6 +631,11 @@ def _resolve_quality_binding(
     if mode == "reports":
         raise WorkflowDefinitionError(
             f"quality gate {gate.node_key} has no deterministic report producer",
+            code="WORKFLOW_OUTPUT_QUALITY_GATE_INVALID",
+        )
+    if not set(producer.output_contract_refs) <= set(gate.input_contract_refs):
+        raise WorkflowDefinitionError(
+            f"quality gate {gate.node_key} does not consume the producer output",
             code="WORKFLOW_OUTPUT_QUALITY_GATE_INVALID",
         )
     return (None, (), (), gate.node_key, mode)

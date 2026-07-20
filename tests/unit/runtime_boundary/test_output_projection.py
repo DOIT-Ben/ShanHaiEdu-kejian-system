@@ -6,7 +6,11 @@ from uuid import UUID
 
 import pytest
 
-from apps.api.artifacts.domain import ArtifactRelationType
+from apps.api.artifacts.domain import (
+    ArtifactInvariantError,
+    ArtifactRelationType,
+    canonical_content_hash,
+)
 from apps.api.runtime_boundary.output_projection import (
     OutputProjectionError,
     compile_output_projection,
@@ -22,6 +26,7 @@ from apps.api.runtime_boundary.ports import (
     TargetSlotAuthorization,
     WorkflowExecutionContext,
 )
+from apps.api.runtime_boundary.projection_package import OutputProjectionPlan
 
 RELEASE_ID = UUID("10000000-0000-4000-8000-000000000001")
 WORKFLOW_ID = UUID("10000000-0000-4000-8000-000000000002")
@@ -35,6 +40,7 @@ PROMPT_SNAPSHOT_ID = UUID("10000000-0000-4000-8000-000000000009")
 UPSTREAM_VERSION_ID = UUID("10000000-0000-4000-8000-000000000010")
 ARTIFACT_ID = UUID("10000000-0000-4000-8000-000000000011")
 ARTIFACT_VERSION_ID = UUID("10000000-0000-4000-8000-000000000012")
+FOREIGN_PROJECT_ID = UUID("10000000-0000-4000-8000-000000000099")
 
 
 def _binding(*, scope: str = "lesson_unit", package: bool = False) -> dict[str, Any]:
@@ -101,7 +107,7 @@ def _package_declaration() -> dict[str, Any]:
             "position": {"source": "intrinsic", "name": "item_position"},
             "title": {"source": "item", "pointer": "/title"},
             "business_prompt": {"source": "item", "pointer": "/business_prompt"},
-            "reference_assets": {"source": "item", "pointer": "/reference_assets"},
+            "reference_assets": {"source": "runtime", "pointer": "/reference_assets"},
             "output_spec": {"source": "item", "pointer": "/output_spec"},
             "target_slot": {"source": "item", "pointer": "/target_slot"},
             "consistency_key": {"source": "item", "pointer": "/consistency_key"},
@@ -163,32 +169,18 @@ def _snapshots() -> FrozenSnapshotRefs:
     )
 
 
-def _upstream() -> dict[str, ArtifactContextVersion]:
+def _upstream(execution: WorkflowExecutionContext) -> dict[str, ArtifactContextVersion]:
     return {
         "approval:source": ArtifactContextVersion(
+            project_id=execution.project_id,
+            lesson_unit_id=execution.lesson_unit_id,
             artifact_version_id=UPSTREAM_VERSION_ID,
+            contract_ref="approval:source",
             artifact_type="source",
             content={},
-            content_hash="source-hash",
+            content_hash="a" * 64,
         )
     }
-
-
-def _artifact_result(**changes: Any) -> ArtifactWriteResult:
-    values: dict[str, Any] = {
-        "artifact_id": ARTIFACT_ID,
-        "artifact_version_id": ARTIFACT_VERSION_ID,
-        "content_hash": "artifact-hash",
-        "project_id": PROJECT_ID,
-        "node_run_id": NODE_RUN_ID,
-        "artifact_key": "ppt-body-prompts:LESSON-001",
-        "artifact_type": "ppt_body_asset_prompt_package",
-        "branch_key": "ppt",
-        "lesson_unit_id": LESSON_UNIT_ID,
-        "content_definition_version_id": CONTENT_DEFINITION_ID,
-    }
-    values.update(changes)
-    return ArtifactWriteResult(**values)
 
 
 def _output() -> dict[str, Any]:
@@ -199,7 +191,6 @@ def _output() -> dict[str, Any]:
                 "key": "visual-01",
                 "title": "First visual",
                 "business_prompt": "Draw the first classroom visual.",
-                "reference_assets": [],
                 "output_spec": {"aspect_ratio": "16:9"},
                 "target_slot": "ppt.page-01.main-visual",
                 "consistency_key": "style-main",
@@ -208,7 +199,6 @@ def _output() -> dict[str, Any]:
                 "key": "visual-02",
                 "title": "Second visual",
                 "business_prompt": "Draw the second classroom visual.",
-                "reference_assets": [],
                 "output_spec": {"aspect_ratio": "16:9"},
                 "target_slot": "ppt.page-02.main-visual",
                 "consistency_key": None,
@@ -226,52 +216,92 @@ def _compile(
     runtime_values: dict[str, Any] | None = None,
     target_slot_authorization: TargetSlotAuthorization | None = None,
     reference_asset_authorization: ReferenceAssetAuthorization | None = None,
-):
-    execution = execution or _execution(scope=scope)
+    upstream_artifacts: dict[str, ArtifactContextVersion] | None = None,
+) -> OutputProjectionPlan:
+    resolved_execution = execution or _execution(scope=scope)
     return compile_output_projection(
         definition=_definition(binding),
-        execution=execution,
+        execution=resolved_execution,
         snapshots=_snapshots(),
         validated_output=output or _output(),
-        upstream_artifacts=_upstream(),
+        upstream_artifacts=(
+            upstream_artifacts if upstream_artifacts is not None else _upstream(resolved_execution)
+        ),
         request_id="request-130",
         runtime_values=runtime_values,
         target_slot_authorization=target_slot_authorization
         if target_slot_authorization is not None
         else (
-            TargetSlotAuthorization(
-                content_release_id=RELEASE_ID,
-                workflow_definition_version_id=WORKFLOW_ID,
-                project_id=execution.project_id,
-                node_key=execution.node_key,
-                branch_key=execution.branch_key or "",
-                lesson_unit_id=execution.lesson_unit_id,
-                slots=("ppt.page-01.main-visual", "ppt.page-02.main-visual"),
-            )
+            _target_slot_authorization()
             if binding.get("output_persistence", {}).get("creation_package")
             else None
         ),
-        reference_asset_authorization=reference_asset_authorization,
+        reference_asset_authorization=(
+            reference_asset_authorization
+            if reference_asset_authorization is not None
+            else (
+                _reference_asset_authorization(())
+                if binding.get("output_persistence", {}).get("creation_package")
+                else None
+            )
+        ),
+    )
+
+
+def _artifact_result(plan: OutputProjectionPlan) -> ArtifactWriteResult:
+    write = plan.artifact_write
+    return ArtifactWriteResult(
+        artifact_id=ARTIFACT_ID,
+        artifact_version_id=ARTIFACT_VERSION_ID,
+        content_hash=canonical_content_hash(write.content),
+        project_id=write.project_id,
+        node_run_id=write.node_run_id,
+        context_snapshot_id=write.context_snapshot_id,
+        prompt_snapshot_id=write.prompt_snapshot_id,
+        artifact_key=write.artifact_key,
+        artifact_type=write.artifact_type,
+        branch_key=write.branch_key,
+        lesson_unit_id=write.lesson_unit_id,
+        content_definition_version_id=write.content_definition_version_id,
     )
 
 
 def _reference_asset_authorization(
-    *, asset_version_id: UUID, role: str = "style"
+    assets: tuple[tuple[str, str], ...],
 ) -> ReferenceAssetAuthorization:
-    execution = _execution()
     return ReferenceAssetAuthorization(
         content_release_id=RELEASE_ID,
         workflow_definition_version_id=WORKFLOW_ID,
-        project_id=execution.project_id,
-        node_key=execution.node_key,
-        branch_key=execution.branch_key or "",
-        lesson_unit_id=execution.lesson_unit_id,
-        assets=(
+        project_id=PROJECT_ID,
+        node_key="example.generate",
+        branch_key="ppt",
+        lesson_unit_id=LESSON_UNIT_ID,
+        assets=tuple(
             CreationPackageReferenceAssetSpec(
-                asset_version_id=asset_version_id,
+                asset_version_id=UUID(asset_id),
                 role=role,
-            ),
+            )
+            for asset_id, role in assets
         ),
+    )
+
+
+def _target_slot_authorization(
+    *,
+    project_id: UUID = PROJECT_ID,
+    slots: tuple[str, ...] = (
+        "ppt.page-01.main-visual",
+        "ppt.page-02.main-visual",
+    ),
+) -> TargetSlotAuthorization:
+    return TargetSlotAuthorization(
+        content_release_id=RELEASE_ID,
+        workflow_definition_version_id=WORKFLOW_ID,
+        project_id=project_id,
+        node_key="example.generate",
+        branch_key="ppt",
+        lesson_unit_id=LESSON_UNIT_ID,
+        slots=slots,
     )
 
 
@@ -332,6 +362,7 @@ def test_rejects_execution_context_mismatches(field: str, value: object, code: s
         ("identity", "OUTPUT_PROJECTION_IDENTITY_SCOPE_MISMATCH"),
         ("artifact_branch", "OUTPUT_PROJECTION_ARTIFACT_BRANCH_MISMATCH"),
         ("content_ref", "OUTPUT_PROJECTION_CONTENT_DEFINITION_MISMATCH"),
+        ("content_source", "OUTPUT_PROJECTION_CONTENT_SOURCE_INVALID"),
     ],
 )
 def test_rejects_published_artifact_mismatches(mutation: str, code: str) -> None:
@@ -341,8 +372,10 @@ def test_rejects_published_artifact_mismatches(mutation: str, code: str) -> None
         artifact["identity"] = {"strategy": "project_singleton", "artifact_key": "wrong"}
     elif mutation == "artifact_branch":
         artifact["branch_key"] = "project"
-    else:
+    elif mutation == "content_ref":
         artifact["content_definition_ref"]["item_key"] = "other.output"
+    else:
+        artifact["content"] = {"source": "constant", "value": {}}
     with pytest.raises(OutputProjectionError) as caught:
         _compile(binding)
     assert caught.value.code == code
@@ -361,7 +394,7 @@ def test_rejects_missing_content_definition_provenance() -> None:
             execution=_execution(),
             snapshots=_snapshots(),
             validated_output=_output(),
-            upstream_artifacts=_upstream(),
+            upstream_artifacts=_upstream(_execution()),
             request_id="request-130",
         )
     assert caught.value.code == "OUTPUT_PROJECTION_CONTENT_DEFINITION_PROVENANCE_MISSING"
@@ -391,10 +424,13 @@ def test_rejects_unknown_superseding_and_untrusted_relations() -> None:
 
 @pytest.mark.parametrize("pointer", ["relative", "/bad~2", "/#", "/*", "/..", "/items/01"])
 def test_rejects_unsafe_or_noncanonical_projection_pointers(pointer: str) -> None:
-    binding = _binding()
-    binding["output_persistence"]["artifact"]["content"]["pointer"] = pointer
+    binding = _binding(package=True)
+    binding["output_persistence"]["creation_package"]["item_mapping"]["title"][
+        "pointer"
+    ] = pointer
+    plan = _compile(binding)
     with pytest.raises(OutputProjectionError) as caught:
-        _compile(binding)
+        materialize_creation_package(plan, artifact_result=_artifact_result(plan))
     assert caught.value.code.startswith("OUTPUT_PROJECTION_POINTER_")
 
 
@@ -405,13 +441,14 @@ def test_runtime_values_cannot_override_trusted_execution_roots() -> None:
 
 
 def test_runtime_projection_cannot_expose_project_or_workflow_ids() -> None:
-    binding = _binding()
-    binding["output_persistence"]["artifact"]["content"] = {
+    binding = _binding(package=True)
+    binding["output_persistence"]["creation_package"]["item_mapping"]["title"] = {
         "source": "runtime",
         "pointer": "/project_id",
     }
+    plan = _compile(binding)
     with pytest.raises(OutputProjectionError) as caught:
-        _compile(binding)
+        materialize_creation_package(plan, artifact_result=_artifact_result(plan))
     assert caught.value.code == "OUTPUT_PROJECTION_RUNTIME_POINTER_INVALID"
 
 
@@ -423,7 +460,7 @@ def test_materializes_creation_package_after_artifact_persistence() -> None:
     binding["output_persistence"]["creation_package"]["items_pointer"] = "/missing"
     package = materialize_creation_package(
         plan,
-        artifact_result=_artifact_result(),
+        artifact_result=_artifact_result(plan),
     )
 
     assert package is not None
@@ -445,30 +482,6 @@ def test_materializes_creation_package_after_artifact_persistence() -> None:
     }
 
 
-@pytest.mark.parametrize(
-    ("field", "value"),
-    [
-        ("project_id", ARTIFACT_ID),
-        ("node_run_id", ARTIFACT_ID),
-        ("artifact_key", "wrong"),
-        ("artifact_type", "wrong"),
-        ("branch_key", "video"),
-        ("lesson_unit_id", None),
-        ("content_definition_version_id", ARTIFACT_ID),
-    ],
-)
-def test_creation_package_rejects_artifact_result_provenance_mismatch(
-    field: str, value: object
-) -> None:
-    plan = _compile(_binding(package=True))
-    with pytest.raises(OutputProjectionError) as caught:
-        materialize_creation_package(
-            plan,
-            artifact_result=_artifact_result(**{field: value}),
-        )
-    assert caught.value.code == "OUTPUT_PROJECTION_ARTIFACT_RESULT_MISMATCH"
-
-
 @pytest.mark.parametrize("duplicate", ["key", "position", "slot"])
 def test_rejects_duplicate_creation_package_coordinates(duplicate: str) -> None:
     binding = _binding(package=True)
@@ -484,7 +497,7 @@ def test_rejects_duplicate_creation_package_coordinates(duplicate: str) -> None:
     with pytest.raises(OutputProjectionError) as caught:
         materialize_creation_package(
             plan,
-            artifact_result=_artifact_result(),
+            artifact_result=_artifact_result(plan),
         )
     assert caught.value.code == "OUTPUT_PROJECTION_PACKAGE_DUPLICATE"
 
@@ -496,88 +509,108 @@ def test_rejects_target_slots_outside_declared_namespace() -> None:
     with pytest.raises(OutputProjectionError) as caught:
         materialize_creation_package(
             plan,
-            artifact_result=_artifact_result(),
+            artifact_result=_artifact_result(plan),
         )
     assert caught.value.code == "OUTPUT_PROJECTION_TARGET_SLOT_UNAUTHORIZED"
 
 
-def test_nonempty_reference_assets_require_trusted_runtime_authorization() -> None:
-    output = _output()
-    asset_id = "10000000-0000-4000-8000-000000000013"
-    output["items"][0]["reference_assets"] = [{"asset_version_id": asset_id, "role": "style"}]
-    plan = _compile(_binding(package=True), output=output)
-    with pytest.raises(OutputProjectionError) as caught:
-        materialize_creation_package(
-            plan,
-            artifact_result=_artifact_result(),
-        )
-    assert caught.value.code == "OUTPUT_PROJECTION_REFERENCE_ASSETS_UNAUTHORIZED"
+def test_rejects_target_slot_prefix_that_cannot_have_a_valid_suffix() -> None:
+    binding = _binding(package=True)
+    binding["output_persistence"]["creation_package"]["target_rules"][
+        "target_slot_prefix"
+    ] = f"{'a' * 159}."
 
+    plan = _compile(binding)
+    with pytest.raises(OutputProjectionError) as caught:
+        materialize_creation_package(plan, artifact_result=_artifact_result(plan))
+    assert caught.value.code == "OUTPUT_PROJECTION_TARGET_RULES_INVALID"
+
+
+def test_nonempty_reference_assets_require_trusted_runtime_authorization() -> None:
+    asset_id = "10000000-0000-4000-8000-000000000013"
     with pytest.raises(OutputProjectionError) as caught:
         _compile(
             _binding(package=True),
-            output=output,
-            runtime_values={"reference_asset_version_ids": [asset_id]},
+            runtime_values={"reference_assets": [{"asset_version_id": asset_id, "role": "style"}]},
         )
     assert caught.value.code == "OUTPUT_PROJECTION_REFERENCE_ASSETS_UNAUTHORIZED"
 
     plan = _compile(
         _binding(package=True),
-        output=output,
-        reference_asset_authorization=_reference_asset_authorization(
-            asset_version_id=UUID(asset_id)
-        ),
+        reference_asset_authorization=_reference_asset_authorization(((asset_id, "style"),)),
     )
     package = materialize_creation_package(
         plan,
-        artifact_result=_artifact_result(),
+        artifact_result=_artifact_result(plan),
     )
     assert package is not None
     assert package.items[0].reference_assets[0].asset_version_id == UUID(asset_id)
 
 
+def test_legacy_reference_asset_version_ids_are_rejected() -> None:
+    asset_id = "10000000-0000-4000-8000-000000000013"
+
+    with pytest.raises(OutputProjectionError) as caught:
+        _compile(
+            _binding(package=True),
+            runtime_values={"reference_asset_version_ids": [asset_id]},
+        )
+
+    assert caught.value.code == "OUTPUT_PROJECTION_REFERENCE_ASSETS_UNAUTHORIZED"
+
+
+def test_phase_two_rejects_tampered_reference_asset_values() -> None:
+    plan = _compile(_binding(package=True))
+    tampered = {
+        "reference_assets": [
+            {
+                "asset_version_id": "10000000-0000-4000-8000-000000000099",
+                "role": "foreign",
+            }
+        ]
+    }
+
+    with pytest.raises(OutputProjectionError) as caught:
+        replace(plan, runtime_values=tampered)
+    assert caught.value.code == "OUTPUT_PROJECTION_REFERENCE_ASSETS_UNAUTHORIZED"
+
+
 def test_reference_asset_authorization_requires_the_same_role() -> None:
-    output = _output()
-    asset_id = UUID("10000000-0000-4000-8000-000000000013")
-    output["items"][0]["reference_assets"] = [
-        {"asset_version_id": str(asset_id), "role": "character"}
-    ]
+    asset_id = "10000000-0000-4000-8000-000000000013"
     plan = _compile(
         _binding(package=True),
-        output=output,
-        reference_asset_authorization=_reference_asset_authorization(
-            asset_version_id=asset_id,
-            role="style",
-        ),
+        reference_asset_authorization=_reference_asset_authorization(((asset_id, "style"),)),
     )
+    tampered = {
+        "reference_assets": [
+            {
+                "asset_version_id": asset_id,
+                "role": "character",
+            }
+        ]
+    }
+
     with pytest.raises(OutputProjectionError) as caught:
-        materialize_creation_package(
-            plan,
-            artifact_result=_artifact_result(),
-        )
+        replace(plan, runtime_values=tampered)
+
     assert caught.value.code == "OUTPUT_PROJECTION_REFERENCE_ASSETS_UNAUTHORIZED"
 
 
 def test_reference_asset_uuid_cannot_be_reused_with_a_different_role() -> None:
-    output = _output()
     asset_id = "10000000-0000-4000-8000-000000000013"
-    output["items"][0]["reference_assets"] = [
-        {"asset_version_id": asset_id, "role": "style"},
-        {"asset_version_id": asset_id, "role": "character"},
-    ]
-    plan = _compile(
-        _binding(package=True),
-        output=output,
-        reference_asset_authorization=_reference_asset_authorization(
-            asset_version_id=UUID(asset_id)
-        ),
-    )
-    with pytest.raises(OutputProjectionError) as caught:
-        materialize_creation_package(
-            plan,
-            artifact_result=_artifact_result(),
+    with pytest.raises(ArtifactInvariantError, match="IDs must be unique"):
+        _reference_asset_authorization(
+            (
+                (asset_id, "style"),
+                (asset_id, "character"),
+            )
         )
-    assert caught.value.code == "OUTPUT_PROJECTION_REFERENCE_ASSETS_INVALID"
+
+
+def test_rejects_more_than_twenty_authorized_reference_assets() -> None:
+    assets = tuple((str(UUID(int=index + 1)), "style") for index in range(21))
+    with pytest.raises(ArtifactInvariantError, match="authorization entries"):
+        _reference_asset_authorization(assets)
 
 
 def test_package_requires_an_authorized_target_slot_set() -> None:
@@ -586,15 +619,195 @@ def test_package_requires_an_authorized_target_slot_set() -> None:
         execution=_execution(),
         snapshots=_snapshots(),
         validated_output=_output(),
-        upstream_artifacts=_upstream(),
+        upstream_artifacts=_upstream(_execution()),
         request_id="request-130",
     )
     with pytest.raises(OutputProjectionError) as caught:
         materialize_creation_package(
             plan,
-            artifact_result=_artifact_result(),
+            artifact_result=_artifact_result(plan),
         )
     assert caught.value.code == "OUTPUT_PROJECTION_TARGET_SLOTS_MISSING"
+
+
+def test_rejects_target_slot_authorization_from_another_project() -> None:
+    with pytest.raises(OutputProjectionError) as caught:
+        _compile(
+            _binding(package=True),
+            target_slot_authorization=_target_slot_authorization(project_id=FOREIGN_PROJECT_ID),
+        )
+    assert caught.value.code == "OUTPUT_PROJECTION_TARGET_SLOTS_MISMATCH"
+
+
+def test_rejects_noncanonical_semantic_target_slot() -> None:
+    output = _output()
+    output["items"][0]["target_slot"] = "ppt.PAGE-01.main-visual"
+    plan = _compile(_binding(package=True), output=output)
+
+    with pytest.raises(OutputProjectionError) as caught:
+        materialize_creation_package(plan, artifact_result=_artifact_result(plan))
+    assert caught.value.code == "OUTPUT_PROJECTION_TARGET_SLOT_UNAUTHORIZED"
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("project_id", FOREIGN_PROJECT_ID),
+        ("node_run_id", UPSTREAM_VERSION_ID),
+        ("context_snapshot_id", UPSTREAM_VERSION_ID),
+        ("prompt_snapshot_id", UPSTREAM_VERSION_ID),
+        ("artifact_key", "foreign-artifact"),
+        ("artifact_type", "foreign-artifact"),
+        ("branch_key", "video"),
+        ("lesson_unit_id", None),
+        ("content_definition_version_id", UPSTREAM_VERSION_ID),
+        ("content_hash", "f" * 64),
+    ),
+)
+def test_rejects_artifact_result_provenance_mismatch(field: str, value: object) -> None:
+    plan = _compile(_binding(package=True))
+    foreign_result = replace(
+        _artifact_result(plan),
+        **{field: value},
+    )
+
+    with pytest.raises(OutputProjectionError) as caught:
+        materialize_creation_package(plan, artifact_result=foreign_result)
+    assert caught.value.code == "OUTPUT_PROJECTION_ARTIFACT_RESULT_MISMATCH"
+
+
+@pytest.mark.parametrize("field", ["project_id", "lesson_unit_id", "contract_ref"])
+def test_rejects_relation_source_with_foreign_provenance(field: str) -> None:
+    execution = _execution()
+    upstream = _upstream(execution)
+    replacement: object = "approval:foreign" if field == "contract_ref" else FOREIGN_PROJECT_ID
+    upstream["approval:source"] = replace(
+        upstream["approval:source"],
+        **{field: replacement},
+    )
+
+    with pytest.raises(OutputProjectionError) as caught:
+        _compile(_binding(), execution=execution, upstream_artifacts=upstream)
+    assert caught.value.code == "OUTPUT_PROJECTION_RELATION_SOURCE_MISMATCH"
+
+
+@pytest.mark.parametrize(
+    "reference_assets",
+    [
+        {
+            "source": "constant",
+            "value": [
+                {
+                    "asset_version_id": "10000000-0000-4000-8000-000000000013",
+                    "role": "style",
+                }
+            ],
+        },
+        {"source": "item", "pointer": "/reference_assets"},
+    ],
+)
+def test_rejects_untrusted_reference_asset_projection_source(
+    reference_assets: dict[str, object],
+) -> None:
+    binding = _binding(package=True)
+    mapping = binding["output_persistence"]["creation_package"]["item_mapping"]
+    mapping["reference_assets"] = reference_assets
+
+    with pytest.raises(OutputProjectionError) as caught:
+        _compile(binding)
+    assert caught.value.code == "OUTPUT_PROJECTION_REFERENCE_ASSET_SOURCE_INVALID"
+
+
+@pytest.mark.parametrize(
+    "reference_assets",
+    [
+        {
+            "source": "constant",
+            "value": [
+                {
+                    "asset_version_id": "10000000-0000-4000-8000-000000000013",
+                    "role": "style",
+                }
+            ],
+        },
+        {"source": "item", "pointer": "/reference_assets"},
+    ],
+)
+def test_phase_two_rejects_tampered_reference_asset_projection_source(
+    reference_assets: dict[str, object],
+) -> None:
+    plan = _compile(_binding(package=True))
+    declaration = dict(plan.package_declaration or {})
+    mapping = dict(declaration["item_mapping"])
+    mapping["reference_assets"] = reference_assets
+    declaration["item_mapping"] = mapping
+
+    with pytest.raises(OutputProjectionError) as caught:
+        replace(plan, package_declaration=declaration)
+    assert caught.value.code == "OUTPUT_PROJECTION_PLAN_DECLARATION_MISMATCH"
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["missing", "package_type", "package_key", "item_mapping", "target_rules"],
+)
+def test_phase_two_rejects_any_tampered_package_declaration(mutation: str) -> None:
+    plan = _compile(_binding(package=True))
+    declaration: dict[str, Any] | None = _package_declaration()
+    if mutation == "missing":
+        declaration = None
+    elif mutation == "package_type":
+        declaration["package_type"] = "video"
+    elif mutation == "package_key":
+        declaration["package_key"] = {
+            "strategy": "source_artifact_version",
+            "prefix": "tampered",
+        }
+    elif mutation == "item_mapping":
+        declaration["item_mapping"]["title"] = {
+            "source": "item",
+            "pointer": "/business_prompt",
+        }
+    else:
+        declaration["target_rules"]["allow_download"] = False
+
+    with pytest.raises(OutputProjectionError) as caught:
+        replace(plan, package_declaration=declaration)
+    assert caught.value.code == "OUTPUT_PROJECTION_PLAN_DECLARATION_MISMATCH"
+
+
+def test_phase_two_rejects_output_that_differs_from_source_artifact() -> None:
+    plan = _compile(_binding(package=True))
+
+    with pytest.raises(OutputProjectionError) as caught:
+        replace(plan, output={"items": []})
+    assert caught.value.code == "OUTPUT_PROJECTION_PLAN_CONTENT_MISMATCH"
+
+
+def test_phase_two_rejects_tampered_request_id() -> None:
+    plan = _compile(_binding(package=True))
+
+    with pytest.raises(OutputProjectionError) as caught:
+        replace(plan, request_id="request-forged")
+    assert caught.value.code == "OUTPUT_PROJECTION_PLAN_PROVENANCE_INVALID"
+
+
+def test_phase_two_rejects_simultaneous_definition_and_declaration_replacement() -> None:
+    plan = _compile(_binding(package=True))
+    forged_binding = _binding(package=True)
+    forged_binding["output_persistence"]["creation_package"]["package_type"] = "video"
+    forged_definition = _definition(forged_binding)
+    forged_declaration = forged_definition.node_binding["output_persistence"][
+        "creation_package"
+    ]
+
+    with pytest.raises(OutputProjectionError) as caught:
+        replace(
+            plan,
+            definition=forged_definition,
+            package_declaration=forged_declaration,
+        )
+    assert caught.value.code == "OUTPUT_PROJECTION_PLAN_UNTRUSTED"
 
 
 @pytest.mark.parametrize(
@@ -612,14 +825,8 @@ def test_package_declaration_matches_exactly_one_package_output(
     with pytest.raises(OutputProjectionError) as caught:
         _compile(
             binding,
-            target_slot_authorization=TargetSlotAuthorization(
-                content_release_id=RELEASE_ID,
-                workflow_definition_version_id=WORKFLOW_ID,
-                project_id=PROJECT_ID,
-                node_key="example.generate",
-                branch_key="ppt",
-                lesson_unit_id=LESSON_UNIT_ID,
-                slots=("ppt.page-01.main-visual",),
+            target_slot_authorization=_target_slot_authorization(
+                slots=("ppt.page-01.main-visual",)
             ),
         )
     assert caught.value.code == code
@@ -629,10 +836,6 @@ def test_node_without_package_returns_none_after_artifact_persistence() -> None:
     plan = _compile(_binding())
     package = materialize_creation_package(
         plan,
-        artifact_result=ArtifactWriteResult(
-            artifact_id=ARTIFACT_ID,
-            artifact_version_id=ARTIFACT_VERSION_ID,
-            content_hash="artifact-hash",
-        ),
+        artifact_result=_artifact_result(plan),
     )
     assert package is None

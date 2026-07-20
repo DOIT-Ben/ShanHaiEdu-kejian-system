@@ -15,6 +15,7 @@ from workflow.node_generation_binding import (
     REGISTERED_MODEL_CAPABILITIES,
     NodeGenerationBindingError,
     validate_workflow_node_catalog,
+    validate_workflow_node_catalog_semantics,
 )
 from workflow.registry import BUILTIN_WORKFLOW_REGISTRY
 
@@ -52,6 +53,10 @@ def load_catalog() -> dict[str, Any]:
 
 def node_by_key(catalog: dict[str, Any], node_key: str) -> dict[str, Any]:
     return next(node for node in catalog["nodes"] if node["node_key"] == node_key)
+
+
+def validator_keys(refs: list[dict[str, Any]]) -> set[str]:
+    return {cast(str, ref["key"]) for ref in refs}
 
 
 def assert_rejected(catalog: dict[str, Any], code: str) -> None:
@@ -119,11 +124,6 @@ def test_schema_and_complete_primary_math_catalog_are_valid() -> None:
     assert lesson_plan_index.quality_validate_node_key == "lesson_plan.validate"
     assert lesson_plan_index.quality_gate_node_key == "lesson_plan.approve"
     assert lesson_plan_index.quality_requirement_mode == "reports"
-    assert all(
-        entry.quality_requirement_mode == "none"
-        for key, entry in validated.indexes.output_definition_index.items()
-        if key.startswith(("ppt.", "video.", "audio."))
-    )
     for contract_ref, expected in {
         "prompt:image_request": {
             "ppt.cover.prompt.generate",
@@ -164,6 +164,137 @@ def test_catalog_declares_versioned_validator_descriptors() -> None:
     )
 
 
+def test_catalog_declares_final_ppt_and_video_quality_chains() -> None:
+    catalog = load_catalog()
+    output_mapping = {
+        "conclusion": {"source": "output", "pointer": "/conclusion"},
+        "findings": {"source": "output", "pointer": "/findings"},
+        "evidence": {"source": "output", "pointer": "/evidence"},
+    }
+
+    ppt_validate = node_by_key(catalog, "ppt.final.validate")
+    ppt_report = ppt_validate["quality_report_persistence"]
+    assert ppt_validate["dependencies"] == ["pptx.export"]
+    assert ppt_report == {
+        "source_input_ref": "asset:pptx",
+        "report_ref": "report:ppt_final_quality",
+        "validator_refs": ppt_validate["validator_refs"],
+        "mapping": output_mapping,
+    }
+    assert validator_keys(ppt_validate["validator_refs"]) == {
+        "validator.pptx.openable",
+        "validator.pptx.render_match",
+        "validator.ppt.teaching_scope",
+        "validator.ppt.layout",
+    }
+    ppt_gate = node_by_key(catalog, "ppt.final.approve")
+    assert ppt_gate["input_contract_refs"] == ["asset:pptx", "report:ppt_final_quality"]
+    assert ppt_gate["dependencies"] == ["pptx.export", "ppt.final.validate"]
+    assert ppt_gate["quality_requirement"] == {
+        "mode": "reports",
+        "report_refs": ["report:ppt_final_quality"],
+        "accepted_conclusions": ["passed"],
+    }
+
+    classroom = node_by_key(catalog, "video.classroom_quality.evaluate")
+    assert classroom["output_contract_refs"] == ["report:video_classroom_quality"]
+    assert classroom["dependencies"] == ["video.timeline.assemble"]
+    video_validate = node_by_key(catalog, "video.technical.validate")
+    video_report = video_validate["quality_report_persistence"]
+    assert video_validate["input_contract_refs"] == [
+        "asset:video_final",
+        "report:video_classroom_quality",
+    ]
+    assert video_validate["output_contract_refs"] == ["report:video_final_quality"]
+    assert video_validate["dependencies"] == [
+        "video.timeline.assemble",
+        "video.classroom_quality.evaluate",
+    ]
+    assert video_report == {
+        "source_input_ref": "asset:video_final",
+        "report_ref": "report:video_final_quality",
+        "validator_refs": video_validate["validator_refs"],
+        "mapping": output_mapping,
+    }
+    assert validator_keys(video_validate["validator_refs"]) == {
+        "validator.video.file",
+        "validator.video.codec",
+        "validator.video.duration",
+        "validator.video.timeline_sync",
+        "validator.video.classroom_quality_schema",
+        "validator.video.handoff",
+        "validator.video.no_preteach",
+    }
+    video_gate = node_by_key(catalog, "video.final.approve")
+    assert video_gate["input_contract_refs"] == [
+        "asset:video_final",
+        "report:video_final_quality",
+    ]
+    assert video_gate["dependencies"] == [
+        "video.timeline.assemble",
+        "video.technical.validate",
+    ]
+    assert video_gate["quality_requirement"] == {
+        "mode": "reports",
+        "report_refs": ["report:video_final_quality"],
+        "accepted_conclusions": ["passed"],
+    }
+
+
+def test_catalog_semantics_are_available_without_reloading_the_schema() -> None:
+    catalog = load_catalog()
+
+    indexes = validate_workflow_node_catalog_semantics(catalog)
+
+    assert indexes == validate_workflow_node_catalog(catalog, schema=load_schema()).indexes
+
+
+def test_internal_input_requires_its_producer_in_the_dependency_closure() -> None:
+    catalog = load_catalog()
+    node_by_key(catalog, "ppt.cover.prompt.generate")["dependencies"] = [
+        "ppt.outline.approve"
+    ]
+
+    assert_rejected(catalog, "NODE_BINDING_INPUT_DEPENDENCY_MISSING")
+    with pytest.raises(NodeGenerationBindingError) as caught:
+        validate_workflow_node_catalog_semantics(catalog)
+    assert caught.value.code == "NODE_BINDING_INPUT_DEPENDENCY_MISSING"
+
+
+def test_cross_branch_input_requires_one_unambiguous_producer() -> None:
+    catalog = load_catalog()
+    node_by_key(catalog, "delivery.package")["input_contract_refs"].append(
+        "package:creation_image"
+    )
+
+    assert_rejected(catalog, "NODE_BINDING_INPUT_PRODUCER_AMBIGUOUS")
+    with pytest.raises(NodeGenerationBindingError) as caught:
+        validate_workflow_node_catalog_semantics(catalog)
+    assert caught.value.code == "NODE_BINDING_INPUT_PRODUCER_AMBIGUOUS"
+
+
+def test_external_inputs_cannot_alias_a_published_output() -> None:
+    catalog = load_catalog()
+    catalog["external_input_contract_refs"].append("approval:lesson_plan")
+
+    assert_rejected(catalog, "NODE_BINDING_EXTERNAL_CONTRACT_COLLISION")
+    with pytest.raises(NodeGenerationBindingError) as caught:
+        validate_workflow_node_catalog_semantics(catalog)
+    assert caught.value.code == "NODE_BINDING_EXTERNAL_CONTRACT_COLLISION"
+
+
+def test_direct_gate_cannot_approve_a_different_contract() -> None:
+    catalog = load_catalog()
+    node_by_key(catalog, "ppt.outline.approve")["input_contract_refs"] = [
+        "approval:lesson_plan"
+    ]
+
+    assert_rejected(catalog, "NODE_BINDING_OUTPUT_QUALITY_GATE_INVALID")
+    with pytest.raises(NodeGenerationBindingError) as caught:
+        validate_workflow_node_catalog_semantics(catalog)
+    assert caught.value.code == "NODE_BINDING_OUTPUT_QUALITY_GATE_INVALID"
+
+
 def test_topology_rejects_missing_cycles_and_implicit_entrypoints() -> None:
     catalog = load_catalog()
     node_by_key(catalog, "lesson_plan.validate")["dependencies"] = ["missing.node"]
@@ -193,8 +324,9 @@ def test_topology_rejects_cross_scope_and_cross_branch_dependencies() -> None:
 
 def test_topology_requires_one_entrypoint_per_scope_branch_group() -> None:
     catalog = load_catalog()
-    duplicate = copy.deepcopy(node_by_key(catalog, "lesson_plan.generate"))
-    duplicate["node_key"] = "lesson_plan.generate_duplicate"
+    duplicate = copy.deepcopy(node_by_key(catalog, "material.file_validate"))
+    duplicate["node_key"] = "material.file_validate_duplicate"
+    duplicate["output_contract_refs"] = ["report:file_validation_duplicate"]
     catalog["nodes"].append(duplicate)
 
     assert_rejected(catalog, "NODE_BINDING_ENTRYPOINT_GROUP_INVALID")
@@ -217,12 +349,77 @@ def test_output_contract_and_content_definition_mappings_are_unambiguous() -> No
     assert_rejected(catalog, "NODE_BINDING_OUTPUT_DEFINITION_DUPLICATE")
 
 
+def test_model_artifact_content_must_preserve_the_validated_output_root() -> None:
+    catalog = load_catalog()
+    node_by_key(catalog, "ppt.outline.generate")["output_persistence"]["artifact"][
+        "content"
+    ] = {"source": "constant", "value": {}}
+
+    assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
+    with pytest.raises(NodeGenerationBindingError) as caught:
+        validate_workflow_node_catalog_semantics(catalog)
+    assert caught.value.code == "NODE_BINDING_ARTIFACT_CONTENT_INVALID"
+
+
+def test_same_branch_model_artifact_input_requires_a_relation_binding() -> None:
+    catalog = load_catalog()
+    relations = node_by_key(catalog, "ppt.cover.prompt.generate")["output_persistence"][
+        "artifact"
+    ]["relations"]
+    relations[:] = [
+        relation
+        for relation in relations
+        if relation["source_binding"] != "artifact:ppt_page_specs"
+    ]
+
+    assert_rejected(catalog, "NODE_BINDING_RELATION_SOURCE_MISSING")
+    with pytest.raises(NodeGenerationBindingError) as caught:
+        validate_workflow_node_catalog_semantics(catalog)
+    assert caught.value.code == "NODE_BINDING_RELATION_SOURCE_MISSING"
+
+
 def test_quality_gate_report_refs_must_be_unique() -> None:
     catalog = load_catalog()
     requirement = node_by_key(catalog, "lesson_plan.approve")["quality_requirement"]
     requirement["report_refs"].append(requirement["report_refs"][0])
 
-    assert_rejected(catalog, "NODE_BINDING_QUALITY_GATE_INVALID")
+    assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
+
+
+def test_quality_report_mapping_requires_real_validator_output() -> None:
+    catalog = load_catalog()
+    mapping = node_by_key(catalog, "lesson_plan.validate")["quality_report_persistence"][
+        "mapping"
+    ]
+    mapping["conclusion"] = {"source": "constant", "value": "passed"}
+
+    assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
+
+
+def test_quality_report_validator_set_must_match_the_node() -> None:
+    catalog = load_catalog()
+    persistence = node_by_key(catalog, "lesson_plan.validate")[
+        "quality_report_persistence"
+    ]
+    persistence["validator_refs"].pop()
+
+    assert_rejected(catalog, "NODE_BINDING_QUALITY_VALIDATOR_INVALID")
+
+
+def test_video_final_quality_chain_cannot_bypass_the_intermediate_report() -> None:
+    catalog = load_catalog()
+    validate_node = node_by_key(catalog, "video.technical.validate")
+    validate_node["dependencies"].remove("video.classroom_quality.evaluate")
+
+    assert_rejected(catalog, "NODE_BINDING_QUALITY_REPORT_INPUT_INVALID")
+
+    catalog = load_catalog()
+    gate = node_by_key(catalog, "video.final.approve")
+    gate["input_contract_refs"].append("report:video_classroom_quality")
+    gate["dependencies"].append("video.classroom_quality.evaluate")
+    gate["quality_requirement"]["report_refs"].append("report:video_classroom_quality")
+
+    assert_rejected(catalog, "NODE_BINDING_QUALITY_REPORT_UNRESOLVED")
 
 
 def test_output_persistence_forbids_implicit_or_extra_targets() -> None:
@@ -241,6 +438,89 @@ def test_output_persistence_forbids_implicit_or_extra_targets() -> None:
         "relations"
     ][0]
     relation["to_artifact_version_id"] = "00000000-0000-0000-0000-000000000000"
+    assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
+
+    catalog = load_catalog()
+    package_node = node_by_key(catalog, "ppt.body_asset_prompts.generate")
+    package_node["output_persistence"]["artifact"]["content"] = {
+        "source": "output",
+        "pointer": "/body_asset_items",
+    }
+    assert_rejected(catalog, "NODE_BINDING_CREATION_PACKAGE_CONTENT_INVALID")
+
+
+def test_semantic_validator_rejects_reference_asset_schema_bypasses() -> None:
+    catalog = load_catalog()
+    mapping = node_by_key(catalog, "ppt.body_asset_prompts.generate")["output_persistence"][
+        "creation_package"
+    ]["item_mapping"]
+    mapping["reference_assets"] = {
+        "source": "constant",
+        "value": [
+            {
+                "asset_version_id": "00000000-0000-4000-8000-000000000001",
+                "role": "style",
+            }
+        ],
+    }
+
+    with pytest.raises(NodeGenerationBindingError) as caught:
+        validate_workflow_node_catalog_semantics(catalog)
+    assert caught.value.code == "NODE_BINDING_REFERENCE_ASSETS_INVALID"
+
+
+def test_output_persistence_string_bounds_match_runtime_dtos() -> None:
+    catalog = load_catalog()
+    max_contract_ref = f"{'a' * 79}:{'b' * 80}"
+    node_by_key(catalog, "material.file_validate")["output_contract_refs"][0] = max_contract_ref
+    node_by_key(catalog, "material.parse")["input_contract_refs"][1] = max_contract_ref
+    lesson_artifact = node_by_key(catalog, "lesson_plan.generate")["output_persistence"][
+        "artifact"
+    ]
+    lesson_artifact["identity"]["artifact_key_prefix"] = "a" * 79
+    lesson_artifact["artifact_type"] = "a" * 80
+    package = node_by_key(catalog, "ppt.body_asset_prompts.generate")[
+        "output_persistence"
+    ]["creation_package"]
+    package["package_key"]["prefix"] = "a" * 120
+    package["target_rules"]["target_slot_prefix"] = f"{'a' * 158}."
+
+    validate_workflow_node_catalog(catalog, schema=load_schema())
+
+    catalog = load_catalog()
+    oversized_contract_ref = f"{'a' * 80}:{'b' * 80}"
+    node_by_key(catalog, "material.file_validate")["output_contract_refs"][0] = (
+        oversized_contract_ref
+    )
+    node_by_key(catalog, "material.parse")["input_contract_refs"][1] = (
+        oversized_contract_ref
+    )
+    assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
+
+    catalog = load_catalog()
+    node_by_key(catalog, "lesson_plan.generate")["output_persistence"]["artifact"][
+        "identity"
+    ]["artifact_key_prefix"] = "a" * 80
+    assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
+
+    catalog = load_catalog()
+    node_by_key(catalog, "lesson_plan.generate")["output_persistence"]["artifact"][
+        "artifact_type"
+    ] = "a" * 81
+    assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
+
+    catalog = load_catalog()
+    package = node_by_key(catalog, "ppt.body_asset_prompts.generate")[
+        "output_persistence"
+    ]["creation_package"]
+    package["package_key"]["prefix"] = "a" * 121
+    assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
+
+    catalog = load_catalog()
+    package = node_by_key(catalog, "ppt.body_asset_prompts.generate")[
+        "output_persistence"
+    ]["creation_package"]
+    package["target_rules"]["target_slot_prefix"] = f"{'a' * 159}."
     assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
 
 
@@ -310,7 +590,7 @@ def test_catalog_hash_is_deterministic_for_semantically_identical_objects() -> N
     assert first_validated.canonical_json == second_validated.canonical_json
     assert first_validated.content_hash == second_validated.content_hash
     assert first_validated.content_hash == (
-        "17d5855448addeed58fbc0044236b7b278768ff8ea222d5d7bfa32d02988f584"
+        "60b997dfedb4aab3b3af0ae012655546fcb41aa8184d869c2cffe501598bfb45"
     )
 
 

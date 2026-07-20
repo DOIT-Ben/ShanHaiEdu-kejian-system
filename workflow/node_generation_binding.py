@@ -23,11 +23,14 @@ from workflow.definition import (
 from workflow.model_capabilities import WORKFLOW_MODEL_CAPABILITIES
 
 MAX_NODE_CATALOG_BYTES = 5_000_000
+MAX_PROJECTION_POINTER_DEPTH = 64
 REGISTERED_MODEL_CAPABILITIES = WORKFLOW_MODEL_CAPABILITIES
 FORBIDDEN_EXECUTOR_TOKENS = frozenset(
     {"bash", "cmd", "http", "https", "javascript", "node", "powershell", "python", "shell"}
 )
 TOKEN_SPLIT = re.compile(r"[^a-z0-9]+")
+TARGET_SLOT_PREFIX_PATTERN = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*\.$")
+MAX_TARGET_SLOT_PREFIX_LENGTH = 159
 
 
 class NodeGenerationBindingError(ValueError):
@@ -78,15 +81,7 @@ def validate_workflow_node_catalog(
     schema: dict[str, Any],
 ) -> ValidatedWorkflowNodeCatalog:
     _validate_schema(catalog, schema)
-    nodes = cast(list[dict[str, Any]], catalog["nodes"])
-    _require_unique_node_keys(nodes)
-    _validate_validator_descriptors(catalog, nodes)
-    _validate_topology(catalog, nodes)
-    _validate_contract_refs(catalog, nodes)
-    for node in nodes:
-        _validate_node(node)
-    _validate_quality_contracts(nodes)
-    indexes = _build_catalog_indexes(nodes)
+    indexes = validate_workflow_node_catalog_semantics(catalog)
     canonical = canonical_catalog_json(catalog)
     return ValidatedWorkflowNodeCatalog(
         catalog=catalog,
@@ -94,6 +89,21 @@ def validate_workflow_node_catalog(
         content_hash=hashlib.sha256(canonical).hexdigest(),
         indexes=indexes,
     )
+
+
+def validate_workflow_node_catalog_semantics(catalog: dict[str, Any]) -> WorkflowIndexes:
+    """Validate a schema-conformant catalog with the shared runtime semantics."""
+
+    nodes = cast(list[dict[str, Any]], catalog["nodes"])
+    _require_unique_node_keys(nodes)
+    _validate_validator_descriptors(catalog, nodes)
+    _validate_topology(catalog, nodes)
+    _validate_contract_refs(catalog, nodes)
+    for node in nodes:
+        _validate_node(node)
+    _validate_model_artifact_relations(nodes)
+    _validate_quality_contracts(nodes)
+    return _build_catalog_indexes(nodes)
 
 
 def _build_catalog_indexes(nodes: list[dict[str, Any]]) -> WorkflowIndexes:
@@ -288,16 +298,40 @@ def _validate_topology(catalog: dict[str, Any], nodes: list[dict[str, Any]]) -> 
 
 def _validate_contract_refs(catalog: dict[str, Any], nodes: list[dict[str, Any]]) -> None:
     external = set(cast(list[str], catalog["external_input_contract_refs"]))
-    produced = {
-        output_ref for node in nodes for output_ref in cast(list[str], node["output_contract_refs"])
-    }
+    producers: dict[str, list[tuple[str, str, str]]] = {}
     for node in nodes:
-        missing = set(cast(list[str], node["input_contract_refs"])) - external - produced
+        for output_ref in cast(list[str], node["output_contract_refs"]):
+            producers.setdefault(output_ref, []).append(
+                (
+                    cast(str, node["execution_scope"]),
+                    cast(str, node["branch_key"]),
+                    cast(str, node["node_key"]),
+                )
+            )
+    produced = set(producers)
+    collisions = external & produced
+    if collisions:
+        raise NodeGenerationBindingError(
+            "NODE_BINDING_EXTERNAL_CONTRACT_COLLISION",
+            f"external inputs collide with published outputs: {sorted(collisions)}",
+        )
+    for node in nodes:
+        inputs = set(cast(list[str], node["input_contract_refs"]))
+        missing = inputs - external - produced
         if missing:
             raise NodeGenerationBindingError(
                 "NODE_BINDING_CONTRACT_REF_UNRESOLVED",
                 f"node contains unresolved input contracts: {node['node_key']}: {sorted(missing)}",
             )
+        group = (cast(str, node["execution_scope"]), cast(str, node["branch_key"]))
+        for input_ref in inputs - external:
+            candidates = producers.get(input_ref, [])
+            same_group = [candidate for candidate in candidates if candidate[:2] == group]
+            if not same_group and len(candidates) > 1:
+                raise NodeGenerationBindingError(
+                    "NODE_BINDING_INPUT_PRODUCER_AMBIGUOUS",
+                    f"node has an ambiguous cross-branch input: {node['node_key']}: {input_ref}",
+                )
 
 
 def _validate_projection_pointer(pointer: object, *, allow_root: bool = True) -> None:
@@ -318,13 +352,19 @@ def _validate_projection_pointer(pointer: object, *, allow_root: bool = True) ->
             "NODE_BINDING_PROJECTION_POINTER_INVALID",
             f"projection pointer is not RFC6901: {pointer}",
         )
-    if any(ord(char) < 0x20 for char in pointer):
+    if any(ord(char) < 0x20 or ord(char) == 0x7F for char in pointer):
         raise NodeGenerationBindingError(
             "NODE_BINDING_PROJECTION_POINTER_INVALID",
             "projection pointer contains a control character",
         )
-    for token in pointer.split("/")[1:]:
-        if "*" in token or token == "-" or "[" in token or "]" in token:
+    tokens = pointer.split("/")[1:]
+    if len(tokens) > MAX_PROJECTION_POINTER_DEPTH:
+        raise NodeGenerationBindingError(
+            "NODE_BINDING_PROJECTION_POINTER_INVALID",
+            "projection pointer is too deep",
+        )
+    for token in tokens:
+        if "*" in token or token in {"-", ".", ".."} or "[" in token or "]" in token:
             raise NodeGenerationBindingError(
                 "NODE_BINDING_PROJECTION_POINTER_INVALID",
                 f"projection pointer uses an unsupported token: {pointer}",
@@ -401,6 +441,11 @@ def _validate_projection_declarations(node: dict[str, Any]) -> None:
                 f"artifact branch does not match node scope: {node['node_key']}",
             )
         content = cast(dict[str, Any], artifact["content"])
+        if content != {"source": "output", "pointer": ""}:
+            raise NodeGenerationBindingError(
+                "NODE_BINDING_ARTIFACT_CONTENT_INVALID",
+                f"artifact content must preserve validated output: {node['node_key']}",
+            )
         _validate_value_projection(content)
         relation_keys: set[tuple[str, str]] = set()
         for relation in cast(list[dict[str, Any]], artifact["relations"]):
@@ -445,41 +490,78 @@ def _validate_projection_declarations(node: dict[str, Any]) -> None:
                 f"creation package declaration has no package output: {node['node_key']}",
             )
         if package is not None:
+            if content != {"source": "output", "pointer": ""}:
+                raise NodeGenerationBindingError(
+                    "NODE_BINDING_CREATION_PACKAGE_CONTENT_INVALID",
+                    "creation package nodes must persist the complete validated output",
+                )
             _validate_projection_pointer(cast(str, package["items_pointer"]))
+            target_rules = cast(dict[str, Any], package["target_rules"])
+            target_slot_prefix = target_rules.get("target_slot_prefix")
+            if (
+                type(target_slot_prefix) is not str
+                or len(target_slot_prefix) > MAX_TARGET_SLOT_PREFIX_LENGTH
+                or TARGET_SLOT_PREFIX_PATTERN.fullmatch(target_slot_prefix) is None
+            ):
+                raise NodeGenerationBindingError(
+                    "NODE_BINDING_TARGET_SLOT_PREFIX_INVALID",
+                    "target-slot prefix must leave room for a semantic slot suffix",
+                )
             item_mapping = cast(dict[str, dict[str, Any]], package["item_mapping"])
             for field_name, mapping in item_mapping.items():
                 _validate_value_projection(mapping, item=True)
-                if field_name == "reference_assets" and mapping.get("source") == "constant":
-                    value = mapping.get("value")
-                    if not isinstance(value, list):
-                        raise NodeGenerationBindingError(
-                            "NODE_BINDING_REFERENCE_ASSETS_INVALID",
-                            "constant reference_assets must be an array",
-                        )
-                    for raw_asset in cast(list[object], value):
-                        if not isinstance(raw_asset, dict):
-                            raise NodeGenerationBindingError(
-                                "NODE_BINDING_REFERENCE_ASSETS_INVALID",
-                                "constant reference assets must contain an ID and role",
-                            )
-                        asset = cast(dict[str, object], raw_asset)
-                        asset_version_id = asset.get("asset_version_id")
-                        role = asset.get("role")
-                        if (
-                            set(asset) != {"asset_version_id", "role"}
-                            or not isinstance(asset_version_id, str)
-                            or not isinstance(role, str)
-                            or not asset_version_id.strip()
-                            or not role.strip()
-                        ):
-                            raise NodeGenerationBindingError(
-                                "NODE_BINDING_REFERENCE_ASSETS_INVALID",
-                                "constant reference assets must contain an ID and role",
-                            )
+                if field_name == "reference_assets" and mapping not in (
+                    {"source": "runtime", "pointer": "/reference_assets"},
+                    {"source": "constant", "value": []},
+                ):
+                    raise NodeGenerationBindingError(
+                        "NODE_BINDING_REFERENCE_ASSETS_INVALID",
+                        "reference assets must use the trusted runtime set or an empty constant",
+                    )
+
+
+def _validate_model_artifact_relations(nodes: list[dict[str, Any]]) -> None:
+    producers: dict[tuple[str, str, str], str] = {}
+    for node in nodes:
+        if node["execution_kind"] != "model_generation":
+            continue
+        group = (cast(str, node["execution_scope"]), cast(str, node["branch_key"]))
+        for output_ref in cast(list[str], node["output_contract_refs"]):
+            producers[(*group, output_ref)] = cast(str, node["node_key"])
+
+    for node in nodes:
+        if node["execution_kind"] != "model_generation":
+            continue
+        group = (cast(str, node["execution_scope"]), cast(str, node["branch_key"]))
+        required = {
+            input_ref
+            for input_ref in cast(list[str], node["input_contract_refs"])
+            if producers.get((*group, input_ref)) not in {None, node["node_key"]}
+        }
+        persistence = cast(dict[str, Any], node["output_persistence"])
+        artifact = cast(dict[str, Any], persistence["artifact"])
+        declared = {
+            relation["source_binding"]
+            for relation in cast(list[dict[str, Any]], artifact["relations"])
+        }
+        missing = required - declared
+        if missing:
+            raise NodeGenerationBindingError(
+                "NODE_BINDING_RELATION_SOURCE_MISSING",
+                f"model node is missing Artifact relations: {node['node_key']}: {sorted(missing)}",
+            )
 
 
 def _validate_quality_contracts(nodes: list[dict[str, Any]]) -> None:
-    report_producers: dict[str, dict[str, Any]] = {}
+    report_producers: dict[tuple[str, str, str], dict[str, Any]] = {}
+    contract_producers: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for node in nodes:
+        scope_branch = (
+            cast(str, node["execution_scope"]),
+            cast(str, node["branch_key"]),
+        )
+        for output_ref in cast(list[str], node["output_contract_refs"]):
+            contract_producers.setdefault((*scope_branch, output_ref), []).append(node)
     for node in nodes:
         reports = [
             ref
@@ -513,15 +595,56 @@ def _validate_quality_contracts(nodes: list[dict[str, Any]]) -> None:
                     "NODE_BINDING_QUALITY_VALIDATOR_INVALID",
                     f"quality report validators are not declared by {node['node_key']}",
                 )
+            if validators != node_validators:
+                raise NodeGenerationBindingError(
+                    "NODE_BINDING_QUALITY_VALIDATOR_INVALID",
+                    f"quality report validators do not match {node['node_key']}",
+                )
             for value in cast(dict[str, dict[str, Any]], persistence["mapping"]).values():
+                if value.get("source") != "output":
+                    raise NodeGenerationBindingError(
+                        "NODE_BINDING_QUALITY_MAPPING_INVALID",
+                        f"quality report mappings must use validator output: {node['node_key']}",
+                    )
                 _validate_value_projection(value)
-            if report_ref in report_producers:
+            scope_branch = (
+                cast(str, node["execution_scope"]),
+                cast(str, node["branch_key"]),
+            )
+            source_producers = contract_producers.get((*scope_branch, source), [])
+            if (
+                len(source_producers) != 1
+                or cast(str, source_producers[0]["node_key"]) not in node["dependencies"]
+            ):
+                raise NodeGenerationBindingError(
+                    "NODE_BINDING_QUALITY_SOURCE_INVALID",
+                    f"quality report bypasses its source producer: {node['node_key']}",
+                )
+            for input_ref in cast(list[str], node["input_contract_refs"]):
+                if not input_ref.startswith("report:"):
+                    continue
+                input_producers = contract_producers.get((*scope_branch, input_ref), [])
+                if (
+                    len(input_producers) != 1
+                    or cast(str, input_producers[0]["node_key"]) not in node["dependencies"]
+                ):
+                    raise NodeGenerationBindingError(
+                        "NODE_BINDING_QUALITY_REPORT_INPUT_INVALID",
+                        f"quality report bypasses an input report: {node['node_key']}",
+                    )
+            report_key = (
+                cast(str, node["execution_scope"]),
+                cast(str, node["branch_key"]),
+                report_ref,
+            )
+            if report_key in report_producers:
                 raise NodeGenerationBindingError(
                     "NODE_BINDING_QUALITY_REPORT_DUPLICATE",
                     f"report has multiple producers: {report_ref}",
                 )
-            report_producers[report_ref] = node
+            report_producers[report_key] = node
 
+    consumed_reports: set[tuple[str, str, str]] = set()
     for node in nodes:
         if node["execution_kind"] != "human_gate":
             continue
@@ -535,19 +658,62 @@ def _validate_quality_contracts(nodes: list[dict[str, Any]]) -> None:
                 f"quality gate contains duplicate report refs: {node['node_key']}",
             )
         for report_ref in report_refs:
+            report_key = (
+                cast(str, node["execution_scope"]),
+                cast(str, node["branch_key"]),
+                report_ref,
+            )
             if report_ref not in node["input_contract_refs"]:
                 raise NodeGenerationBindingError(
                     "NODE_BINDING_QUALITY_GATE_INVALID",
                     f"quality gate does not consume report: {node['node_key']}",
                 )
-            if report_ref not in report_producers:
+            producer = report_producers.get(report_key)
+            if producer is None:
                 raise NodeGenerationBindingError(
                     "NODE_BINDING_QUALITY_REPORT_UNRESOLVED",
                     f"quality gate references an undeclared report: {report_ref}",
                 )
+            if cast(str, producer["node_key"]) not in node["dependencies"]:
+                raise NodeGenerationBindingError(
+                    "NODE_BINDING_QUALITY_GATE_INVALID",
+                    f"quality gate bypasses report producer: {node['node_key']}",
+                )
+            persistence = cast(dict[str, Any], producer["quality_report_persistence"])
+            source_ref = cast(str, persistence["source_input_ref"])
+            source_producers = contract_producers.get(
+                (
+                    cast(str, node["execution_scope"]),
+                    cast(str, node["branch_key"]),
+                    source_ref,
+                ),
+                [],
+            )
+            if (
+                len(source_producers) != 1
+                or cast(str, source_producers[0]["node_key"]) not in node["dependencies"]
+                or source_ref not in node["input_contract_refs"]
+            ):
+                raise NodeGenerationBindingError(
+                    "NODE_BINDING_QUALITY_GATE_INVALID",
+                    f"quality gate bypasses source producer: {node['node_key']}",
+                )
+            if report_key in consumed_reports:
+                raise NodeGenerationBindingError(
+                    "NODE_BINDING_QUALITY_GATE_INVALID",
+                    f"quality report has multiple gates: {report_ref}",
+                )
+            consumed_reports.add(report_key)
+    orphaned = set(report_producers) - consumed_reports
+    if orphaned:
+        raise NodeGenerationBindingError(
+            "NODE_BINDING_QUALITY_REPORT_ORPHANED",
+            f"quality reports have no gate: {sorted(key[2] for key in orphaned)}",
+        )
 
 
 def _validate_node(node: dict[str, Any]) -> None:
+    _validate_execution_kind_declaration(node)
     _validate_prompt_exposure(node)
     _validate_unique_strings(node, "input_contract_refs", "NODE_BINDING_CONTRACT_REF_DUPLICATE")
     _validate_unique_strings(node, "output_contract_refs", "NODE_BINDING_CONTRACT_REF_DUPLICATE")
@@ -569,6 +735,49 @@ def _validate_node(node: dict[str, Any]) -> None:
         raise NodeGenerationBindingError(
             "NODE_BINDING_HUMAN_GATE_INVALID",
             f"human gate must block downstream execution: {node['node_key']}",
+        )
+
+
+def _validate_execution_kind_declaration(node: dict[str, Any]) -> None:
+    kind = node.get("execution_kind")
+    rules = {
+        "model_generation": (
+            {"model_capability", "generation_template_ref", "output_persistence"},
+            {"executor_ref", "quality_report_persistence", "quality_requirement"},
+        ),
+        "deterministic": (
+            {"executor_ref"},
+            {
+                "model_capability",
+                "generation_template_ref",
+                "output_persistence",
+                "quality_requirement",
+            },
+        ),
+        "human_gate": (
+            {"quality_requirement"},
+            {
+                "model_capability",
+                "generation_template_ref",
+                "executor_ref",
+                "output_persistence",
+                "quality_report_persistence",
+            },
+        ),
+    }
+    rule = rules.get(cast(str, kind))
+    if rule is None:
+        raise NodeGenerationBindingError(
+            "NODE_BINDING_EXECUTION_KIND_INVALID",
+            f"node has an unsupported execution kind: {node.get('node_key')}",
+        )
+    required, forbidden = rule
+    missing = required - node.keys()
+    incompatible = forbidden & node.keys()
+    if missing or incompatible:
+        raise NodeGenerationBindingError(
+            "NODE_BINDING_EXECUTION_KIND_INVALID",
+            f"node has incompatible execution fields: {node.get('node_key')}",
         )
 
 

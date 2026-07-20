@@ -13,6 +13,7 @@ from apps.api.runtime_boundary.ports import (
 )
 from apps.api.runtime_boundary.projection_values import (
     OutputProjectionError,
+    require_mapping,
     require_text_sequence,
 )
 
@@ -97,4 +98,29 @@ def validate_package_contract(
         raise OutputProjectionError(
             "OUTPUT_PROJECTION_PACKAGE_OUTPUT_MISMATCH",
             "a package declaration must map to exactly one package output",
+        )
+    if package is None:
+        return
+    validate_reference_asset_projection(package)
+
+
+def validate_reference_asset_projection(package: Mapping[str, Any]) -> None:
+    """Require package reference assets to come from the typed runtime authorization."""
+
+    item_mapping = require_mapping(
+        package.get("item_mapping"),
+        "OUTPUT_PROJECTION_ITEM_MAPPING_INVALID",
+    )
+    reference_assets = require_mapping(
+        item_mapping.get("reference_assets"),
+        "OUTPUT_PROJECTION_REFERENCE_ASSET_SOURCE_INVALID",
+    )
+    allowed = reference_assets == {
+        "source": "runtime",
+        "pointer": "/reference_assets",
+    } or reference_assets == {"source": "constant", "value": []}
+    if not allowed:
+        raise OutputProjectionError(
+            "OUTPUT_PROJECTION_REFERENCE_ASSET_SOURCE_INVALID",
+            "reference assets must use the trusted runtime set or an empty constant",
         )
