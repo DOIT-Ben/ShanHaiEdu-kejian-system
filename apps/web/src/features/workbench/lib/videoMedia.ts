@@ -57,3 +57,21 @@ export function getPlayableFinalVideo(
   }
   return null;
 }
+
+export function finalVideoMediaConfirmationKey(projectId: string, lessonId: string) {
+  return `project:${projectId}:lesson:${lessonId}:final-video:media-confirmation`;
+}
+
+export function isFinalVideoMediaConfirmed(
+  runtime: MockRuntimeState,
+  projectId: string,
+  lessonId: string,
+  media = getPlayableFinalVideo(runtime, projectId, lessonId),
+) {
+  if (!media) return false;
+  const value = runtime.drafts[finalVideoMediaConfirmationKey(projectId, lessonId)]?.value;
+  if (!isRecord(value)) return false;
+  return (
+    value.status === "confirmed" && value.src === media.src && value.mimeType === media.mimeType
+  );
+}

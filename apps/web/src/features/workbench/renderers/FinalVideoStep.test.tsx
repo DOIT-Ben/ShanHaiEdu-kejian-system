@@ -116,7 +116,7 @@ describe("FinalVideoStep synthesis single flight", () => {
     expect(screen.getByText("字幕尚未检查")).toBeInTheDocument();
   });
 
-  it("只有画面文件时开放画面确认，但不冒充声音和字幕已检查", () => {
+  it("只有浏览器确认可播放的画面文件才开放确认", async () => {
     saveMockDraft(
       "project:project-a:lesson:lesson-a:final-video:media",
       { mimeType: "video/mp4", src: "https://cdn.example.com/final.mp4" },
@@ -133,17 +133,25 @@ describe("FinalVideoStep synthesis single flight", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByLabelText("果汁标签侦探课堂导入视频").tagName).toBe("VIDEO");
-    expect(screen.getByRole("button", { name: "确认画面文件" })).toBeEnabled();
+    const video = screen.getByLabelText("果汁标签侦探课堂导入视频");
+    expect(video.tagName).toBe("VIDEO");
+    expect(screen.getByRole("button", { name: "正在检查视频文件" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "正在检查视频" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "下载关键帧说明" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "确认画面文件" })).not.toBeInTheDocument();
+
+    fireEvent.loadedMetadata(video);
+
+    expect(await screen.findByRole("button", { name: "确认画面文件" })).toBeEnabled();
     expect(screen.getByText("画面待确认")).toBeInTheDocument();
     expect(screen.getByText("声音待确认")).toBeInTheDocument();
     expect(screen.getByText("字幕文件未提供")).toBeInTheDocument();
     expect(screen.queryByText("声音清楚")).not.toBeInTheDocument();
     expect(screen.queryByText("字幕易读")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("果汁标签侦探课堂导入视频").querySelector("track")).toBeNull();
+    expect(video.querySelector("track")).toBeNull();
   });
 
-  it("有独立字幕文件时挂载真实字幕轨并提示教师检查", () => {
+  it("有独立字幕文件时挂载真实字幕轨并提示教师检查", async () => {
     saveMockDraft(
       "project:project-a:lesson:lesson-a:final-video:media",
       {
@@ -164,11 +172,40 @@ describe("FinalVideoStep synthesis single flight", () => {
       </MemoryRouter>,
     );
 
-    const track = screen.getByLabelText("果汁标签侦探课堂导入视频").querySelector("track");
+    const video = screen.getByLabelText("果汁标签侦探课堂导入视频");
+    const track = video.querySelector("track");
     expect(track).toHaveAttribute("kind", "subtitles");
     expect(track).toHaveAttribute("src", "https://cdn.example.com/final.vtt");
     expect(track).toHaveAttribute("srclang", "zh-CN");
-    expect(screen.getByText("字幕待确认")).toBeInTheDocument();
+    fireEvent.loadedMetadata(video);
+    expect(await screen.findByText("字幕待确认")).toBeInTheDocument();
+  });
+
+  it("视频文件读取失败时禁止批准并提供重新加载入口", async () => {
+    saveMockDraft(
+      "project:project-a:lesson:lesson-a:final-video:media",
+      { mimeType: "video/mp4", src: "https://cdn.example.com/missing.mp4" },
+      { lessonId: "lesson-a", nodeKey: "final-video", projectId: "project-a" },
+    );
+    render(
+      <MemoryRouter initialEntries={["/projects/project-a/lessons/lesson-a/work/final-video"]}>
+        <Routes>
+          <Route
+            element={<FinalVideoStep />}
+            path="/projects/:projectId/lessons/:lessonId/work/final-video"
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.error(screen.getByLabelText("果汁标签侦探课堂导入视频"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("视频文件无法读取");
+    expect(screen.queryByRole("button", { name: "确认画面文件" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "视频暂不可下载" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "下载关键帧说明" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "重新加载视频" }));
+    expect(screen.getByRole("button", { name: "正在检查视频文件" })).toBeDisabled();
   });
 
   it("跨域视频下载失败后显示原因并保留重试入口", async () => {
@@ -190,6 +227,7 @@ describe("FinalVideoStep synthesis single flight", () => {
       </MemoryRouter>,
     );
 
+    fireEvent.loadedMetadata(screen.getByLabelText("果汁标签侦探课堂导入视频"));
     fireEvent.click(screen.getByRole("button", { name: "下载视频" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("视频文件暂时无法下载");

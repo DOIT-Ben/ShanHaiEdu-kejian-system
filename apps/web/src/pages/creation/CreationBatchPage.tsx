@@ -542,6 +542,7 @@ export function CreationBatchPage() {
         open={saveOpen}
         result={{
           id: `batch-${batchId}-item-${String(selected)}-candidate-${String(selectedCandidate + 1)}`,
+          preview: { candidate: selectedCandidate, generation: 0, ratio: "1:1" },
           title: `${item.title} · 作品 ${String(selectedCandidate + 1)}`,
           type: "image",
           lessonLabel: sourceLessonId ? "当前课时" : "多张作品",

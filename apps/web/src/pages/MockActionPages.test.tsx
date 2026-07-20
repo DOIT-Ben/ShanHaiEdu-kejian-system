@@ -11,7 +11,9 @@ import { AdminUsagePage } from "@/pages/admin/AdminUsagePage";
 import { AdminUsersPage } from "@/pages/admin/AdminUsersPage";
 import { AdminWorkflowsPage } from "@/pages/admin/AdminWorkflowsPage";
 import { ProjectResultsPage } from "@/pages/projects/ProjectResultsPage";
-import { listMockTasks, resetMockRuntime } from "@/shared/api/mocks/runtime";
+import { getMockRuntimeState, listMockTasks, resetMockRuntime } from "@/shared/api/mocks/runtime";
+import { listMockSavedResults } from "@/shared/api/mocks/savedResults";
+import { demoProjectId } from "@/shared/data/mockData";
 
 function first(elements: HTMLElement[]) {
   const element = elements[0];
@@ -200,15 +202,28 @@ describe("成果与批次 Mock 操作", () => {
     anchorClick.mockRestore();
   });
 
-  it("切换备选作品、重新制作并查看创作要求", () => {
+  it("切换备选作品、保存当前候选并查看创作要求", () => {
     render(
-      <MemoryRouter>
-        <CreationBatchPage />
-      </MemoryRouter>,
+      <TooltipProvider>
+        <MemoryRouter>
+          <CreationBatchPage />
+        </MemoryRouter>
+      </TooltipProvider>,
     );
     const candidate = screen.getByRole("button", { name: "备选作品 2" });
     fireEvent.click(candidate);
     expect(candidate).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "就用这张" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存到项目" }));
+    const saveDialog = screen.getByRole("dialog", { name: "保存到项目" });
+    fireEvent.click(within(saveDialog).getByRole("button", { name: "保存到这个位置" }));
+    expect(listMockSavedResults(getMockRuntimeState(), demoProjectId)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          preview: { candidate: 1, generation: 0, ratio: "1:1" },
+        }),
+      ]),
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /三张.*标签并排/ }));
     fireEvent.click(screen.getByRole("button", { name: "重新制作这张" }));

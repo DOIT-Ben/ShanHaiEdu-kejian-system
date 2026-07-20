@@ -14,6 +14,7 @@ import type { WorkflowStatus } from "@/entities/workflow/model";
 import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
 import {
   getPlayableFinalVideo,
+  isFinalVideoMediaConfirmed,
   type PlayableVideoMedia,
 } from "@/features/workbench/lib/videoMedia";
 import { saveMockDraft, type MockRuntimeState, useMockRuntime } from "@/shared/api/mocks/runtime";
@@ -104,14 +105,15 @@ export function buildDeliveryRequirements(runtime: MockRuntimeState, projectId: 
         lesson.videoStatus,
       );
       const media = getPlayableFinalVideo(runtime, projectId, lesson.id);
+      const mediaConfirmed = isFinalVideoMediaConfirmed(runtime, projectId, lesson.id, media);
       requirements.push({
         key: `${lesson.id}:final-video`,
         kind: "video",
         label: `${lessonLabel} · 课堂导入视频`,
         lessonTitle: lesson.title,
         revision: finalVideo.revision,
-        status: media ? finalVideo.status : "not_ready",
-        ...(media ? { media } : {}),
+        status: media && mediaConfirmed ? finalVideo.status : "not_ready",
+        ...(media && mediaConfirmed ? { media } : {}),
       });
     }
     return requirements;
@@ -211,7 +213,7 @@ function deliveryFiles(
   });
   files.push({
     name: `${projectTitle}_质量报告.pdf`,
-    detail: "教学内容、画面、声音与字幕检查 · 当前说明",
+    detail: "教学内容与当前可用媒体检查 · 当前说明",
     icon: CheckCircle2,
     status: packageApproved ? "approved" : "not_ready",
   });

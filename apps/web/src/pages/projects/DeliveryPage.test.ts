@@ -16,6 +16,7 @@ import {
   updateMockNodeState,
 } from "@/shared/api/mocks/runtime";
 import { saveMockResult } from "@/shared/api/mocks/savedResults";
+import { finalVideoMediaConfirmationKey } from "@/features/workbench/lib/videoMedia";
 import { downloadRemoteFile } from "@/shared/lib/downloadRemoteFile";
 import { demoLessonId, demoProjectId, lessons } from "@/shared/data/mockData";
 
@@ -65,7 +66,7 @@ describe("delivery requirements", () => {
     ).toBeUndefined();
   });
 
-  it("只有明确的视频地址才允许进入交付", () => {
+  it("只有浏览器确认过且来源未变化的视频才允许进入交付", () => {
     store.updateNodeState(demoProjectId, demoLessonId, "final-video", { status: "approved" });
     store.saveDraft(
       `project:${demoProjectId}:lesson:${demoLessonId}:final-video:media`,
@@ -77,7 +78,40 @@ describe("delivery requirements", () => {
       { lessonId: demoLessonId, nodeKey: "final-video", projectId: demoProjectId },
     );
 
-    const requirement = buildDeliveryRequirements(store.getState(), demoProjectId).find(
+    let requirement = buildDeliveryRequirements(store.getState(), demoProjectId).find(
+      (item) => item.key === `${demoLessonId}:final-video`,
+    );
+
+    expect(requirement).toMatchObject({ status: "not_ready" });
+    expect(requirement?.media).toBeUndefined();
+
+    store.saveDraft(
+      finalVideoMediaConfirmationKey(demoProjectId, demoLessonId),
+      {
+        mimeType: "video/mp4",
+        src: "https://cdn.example.com/previous.mp4",
+        status: "confirmed",
+      },
+      { lessonId: demoLessonId, nodeKey: "final-video", projectId: demoProjectId },
+    );
+
+    requirement = buildDeliveryRequirements(store.getState(), demoProjectId).find(
+      (item) => item.key === `${demoLessonId}:final-video`,
+    );
+    expect(requirement).toMatchObject({ status: "not_ready" });
+    expect(requirement?.media).toBeUndefined();
+
+    store.saveDraft(
+      finalVideoMediaConfirmationKey(demoProjectId, demoLessonId),
+      {
+        mimeType: "video/mp4",
+        src: "https://cdn.example.com/final.mp4",
+        status: "confirmed",
+      },
+      { lessonId: demoLessonId, nodeKey: "final-video", projectId: demoProjectId },
+    );
+
+    requirement = buildDeliveryRequirements(store.getState(), demoProjectId).find(
       (item) => item.key === `${demoLessonId}:final-video`,
     );
 
@@ -124,6 +158,15 @@ describe("delivery requirements", () => {
       { mimeType: "video/mp4", src: "https://cdn.example.com/final.mp4" },
       { lessonId: demoLessonId, nodeKey: "final-video", projectId: demoProjectId },
     );
+    saveMockDraft(
+      finalVideoMediaConfirmationKey(demoProjectId, demoLessonId),
+      {
+        mimeType: "video/mp4",
+        src: "https://cdn.example.com/final.mp4",
+        status: "confirmed",
+      },
+      { lessonId: demoLessonId, nodeKey: "final-video", projectId: demoProjectId },
+    );
     const fingerprint = createDeliveryFingerprint(getMockRuntimeState(), demoProjectId);
     saveMockDraft(
       `project:${demoProjectId}:delivery-package`,
@@ -148,6 +191,8 @@ describe("delivery requirements", () => {
       ),
     );
 
+    expect(screen.getByText("教学内容与当前可用媒体检查 · 当前说明")).toBeInTheDocument();
+    expect(screen.queryByText(/声音与字幕检查/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "下载文件" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("暂时无法下载");
     fireEvent.click(screen.getByRole("button", { name: "重新下载" }));
