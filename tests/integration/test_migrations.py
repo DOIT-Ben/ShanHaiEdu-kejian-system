@@ -167,7 +167,7 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
             )
             == 1
         )
-    assert ScriptDirectory.from_config(config).get_current_head() == "e6b9a2c4d801"
+    assert ScriptDirectory.from_config(config).get_current_head() == "f2a7b9c1d304"
     previous = os.environ.get("SHANHAI_DATABASE_URL")
     os.environ["SHANHAI_DATABASE_URL"] = postgres_database_url
     try:

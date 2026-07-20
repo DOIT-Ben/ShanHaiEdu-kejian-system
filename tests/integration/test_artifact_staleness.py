@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from apps.api.artifacts.repository import ArtifactRepository
+from apps.api.artifacts.models import ArtifactRelation
 from apps.api.artifacts.service import ArtifactService
 from apps.api.content_runtime.registry import BUILTIN_CONTENT_DEFINITION_VERSION_ID
 from apps.api.creation.models import CreationPackage
@@ -13,6 +15,7 @@ from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.reliability.models import EventStreamEntry
 from apps.api.workflows.models import NodeRun
+from apps.api.ids import new_uuid7
 from tests.fakes.identity import seed_test_actor
 from tests.integration.test_creation_lifecycle import seed_project_package
 
@@ -186,6 +189,76 @@ def test_relation_cycle_and_cross_tenant_visibility_are_rejected(
             actor_type="system",
         )
         assert ArtifactRepository(session, foreign_actor).get(first.id) is None
+
+
+def test_relation_impact_scope_database_constraint_accepts_only_current_shapes(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session, session.begin():
+        actor = seed_test_actor(session)
+        project = ProjectRepository(session, actor).create(
+            CreateProjectRequest(title="Fractions", knowledge_point="One half")
+        )
+        _source, source_version = create_approved(
+            session, actor, project.id, "scope-source", {"value": 1}
+        )
+        _target, target_version = create_approved(
+            session, actor, project.id, "scope-target", {"value": 2}
+        )
+        service = ArtifactService(session, actor)
+        service.add_relation(
+            from_version_id=source_version.id,
+            to_version_id=target_version.id,
+            relation_type="references",
+            binding_key="scope-all",
+            impact_scope={"mode": "all"},
+        )
+        service.add_relation(
+            from_version_id=source_version.id,
+            to_version_id=target_version.id,
+            relation_type="references",
+            binding_key="scope-keyed",
+            impact_scope={
+                "mode": "keyed",
+                "selector": "lesson_key",
+                "keys": ["LESSON-001"],
+            },
+        )
+        session.flush()
+
+        invalid_scopes = [
+            {},
+            {"mode": "keyed", "selector": "lesson_key", "keys": []},
+            {
+                "mode": "keyed",
+                "selector": "lesson_unit_key",
+                "keys": ["LESSON-001"],
+            },
+            {
+                "mode": "keyed",
+                "selector": "lesson_key",
+                "keys": ["LESSON-001"],
+                "extra": True,
+            },
+            {"mode": "all", "extra": True},
+        ]
+        for index, impact_scope in enumerate(invalid_scopes):
+            with pytest.raises(IntegrityError):
+                with session.begin_nested():
+                    session.add(
+                        ArtifactRelation(
+                            id=new_uuid7(),
+                            organization_id=actor.organization_id,
+                            from_artifact_version_id=source_version.id,
+                            to_artifact_version_id=target_version.id,
+                            relation_type="constrains",
+                            binding_key=f"invalid-scope-{index}",
+                            impact_scope_json=impact_scope,
+                            created_by=actor.principal_id,
+                        )
+                    )
+                    session.flush()
 
 
 def test_revoking_an_upstream_approval_marks_real_downstream_stale(
