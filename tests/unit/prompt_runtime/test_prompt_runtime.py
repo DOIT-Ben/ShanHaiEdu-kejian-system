@@ -235,9 +235,7 @@ def test_prompt_runtime_rejects_the_retired_append_edit_policy() -> None:
             template_key="lesson-plan.prompt",
             template_version="1.0.0",
             platform_safety="locked safety",
-            sections=(
-                PromptSection("task", "task", "editable task", True, True),
-            ),
+            sections=(PromptSection("task", "task", "editable task", True, True),),
             context=assemble_context((), {}),
             output_schema={"type": "object"},
             provider_format="locked provider format",
