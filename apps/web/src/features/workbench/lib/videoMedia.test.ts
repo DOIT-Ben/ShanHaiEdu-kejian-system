@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createDefaultMockRuntimeState } from "@/shared/api/mocks/runtime";
 import {
   finalVideoMediaConfirmationKey,
+  getConfirmedFinalVideoMedia,
   getPlayableFinalVideo,
   isFinalVideoMediaConfirmed,
   parsePlayableVideoMedia,
@@ -104,5 +105,23 @@ describe("video media truth boundary", () => {
     };
 
     expect(isFinalVideoMediaConfirmed(runtime, "project-a", "lesson-a")).toBe(true);
+    expect(getConfirmedFinalVideoMedia(runtime, "project-a", "lesson-a")).toBeNull();
+
+    runtime.nodeStates["project-a:lesson-a:final-video"] = {
+      id: "node-final-video",
+      lesson_id: "lesson-a",
+      node_key: "final-video",
+      project_id: "project-a",
+      revision: 1,
+      stale_reason: null,
+      status: "approved",
+      title: "生成课堂导入视频",
+      updated_at: "2026-07-20T00:00:00Z",
+    };
+    expect(getConfirmedFinalVideoMedia(runtime, "project-a", "lesson-a")).toMatchObject({
+      src: "https://cdn.example.com/current.mp4",
+      subtitleFormat: "vtt",
+      subtitleSrc: "https://cdn.example.com/current.vtt",
+    });
   });
 });

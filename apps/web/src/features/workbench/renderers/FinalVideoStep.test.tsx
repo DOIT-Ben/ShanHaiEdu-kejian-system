@@ -145,6 +145,10 @@ describe("FinalVideoStep synthesis single flight", () => {
     expect(screen.getByRole("button", { name: "正在检查视频文件" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: "确认画面文件" })).not.toBeInTheDocument();
 
+    fireEvent.loadedData(video);
+    expect(screen.getByRole("button", { name: "正在检查视频文件" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "确认画面文件" })).not.toBeInTheDocument();
+
     fireEvent.canPlay(video);
 
     expect(await screen.findByRole("button", { name: "确认画面文件" })).toBeEnabled();
