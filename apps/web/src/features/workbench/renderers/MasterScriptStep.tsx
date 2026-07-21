@@ -1,4 +1,12 @@
-import { AlertTriangle, ArrowRight, Check, PencilLine, Plus, RefreshCw } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  BookOpen,
+  Check,
+  PencilLine,
+  Plus,
+  RefreshCw,
+} from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { createTopicIntroOptions, introOptions } from "@/features/intro-options/data";
@@ -247,28 +255,24 @@ export function MasterScriptStep() {
             课堂导入已经改用“{adoptedOption.title}”。旧稿暂时保留为只读，更新后再确认。
           </span>
         </div>
-      ) : (
-        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-[var(--sh-radius-sm)] border border-[var(--sh-warning)]/30 bg-[var(--sh-warning-soft)] px-3 py-2 text-xs">
-          <strong className="text-[var(--sh-ink-strong)]">课堂交接：</strong>
-          <span className="text-[var(--sh-ink-muted)]">{adoptedOption.handoff}</span>
-          <button
-            className="ml-auto font-semibold text-[var(--sh-brand-600)]"
-            onClick={() => openContextDrawer("references")}
-            type="button"
-          >
-            查看选定方案
-          </button>
-        </div>
-      )}
+      ) : null}
       <MarkdownDocument
         ariaLabel="母版剧本正文"
         dirty={dirty}
         extraActions={
-          approved || stale ? undefined : (
-            <Button onClick={addScene} size="sm" variant="quiet">
-              <Plus aria-hidden="true" />
-              增加场次
-            </Button>
+          stale ? undefined : (
+            <>
+              <Button onClick={() => openContextDrawer("references")} size="sm" variant="quiet">
+                <BookOpen aria-hidden="true" />
+                导入方案
+              </Button>
+              {approved ? null : (
+                <Button onClick={addScene} size="sm" variant="quiet">
+                  <Plus aria-hidden="true" />
+                  增加场次
+                </Button>
+              )}
+            </>
           )
         }
         markdown={markdown}

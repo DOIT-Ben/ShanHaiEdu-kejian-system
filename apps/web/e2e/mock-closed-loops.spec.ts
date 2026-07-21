@@ -273,6 +273,9 @@ test("PPT 正文编辑和确认刷新后仍保留", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "封面标题" })).toHaveText("百分数就在身边");
   await expect(page.getByRole("button", { name: "重新编辑 PPT" })).toBeVisible();
   await page.goto(`/app/projects/${projectId}/lessons/${lessonId}/work/ppt-export`);
+  await expect(page.getByRole("heading", { level: 1, name: "课件预览" })).toHaveCount(1);
+  await expect(page.getByText("最后一步 · 带走课堂作品", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("7 页课件预览", { exact: true })).toBeVisible();
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "下载课件预览" }).click();
   const download = await downloadPromise;

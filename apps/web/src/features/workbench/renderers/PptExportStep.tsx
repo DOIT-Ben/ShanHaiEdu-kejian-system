@@ -8,7 +8,6 @@ import { readPptOutlinePages, type PptOutlinePage } from "@/features/workbench/l
 import { useMockRuntime } from "@/shared/api/mocks/runtime";
 import { downloadExampleFile } from "@/shared/lib/downloadExampleFile";
 import { Button } from "@/shared/ui/Button";
-import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { demoProjectId } from "@/shared/data/mockData";
 import { requiredItem } from "@/shared/lib/requiredItem";
@@ -133,7 +132,6 @@ export function PptExportStep() {
   const nodeState = runtime.nodeStates[`${projectId}:${lessonId}:ppt-pages`];
   const stale = nodeState?.status === "stale";
   const approved = Boolean(pptPagesSnapshot) && !stale;
-  const newerDraftPending = approved && nodeState?.status === "review_required";
   const pageCount = pageTitles.length;
   const checks = approved
     ? [`${String(pageCount)} 页课堂内容已确认`, "16:9 画幅适合教室大屏", "标题与正文仍可继续编辑"]
@@ -142,48 +140,43 @@ export function PptExportStep() {
         "正文还需要你确认",
         `确认后可下载完整的 ${String(pageCount)} 页预览`,
       ];
+  const exportAction = approved ? (
+    <Button
+      onClick={() =>
+        downloadExampleFile(
+          `${topic}_课堂课件预览.html`,
+          buildPptPreview(topic, outlinePages, approvedContent, demo, coverVariant),
+          "text/html;charset=utf-8",
+        )
+      }
+      size="md"
+    >
+      <Download aria-hidden="true" />
+      下载课件预览
+    </Button>
+  ) : (
+    <Button asChild size="md">
+      <Link to={pagesPath}>
+        <PencilLine aria-hidden="true" />
+        去确认 PPT 正文
+      </Link>
+    </Button>
+  );
 
   return (
     <WorkbenchPageFrame>
-      <FocusPageHeader
-        action={
-          approved ? (
-            <Button
-              onClick={() =>
-                downloadExampleFile(
-                  `${topic}_课堂课件预览.html`,
-                  buildPptPreview(topic, outlinePages, approvedContent, demo, coverVariant),
-                  "text/html;charset=utf-8",
-                )
-              }
-              size="md"
-            >
-              <Download aria-hidden="true" />
-              下载课件预览
-            </Button>
-          ) : (
-            <Button asChild size="md">
-              <Link to={pagesPath}>
-                <PencilLine aria-hidden="true" />
-                去确认 PPT 正文
-              </Link>
-            </Button>
-          )
-        }
-        description={
-          approved
-            ? newerDraftPending
-              ? "当前已批准版本仍可下载；正在修改的新稿确认后会替换它。"
-              : "最后看一眼封面、正文和课堂顺序，确认后即可带进教室。"
-            : "页面已经排好，先确认正文内容，再下载完整课件预览。"
-        }
-        eyebrow="最后一步 · 带走课堂作品"
-        status={<StatusBadge status={stale ? "stale" : approved ? "ready" : "review_required"} />}
-        title={approved ? `导出${topic}课件` : "确认正文后再导出课件"}
-      />
+      <header className="flex min-h-10 flex-wrap items-center justify-between gap-2 border-b border-[var(--sh-line-subtle)] pb-3">
+        <h1 className="sr-only">课件预览</h1>
+        <div className="flex min-w-0 items-center gap-2 text-sm font-medium text-[var(--sh-ink-strong)]">
+          <Presentation aria-hidden="true" className="size-4 shrink-0 text-[var(--sh-brand-700)]" />
+          <span>{String(pageCount)} 页课件预览</span>
+          <StatusBadge status={stale ? "stale" : approved ? "ready" : "review_required"} />
+        </div>
+        <div className="shrink-0">{exportAction}</div>
+      </header>
       {stale ? <StaleContentNotice reason={nodeState.stale_reason?.summary} /> : null}
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
         <section className="relative overflow-hidden rounded-[var(--sh-radius-md)] bg-[var(--sh-surface-stage)] p-3 shadow-[var(--sh-shadow-card)] md:p-4">
           <div className="absolute inset-x-[13%] bottom-[7%] top-[15%] rotate-[3deg] rounded-[var(--sh-radius-md)] bg-[var(--sh-accent-rose-soft)] shadow-[var(--sh-shadow-card)]" />
           <div className="absolute inset-x-[10%] bottom-[10%] top-[10%] -rotate-[2deg] rounded-[var(--sh-radius-md)] bg-[var(--sh-brand-100)] shadow-[var(--sh-shadow-card)]" />

@@ -51,6 +51,8 @@ test("母版剧本增加场次并刷新后保留", async ({ page }) => {
   await loginAsTeacher(page);
   await unlockWorkbenchStep(page, projectId, lessonId, "master-script");
   await page.goto(`${workUrl}/master-script`);
+  await expect(page.getByRole("button", { name: "导入方案" })).toBeVisible();
+  await expect(page.getByText("课堂交接：", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "增加场次" }).click();
   await page.getByRole("button", { name: "编辑" }).click();
   const script = page.getByRole("textbox", { name: "母版剧本正文" });
