@@ -8,6 +8,7 @@ from types import MappingProxyType
 from typing import Any
 
 from workflow.definition import (
+    WorkflowApprovalCompletionBinding,
     WorkflowDefinitionError,
     WorkflowGraph,
     WorkflowIndexes,
@@ -216,6 +217,7 @@ def _output_binding(
     generation_key: str,
     quality: QualityBinding,
 ) -> WorkflowOutputDefinitionBinding:
+    completion = _approval_completion(node)
     return WorkflowOutputDefinitionBinding(
         content_definition_key=content_key,
         generation_template_key=generation_key,
@@ -230,6 +232,24 @@ def _output_binding(
         quality_validator_refs=quality[2],
         quality_gate_node_key=quality[3],
         quality_requirement_mode=quality[4],
+        approval_completion=completion,
+    )
+
+
+def _approval_completion(
+    node: WorkflowNodeDefinition,
+) -> WorkflowApprovalCompletionBinding | None:
+    binding = as_mapping(node.binding)
+    persistence = as_mapping(binding.get("output_persistence")) if binding is not None else None
+    completion = (
+        as_mapping(persistence.get("approval_completion")) if persistence is not None else None
+    )
+    if completion is None:
+        return None
+    return WorkflowApprovalCompletionBinding(
+        kind=require_text(completion, "kind"),
+        collection_pointer=require_text(completion, "collection_pointer"),
+        stable_key_field=require_text(completion, "stable_key_field"),
     )
 
 

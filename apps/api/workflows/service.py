@@ -25,6 +25,21 @@ from apps.api.workflows.repository import WorkflowRuntimeRepository
 from workflow.node_state import NodeStateError, NodeStatus, ensure_node_transition
 from workflow.registry import BUILTIN_WORKFLOW_REGISTRY, RegisteredWorkflow
 
+_BRANCH_RETIREMENT_PATHS: dict[NodeStatus, tuple[NodeStatus, ...]] = {
+    NodeStatus.DISABLED: (),
+    NodeStatus.NOT_READY: (NodeStatus.DISABLED,),
+    NodeStatus.READY: (NodeStatus.DISABLED,),
+    NodeStatus.DRAFT: (NodeStatus.STALE, NodeStatus.SKIPPED),
+    NodeStatus.REVIEW_REQUIRED: (NodeStatus.STALE, NodeStatus.SKIPPED),
+    NodeStatus.APPROVED: (NodeStatus.STALE, NodeStatus.SKIPPED),
+    NodeStatus.PARTIALLY_COMPLETED: (NodeStatus.FAILED, NodeStatus.SKIPPED),
+    NodeStatus.FAILED: (NodeStatus.SKIPPED,),
+    NodeStatus.PAUSED: (NodeStatus.CANCELLED,),
+    NodeStatus.CANCELLED: (),
+    NodeStatus.STALE: (NodeStatus.SKIPPED,),
+    NodeStatus.SKIPPED: (),
+}
+
 
 class WorkflowRuntimeError(ValueError):
     """Raised when a workflow runtime invariant is violated."""
@@ -150,6 +165,54 @@ class WorkflowRuntimeService:
                 run.project_id,
                 ProjectAction.EDIT,
             )
+        return self._transition_locked(node, run, target)
+
+    def approve_review_gate(self, node_run_id: UUID) -> NodeRun:
+        """Complete an existing human gate with REVIEW authority only."""
+
+        node = self._require_node(node_run_id, for_update=True)
+        run = self._require_run(node.workflow_run_id)
+        if not self._actor.is_system:
+            ProjectAccessService(self._session, self._actor).require(
+                run.project_id,
+                ProjectAction.REVIEW,
+            )
+        if NodeStatus(node.status) is not NodeStatus.REVIEW_REQUIRED:
+            raise WorkflowRuntimeError("the node is not awaiting review")
+        return self._transition_locked(node, run, NodeStatus.APPROVED)
+
+    def retire_branch_node(
+        self,
+        node_run_id: UUID,
+        *,
+        review_completion: bool,
+    ) -> NodeRun:
+        """Permanently retire a non-active branch node through declared transitions."""
+
+        node = self._require_node(node_run_id, for_update=True)
+        run = self._require_run(node.workflow_run_id)
+        if not self._actor.is_system:
+            access = ProjectAccessService(self._session, self._actor)
+            if review_completion:
+                access.require_review_completion(run.project_id, for_update=False)
+            else:
+                access.require(run.project_id, ProjectAction.EDIT, for_update=False)
+        status = NodeStatus(node.status)
+        path = _BRANCH_RETIREMENT_PATHS.get(status)
+        if path is None:
+            raise WorkflowRuntimeError(
+                f"active node {node.id} must finish cancellation before branch retirement"
+            )
+        for target in path:
+            self._transition_locked(node, run, target)
+        return node
+
+    def _transition_locked(
+        self,
+        node: NodeRun,
+        run: WorkflowRun,
+        target: NodeStatus,
+    ) -> NodeRun:
         try:
             ensure_node_transition(NodeStatus(node.status), target)
         except NodeStateError as exc:

@@ -32,6 +32,9 @@ CONTEXT_SOURCE_REGISTRY = MappingProxyType(
             "artifact", "approval:lesson_plan", ("lesson_plan",), "lesson", "lesson_plan"
         ),
         "material.approved_parse": ContextSourceDefinition("asset", "content:material_evidence"),
+        "material_scope.approved_version": ContextSourceDefinition(
+            "artifact", "approval:material_scope", ("material_scope",), "project", "project"
+        ),
         "ppt_outline.approved_version": ContextSourceDefinition(
             "artifact", "approval:ppt_outline", ("ppt_outline",), "lesson", "ppt"
         ),

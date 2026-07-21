@@ -33,7 +33,7 @@
       "kind": "prompt_template",
       "path": "items/lesson-division-generate-prompt.json",
       "schema_id": "https://shanhaiedu.local/contracts/prompt-template.schema.json",
-      "sha256": "e25111fe14af846e392c8d9d7ccb33a3c75166bdd465a03f2ac5d4138d965a24"
+      "sha256": "53271e4e0b409236444ffafc3e93200d9fcbb7bf1f1947e338e42f106abbf93e"
     },
     {
       "item_key": "lesson.division.generate.projection",

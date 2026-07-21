@@ -41,13 +41,18 @@ def collect_context_items(
             "NODE_EXECUTION_CONTEXT_POLICY_INVALID",
             "the published context policy has no source allowlist",
         )
-    items: list[ContextItem] = []
+    sources: list[str] = []
+    artifact_context: dict[str, tuple[ArtifactContextVersion, ...]] = {}
     for source in cast(Sequence[object], allowed):
         if type(source) is not str:
             raise NodeExecutionError(
                 "NODE_EXECUTION_CONTEXT_POLICY_INVALID",
                 "the published context source is invalid",
             )
+        sources.append(source)
+        artifact_context[source] = artifacts.list_context_versions(execution, source)
+    items: list[ContextItem] = []
+    for source in sources:
         items.extend(
             ContextItem(
                 source=source,
@@ -55,11 +60,15 @@ def collect_context_items(
                 source_version_id=str(value.artifact_version_id),
                 content=cast(Mapping[str, Any], plain_json_value(value.content)),
             )
-            for value in artifacts.list_context_versions(execution, source)
+            for value in artifact_context[source]
         )
         items.extend(
             _asset_context_item(source, value)
-            for value in assets.list_context_items(execution.project_id, source)
+            for value in assets.list_context_items(
+                execution.project_id,
+                source,
+                artifact_context=artifact_context,
+            )
         )
     return tuple(items)
 

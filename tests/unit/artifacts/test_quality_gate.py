@@ -24,7 +24,7 @@ def test_report_gate_resolves_exact_validate_node_and_validator_set() -> None:
     assert gate.validate_node_key == "lesson.division.validate"
     assert (
         gate.validator_set_hash
-        == "05008a2b1b1b1287f94ba8900314ac3edd0a9b7a8990d547e2a7beaae098ac5d"
+        == "d8dfb5a5cc611a55993a44c5ee27a6e3018aa75fffe68ea3d77f424fcbb1a7d2"
     )
     assert gate.accepted_conclusions == ("passed",)
 

@@ -71,7 +71,19 @@ class RuntimeSeed:
     workflow_run_id: UUID
     node_run_id: UUID
     upstream_version_id: UUID
+    source_material_id: UUID
+    material_parse_version_id: UUID
+    material_evidence_hash: str
+    material_evidence: dict[str, object]
     output: dict[str, object]
+
+
+@dataclass(frozen=True, slots=True)
+class MaterialContextSeed:
+    source_material_id: UUID
+    material_parse_version_id: UUID
+    content_hash: str
+    content: dict[str, object]
 
 
 @pytest.mark.parametrize(
@@ -1532,13 +1544,14 @@ def _seed_runtime(factory: sessionmaker[Session]) -> RuntimeSeed:
             )
         )
         assert definition is not None
-        _seed_material_context(session, actor, project.id, case)
+        material = _seed_material_context(session, actor, project.id, case)
         upstream = _seed_approved_scope(
             session,
             actor,
             project.id,
             definition.id,
             output,
+            material,
         )
         node = WorkflowRuntimeService(session, actor).create_project_node_run(
             run.id,
@@ -1551,6 +1564,10 @@ def _seed_runtime(factory: sessionmaker[Session]) -> RuntimeSeed:
         workflow_run_id=run.id,
         node_run_id=node.id,
         upstream_version_id=upstream.id,
+        source_material_id=material.source_material_id,
+        material_parse_version_id=material.material_parse_version_id,
+        material_evidence_hash=material.content_hash,
+        material_evidence=material.content,
         output=output,
     )
 
@@ -1586,7 +1603,7 @@ def _seed_material_context(
     actor: ActorContext,
     project_id: UUID,
     case: dict[str, object],
-) -> None:
+) -> MaterialContextSeed:
     asset = FileAsset(
         id=new_uuid7(),
         organization_id=actor.organization_id,
@@ -1644,30 +1661,35 @@ def _seed_material_context(
         "source": case["source"],
         "material_evidence": case["material_evidence"],
     }
-    session.add(
-        MaterialParseVersion(
-            id=new_uuid7(),
-            organization_id=actor.organization_id,
-            source_material_id=material.id,
-            file_asset_version_id=version.id,
-            generation_job_id=None,
-            version_no=1,
-            status="succeeded",
-            parser_name="issue-89-fake",
-            parser_version="1",
-            content_json=content,
-            page_count=1,
-            text_checksum=canonical_content_hash(content),
-            validation_report_json={"valid": True},
-            error_code=None,
-            created_at=utc_now(),
-            started_at=utc_now(),
-            completed_at=utc_now(),
-            created_by=actor.principal_id,
-            updated_by=actor.principal_id,
-        )
+    parse = MaterialParseVersion(
+        id=new_uuid7(),
+        organization_id=actor.organization_id,
+        source_material_id=material.id,
+        file_asset_version_id=version.id,
+        generation_job_id=None,
+        version_no=1,
+        status="succeeded",
+        parser_name="issue-89-fake",
+        parser_version="1",
+        content_json=content,
+        page_count=1,
+        text_checksum=canonical_content_hash(content),
+        validation_report_json={"valid": True},
+        error_code=None,
+        created_at=utc_now(),
+        started_at=utc_now(),
+        completed_at=utc_now(),
+        created_by=actor.principal_id,
+        updated_by=actor.principal_id,
     )
+    session.add(parse)
     session.flush()
+    return MaterialContextSeed(
+        source_material_id=material.id,
+        material_parse_version_id=parse.id,
+        content_hash=parse.text_checksum,
+        content=content,
+    )
 
 
 def _seed_approved_scope(
@@ -1676,7 +1698,13 @@ def _seed_approved_scope(
     project_id: UUID,
     definition_id: UUID,
     content: dict[str, object],
+    material: MaterialContextSeed,
 ) -> ArtifactVersion:
+    scope_content = {
+        **content,
+        "source_material_id": str(material.source_material_id),
+        "material_parse_version_id": str(material.material_parse_version_id),
+    }
     return _seed_approved_artifact(
         session,
         actor,
@@ -1686,7 +1714,7 @@ def _seed_approved_scope(
         artifact_type="material_scope",
         branch_key="project",
         lesson_unit_id=None,
-        content=content,
+        content=scope_content,
     )
 
 

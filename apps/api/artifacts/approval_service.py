@@ -8,9 +8,9 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from apps.api.artifacts.approval_completion import prepare_declared_approval
 from apps.api.artifacts.domain import ApprovalAction
 from apps.api.artifacts.models import Approval, Artifact, ArtifactVersion
-from apps.api.artifacts.quality_gate import ArtifactQualityApprovalGuard
 from apps.api.artifacts.relation_service import ArtifactRelationService
 from apps.api.artifacts.repository import ArtifactRepository
 from apps.api.creation.staleness_service import CreationPackageStalenessService
@@ -113,19 +113,22 @@ class ArtifactApprovalService:
         existing = self._repository.latest_action(version.id, ApprovalAction.APPROVE.value)
         if artifact.current_approved_version_id == version.id and existing is not None:
             return existing
-        if artifact.current_submitted_version_id != version.id:
-            raise self._state_conflict("Only the current submitted version can be approved.")
+        if artifact.status != "in_review" or artifact.current_submitted_version_id != version.id:
+            raise self._state_conflict(
+                "Only the current submitted version in review can be approved."
+            )
         project = self._require_project(artifact.project_id, for_update=False)
-        quality_evidence = ArtifactQualityApprovalGuard(
+        previous_version_id = artifact.current_approved_version_id
+        quality_evidence, stale_ids, stale_node_ids = prepare_declared_approval(
             self._session,
             self._actor,
-        ).require_evidence(
+            self._relations,
             artifact,
             version,
-            content_release_id=project.content_release_id,
-            workflow_definition_version_id=project.workflow_definition_version_id,
+            previous_version_id=previous_version_id,
+            fixed_release=(project.content_release_id, project.workflow_definition_version_id),
+            request_id=request_id,
         )
-        previous_version_id = artifact.current_approved_version_id
         approval = self._record(
             version, ApprovalAction.APPROVE, comment, quality_evidence, policy_snapshot
         )
@@ -134,7 +137,6 @@ class ArtifactApprovalService:
         artifact.status = "approved"
         artifact.stale_reason_json = None
         self._session.flush()
-        stale_ids, stale_node_ids = self._relations.propagate_stale(previous_version_id, version.id)
         CreationPackageStalenessService(
             self._session, self._actor.organization_id
         ).mark_source_nodes_stale(stale_node_ids)

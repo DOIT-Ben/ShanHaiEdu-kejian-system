@@ -24,14 +24,17 @@ from apps.api.artifacts.domain import ApprovalAction, canonical_content_hash
 from apps.api.artifacts.models import Approval, Artifact, ArtifactDraft, ArtifactVersion
 from apps.api.artifacts.relation_service import ArtifactRelationService
 from apps.api.artifacts.service import ArtifactService
+from apps.api.content_runtime.models import ContentDefinitionVersion
 from apps.api.database import build_engine, build_session_factory, utc_now
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, system_actor
 from apps.api.ids import new_uuid7
+from apps.api.lessons.models import LessonUnit
 from apps.api.reliability.events import EventWriter
 from apps.api.reliability.models import EventStreamEntry, OutboxEvent
-from apps.api.workflows.models import NodeRun
+from apps.api.workflows.models import BranchRun, NodeRun, WorkflowRun
 from apps.api.workflows.service import WorkflowRuntimeService
+from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
 from tests.integration.test_node_execution_runtime import (
     _seed_approved_artifact,  # pyright: ignore[reportPrivateUsage]
     _seed_runtime,  # pyright: ignore[reportPrivateUsage]
@@ -41,6 +44,7 @@ from workflow.registry import BUILTIN_WORKFLOW_REGISTRY
 
 ROOT = Path(__file__).resolve().parents[2]
 CATALOG = ROOT / "contracts/fixtures/workflow-node-generation-bindings/primary-math-courseware.json"
+GOLDEN_CASE = ROOT / "contracts/fixtures/golden-projects/numbers-1-to-5/golden-project.json"
 
 
 @dataclass(frozen=True, slots=True)
@@ -325,6 +329,8 @@ def _seed_submitted_quality_artifact(
     factory: sessionmaker[Session],
 ) -> ApprovalSeed:
     runtime = _seed_runtime(factory)
+    case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
+    lesson_plan_content = build_golden_branch_source_outputs(case)["lesson_plan.generate"]
     with factory() as session, session.begin():
         upstream = session.get(ArtifactVersion, runtime.upstream_version_id)
         upstream_artifact = session.get(
@@ -332,15 +338,51 @@ def _seed_submitted_quality_artifact(
             upstream.artifact_id if upstream is not None else None,
         )
         assert upstream is not None and upstream_artifact is not None
+        definition = session.scalar(
+            select(ContentDefinitionVersion).where(
+                ContentDefinitionVersion.definition_key == "lesson_plan.generate.output"
+            )
+        )
+        run = session.get(WorkflowRun, runtime.workflow_run_id)
+        assert definition is not None and run is not None
+        lesson = LessonUnit(
+            id=new_uuid7(),
+            organization_id=runtime.actor.organization_id,
+            project_id=runtime.project_id,
+            lesson_key="QUALITY-APPROVAL-LESSON",
+            position=1,
+            title="Quality approval fixture",
+            scope_summary="Exercise the generic artifact quality approval guard",
+            objective_summary="Keep declared lesson division completion out of this fixture",
+            estimated_minutes=40,
+            source_division_version_id=runtime.upstream_version_id,
+            status="active",
+            created_by=runtime.actor.principal_id,
+            updated_by=runtime.actor.principal_id,
+        )
+        session.add(lesson)
+        session.flush()
+        branch = BranchRun(
+            id=new_uuid7(),
+            workflow_run_id=run.id,
+            lesson_unit_id=lesson.id,
+            branch_key="lesson_plan",
+            status="active",
+            started_at=utc_now(),
+            created_by=runtime.actor.principal_id,
+            updated_by=runtime.actor.principal_id,
+        )
+        session.add(branch)
+        session.flush()
         artifact = Artifact(
             id=new_uuid7(),
             organization_id=runtime.actor.organization_id,
             project_id=runtime.project_id,
-            lesson_unit_id=None,
-            branch_key="project",
+            lesson_unit_id=lesson.id,
+            branch_key="lesson_plan",
             artifact_key=f"quality-review:{new_uuid7()}",
-            artifact_type="lesson_division",
-            content_definition_version_id=upstream_artifact.content_definition_version_id,
+            artifact_type="lesson_plan",
+            content_definition_version_id=definition.id,
             status="in_review",
             stale_reason_json=None,
             created_by=runtime.actor.principal_id,
@@ -348,8 +390,11 @@ def _seed_submitted_quality_artifact(
         )
         session.add(artifact)
         session.flush()
-        prior_content = dict(runtime.output)
-        prior_content["scope_summary"] = f"{prior_content['scope_summary']} (previous draft)"
+        prior_content = dict(lesson_plan_content)
+        prior_content["material_analysis"] = dict(prior_content["material_analysis"])
+        prior_content["material_analysis"]["teaching_value"] = (
+            f"{prior_content['material_analysis']['teaching_value']} (previous draft)"
+        )
         prior = ArtifactVersion(
             id=new_uuid7(),
             organization_id=runtime.actor.organization_id,
@@ -372,8 +417,8 @@ def _seed_submitted_quality_artifact(
             organization_id=runtime.actor.organization_id,
             artifact_id=artifact.id,
             version_no=2,
-            content_json=dict(runtime.output),
-            content_hash=canonical_content_hash(runtime.output),
+            content_json=dict(lesson_plan_content),
+            content_hash=canonical_content_hash(lesson_plan_content),
             render_summary_json={},
             source_kind="manual",
             source_node_run_id=None,
@@ -432,19 +477,38 @@ def _seed_submitted_quality_artifact(
             ]
         )
         workflow = WorkflowRuntimeService(session, runtime.actor)
-        node = workflow.create_project_node_run(
-            runtime.workflow_run_id,
-            node_key="lesson.division.validate",
-            status=NodeStatus.READY,
+        node = NodeRun(
+            id=new_uuid7(),
+            organization_id=runtime.actor.organization_id,
+            workflow_run_id=run.id,
+            branch_run_id=branch.id,
+            node_key="lesson_plan.validate",
+            run_no=1,
+            status=NodeStatus.READY.value,
+            trigger_type="manual",
+            automation_policy_snapshot_json=run.automation_policy_snapshot_json,
+            created_by=runtime.actor.principal_id,
+            updated_by=runtime.actor.principal_id,
         )
+        session.add(node)
+        session.flush()
         workflow.add_input_snapshot(
             node.id,
-            input_key="artifact:lesson_division",
+            input_key="artifact:lesson_plan",
             source_type="artifact",
             source_id=artifact.id,
             source_version_id=version.id,
             content_hash=version.content_hash,
             snapshot=dict(version.content_json),
+        )
+        workflow.add_input_snapshot(
+            node.id,
+            input_key="content:material_evidence",
+            source_type="material_parse",
+            source_id=runtime.source_material_id,
+            source_version_id=runtime.material_parse_version_id,
+            content_hash=runtime.material_evidence_hash,
+            snapshot=dict(runtime.material_evidence),
         )
     return ApprovalSeed(
         actor=runtime.actor,
@@ -475,7 +539,7 @@ def _execute_report(
 
 def _binding() -> QualityReportBinding:
     registered = BUILTIN_WORKFLOW_REGISTRY.load(json.loads(CATALOG.read_text(encoding="utf-8")))
-    return resolve_quality_report_binding(registered, "lesson.division.validate")
+    return resolve_quality_report_binding(registered, "lesson_plan.validate")
 
 
 def _approval_count(session: Session, version_id: UUID, action: str) -> int:

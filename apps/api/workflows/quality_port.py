@@ -64,6 +64,33 @@ class SqlAlchemyQualityWorkflowPort:
             content_hash=snapshot.content_hash,
         )
 
+    def require_supporting_input(
+        self,
+        node_run_id: UUID,
+        input_key: str,
+    ) -> QualitySourceInput:
+        snapshot = self._session.scalar(
+            select(NodeInputSnapshot).where(
+                NodeInputSnapshot.node_run_id == node_run_id,
+                NodeInputSnapshot.input_key == input_key,
+            )
+        )
+        if (
+            snapshot is None
+            or snapshot.source_type not in {"artifact", "material_parse"}
+            or snapshot.source_version_id is None
+        ):
+            raise WorkflowExecutionPortError(
+                "QUALITY_SUPPORTING_INPUT_MISSING",
+                "the validate node has no exact supporting-input snapshot",
+            )
+        return QualitySourceInput(
+            source_type=snapshot.source_type,
+            source_id=snapshot.source_id,
+            source_version_id=snapshot.source_version_id,
+            content_hash=snapshot.content_hash,
+        )
+
     def fail_prepare(self, node_run_id: UUID, *, code: str) -> QualityFailureRouting | None:
         node = self._repository.get_node(node_run_id, for_update=True)
         if node is None:
