@@ -7,6 +7,7 @@ from typing import Literal
 from uuid import UUID
 
 import pytest
+
 from apps.api.artifact_quality.contracts import (
     ArtifactQualityReportResult,
     QualityValidationContext,
@@ -18,6 +19,10 @@ from apps.api.artifact_quality.service import ArtifactQualityError, ArtifactQual
 NODE_RUN_ID = UUID("10000000-0000-4000-8000-000000000133")
 SOURCE_VERSION_ID = UUID("10000000-0000-4000-8000-000000000134")
 REPORT_ID = UUID("10000000-0000-4000-8000-000000000135")
+ORGANIZATION_ID = UUID("10000000-0000-4000-8000-000000000136")
+PROJECT_ID = UUID("10000000-0000-4000-8000-000000000137")
+CONTENT_RELEASE_ID = UUID("10000000-0000-4000-8000-000000000138")
+WORKFLOW_VERSION_ID = UUID("10000000-0000-4000-8000-000000000139")
 VALIDATOR_REF = ValidatorRef(
     key="validator.fixture",
     semantic_version="1.0.0",
@@ -27,11 +32,17 @@ VALIDATOR_REF = ValidatorRef(
 
 def validation_context() -> QualityValidationContext:
     return QualityValidationContext(
+        organization_id=ORGANIZATION_ID,
+        project_id=PROJECT_ID,
+        lesson_unit_id=None,
+        content_release_id=CONTENT_RELEASE_ID,
+        workflow_definition_version_id=WORKFLOW_VERSION_ID,
         node_run_id=NODE_RUN_ID,
         source_artifact_version_id=SOURCE_VERSION_ID,
         source_content_hash="b" * 64,
         source_content={"title": "Fractions"},
         validator_refs=(VALIDATOR_REF,),
+        validator_set_hash="c" * 64,
     )
 
 
