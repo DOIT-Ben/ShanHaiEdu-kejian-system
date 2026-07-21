@@ -30,6 +30,7 @@ EXPECTED_TABLES = {
     "approvals",
     "asset_bindings",
     "artifact_drafts",
+    "artifact_quality_reports",
     "artifact_relations",
     "artifact_versions",
     "artifacts",
@@ -112,9 +113,37 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
     }
     assert "fk_artifact_versions_context_snapshot" in artifact_foreign_keys
     assert "fk_artifact_versions_prompt_snapshot" in artifact_foreign_keys
+    quality_report_foreign_keys = {
+        foreign_key["name"]
+        for foreign_key in database_inspector.get_foreign_keys("artifact_quality_reports")
+    }
+    assert {
+        "fk_artifact_quality_reports_content_release",
+        "fk_artifact_quality_reports_lesson_unit",
+        "fk_artifact_quality_reports_organization",
+        "fk_artifact_quality_reports_project",
+        "fk_artifact_quality_reports_source_version",
+        "fk_artifact_quality_reports_validate_node_run",
+        "fk_artifact_quality_reports_workflow_version",
+    }.issubset(quality_report_foreign_keys)
+    quality_report_indexes = {
+        index["name"] for index in database_inspector.get_indexes("artifact_quality_reports")
+    }
+    assert "uq_artifact_quality_reports_source_workflow_validators" in quality_report_indexes
+    assert "uq_artifact_quality_reports_validate_node_run" in quality_report_indexes
     binding_indexes = {index["name"] for index in database_inspector.get_indexes("asset_bindings")}
     assert "uq_asset_bindings_active_slot_position" in binding_indexes
     with engine.connect() as connection:
+        assert (
+            connection.scalar(
+                text(
+                    "SELECT count(*) FROM pg_trigger "
+                    "WHERE tgname = 'trg_artifact_quality_reports_immutable' "
+                    "AND NOT tgisinternal"
+                )
+            )
+            == 1
+        )
         assert (
             connection.scalar(
                 text(
