@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 ApprovalKind = Literal["master_script", "rough_storyboard"]
 AssetType = Literal["character", "scene", "prop", "creature"]
 AspectRatio = Literal["16:9", "9:16"]
+NonEmptyText = Annotated[str, Field(min_length=1, max_length=10_000)]
 
 
 class _FrozenModel(BaseModel):
@@ -27,7 +27,7 @@ class IntroSelectionSnapshot(_FrozenModel):
     course_anchor: str = Field(min_length=1, max_length=5_000)
     classroom_first_question: str = Field(min_length=1, max_length=5_000)
     handoff_moment: str = Field(min_length=1, max_length=5_000)
-    must_not_preteach: tuple[str, ...] = Field(min_length=1, max_length=50)
+    must_not_preteach: tuple[NonEmptyText, ...] = Field(min_length=1, max_length=50)
 
 
 class PricingSnapshot(_FrozenModel):
@@ -67,7 +67,7 @@ class TeacherConfirmation(_FrozenModel):
     currency: str = Field(pattern=r"^[A-Z]{3}$")
     confirmed_duration_seconds: int = Field(ge=60, le=180)
     confirmed_estimated_cost: Decimal = Field(ge=0)
-    confirmed_at: datetime
+    confirmed_at: AwareDatetime
 
 
 class ApprovalFact(_FrozenModel):
@@ -76,19 +76,32 @@ class ApprovalFact(_FrozenModel):
     subject_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     confirmation_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     approved_by: str = Field(min_length=1, max_length=160)
-    approved_at: datetime
+    approved_at: AwareDatetime
+
+
+class SceneAssetRequirement(_FrozenModel):
+    asset_key: str = Field(min_length=1, max_length=160)
+    asset_type: AssetType
+    identity_key: str = Field(min_length=1, max_length=160)
+    purpose: str = Field(min_length=1, max_length=5_000)
+    visual_description: str = Field(min_length=1, max_length=10_000)
 
 
 class MasterScene(_FrozenModel):
-    scene_key: str
+    scene_key: NonEmptyText
     position: int = Field(ge=1)
-    purpose: str
-    visible_change: str
-    visible_beats: tuple[str, ...] = Field(min_length=1, max_length=4)
+    purpose: NonEmptyText
+    location: NonEmptyText
+    action: NonEmptyText
+    visible_change: NonEmptyText
+    visible_beats: tuple[NonEmptyText, ...] = Field(min_length=1, max_length=4)
     estimated_shot_count: int = Field(ge=1, le=6)
-    narration: str
-    start_state: str
-    end_state: str
+    narration: NonEmptyText
+    dialogue: NonEmptyText
+    sound_intent: NonEmptyText
+    start_state: NonEmptyText
+    end_state: NonEmptyText
+    asset_requirements: tuple[SceneAssetRequirement, ...] = Field(min_length=1)
 
 
 class MasterScript(_FrozenModel):
@@ -115,9 +128,9 @@ class RoughBeat(_FrozenModel):
     scene_key: str
     scene_beat_position: int = Field(ge=1, le=4)
     position: int = Field(ge=1)
-    main_event: str
-    start_state: str
-    end_state: str
+    main_event: NonEmptyText
+    start_state: NonEmptyText
+    end_state: NonEmptyText
     duration_seconds: int = Field(gt=0)
     asset_keys: tuple[str, ...] = Field(min_length=1)
 
@@ -127,6 +140,7 @@ class RoughStoryboard(_FrozenModel):
     source_master_script_key: str
     beats: tuple[RoughBeat, ...] = Field(min_length=1)
     total_duration_seconds: int = Field(ge=60, le=180)
+    generated_at: AwareDatetime
 
 
 class ReviewableRoughStoryboardStage(_FrozenModel):
@@ -141,7 +155,8 @@ class VideoAsset(_FrozenModel):
     asset_key: str
     asset_type: AssetType
     identity_key: str
-    purpose: str
+    purpose: NonEmptyText
+    visual_description: NonEmptyText
     source_beat_keys: tuple[str, ...] = Field(min_length=1)
 
 
@@ -161,7 +176,7 @@ class VisualPlan(_FrozenModel):
 
 class ImagePrompt(_FrozenModel):
     asset_key: str
-    prompt: str
+    prompt: NonEmptyText
     negative_constraints: tuple[str, ...] = Field(min_length=1)
     aspect_ratio: AspectRatio
 

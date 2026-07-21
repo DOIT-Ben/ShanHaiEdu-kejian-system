@@ -7,6 +7,7 @@ from typing import Any, cast, get_type_hints
 import pytest
 from pydantic import BaseModel
 
+from apps.api.video_preproduction.asset_planning import inventory_assets
 from apps.api.video_preproduction.fake import ScriptedDeterministicTextFake
 from apps.api.video_preproduction.models import (
     ApprovalFact,
@@ -27,7 +28,6 @@ from apps.api.video_preproduction.validator import (
     canonical_fact_hash,
     canonical_package_bytes,
     canonical_package_hash,
-    inventory_assets,
     validate_package,
 )
 
@@ -82,6 +82,7 @@ def approval(
     value: BaseModel,
     *,
     confirmation_fact: TeacherConfirmation | None = None,
+    approved_at: datetime = NOW,
 ) -> ApprovalFact:
     return ApprovalFact(
         subject_kind=subject_kind,
@@ -91,14 +92,14 @@ def approval(
             canonical_fact_hash(confirmation_fact) if confirmation_fact is not None else None
         ),
         approved_by="teacher-001",
-        approved_at=NOW,
+        approved_at=approved_at,
     )
 
 
 def build_package(*, payload: VideoPreproductionRequest | None = None):
     selected = payload or request()
     fake = ScriptedDeterministicTextFake()
-    service = VideoPreproductionService(fake)
+    service = VideoPreproductionService(fake, clock=lambda: NOW)
     master_stage = service.generate_master_script(selected)
     recommendation = service.recommend(selected, master_stage)
     confirmed = confirmation(recommendation)
@@ -127,7 +128,7 @@ def build_package(*, payload: VideoPreproductionRequest | None = None):
 def test_master_precedes_story_based_recommendation_and_teacher_confirmation() -> None:
     payload = request()
     fake = ScriptedDeterministicTextFake()
-    service = VideoPreproductionService(fake)
+    service = VideoPreproductionService(fake, clock=lambda: NOW)
     master_stage = service.generate_master_script(payload)
     recommendation = service.recommend(payload, master_stage)
     assert fake.calls == 1
@@ -153,7 +154,7 @@ def test_master_generation_accepts_a_provider_neutral_text_generator() -> None:
             return self._fake.generate_master_script(snapshot)
 
     generator = DelegatingTextGenerator()
-    service = VideoPreproductionService(generator)
+    service = VideoPreproductionService(generator, clock=lambda: NOW)
 
     stage = service.generate_master_script(request())
 
@@ -165,7 +166,7 @@ def test_master_generation_accepts_a_provider_neutral_text_generator() -> None:
 
 def test_master_generation_rejects_missing_or_invalid_pricing_before_fake_call() -> None:
     fake = ScriptedDeterministicTextFake()
-    service = VideoPreproductionService(fake)
+    service = VideoPreproductionService(fake, clock=lambda: NOW)
     valid = request()
     assert valid.pricing_snapshot is not None
     invalid_pricing = valid.pricing_snapshot.model_copy(
@@ -211,10 +212,19 @@ def test_master_generation_rejects_missing_or_invalid_pricing_before_fake_call()
     assert caught.value.code == "VIDEO_PREPRODUCTION_REQUEST_INVALID"
     assert fake.calls == 0
 
+    empty_constraint = valid.intro_selection_snapshot.model_copy(
+        update={"must_not_preteach": ("",)}
+    )
+    invalid_request = valid.model_copy(update={"intro_selection_snapshot": empty_constraint})
+    with pytest.raises(VideoPreproductionError) as caught:
+        service.generate_master_script(invalid_request)
+    assert caught.value.code == "VIDEO_PREPRODUCTION_REQUEST_INVALID"
+    assert fake.calls == 0
+
 
 def test_rough_storyboard_requires_confirmation_and_master_approval() -> None:
     payload = request()
-    service = VideoPreproductionService(ScriptedDeterministicTextFake())
+    service = VideoPreproductionService(ScriptedDeterministicTextFake(), clock=lambda: NOW)
     master_stage = service.generate_master_script(payload)
     recommendation = service.recommend(payload, master_stage)
     confirmed = confirmation(recommendation)
@@ -297,8 +307,23 @@ def test_final_package_revalidates_recommendation_and_confirmation_facts() -> No
     assert package.validation_report.valid is True
 
 
+def test_package_rejects_rough_approval_before_storyboard_generation() -> None:
+    _, _, service, payload, _, _, rough_stage = build_package()
+    early = approval(
+        "rough_storyboard",
+        rough_stage.rough_storyboard.rough_storyboard_key,
+        rough_stage.rough_storyboard,
+        approved_at=rough_stage.rough_storyboard.generated_at - timedelta(seconds=1),
+    )
+
+    with pytest.raises(VideoPreproductionError) as caught:
+        service.generate_package(payload, rough_stage, early)
+
+    assert caught.value.code == "ROUGH_STORYBOARD_APPROVAL_REQUIRED"
+
+
 def test_story_structure_and_server_price_facts_change_recommendations() -> None:
-    service = VideoPreproductionService(ScriptedDeterministicTextFake())
+    service = VideoPreproductionService(ScriptedDeterministicTextFake(), clock=lambda: NOW)
     baseline_request = request()
     baseline_master = service.generate_master_script(baseline_request)
     baseline = service.recommend(baseline_request, baseline_master)
@@ -344,6 +369,27 @@ def test_scene_and_beat_mapping_is_complete_and_ends_at_handoff() -> None:
     assert package.rough_storyboard.beats[-1].end_state == (package.source_snapshot.handoff_moment)
 
 
+def test_nested_master_and_rough_text_cannot_hide_preteaching() -> None:
+    payload = request()
+    baseline = ScriptedDeterministicTextFake().generate_master_script(
+        payload.intro_selection_snapshot
+    )
+    scene = baseline.scenes[0].model_copy(
+        update={"visible_beats": ("这里提前讲出比较大小", *baseline.scenes[0].visible_beats[1:])}
+    )
+
+    class ForbiddenGenerator:
+        def generate_master_script(self, snapshot: IntroSelectionSnapshot) -> MasterScript:
+            return baseline.model_copy(update={"scenes": (scene, *baseline.scenes[1:])})
+
+    service = VideoPreproductionService(ForbiddenGenerator(), clock=lambda: NOW)
+
+    with pytest.raises(VideoPreproductionError) as caught:
+        service.generate_master_script(payload)
+
+    assert caught.value.code == "VIDEO_MASTER_SCRIPT_INVALID"
+
+
 def test_classified_asset_inventory_and_bidirectional_links_are_exact() -> None:
     package, *_ = build_package()
     inventory = package.asset_inventory
@@ -365,6 +411,18 @@ def test_classified_asset_inventory_and_bidirectional_links_are_exact() -> None:
     assert {prompt.asset_key for prompt in package.production_plan.image_prompts} == {
         asset.asset_key for asset in inventory_assets(inventory)
     }
+    combined_prompts = " ".join(prompt.prompt for prompt in package.production_plan.image_prompts)
+    assert "机器人" in combined_prompts
+    assert "补给盒" in combined_prompts
+    assert "卡槽" in combined_prompts
+    for asset in inventory_assets(inventory):
+        prompt = next(
+            item
+            for item in package.production_plan.image_prompts
+            if item.asset_key == asset.asset_key
+        )
+        assert asset.visual_description in prompt.prompt
+        assert asset.purpose in prompt.prompt
 
 
 def test_validator_rejects_mapping_link_and_prompt_drift() -> None:
@@ -404,6 +462,29 @@ def test_validator_rejects_mapping_link_and_prompt_drift() -> None:
     assert "image prompts must use the visual plan aspect ratio" in report.errors
     assert "image prompts must retain visual plan negative constraints" in report.errors
     assert "rough storyboard declared duration must equal beat durations" in report.errors
+
+
+def test_validator_rejects_hidden_rough_preteach_and_asset_semantic_drift() -> None:
+    package, *_ = build_package()
+    first_beat = package.rough_storyboard.beats[0].model_copy(
+        update={"main_event": "提前讲出比较大小"}
+    )
+    rough = package.rough_storyboard.model_copy(
+        update={"beats": (first_beat, *package.rough_storyboard.beats[1:])}
+    )
+    first_asset = package.asset_inventory.characters[0].model_copy(
+        update={"visual_description": "generic placeholder"}
+    )
+    inventory = package.asset_inventory.model_copy(update={"characters": (first_asset,)})
+
+    report = validate_package(
+        package.model_copy(update={"rough_storyboard": rough, "asset_inventory": inventory})
+    )
+
+    assert report.valid is False
+    assert "rough storyboard must not preteach: 比较大小" in report.errors
+    assert "asset inventory must preserve master asset semantics" in report.errors
+    assert "image prompts must retain asset visual semantics" in report.errors
 
 
 def test_canonical_serialization_bytes_are_stable_and_detect_tampering() -> None:

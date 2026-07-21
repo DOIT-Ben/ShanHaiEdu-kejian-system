@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from pydantic import ValidationError
 
+from apps.api.video_preproduction.asset_planning import (
+    build_asset_inventory,
+    build_production_plan,
+)
 from apps.api.video_preproduction.models import (
     ApprovalFact,
-    AssetInventory,
     DurationRecommendation,
-    ImagePrompt,
     MasterScene,
     PricingSnapshot,
-    ProductionPlan,
     ReviewableMasterScriptStage,
     ReviewableRoughStoryboardStage,
     ReviewableVideoPreproductionPackage,
@@ -22,14 +25,12 @@ from apps.api.video_preproduction.models import (
     StoryComplexity,
     TeacherConfirmation,
     ValidationReport,
-    VideoAsset,
     VideoPreproductionRequest,
     VisualPlan,
 )
 from apps.api.video_preproduction.ports import VideoPreproductionTextGenerator
 from apps.api.video_preproduction.validator import (
     canonical_package_hash,
-    inventory_assets,
     validate_approval,
     validate_master_script,
     validate_package,
@@ -44,8 +45,14 @@ class VideoPreproductionError(ValueError):
 
 
 class VideoPreproductionService:
-    def __init__(self, text_generator: VideoPreproductionTextGenerator) -> None:
+    def __init__(
+        self,
+        text_generator: VideoPreproductionTextGenerator,
+        *,
+        clock: Callable[[], datetime] | None = None,
+    ) -> None:
         self._text_generator = text_generator
+        self._clock = clock or (lambda: datetime.now(UTC))
 
     def generate_master_script(
         self,
@@ -122,8 +129,20 @@ class VideoPreproductionService:
             error_code="MASTER_SCRIPT_APPROVAL_REQUIRED",
             confirmation=confirmed,
         )
-        rough = _build_rough_storyboard(master_stage, confirmed.confirmed_duration_seconds)
-        if validate_rough_storyboard(master_stage.master_script, rough, expected):
+        generated_at = self._clock()
+        if generated_at < max(confirmed.confirmed_at, approved.approved_at):
+            raise VideoPreproductionError("VIDEO_ROUGH_STORYBOARD_INVALID")
+        rough = _build_rough_storyboard(
+            master_stage,
+            confirmed.confirmed_duration_seconds,
+            generated_at=generated_at,
+        )
+        if validate_rough_storyboard(
+            master_stage.source_snapshot,
+            master_stage.master_script,
+            rough,
+            expected,
+        ):
             raise VideoPreproductionError("VIDEO_ROUGH_STORYBOARD_INVALID")
         return ReviewableRoughStoryboardStage(
             master_stage=master_stage,
@@ -146,6 +165,11 @@ class VideoPreproductionService:
             key=rough_stage.rough_storyboard.rough_storyboard_key,
             value=rough_stage.rough_storyboard,
             error_code="ROUGH_STORYBOARD_APPROVAL_REQUIRED",
+            not_before=max(
+                rough_stage.teacher_confirmation.confirmed_at,
+                rough_stage.master_script_approval.approved_at,
+                rough_stage.rough_storyboard.generated_at,
+            ),
         )
         package = _build_package(request, rough_stage, approved)
         report = validate_package(package)
@@ -225,6 +249,7 @@ def _require_approval(
     value: object,
     error_code: str,
     confirmation: TeacherConfirmation | None = None,
+    not_before: datetime | None = None,
 ) -> ApprovalFact:
     if approval is None or validate_approval(
         approval,
@@ -232,6 +257,7 @@ def _require_approval(
         key=key,
         value=value,
         confirmation=confirmation,
+        not_before=not_before,
     ):
         raise VideoPreproductionError(error_code)
     return approval
@@ -256,7 +282,10 @@ def _revalidate_stage(
         confirmation=rough_stage.teacher_confirmation,
     )
     if validate_rough_storyboard(
-        master_stage.master_script, rough_stage.rough_storyboard, expected
+        master_stage.source_snapshot,
+        master_stage.master_script,
+        rough_stage.rough_storyboard,
+        expected,
     ):
         raise VideoPreproductionError("VIDEO_ROUGH_STORYBOARD_INVALID")
 
@@ -264,6 +293,8 @@ def _revalidate_stage(
 def _build_rough_storyboard(
     master_stage: ReviewableMasterScriptStage,
     target_duration: int,
+    *,
+    generated_at: datetime,
 ) -> RoughStoryboard:
     master = master_stage.master_script
     event_count = sum(len(scene.visible_beats) for scene in master.scenes)
@@ -277,6 +308,7 @@ def _build_rough_storyboard(
         source_master_script_key=master.master_script_key,
         beats=tuple(beats),
         total_duration_seconds=sum(beat.duration_seconds for beat in beats),
+        generated_at=generated_at,
     )
 
 
@@ -296,9 +328,7 @@ def _build_beat(
         if event_position == event_count
         else f"{scene.scene_key}-beat-{event_position}"
     )
-    asset_keys = ("asset-character", f"asset-scene-{scene.position}")
-    if position == 1:
-        asset_keys = (*asset_keys, "asset-prop")
+    asset_keys = tuple(requirement.asset_key for requirement in scene.asset_requirements)
     return RoughBeat(
         beat_key=f"beat-{position}",
         scene_key=scene.scene_key,
@@ -324,8 +354,11 @@ def _build_package(
 ) -> ReviewableVideoPreproductionPackage:
     master_stage = rough_stage.master_stage
     visual = _build_visual_plan(request)
-    inventory = _build_asset_inventory(rough_stage.rough_storyboard)
-    plan = _build_production_plan(inventory, visual)
+    inventory = build_asset_inventory(
+        master_stage.master_script.scenes,
+        rough_stage.rough_storyboard,
+    )
+    plan = build_production_plan(inventory, visual)
     package = ReviewableVideoPreproductionPackage(
         source_snapshot=master_stage.source_snapshot,
         teacher_confirmation=rough_stage.teacher_confirmation,
@@ -353,48 +386,3 @@ def _build_visual_plan(request: VideoPreproductionRequest) -> VisualPlan:
         ),
         negative_constraints=("文字", "水印", "Logo", "额外主体"),
     )
-
-
-def _build_asset_inventory(storyboard: RoughStoryboard) -> AssetInventory:
-    all_beat_keys = tuple(beat.beat_key for beat in storyboard.beats)
-    character = VideoAsset(
-        asset_key="asset-character",
-        asset_type="character",
-        identity_key="story-character",
-        purpose="承载故事主要行动。",
-        source_beat_keys=all_beat_keys,
-    )
-    scene_keys = tuple(dict.fromkeys(beat.scene_key for beat in storyboard.beats))
-    scenes = tuple(
-        VideoAsset(
-            asset_key=f"asset-scene-{scene_position}",
-            asset_type="scene",
-            identity_key=f"story-scene-{scene_position}",
-            purpose=f"呈现第{scene_position}场空间。",
-            source_beat_keys=tuple(
-                beat.beat_key for beat in storyboard.beats if beat.scene_key == scene_key
-            ),
-        )
-        for scene_position, scene_key in enumerate(scene_keys, start=1)
-    )
-    prop = VideoAsset(
-        asset_key="asset-prop",
-        asset_type="prop",
-        identity_key="story-prop",
-        purpose="承载开场可见变化。",
-        source_beat_keys=(storyboard.beats[0].beat_key,),
-    )
-    return AssetInventory(characters=(character,), scenes=scenes, props=(prop,), creatures=())
-
-
-def _build_production_plan(inventory: AssetInventory, visual: VisualPlan) -> ProductionPlan:
-    prompts = tuple(
-        ImagePrompt(
-            asset_key=asset.asset_key,
-            prompt=f"{asset.purpose} 独立构图, 保持统一视觉语言, 无文字无水印。",
-            negative_constraints=visual.negative_constraints,
-            aspect_ratio=visual.aspect_ratio,
-        )
-        for asset in inventory_assets(inventory)
-    )
-    return ProductionPlan(kind="image_prompts_only", image_prompts=prompts)
