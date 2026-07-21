@@ -81,6 +81,10 @@ class RuntimeSeed:
         "context_snapshot_id",
         "prompt_snapshot_id",
         "content_definition_version_id",
+        "request_id",
+        "artifact_key",
+        "artifact_type",
+        "branch_key",
     ],
 )
 def test_generated_artifact_capability_rejects_forged_execution_provenance(
@@ -105,7 +109,14 @@ def test_generated_artifact_capability_rejects_forged_execution_provenance(
         target_slot_authorization=context.target_slot_authorization,
         reference_asset_authorization=context.reference_asset_authorization,
     )
-    forged = replace(plan.artifact_write, **{field: new_uuid7()})
+    uuid_fields = {
+        "node_run_id",
+        "context_snapshot_id",
+        "prompt_snapshot_id",
+        "content_definition_version_id",
+    }
+    forged_value = new_uuid7() if field in uuid_fields else f"forged-{field}"
+    forged = replace(plan.artifact_write, **{field: forged_value})
 
     with factory() as session, session.begin():
         with pytest.raises(ArtifactExecutionPortError) as caught:

@@ -2,20 +2,24 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from apps.api.content_runtime.authoring_policy import (
     AuthoringPolicy,
     AuthoringPolicyUnavailable,
-    compile_authoring_policy,
 )
+from apps.api.content_runtime.authoring_policy_compiler import compile_authoring_policy
 from apps.api.content_runtime.models import (
     ContentDefinitionVersion,
     ContentPackageItemVersion,
     ContentPackageVersion,
 )
 from workflow.content_package import canonical_json_sha256
+
+_CONTENT_DEFINITION_SCHEMA_ID = "https://shanhaiedu.local/contracts/content-definition.schema.json"
 
 
 class AuthoringPolicyLoader:
@@ -43,7 +47,8 @@ class AuthoringPolicyLoader:
             )
         item, _package = row
         if (
-            item.checksum != definition.checksum
+            item.schema_id != _CONTENT_DEFINITION_SCHEMA_ID
+            or item.checksum != definition.checksum
             or canonical_json_sha256(item.payload_json) != item.checksum
         ):
             raise AuthoringPolicyUnavailable(
@@ -55,3 +60,11 @@ class AuthoringPolicyLoader:
                 "published content definition authoring policy identity differs"
             )
         return policy
+
+    def require_by_id(self, definition_id: UUID) -> AuthoringPolicy:
+        definition = self._session.get(ContentDefinitionVersion, definition_id)
+        if definition is None:
+            raise AuthoringPolicyUnavailable(
+                "published content definition has no authoring policy source"
+            )
+        return self.require(definition)

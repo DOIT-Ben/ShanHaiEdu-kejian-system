@@ -18,7 +18,12 @@ from apps.api.projects.models import Project
 from workflow.content_package import canonical_json_sha256
 
 
-def ensure_test_authoring_definition(session, project_id):
+def ensure_test_authoring_definition(
+    session,
+    project_id,
+    *,
+    schema_id="https://shanhaiedu.local/contracts/content-definition.schema.json",
+):
     project = session.get(Project, project_id)
     assert project is not None
     existing = (
@@ -94,7 +99,7 @@ def ensure_test_authoring_definition(session, project_id):
                 content_package_version_id=package_version_id,
                 item_key="test.authoring",
                 kind="content_definition",
-                schema_id="https://shanhaiedu.local/contracts/content-definition.schema.json",
+                schema_id=schema_id,
                 payload_json=payload,
                 checksum=item_checksum,
             ),

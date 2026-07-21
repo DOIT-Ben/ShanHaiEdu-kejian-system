@@ -64,7 +64,7 @@ class ArtifactService:
         definition = self._validation.require_definition(
             content_definition_version_id, project.content_release_id
         )
-        self._authoring.validate(definition, initial_content, baseline=None)
+        self._authoring.validate(definition.id, initial_content, baseline=None)
         artifact = self._new_artifact(
             project.id,
             lesson_unit_id,
@@ -102,7 +102,7 @@ class ArtifactService:
         draft = self._require_draft(artifact.id, draft_branch, expected_lock_version)
         definition = self._validation.require_artifact_definition(artifact)
         baseline = self._authoring.baseline(artifact, draft)
-        self._authoring.validate(definition, content, baseline=baseline)
+        self._authoring.validate(definition.id, content, baseline=baseline)
         draft.content_json = content
         draft.validation_report_json = self._validation.validation_report(definition, content)
         draft.autosaved_at = utc_now()
@@ -243,7 +243,7 @@ class ArtifactService:
     ) -> tuple[str, dict[str, Any]]:
         definition = self._validation.require_artifact_definition(artifact)
         baseline = self._authoring.baseline(artifact, draft)
-        self._authoring.validate(definition, draft.content_json, baseline=baseline)
+        self._authoring.validate(definition.id, draft.content_json, baseline=baseline)
         report = self._validation.validation_report(definition, draft.content_json)
         if not report["valid"]:
             raise ApiError(

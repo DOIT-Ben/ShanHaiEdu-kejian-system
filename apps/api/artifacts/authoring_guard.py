@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy.orm import Session
 
@@ -14,7 +15,6 @@ from apps.api.content_runtime.authoring_policy import (
     AuthoringViolation,
 )
 from apps.api.content_runtime.authoring_policy_loader import AuthoringPolicyLoader
-from apps.api.content_runtime.models import ContentDefinitionVersion
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext
 
@@ -41,13 +41,13 @@ class ArtifactAuthoringGuard:
 
     def validate(
         self,
-        definition: ContentDefinitionVersion,
+        definition_id: UUID,
         content: dict[str, Any],
         *,
         baseline: dict[str, Any] | None,
     ) -> None:
         try:
-            policy = AuthoringPolicyLoader(self._session).require(definition)
+            policy = AuthoringPolicyLoader(self._session).require_by_id(definition_id)
             if baseline is None:
                 policy.validate_create(content)
             else:

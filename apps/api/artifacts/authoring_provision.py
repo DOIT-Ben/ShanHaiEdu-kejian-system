@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 from uuid import UUID
 
 from sqlalchemy import select
@@ -20,7 +20,6 @@ from apps.api.content_runtime.authoring_policy import (
     AuthoringViolation,
 )
 from apps.api.content_runtime.authoring_policy_loader import AuthoringPolicyLoader
-from apps.api.content_runtime.models import ContentDefinitionVersion
 from apps.api.database import utc_now
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext
@@ -41,17 +40,29 @@ class RepeatableItemProvision:
     draft_id: UUID
     based_on_version_id: UUID
     baseline_content_hash: str
+    expected_draft_content_hash: str
     expected_lock_version: int
     field_path: tuple[str, ...]
-    item: Mapping[str, Any]
+    parent_identities: tuple[str, ...]
+    provision_key: str
+
+
+class RepeatableItemProvisioner(Protocol):
+    def materialize(self, provision_key: str) -> Mapping[str, Any]: ...
 
 
 class ArtifactAuthoringProvisionPort:
-    def __init__(self, session: Session, actor: ActorContext) -> None:
+    def __init__(
+        self,
+        session: Session,
+        actor: ActorContext,
+        provisioner: RepeatableItemProvisioner | None = None,
+    ) -> None:
         self._session = session
         self._actor = actor
         self._repository = ArtifactRepository(session, actor)
         self._validation = ArtifactValidation(session, actor)
+        self._provisioner = provisioner
 
     def open_generated_draft(self, request: GeneratedDraftRequest) -> ArtifactDraft:
         self._require_system()
@@ -62,7 +73,7 @@ class ArtifactAuthoringProvisionPort:
             request.expected_content_hash,
         )
         definition = self._validation.require_artifact_definition(artifact)
-        self._require_policy(definition)
+        self._require_policy(definition.id)
         self._validate_draft_branch(request.draft_branch)
         existing = self._repository.get_draft(
             artifact.id,
@@ -104,6 +115,50 @@ class ArtifactAuthoringProvisionPort:
     ) -> ArtifactDraft:
         self._require_system()
         artifact = self._require_artifact(request.artifact_id)
+        draft = self._require_draft(artifact, request)
+        baseline = self._require_generated_version(
+            artifact,
+            request.based_on_version_id,
+            request.baseline_content_hash,
+        )
+        definition = self._validation.require_artifact_definition(artifact)
+        policy = self._require_policy(definition.id)
+        if self._provisioner is None:
+            raise self._conflict("The owning authoring provisioner is unavailable.")
+        item = self._provisioner.materialize(request.provision_key)
+        try:
+            content = policy.provision_repeatable_item(
+                baseline.content_json,
+                draft.content_json,
+                field_path=request.field_path,
+                parent_identities=request.parent_identities,
+                item=item,
+            )
+        except AuthoringViolation as exc:
+            raise self._violation(exc) from exc
+        report = self._validation.validation_report(definition, content)
+        if not report["valid"]:
+            raise ApiError(
+                status_code=422,
+                code="INVALID_ARTIFACT",
+                message="The provisioned item does not match the published schema.",
+            )
+        draft.content_json = content
+        draft.validation_report_json = report
+        draft.autosaved_at = utc_now()
+        draft.updated_at = utc_now()
+        draft.updated_by = self._actor.principal_id
+        draft.lock_version += 1
+        artifact.current_draft_id = draft.id
+        self._touch_artifact(artifact)
+        self._session.flush()
+        return draft
+
+    def _require_draft(
+        self,
+        artifact: Artifact,
+        request: RepeatableItemProvision,
+    ) -> ArtifactDraft:
         draft = self._session.scalar(
             select(ArtifactDraft)
             .where(
@@ -119,33 +174,9 @@ class ArtifactAuthoringProvisionPort:
         if (
             draft.based_on_version_id != request.based_on_version_id
             or draft.lock_version != request.expected_lock_version
+            or canonical_content_hash(draft.content_json) != request.expected_draft_content_hash
         ):
             raise self._conflict("The authoring draft changed after the supplied baseline.")
-        baseline = self._require_generated_version(
-            artifact,
-            request.based_on_version_id,
-            request.baseline_content_hash,
-        )
-        definition = self._validation.require_artifact_definition(artifact)
-        policy = self._require_policy(definition)
-        try:
-            content = policy.provision_repeatable_item(
-                baseline.content_json,
-                draft.content_json,
-                field_path=request.field_path,
-                item=request.item,
-            )
-        except AuthoringViolation as exc:
-            raise self._violation(exc) from exc
-        draft.content_json = content
-        draft.validation_report_json = self._validation.validation_report(definition, content)
-        draft.autosaved_at = utc_now()
-        draft.updated_at = utc_now()
-        draft.updated_by = self._actor.principal_id
-        draft.lock_version += 1
-        artifact.current_draft_id = draft.id
-        self._touch_artifact(artifact)
-        self._session.flush()
         return draft
 
     def _require_artifact(self, artifact_id: UUID) -> Artifact:
@@ -175,9 +206,9 @@ class ArtifactAuthoringProvisionPort:
             raise self._conflict("The generated authoring baseline is unavailable.")
         return version
 
-    def _require_policy(self, definition: ContentDefinitionVersion) -> AuthoringPolicy:
+    def _require_policy(self, definition_id: UUID) -> AuthoringPolicy:
         try:
-            return AuthoringPolicyLoader(self._session).require(definition)
+            return AuthoringPolicyLoader(self._session).require_by_id(definition_id)
         except AuthoringPolicyUnavailable as exc:
             raise ApiError(
                 status_code=422,

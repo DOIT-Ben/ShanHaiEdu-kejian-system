@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable, Mapping, Sequence
-from copy import deepcopy
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -29,6 +28,8 @@ class FieldPolicy:
     editable: bool
     deletable: bool
     repeatable: bool
+    min_items: int | None = None
+    max_items: int | None = None
     children: tuple[FieldPolicy, ...] = ()
 
     @property
@@ -37,8 +38,9 @@ class FieldPolicy:
         for child in self.children:
             if not child.editable:
                 paths.append((child.field_key,))
-            for nested in child.locked_descendants:
-                paths.append((child.field_key, *nested))
+            elif not child.repeatable:
+                for nested in child.locked_descendants:
+                    paths.append((child.field_key, *nested))
         return tuple(paths)
 
 
@@ -71,51 +73,32 @@ class AuthoringPolicy:
         candidate: Mapping[str, Any],
         *,
         field_path: tuple[str, ...],
+        parent_identities: tuple[str, ...] = (),
         item: Mapping[str, Any],
     ) -> dict[str, Any]:
-        """Append one server-owned item after validating all existing user changes."""
+        from apps.api.content_runtime.authoring_policy_provision import (
+            provision_repeatable_item,
+        )
 
-        self.validate_update(baseline, candidate)
-        field = self._field_at(field_path)
-        if not field.repeatable or not field.editable:
-            raise AuthoringViolation(field_path, "field does not allow item provisioning")
-        result = deepcopy(dict(candidate))
-        target = _resolve_mutable_path(result, field_path)
-        if not isinstance(target, list):
-            raise AuthoringViolation(field_path, "repeatable field must contain an array")
-        target_items = cast(list[object], target)
-        locked_paths = field.locked_descendants
-        if locked_paths:
-            existing = self._index_items(target_items, locked_paths, field_path)
-            values: list[tuple[tuple[str, ...], object]] = []
-            for locked_path in locked_paths:
-                value = _resolve_path(item, locked_path)
-                if value is _MISSING:
-                    raise AuthoringViolation(
-                        (*field_path, *locked_path),
-                        "provisioned item locked identity is missing",
-                    )
-                values.append((locked_path, value))
-            if _canonical(values) in existing:
-                raise AuthoringViolation(
-                    field_path,
-                    "repeatable locked identity must be unique",
-                )
-        target_items.append(deepcopy(dict(item)))
-        return result
+        return provision_repeatable_item(
+            self,
+            baseline,
+            candidate,
+            field_path=field_path,
+            parent_identities=parent_identities,
+            item=item,
+        )
 
-    def _field_at(self, path: tuple[str, ...]) -> FieldPolicy:
-        if not path:
-            raise AuthoringViolation(path, "authoring field path is empty")
-        fields = self.fields
-        field: FieldPolicy | None = None
-        for part in path:
-            field = next((item for item in fields if item.field_key == part), None)
-            if field is None:
-                raise AuthoringViolation(path, "authoring field path is unknown")
-            fields = field.children
-        assert field is not None
-        return field
+    def repeatable_item_identity(
+        self,
+        field_path: tuple[str, ...],
+        item: Mapping[str, Any],
+    ) -> str:
+        from apps.api.content_runtime.authoring_policy_provision import (
+            repeatable_item_identity,
+        )
+
+        return repeatable_item_identity(self, field_path, item)
 
     def _validate_create_field(
         self,
@@ -132,6 +115,7 @@ class AuthoringPolicy:
             raise AuthoringViolation(path, "locked field cannot be supplied by this writer")
         if field.repeatable:
             items = _require_sequence(value, path)
+            self._validate_quantity(field, items, path)
             for item in items:
                 self._validate_new_item(field, item, path)
             return
@@ -190,12 +174,12 @@ class AuthoringPolicy:
                 raise AuthoringViolation(path, "locked field cannot be changed")
             return
         if old_present and not new_present:
-            if not field.deletable:
-                raise AuthoringViolation(path, "field is not deletable")
             return
         if not old_present:
             if field.repeatable:
-                for item in _require_sequence(candidate[key], path):
+                items = _require_sequence(candidate[key], path)
+                self._validate_quantity(field, items, path)
+                for item in items:
                     self._validate_new_item(field, item, path)
             else:
                 self._validate_create_children(field, candidate[key], path)
@@ -235,20 +219,13 @@ class AuthoringPolicy:
         new_items: Sequence[object],
         path: tuple[str, ...],
     ) -> None:
+        self._validate_quantity(field, new_items, path)
         locked_paths = field.locked_descendants
         if not locked_paths:
-            if not field.deletable and len(new_items) < len(old_items):
-                raise AuthoringViolation(path, "repeatable field is not deletable")
-            for index, (old_item, new_item) in enumerate(zip(old_items, new_items, strict=False)):
-                self._validate_item_update(field, old_item, new_item, (*path, str(index)))
-            for item in new_items[len(old_items) :]:
-                self._validate_new_item(field, item, path)
             return
 
         old_by_identity = self._index_items(old_items, locked_paths, path)
         new_by_identity = self._index_items(new_items, locked_paths, path)
-        if not field.deletable and set(old_by_identity) != set(new_by_identity):
-            raise AuthoringViolation(path, "repeatable field is not deletable")
         for identity, item in new_by_identity.items():
             old_item = old_by_identity.get(identity)
             if old_item is None:
@@ -257,6 +234,17 @@ class AuthoringPolicy:
                     "new repeatable items with locked identity require server provisioning",
                 )
             self._validate_item_update(field, old_item, item, path)
+
+    @staticmethod
+    def _validate_quantity(
+        field: FieldPolicy,
+        items: Sequence[object],
+        path: tuple[str, ...],
+    ) -> None:
+        if field.min_items is not None and len(items) < field.min_items:
+            raise AuthoringViolation(path, "repeatable field is below its minimum size")
+        if field.max_items is not None and len(items) > field.max_items:
+            raise AuthoringViolation(path, "repeatable field exceeds its maximum size")
 
     def _index_items(
         self,
@@ -269,13 +257,11 @@ class AuthoringPolicy:
             if not isinstance(item, Mapping):
                 raise AuthoringViolation(path, "repeatable items must be objects")
             mapping = cast(Mapping[str, Any], item)
-            values: list[tuple[tuple[str, ...], object]] = []
-            for locked_path in locked_paths:
-                value = _resolve_path(mapping, locked_path)
-                if value is _MISSING:
-                    raise AuthoringViolation((*path, *locked_path), "locked identity is missing")
-                values.append((locked_path, value))
-            identity = _canonical(values)
+            from apps.api.content_runtime.authoring_policy_provision import (
+                locked_item_identity,
+            )
+
+            identity = locked_item_identity(mapping, locked_paths, path)
             if identity in indexed:
                 raise AuthoringViolation(path, "repeatable locked identity must be unique")
             indexed[identity] = mapping
@@ -294,77 +280,6 @@ class AuthoringPolicy:
         new_mapping = cast(Mapping[str, Any], new_item)
         for child in field.children:
             self._validate_update_field(child, old_mapping, new_mapping, path)
-
-
-def compile_authoring_policy(payload: object, *, checksum: str) -> AuthoringPolicy:
-    if not isinstance(payload, Mapping):
-        raise AuthoringPolicyUnavailable("published content definition is unavailable")
-    payload_mapping = cast(Mapping[str, object], payload)
-    if payload_mapping.get("kind") != "content_definition":
-        raise AuthoringPolicyUnavailable("published content definition is unavailable")
-    raw_spec = payload_mapping.get("spec")
-    if not isinstance(raw_spec, Mapping):
-        raise AuthoringPolicyUnavailable("published content definition has no policy spec")
-    spec = cast(Mapping[str, object], raw_spec)
-    definition_key = spec.get("definition_key")
-    raw_fields = spec.get("fields")
-    if not isinstance(definition_key, str) or not definition_key:
-        raise AuthoringPolicyUnavailable("published content definition key is invalid")
-    if not isinstance(raw_fields, list) or not raw_fields:
-        raise AuthoringPolicyUnavailable("published content definition fields are unavailable")
-    fields = cast(list[object], raw_fields)
-    if type(checksum) is not str or len(checksum) != 64:
-        raise AuthoringPolicyUnavailable("published content definition checksum is invalid")
-    try:
-        compiled = tuple(_compile_field(field, ()) for field in fields)
-    except (TypeError, ValueError) as exc:
-        raise AuthoringPolicyUnavailable(
-            "published content definition policy is incomplete"
-        ) from exc
-    _require_unique((field.field_key for field in compiled), ())
-    return AuthoringPolicy(definition_key, checksum, compiled)
-
-
-def _compile_field(raw: object, parent_path: tuple[str, ...]) -> FieldPolicy:
-    if not isinstance(raw, Mapping):
-        raise TypeError("field must be an object")
-    mapping = cast(Mapping[str, object], raw)
-    key = mapping.get("field_key")
-    field_type = mapping.get("type")
-    editable = mapping.get("editable")
-    deletable = mapping.get("deletable")
-    if (
-        not isinstance(key, str)
-        or not key
-        or not isinstance(field_type, str)
-        or type(editable) is not bool
-        or type(deletable) is not bool
-    ):
-        raise ValueError("field authoring flags are incomplete")
-    children_raw = mapping.get("children", [])
-    if not isinstance(children_raw, list):
-        raise TypeError("field children must be an array")
-    children = tuple(
-        _compile_field(child, (*parent_path, key)) for child in cast(list[object], children_raw)
-    )
-    _require_unique((child.field_key for child in children), (*parent_path, key))
-    repeatable = mapping.get("repeatable", field_type == "repeatable")
-    if type(repeatable) is not bool:
-        raise TypeError("repeatable flag must be boolean")
-    return FieldPolicy(
-        key,
-        field_type,
-        editable,
-        deletable,
-        repeatable,
-        children,
-    )
-
-
-def _require_unique(values: Iterable[str], path: tuple[str, ...]) -> None:
-    values = tuple(values)
-    if len(values) != len(set(values)):
-        raise ValueError(f"duplicate field key at {'.'.join(path)}")
 
 
 def _require_sequence(value: object, path: tuple[str, ...]) -> Sequence[object]:
@@ -387,18 +302,6 @@ def _resolve_path(value: Mapping[str, Any], path: tuple[str, ...]) -> object:
 
 def _has_path(value: Mapping[str, Any], path: tuple[str, ...]) -> bool:
     return _resolve_path(value, path) is not _MISSING
-
-
-def _resolve_mutable_path(value: dict[str, Any], path: tuple[str, ...]) -> object:
-    current: object = value
-    for key in path:
-        if not isinstance(current, dict):
-            return _MISSING
-        mapping = cast(dict[str, object], current)
-        if key not in mapping:
-            return _MISSING
-        current = mapping[key]
-    return current
 
 
 def _json_equal(left: Any, right: Any) -> bool:

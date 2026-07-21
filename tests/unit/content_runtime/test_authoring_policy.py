@@ -7,8 +7,8 @@ import pytest
 from apps.api.content_runtime.authoring_policy import (
     AuthoringPolicyUnavailable,
     AuthoringViolation,
-    compile_authoring_policy,
 )
+from apps.api.content_runtime.authoring_policy_compiler import compile_authoring_policy
 from apps.api.content_runtime.package_source import load_builtin_courseware_release
 from workflow.content_package import canonical_json_sha256
 
@@ -34,6 +34,8 @@ def _field(
     field_type: str = "text",
     children: list[dict[str, object]] | None = None,
     repeatable: bool = False,
+    min_items: int | None = None,
+    max_items: int | None = None,
 ) -> dict[str, object]:
     value: dict[str, object] = {
         "field_key": key,
@@ -47,6 +49,10 @@ def _field(
         value["children"] = children
     if repeatable:
         value["repeatable"] = True
+    if min_items is not None:
+        value["min_items"] = min_items
+    if max_items is not None:
+        value["max_items"] = max_items
     return value
 
 
@@ -205,7 +211,7 @@ def test_server_provision_can_add_one_unique_locked_repeatable_item() -> None:
         )
 
 
-def test_repeatable_reorder_duplicate_and_deletion_follow_declared_policy() -> None:
+def test_repeatable_reorder_duplicate_and_deletion_follow_quantity_policy() -> None:
     locked_children = [
         _field("item_key", editable=False),
         _field("prompt", editable=True),
@@ -218,6 +224,8 @@ def test_repeatable_reorder_duplicate_and_deletion_follow_declared_policy() -> N
                 deletable=False,
                 field_type="repeatable",
                 repeatable=True,
+                min_items=1,
+                max_items=2,
                 children=locked_children,
             )
         ),
@@ -248,29 +256,141 @@ def test_repeatable_reorder_duplicate_and_deletion_follow_declared_policy() -> N
                 ]
             },
         )
-    with pytest.raises(AuthoringViolation):
-        fixed.validate_update(
-            baseline,
-            {"items": [{"item_key": "one", "prompt": "first"}]},
-        )
-
-    deletable = compile_authoring_policy(
-        _definition(
-            _field(
-                "items",
-                editable=True,
-                deletable=True,
-                field_type="repeatable",
-                repeatable=True,
-                children=locked_children,
-            )
-        ),
-        checksum="1" * 64,
-    )
-    deletable.validate_update(
+    fixed.validate_update(
         baseline,
         {"items": [{"item_key": "one", "prompt": "first"}]},
     )
+    with pytest.raises(AuthoringViolation):
+        fixed.validate_update(
+            {"items": [{"item_key": "one", "prompt": "first"}]},
+            {"items": []},
+        )
+
+
+def test_deletable_does_not_control_teacher_content_values() -> None:
+    policy = compile_authoring_policy(
+        _definition(_field("title", editable=True, deletable=False)),
+        checksum="1" * 64,
+    )
+
+    policy.validate_update({"title": "before"}, {})
+
+
+def test_nested_repeatables_validate_identity_at_each_level() -> None:
+    policy = compile_authoring_policy(
+        _definition(
+            _field(
+                "outer_items",
+                editable=True,
+                field_type="repeatable",
+                repeatable=True,
+                children=[
+                    _field("outer_key", editable=False),
+                    _field(
+                        "inner_items",
+                        editable=True,
+                        field_type="repeatable",
+                        repeatable=True,
+                        min_items=1,
+                        children=[
+                            _field("inner_key", editable=False),
+                            _field("text", editable=True),
+                        ],
+                    ),
+                ],
+            )
+        ),
+        checksum="2" * 64,
+    )
+    baseline = {
+        "outer_items": [
+            {
+                "outer_key": "outer-1",
+                "inner_items": [
+                    {"inner_key": "inner-1", "text": "first"},
+                    {"inner_key": "inner-2", "text": "second"},
+                ],
+            }
+        ]
+    }
+
+    policy.validate_update(
+        baseline,
+        {
+            "outer_items": [
+                {
+                    "outer_key": "outer-1",
+                    "inner_items": [
+                        {"inner_key": "inner-2", "text": "edited"},
+                        {"inner_key": "inner-1", "text": "first"},
+                    ],
+                }
+            ]
+        },
+    )
+    policy.validate_update(
+        baseline,
+        {
+            "outer_items": [
+                {
+                    "outer_key": "outer-1",
+                    "inner_items": [{"inner_key": "inner-1", "text": "first"}],
+                }
+            ]
+        },
+    )
+    with pytest.raises(AuthoringViolation):
+        policy.validate_update(
+            baseline,
+            {
+                "outer_items": [
+                    {
+                        "outer_key": "outer-1",
+                        "inner_items": [
+                            {"inner_key": "inner-1", "text": "first"},
+                            {"inner_key": "inner-1", "text": "duplicate"},
+                        ],
+                    }
+                ]
+            },
+        )
+
+    parent_identity = policy.repeatable_item_identity(
+        ("outer_items",),
+        baseline["outer_items"][0],
+    )
+    provisioned = policy.provision_repeatable_item(
+        baseline,
+        baseline,
+        field_path=("outer_items", "inner_items"),
+        parent_identities=(parent_identity,),
+        item={"inner_key": "inner-3", "text": "server provisioned"},
+    )
+    assert provisioned["outer_items"][0]["inner_items"][-1]["inner_key"] == "inner-3"
+    with pytest.raises(AuthoringViolation):
+        policy.provision_repeatable_item(
+            baseline,
+            baseline,
+            field_path=("outer_items", "inner_items"),
+            parent_identities=(parent_identity,),
+            item={"inner_key": "inner-1", "text": "duplicate"},
+        )
+    with pytest.raises(AuthoringViolation):
+        policy.validate_update(
+            baseline,
+            {
+                "outer_items": [
+                    {
+                        "outer_key": "outer-1",
+                        "inner_items": [
+                            {"inner_key": "inner-1", "text": "first"},
+                            {"inner_key": "inner-2", "text": "second"},
+                            {"inner_key": "inner-3", "text": "new"},
+                        ],
+                    }
+                ]
+            },
+        )
 
 
 def test_all_current_builtin_definitions_compile_authoring_policy() -> None:

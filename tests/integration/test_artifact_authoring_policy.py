@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 from sqlalchemy import select
@@ -21,7 +23,7 @@ from apps.api.content_runtime.publication_service import ContentReleasePublisher
 from apps.api.content_runtime.registry import BUILTIN_CONTENT_DEFINITION_VERSION_ID
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import ApiError
-from apps.api.identity.context import system_actor
+from apps.api.identity.context import ActorContext, system_actor
 from apps.api.ids import new_uuid7
 from apps.api.model_gateway.audit import SqlAlchemyAttemptAuditSink
 from apps.api.model_gateway.contracts import ModelCapability
@@ -31,10 +33,19 @@ from apps.api.node_execution.service import NodeExecutionService
 from apps.api.node_execution.sqlalchemy import SqlAlchemyNodeExecutionTransactionFactory
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
+from tests.fakes.content_runtime import ensure_test_authoring_definition
 from tests.fakes.identity import seed_test_actor
 from tests.integration.test_node_execution_runtime import _seed_runtime
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+class _StaticItemProvisioner:
+    def __init__(self, items: dict[str, dict[str, object]]) -> None:
+        self._items = items
+
+    def materialize(self, provision_key: str) -> dict[str, object]:
+        return deepcopy(self._items[provision_key])
 
 
 def test_legacy_seed_mutation_fails_closed(migrated_database_url: str) -> None:
@@ -92,6 +103,79 @@ def test_current_policy_allows_editable_fields_and_rejects_locked_fields(
 
         assert caught.value.code == "AUTHORING_POLICY_VIOLATION"
         assert caught.value.details == {"paths": ["division_key"]}
+
+
+def test_current_policy_rejects_wrong_published_schema_id(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session, session.begin():
+        actor = seed_test_actor(session)
+        project = _create_project(session, actor, "Wrong schema authoring")
+        definition_id = ensure_test_authoring_definition(
+            session,
+            project.id,
+            schema_id="https://shanhaiedu.local/contracts/prompt-template.schema.json",
+        )
+
+        with pytest.raises(ApiError) as caught:
+            ArtifactService(session, actor).create(
+                project.id,
+                artifact_key="wrong-schema",
+                artifact_type="lesson_division",
+                branch_key="project",
+                content_definition_version_id=definition_id,
+                draft_branch="main",
+                initial_content={"lesson_count": 2},
+                request_id="issue-131-wrong-schema",
+            )
+
+        assert caught.value.code == "AUTHORING_POLICY_UNAVAILABLE"
+
+
+def test_concurrent_authoring_save_has_one_effective_write(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session, session.begin():
+        actor, project, definition = _seed_current_project(session)
+        artifact = ArtifactService(session, actor).create(
+            project.id,
+            artifact_key="concurrent-authoring",
+            artifact_type="lesson_division",
+            branch_key="project",
+            content_definition_version_id=definition.id,
+            draft_branch="main",
+            initial_content={"lesson_count": 2},
+            request_id="issue-131-concurrent-create",
+        )
+        draft = ArtifactRepository(session, actor).get_draft(artifact.id, "main")
+        assert draft is not None
+        initial_lock = draft.lock_version
+
+    def save(lesson_count: int) -> str:
+        try:
+            with factory() as worker_session, worker_session.begin():
+                ArtifactService(worker_session, actor).save_draft(
+                    artifact.id,
+                    "main",
+                    expected_lock_version=initial_lock,
+                    content={"lesson_count": lesson_count},
+                    request_id=f"issue-131-concurrent-{lesson_count}",
+                )
+            return "saved"
+        except ApiError as exc:
+            return exc.code
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(save, (3, 4)))
+
+    assert sorted(results) == ["EDIT_CONFLICT", "saved"]
+    with factory() as session:
+        draft = ArtifactRepository(session, actor).get_draft(artifact.id, "main")
+        assert draft is not None
+        assert draft.lock_version == initial_lock + 1
+        assert draft.content_json["lesson_count"] in {3, 4}
 
 
 def test_save_uses_exact_immutable_version_as_authoring_baseline(
@@ -204,6 +288,91 @@ def test_system_actor_does_not_bypass_authoring_guard(migrated_database_url: str
                 request_id="issue-131-system",
             )
         assert caught.value.code == "AUTHORING_POLICY_VIOLATION"
+
+
+def test_save_rejects_baseline_from_another_artifact(migrated_database_url: str) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session, session.begin():
+        actor, project, definition = _seed_current_project(session)
+        service = ArtifactService(session, actor)
+        first = service.create(
+            project.id,
+            artifact_key="first-baseline",
+            artifact_type="lesson_division",
+            branch_key="project",
+            content_definition_version_id=definition.id,
+            draft_branch="main",
+            initial_content={"lesson_count": 1},
+            request_id="issue-131-first",
+        )
+        second = service.create(
+            project.id,
+            artifact_key="second-baseline",
+            artifact_type="lesson_division",
+            branch_key="project",
+            content_definition_version_id=definition.id,
+            draft_branch="main",
+            initial_content={"lesson_count": 1},
+            request_id="issue-131-second",
+        )
+        second_content = {"division_key": "second", "lesson_count": 1}
+        second_version = ArtifactVersion(
+            id=new_uuid7(),
+            organization_id=actor.organization_id,
+            artifact_id=second.id,
+            version_no=1,
+            content_json=second_content,
+            content_hash=canonical_content_hash(second_content),
+            render_summary_json={},
+            source_kind="model",
+            source_node_run_id=None,
+            context_snapshot_id=None,
+            prompt_snapshot_id=None,
+            validation_report_json={"valid": True},
+            created_by=actor.principal_id,
+        )
+        session.add(second_version)
+        session.flush()
+        first_draft = ArtifactRepository(session, actor).get_draft(first.id, "main")
+        assert first_draft is not None
+        first_draft.based_on_version_id = second_version.id
+        session.flush()
+
+        with pytest.raises(ApiError) as caught:
+            service.save_draft(
+                first.id,
+                "main",
+                expected_lock_version=first_draft.lock_version,
+                content={"division_key": "second", "lesson_count": 2},
+                request_id="issue-131-wrong-baseline",
+            )
+        assert caught.value.code == "AUTHORING_BASELINE_INVALID"
+
+
+def test_cross_tenant_authoring_is_not_disclosed(migrated_database_url: str) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session, session.begin():
+        _actor, project, definition = _seed_current_project(session)
+        foreign = ActorContext(
+            organization_id=UUID("01900000-0000-7000-8000-000000000099"),
+            principal_id=UUID("01900000-0000-7000-8000-000000000199"),
+            user_id=UUID("01900000-0000-7000-8000-000000000299"),
+            actor_type="user",
+            organization_role="owner",
+        )
+
+        with pytest.raises(ApiError) as caught:
+            ArtifactService(session, foreign).create(
+                project.id,
+                artifact_key="foreign",
+                artifact_type="lesson_division",
+                branch_key="project",
+                content_definition_version_id=definition.id,
+                draft_branch="main",
+                initial_content={"lesson_count": 1},
+                request_id="issue-131-foreign",
+            )
+        assert caught.value.code == "PROJECT_NOT_FOUND"
 
 
 async def test_generated_version_opens_an_exact_idempotent_authoring_draft(
@@ -325,9 +494,19 @@ async def test_locked_repeatable_item_requires_exact_server_provision(
             draft_id=saved.id,
             based_on_version_id=version.id,
             baseline_content_hash=version.content_hash,
+            expected_draft_content_hash=canonical_content_hash(saved.content_json),
             expected_lock_version=saved.lock_version,
             field_path=("lesson_units",),
-            item=new_item,
+            parent_identities=(),
+            provision_key="lesson-new",
+        )
+        with pytest.raises(ApiError) as no_provisioner:
+            port.provision_repeatable_item(request)
+        assert no_provisioner.value.code == "AUTHORING_PROVISION_CONFLICT"
+        port = ArtifactAuthoringProvisionPort(
+            session,
+            system,
+            _StaticItemProvisioner({"lesson-new": new_item}),
         )
         provisioned = port.provision_repeatable_item(request)
         assert provisioned.validation_report_json["valid"] is True
