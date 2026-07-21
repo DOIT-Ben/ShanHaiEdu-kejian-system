@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Protocol
+from uuid import UUID
 
 from apps.api.model_gateway.contracts import (
     ImageModelRequest,
@@ -37,7 +38,12 @@ class ImageProvider(ProviderMetadata, Protocol):
 
 
 class VideoProvider(ProviderMetadata, Protocol):
-    async def submit(self, request: VideoModelRequest) -> VideoProviderResult: ...
+    async def submit(
+        self,
+        request: VideoModelRequest,
+        *,
+        organization_id: UUID | None = None,
+    ) -> VideoProviderResult: ...
 
     async def poll(self, request: VideoPollRequest) -> VideoProviderResult: ...
 

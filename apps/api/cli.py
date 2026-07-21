@@ -31,7 +31,7 @@ from apps.api.model_gateway.contracts import (
 from apps.api.model_gateway.factory import build_real_text_gateway, build_real_video_gateway
 from apps.api.model_gateway.fake import DeterministicFakeTextProvider
 from apps.api.model_gateway.gateway import ModelGateway
-from apps.api.model_gateway.newapi_video import LocalVideoSmokeStore
+from apps.api.model_gateway.video_store import LocalVideoSmokeStore
 from apps.api.model_gateway.video_smoke import VideoProbeError, VideoProbeResult, probe_mp4
 from apps.api.model_registry import register_models
 from apps.api.settings import Settings, get_settings

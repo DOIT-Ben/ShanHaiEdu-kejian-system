@@ -23,6 +23,7 @@ from apps.api.model_gateway.newapi_video import (
     NewApiVideoProvider,
     StoredVideoFile,
 )
+from apps.api.model_gateway.provider_media import ProviderMediaResolutionError
 
 TASK_ID = "018f0000-0000-7000-8000-000000000001"
 
@@ -63,6 +64,7 @@ def provider(
     store: RecordingVideoStore,
     *,
     max_download_bytes: int = 10_000_000,
+    media_reference_resolver=None,
 ) -> NewApiVideoProvider:
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     return NewApiVideoProvider(
@@ -75,6 +77,7 @@ def provider(
             max_download_bytes=max_download_bytes,
         ),
         store=store,
+        media_reference_resolver=media_reference_resolver,
         client=client,
     )
 
@@ -172,6 +175,72 @@ async def test_submit_fails_closed_when_private_asset_references_cannot_be_resol
 
     assert captured.value.code == GatewayErrorCode.ROUTE_UNAVAILABLE
     assert captured.value.retryable is False
+
+
+async def test_submit_maps_one_resolved_private_image_to_first_frame_url() -> None:
+    store = RecordingVideoStore()
+    organization_id = UUID("018f0000-0000-7000-8000-000000000003")
+    reference = MediaReference(
+        file_version_id=UUID("018f0000-0000-7000-8000-000000000004"),
+        mime_type="image/png",
+    )
+
+    class Resolver:
+        def __init__(self) -> None:
+            self.calls: list[tuple[UUID, MediaReference]] = []
+
+        def resolve(self, *, organization_id: UUID, reference: MediaReference) -> str:
+            self.calls.append((organization_id, reference))
+            return "https://relay.test/_provider-media/opaque.png?expires=1&signature=test"
+
+    resolver = Resolver()
+
+    def handler(http_request: httpx.Request) -> httpx.Response:
+        assert json.loads(http_request.content) == {
+            "model": "video-grok",
+            "prompt": "A simple paper boat moves across a calm blue pond.",
+            "duration": 6,
+            "first_frame_url": "https://relay.test/_provider-media/opaque.png?expires=1&signature=test",
+        }
+        return httpx.Response(
+            200,
+            json={
+                "id": TASK_ID,
+                "model": "video-grok",
+                "status": "queued",
+            },
+        )
+
+    result = await provider(handler, store, media_reference_resolver=resolver).submit(
+        video_request(references=[reference]),
+        organization_id=organization_id,
+    )
+
+    assert result.status == VideoOperationStatus.SUBMITTED
+    assert resolver.calls == [(organization_id, reference)]
+
+
+async def test_submit_fails_closed_when_the_reference_resolver_rejects_the_asset() -> None:
+    store = RecordingVideoStore()
+    reference = MediaReference(
+        file_version_id=UUID("018f0000-0000-7000-8000-000000000005"),
+        mime_type="image/png",
+    )
+
+    class RejectingResolver:
+        def resolve(self, **_kwargs) -> str:
+            raise ProviderMediaResolutionError("asset is unavailable")
+
+    def handler(_http_request: httpx.Request) -> httpx.Response:
+        raise AssertionError("the provider must not receive an unresolved image")
+
+    with pytest.raises(ModelGatewayError) as captured:
+        await provider(handler, store, media_reference_resolver=RejectingResolver()).submit(
+            video_request(references=[reference]),
+            organization_id=UUID("018f0000-0000-7000-8000-000000000006"),
+        )
+
+    assert captured.value.code == GatewayErrorCode.ROUTE_UNAVAILABLE
 
 
 async def test_submit_conflict_becomes_submission_unknown_without_a_second_request() -> None:

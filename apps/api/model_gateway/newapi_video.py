@@ -7,11 +7,9 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import shutil
 import tempfile
-from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
-from typing import Literal, Protocol, cast
+from pathlib import Path
+from typing import Literal, cast
 from uuid import UUID
 
 import httpx
@@ -28,6 +26,9 @@ from apps.api.model_gateway.contracts import (
     VideoProviderResult,
 )
 from apps.api.model_gateway.openai_compatible import map_provider_error
+from apps.api.model_gateway.newapi_video_submission import build_newapi_video_submission_payload
+from apps.api.model_gateway.provider_media import ProviderMediaReferenceResolver
+from apps.api.model_gateway.video_store import StoredVideoFile, VideoResultStore
 
 
 class NewApiVideoConfig(BaseModel):
@@ -39,63 +40,6 @@ class NewApiVideoConfig(BaseModel):
     api_key: SecretStr
     timeout_seconds: float = Field(gt=0, le=600)
     max_download_bytes: int = Field(gt=0, le=1_073_741_824)
-
-
-@dataclass(frozen=True, slots=True)
-class StoredVideoFile:
-    storage_key: str
-    sha256: str
-    size_bytes: int
-    mime_type: str
-
-
-class VideoResultStore(Protocol):
-    def persist(
-        self,
-        *,
-        key: str,
-        source: Path,
-        media_type: str,
-    ) -> StoredVideoFile: ...
-
-
-class LocalVideoSmokeStore:
-    def __init__(self, output_root: Path) -> None:
-        self._output_root = output_root.resolve()
-
-    def persist(
-        self,
-        *,
-        key: str,
-        source: Path,
-        media_type: str,
-    ) -> StoredVideoFile:
-        if not source.is_file() or media_type != "video/mp4":
-            raise OSError("video smoke output source is invalid")
-        destination = self.path_for(key)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(source, destination)
-        payload = destination.read_bytes()
-        if not payload:
-            destination.unlink(missing_ok=True)
-            raise OSError("video smoke output is empty")
-        return StoredVideoFile(
-            storage_key=key,
-            sha256=hashlib.sha256(payload).hexdigest(),
-            size_bytes=len(payload),
-            mime_type=media_type,
-        )
-
-    def path_for(self, key: str) -> Path:
-        relative = PurePosixPath(key)
-        if relative.is_absolute() or any(part in {"", ".", ".."} for part in relative.parts):
-            raise OSError("video smoke output key is unsafe")
-        destination = (self._output_root / Path(*relative.parts)).resolve()
-        try:
-            destination.relative_to(self._output_root)
-        except ValueError as exc:
-            raise OSError("video smoke output key escapes the output root") from exc
-        return destination
 
 
 class _GatewayMediaTask(BaseModel):
@@ -113,10 +57,12 @@ class NewApiVideoProvider:
         config: NewApiVideoConfig,
         *,
         store: VideoResultStore,
+        media_reference_resolver: ProviderMediaReferenceResolver | None = None,
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self._config = config
         self._store = store
+        self._media_reference_resolver = media_reference_resolver
         self._owns_client = client is None
         self._client = client or httpx.AsyncClient(
             timeout=httpx.Timeout(config.timeout_seconds),
@@ -134,17 +80,22 @@ class NewApiVideoProvider:
     def model_name(self) -> str:
         return self._config.model
 
-    async def submit(self, request: VideoModelRequest) -> VideoProviderResult:
-        if request.references:
-            raise ModelGatewayError(GatewayErrorCode.ROUTE_UNAVAILABLE, retryable=False)
+    async def submit(
+        self,
+        request: VideoModelRequest,
+        *,
+        organization_id: UUID | None = None,
+    ) -> VideoProviderResult:
+        payload = await build_newapi_video_submission_payload(
+            model=self._config.model,
+            request=request,
+            organization_id=organization_id,
+            media_reference_resolver=self._media_reference_resolver,
+        )
         try:
             response = await self._client.post(
                 self._url("videos"),
-                json={
-                    "model": self._config.model,
-                    "prompt": request.prompt,
-                    "duration": request.duration_seconds,
-                },
+                json=payload,
                 headers=self._headers(**{"Idempotency-Key": _idempotency_key(request.request_id)}),
             )
         except httpx.TimeoutException as exc:

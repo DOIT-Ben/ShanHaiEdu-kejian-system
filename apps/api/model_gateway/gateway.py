@@ -182,9 +182,10 @@ class ModelGateway:
         cancellation: CancellationToken | None = None,
         audit_context: ModelAuditContext | None = None,
     ) -> VideoGatewayResult:
+        organization_id = audit_context.organization_id if audit_context is not None else None
         return await self._run_video(
             request,
-            lambda provider: provider.submit(request),
+            lambda provider: provider.submit(request, organization_id=organization_id),
             operation_kind="video_submit",
             cancellation=cancellation,
             audit_context=audit_context,
