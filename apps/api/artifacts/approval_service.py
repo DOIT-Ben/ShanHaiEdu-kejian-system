@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from apps.api.artifacts.domain import ApprovalAction
 from apps.api.artifacts.models import Approval, Artifact, ArtifactVersion
+from apps.api.artifacts.quality_gate import ArtifactQualityApprovalGuard
 from apps.api.artifacts.relation_service import ArtifactRelationService
 from apps.api.artifacts.repository import ArtifactRepository
 from apps.api.creation.staleness_service import CreationPackageStalenessService
@@ -37,7 +38,6 @@ class ArtifactApprovalService:
         action: str,
         comment: str | None,
         request_id: str | None,
-        quality_evidence: dict[str, Any] | None = None,
         policy_snapshot: dict[str, Any] | None = None,
     ) -> Approval:
         resolved_action, version, artifact = self.require_access(
@@ -56,7 +56,6 @@ class ArtifactApprovalService:
                 version,
                 comment,
                 request_id,
-                quality_evidence,
                 policy_snapshot,
             )
         if resolved_action is ApprovalAction.ACCEPT_STALE:
@@ -65,7 +64,6 @@ class ArtifactApprovalService:
                 version,
                 comment,
                 request_id,
-                quality_evidence,
                 policy_snapshot,
             )
         if resolved_action is ApprovalAction.REQUEST_CHANGES:
@@ -74,7 +72,6 @@ class ArtifactApprovalService:
                 version,
                 comment,
                 request_id,
-                quality_evidence,
                 policy_snapshot,
             )
         return self._revoke(
@@ -82,7 +79,6 @@ class ArtifactApprovalService:
             version,
             comment,
             request_id,
-            quality_evidence,
             policy_snapshot,
         )
 
@@ -112,7 +108,6 @@ class ArtifactApprovalService:
         version: ArtifactVersion,
         comment: str | None,
         request_id: str | None,
-        quality_evidence: dict[str, Any] | None,
         policy_snapshot: dict[str, Any] | None,
     ) -> Approval:
         existing = self._repository.latest_action(version.id, ApprovalAction.APPROVE.value)
@@ -120,6 +115,16 @@ class ArtifactApprovalService:
             return existing
         if artifact.current_submitted_version_id != version.id:
             raise self._state_conflict("Only the current submitted version can be approved.")
+        project = self._require_project(artifact.project_id, for_update=False)
+        quality_evidence = ArtifactQualityApprovalGuard(
+            self._session,
+            self._actor,
+        ).require_evidence(
+            artifact,
+            version,
+            content_release_id=project.content_release_id,
+            workflow_definition_version_id=project.workflow_definition_version_id,
+        )
         previous_version_id = artifact.current_approved_version_id
         approval = self._record(
             version, ApprovalAction.APPROVE, comment, quality_evidence, policy_snapshot
@@ -161,7 +166,6 @@ class ArtifactApprovalService:
         version: ArtifactVersion,
         comment: str | None,
         request_id: str | None,
-        quality_evidence: dict[str, Any] | None,
         policy_snapshot: dict[str, Any] | None,
     ) -> Approval:
         if artifact.current_approved_version_id != version.id or artifact.status != "stale":
@@ -170,7 +174,7 @@ class ArtifactApprovalService:
             version,
             ApprovalAction.ACCEPT_STALE,
             comment,
-            quality_evidence,
+            {},
             policy_snapshot,
         )
         artifact.status = "approved"
@@ -186,7 +190,6 @@ class ArtifactApprovalService:
         version: ArtifactVersion,
         comment: str | None,
         request_id: str | None,
-        quality_evidence: dict[str, Any] | None,
         policy_snapshot: dict[str, Any] | None,
     ) -> Approval:
         if artifact.status != "in_review" or artifact.current_submitted_version_id != version.id:
@@ -195,7 +198,7 @@ class ArtifactApprovalService:
             version,
             ApprovalAction.REQUEST_CHANGES,
             comment,
-            quality_evidence,
+            {},
             policy_snapshot,
         )
         artifact.current_submitted_version_id = None
@@ -211,16 +214,13 @@ class ArtifactApprovalService:
         version: ArtifactVersion,
         comment: str | None,
         request_id: str | None,
-        quality_evidence: dict[str, Any] | None,
         policy_snapshot: dict[str, Any] | None,
     ) -> Approval:
         if not comment or not comment.strip():
             raise self._invalid("Revoking an approval requires a reason.")
         if artifact.current_approved_version_id != version.id:
             raise self._state_conflict("Only the current approved version can be revoked.")
-        approval = self._record(
-            version, ApprovalAction.REVOKE, comment, quality_evidence, policy_snapshot
-        )
+        approval = self._record(version, ApprovalAction.REVOKE, comment, {}, policy_snapshot)
         artifact.current_approved_version_id = None
         stale_ids, stale_node_ids = self._relations.propagate_stale(version.id, None)
         CreationPackageStalenessService(

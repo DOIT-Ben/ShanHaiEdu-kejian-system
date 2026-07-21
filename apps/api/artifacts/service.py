@@ -163,7 +163,6 @@ class ArtifactService:
         action: str,
         comment: str | None,
         request_id: str | None,
-        quality_evidence: dict[str, Any] | None = None,
         policy_snapshot: dict[str, Any] | None = None,
     ) -> Approval:
         return ArtifactApprovalService(self._session, self._actor).review(
@@ -171,7 +170,6 @@ class ArtifactService:
             action=action,
             comment=comment,
             request_id=request_id,
-            quality_evidence=quality_evidence,
             policy_snapshot=policy_snapshot,
         )
 
