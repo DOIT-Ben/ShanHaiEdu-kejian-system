@@ -3,6 +3,10 @@ from __future__ import annotations
 import pytest
 
 from apps.api.ppt_rendering import (
+    MAX_BACKGROUND_BYTES,
+    MAX_ELEMENTS_PER_PAGE,
+    MAX_PAGES,
+    MAX_TOTAL_INPUT_BYTES,
     AssemblyRequest,
     BackgroundImage,
     Box,
@@ -11,7 +15,7 @@ from apps.api.ppt_rendering import (
     TextElement,
     assemble_pages,
 )
-from tests.unit.ppt_rendering.helpers import make_page, make_request, png_bytes
+from tests.unit.ppt_rendering.helpers import jpeg_bytes, make_page, make_request, png_bytes
 
 
 @pytest.mark.parametrize(
@@ -104,3 +108,105 @@ def test_duplicate_element_keys_are_rejected() -> None:
 
     with pytest.raises(PptRenderingError, match="PPT_ELEMENT_KEY_DUPLICATE"):
         assemble_pages(make_request(pages=(page,)))
+
+
+@pytest.mark.parametrize(
+    ("content", "media_type", "code"),
+    [
+        (png_bytes()[:-1], "image/png", "PPT_BACKGROUND_IMAGE_INVALID"),
+        (jpeg_bytes()[:-1], "image/jpeg", "PPT_BACKGROUND_IMAGE_INVALID"),
+        (png_bytes(), "image/jpeg", "PPT_BACKGROUND_IMAGE_INVALID"),
+        (png_bytes(width=2, height=2), "image/png", "PPT_BACKGROUND_ASPECT_RATIO_INVALID"),
+    ],
+)
+def test_background_image_integrity_and_aspect_ratio_fail_closed(
+    content: bytes, media_type: str, code: str
+) -> None:
+    background = BackgroundImage.model_construct(content=content, media_type=media_type)
+    page = make_page().model_copy(update={"backgrounds": (background,)})
+
+    with pytest.raises(PptRenderingError, match=code) as caught:
+        assemble_pages(make_request(pages=(page,)))
+
+    assert caught.value.code == code
+
+
+@pytest.mark.parametrize(
+    ("content", "media_type"),
+    [(png_bytes(), "image/png"), (jpeg_bytes(), "image/jpeg")],
+)
+def test_valid_png_and_jpeg_dimensions_are_recorded(content: bytes, media_type: str) -> None:
+    background = BackgroundImage.model_construct(content=content, media_type=media_type)
+    page = make_page().model_copy(update={"backgrounds": (background,)})
+
+    manifest = assemble_pages(make_request(pages=(page,)))
+
+    assert manifest.pages[0].background_width == 160
+    assert manifest.pages[0].background_height == 90
+
+
+def test_png_crc_corruption_is_rejected() -> None:
+    corrupted = bytearray(png_bytes())
+    corrupted[-1] ^= 0x01
+    background = BackgroundImage(content=bytes(corrupted), media_type="image/png")
+    page = make_page().model_copy(update={"backgrounds": (background,)})
+
+    with pytest.raises(PptRenderingError, match="PPT_BACKGROUND_IMAGE_INVALID"):
+        assemble_pages(make_request(pages=(page,)))
+
+
+@pytest.mark.parametrize(
+    "update",
+    [
+        {"element_key": "invalid\x00name"},
+        {"text": "invalid\x01text"},
+        {"font": {"family": "invalid\ud800font"}},
+    ],
+)
+def test_xml_10_illegal_characters_are_rejected(update: dict[str, object]) -> None:
+    source = make_page()
+    title = source.elements[0]
+    if "font" in update:
+        font = title.font.model_copy(update=update["font"])  # type: ignore[union-attr]
+        update = {"font": font}
+    invalid = title.model_copy(update=update)
+    page = source.model_copy(update={"elements": (invalid, *source.elements[1:])})
+
+    with pytest.raises(PptRenderingError, match="PPT_XML_TEXT_INVALID"):
+        assemble_pages(make_request(pages=(page,)))
+
+
+def test_request_size_limits_are_stable() -> None:
+    too_many_pages = tuple(
+        make_page(page_key=f"page-{position}", position=position)
+        for position in range(1, MAX_PAGES + 2)
+    )
+    with pytest.raises(PptRenderingError, match="PPT_PAGE_LIMIT_EXCEEDED"):
+        assemble_pages(make_request(pages=too_many_pages))
+
+    source = make_page()
+    too_many_elements = tuple(
+        source.elements[0].model_copy(update={"element_key": f"element-{index}"})
+        for index in range(MAX_ELEMENTS_PER_PAGE + 1)
+    )
+    page = source.model_copy(update={"elements": too_many_elements})
+    with pytest.raises(PptRenderingError, match="PPT_ELEMENT_LIMIT_EXCEEDED"):
+        assemble_pages(make_request(pages=(page,)))
+
+    oversized_content = b"x" * (MAX_BACKGROUND_BYTES + 1)
+    oversized = BackgroundImage.model_construct(content=oversized_content, media_type="image/png")
+    page = source.model_copy(update={"backgrounds": (oversized,)})
+    with pytest.raises(PptRenderingError, match="PPT_BACKGROUND_SIZE_EXCEEDED"):
+        assemble_pages(make_request(pages=(page,)))
+
+    shared_content = b"x" * MAX_BACKGROUND_BYTES
+    shared = BackgroundImage.model_construct(content=shared_content, media_type="image/png")
+    page_count = MAX_TOTAL_INPUT_BYTES // MAX_BACKGROUND_BYTES + 1
+    pages = tuple(
+        make_page(page_key=f"page-{position}", position=position).model_copy(
+            update={"backgrounds": (shared,)}
+        )
+        for position in range(1, page_count + 1)
+    )
+    with pytest.raises(PptRenderingError, match="PPT_TOTAL_INPUT_SIZE_EXCEEDED"):
+        assemble_pages(make_request(pages=pages))

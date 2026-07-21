@@ -7,13 +7,17 @@ import json
 import re
 
 from apps.api.ppt_rendering.errors import PptRenderingError
+from apps.api.ppt_rendering.images import ImageInfo, inspect_background
 from apps.api.ppt_rendering.models import (
     IMPLEMENTATION_VERSION,
+    MAX_BACKGROUND_BYTES,
+    MAX_ELEMENTS_PER_PAGE,
+    MAX_PAGES,
+    MAX_TOTAL_INPUT_BYTES,
     SLIDE_HEIGHT_EMU,
     SLIDE_WIDTH_EMU,
     AssemblyManifest,
     AssemblyRequest,
-    BackgroundImage,
     ManifestElement,
     ManifestPage,
     PageSpec,
@@ -25,8 +29,10 @@ _COLOR = re.compile(r"^[0-9A-F]{6}$")
 
 
 def build_manifest(request: AssemblyRequest) -> AssemblyManifest:
-    _validate_request(request)
-    pages = tuple(_manifest_page(page) for page in request.pages)
+    image_info = _validate_request(request)
+    pages = tuple(
+        _manifest_page(page, info) for page, info in zip(request.pages, image_info, strict=True)
+    )
     payload = {
         "implementation_version": IMPLEMENTATION_VERSION,
         "canvas": request.canvas.model_dump(mode="json"),
@@ -43,7 +49,8 @@ def build_manifest(request: AssemblyRequest) -> AssemblyManifest:
     )
 
 
-def _validate_request(request: AssemblyRequest) -> None:
+def _validate_request(request: AssemblyRequest) -> tuple[ImageInfo, ...]:
+    _validate_limits(request)
     canvas = request.canvas
     if canvas.width != SLIDE_WIDTH_EMU or canvas.height != SLIDE_HEIGHT_EMU:
         raise PptRenderingError(
@@ -55,6 +62,7 @@ def _validate_request(request: AssemblyRequest) -> None:
         raise PptRenderingError("PPT_PAGES_REQUIRED", "at least one page is required")
 
     page_keys: set[str] = set()
+    image_info: list[ImageInfo] = []
     for expected_position, page in enumerate(request.pages, start=1):
         if not page.page_key.strip():
             raise PptRenderingError("PPT_PAGE_KEY_REQUIRED", "page_key is required")
@@ -65,17 +73,19 @@ def _validate_request(request: AssemblyRequest) -> None:
             raise PptRenderingError(
                 "PPT_PAGE_ORDER_INVALID", "page positions must be consecutive and ordered"
             )
-        _validate_page(request, page)
+        image_info.append(_validate_page(request, page))
+    return tuple(image_info)
 
 
-def _validate_page(request: AssemblyRequest, page: PageSpec) -> None:
+def _validate_page(request: AssemblyRequest, page: PageSpec) -> ImageInfo:
     backgrounds = page.backgrounds
     if not backgrounds:
         raise PptRenderingError("PPT_PAGE_BACKGROUND_REQUIRED", "each page needs one background")
     if len(backgrounds) > 1:
         raise PptRenderingError("PPT_PAGE_BACKGROUND_MULTIPLE", "each page allows one background")
+    image_info: ImageInfo | None = None
     for background in backgrounds:
-        _validate_background(background)
+        image_info = inspect_background(background)
 
     element_keys: set[str] = set()
     for element in page.elements:
@@ -83,17 +93,9 @@ def _validate_page(request: AssemblyRequest, page: PageSpec) -> None:
             raise PptRenderingError("PPT_ELEMENT_KEY_DUPLICATE", "element keys must be unique")
         element_keys.add(element.element_key)
         _validate_element(request, element)
-
-
-def _validate_background(background: BackgroundImage) -> None:
-    signatures = {
-        "image/png": b"\x89PNG\r\n\x1a\n",
-        "image/jpeg": b"\xff\xd8\xff",
-    }
-    if not background.content.startswith(signatures[background.media_type]):
-        raise PptRenderingError(
-            "PPT_BACKGROUND_MEDIA_INVALID", "background bytes do not match media type"
-        )
+    if image_info is None:
+        raise PptRenderingError("PPT_PAGE_BACKGROUND_REQUIRED", "each page needs one background")
+    return image_info
 
 
 def _validate_element(request: AssemblyRequest, element: TextElement | ShapeElement) -> None:
@@ -110,7 +112,10 @@ def _validate_element(request: AssemblyRequest, element: TextElement | ShapeElem
         raise PptRenderingError(
             "PPT_ELEMENT_OUT_OF_BOUNDS", "editable element must remain inside the safe area"
         )
+    _validate_xml_text(element.element_key)
     if isinstance(element, TextElement):
+        _validate_xml_text(element.text)
+        _validate_xml_text(element.font.family)
         if not element.text.strip():
             raise PptRenderingError("PPT_TEXT_REQUIRED", "text elements cannot be blank")
         if not _COLOR.fullmatch(element.font.color):
@@ -121,7 +126,7 @@ def _validate_element(request: AssemblyRequest, element: TextElement | ShapeElem
         raise PptRenderingError("PPT_COLOR_INVALID", "shape colors must be six hex digits")
 
 
-def _manifest_page(page: PageSpec) -> ManifestPage:
+def _manifest_page(page: PageSpec, image_info: ImageInfo) -> ManifestPage:
     background = page.backgrounds[0]
     elements = tuple(
         ManifestElement(
@@ -134,6 +139,13 @@ def _manifest_page(page: PageSpec) -> ManifestPage:
                 else "native"
             ),
             box=element.box,
+            text=element.text if isinstance(element, TextElement) else None,
+            font=element.font if isinstance(element, TextElement) else None,
+            fill_color=element.fill_color if isinstance(element, ShapeElement) else None,
+            line_color=element.line_color if isinstance(element, ShapeElement) else None,
+            line_width_points=(
+                element.line_width_points if isinstance(element, ShapeElement) else None
+            ),
         )
         for element in page.elements
     )
@@ -143,5 +155,51 @@ def _manifest_page(page: PageSpec) -> ManifestPage:
         background_sha256=hashlib.sha256(background.content).hexdigest(),
         background_media_type=background.media_type,
         background_size_bytes=len(background.content),
+        background_width=image_info.width,
+        background_height=image_info.height,
         elements=elements,
     )
+
+
+def _validate_limits(request: AssemblyRequest) -> None:
+    if len(request.pages) > MAX_PAGES:
+        raise PptRenderingError("PPT_PAGE_LIMIT_EXCEEDED", "page count exceeds the frozen limit")
+    total_bytes = 0
+    for page in request.pages:
+        if len(page.elements) > MAX_ELEMENTS_PER_PAGE:
+            raise PptRenderingError(
+                "PPT_ELEMENT_LIMIT_EXCEEDED", "page element count exceeds the frozen limit"
+            )
+        total_bytes += _encoded_size(page.page_key)
+        for background in page.backgrounds:
+            if len(background.content) > MAX_BACKGROUND_BYTES:
+                raise PptRenderingError(
+                    "PPT_BACKGROUND_SIZE_EXCEEDED", "background bytes exceed the frozen limit"
+                )
+            total_bytes += len(background.content) + _encoded_size(background.media_type)
+        for element in page.elements:
+            total_bytes += _encoded_size(element.element_key) + _encoded_size(element.kind)
+            if isinstance(element, TextElement):
+                total_bytes += _encoded_size(element.text) + _encoded_size(element.font.family)
+        if total_bytes > MAX_TOTAL_INPUT_BYTES:
+            raise PptRenderingError(
+                "PPT_TOTAL_INPUT_SIZE_EXCEEDED", "request bytes exceed the frozen limit"
+            )
+
+
+def _encoded_size(value: str) -> int:
+    return len(value.encode("utf-8", errors="surrogatepass"))
+
+
+def _validate_xml_text(value: str) -> None:
+    for character in value:
+        codepoint = ord(character)
+        if codepoint in {0x09, 0x0A, 0x0D}:
+            continue
+        if 0x20 <= codepoint <= 0xD7FF or 0xE000 <= codepoint <= 0xFFFD:
+            continue
+        if 0x10000 <= codepoint <= 0x10FFFF:
+            continue
+        raise PptRenderingError(
+            "PPT_XML_TEXT_INVALID", "text contains a character forbidden by XML 1.0"
+        )

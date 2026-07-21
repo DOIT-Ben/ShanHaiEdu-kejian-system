@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import struct
 import zlib
 
@@ -15,20 +16,53 @@ from apps.api.ppt_rendering import (
 )
 
 
-def png_bytes(*, red: int = 245, green: int = 248, blue: int = 255) -> bytes:
-    """Build a dependency-free 2x2 RGB PNG fixture."""
+def png_bytes(
+    *,
+    width: int = 160,
+    height: int = 90,
+    red: int = 245,
+    green: int = 248,
+    blue: int = 255,
+) -> bytes:
+    """Build a dependency-free RGB PNG fixture."""
 
     def chunk(kind: bytes, payload: bytes) -> bytes:
         body = kind + payload
         return struct.pack(">I", len(payload)) + body + struct.pack(">I", zlib.crc32(body))
 
-    header = struct.pack(">IIBBBBB", 2, 2, 8, 2, 0, 0, 0)
-    row = b"\x00" + bytes((red, green, blue)) * 2
+    header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    row = b"\x00" + bytes((red, green, blue)) * width
     return (
         b"\x89PNG\r\n\x1a\n"
         + chunk(b"IHDR", header)
-        + chunk(b"IDAT", zlib.compress(row * 2))
+        + chunk(b"IDAT", zlib.compress(row * height))
         + chunk(b"IEND", b"")
+    )
+
+
+def jpeg_bytes() -> bytes:
+    """Return a dependency-free baseline 160x90 JPEG fixture."""
+
+    return base64.b64decode(
+        "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoH"
+        "BwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQME"
+        "BAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU"
+        "FBQUFBQUFBQUFBQUFBT/wAARCABaAKADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEA"
+        "AAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIh"
+        "MUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6"
+        "Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZ"
+        "mqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx"
+        "8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREA"
+        "AgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAV"
+        "YnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hp"
+        "anN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPE"
+        "xcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD9"
+        "O6KKK7TiCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAoo"
+        "ooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAoo"
+        "ooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAoo"
+        "ooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAoo"
+        "ooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAoo"
+        "ooAKKKKACiiigAooooA//9k="
     )
 
 

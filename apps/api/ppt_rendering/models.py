@@ -10,6 +10,10 @@ SLIDE_WIDTH_EMU = 12_192_000
 SLIDE_HEIGHT_EMU = 6_858_000
 PPTX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 IMPLEMENTATION_VERSION = "ppt-render-core/1"
+MAX_PAGES = 60
+MAX_ELEMENTS_PER_PAGE = 200
+MAX_BACKGROUND_BYTES = 16 * 1024 * 1024
+MAX_TOTAL_INPUT_BYTES = 128 * 1024 * 1024
 
 ElementKey = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
 PageKey = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
@@ -99,6 +103,11 @@ class ManifestElement(_FrozenModel):
     kind: str
     editability: Literal["native", "editable_text_fallback"]
     box: Box
+    text: str | None = None
+    font: FontStyle | None = None
+    fill_color: Color | None = None
+    line_color: Color | None = None
+    line_width_points: int | None = None
 
 
 class ManifestPage(_FrozenModel):
@@ -107,6 +116,8 @@ class ManifestPage(_FrozenModel):
     background_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     background_media_type: Literal["image/png", "image/jpeg"]
     background_size_bytes: int = Field(gt=0)
+    background_width: int = Field(gt=0)
+    background_height: int = Field(gt=0)
     elements: tuple[ManifestElement, ...]
 
 

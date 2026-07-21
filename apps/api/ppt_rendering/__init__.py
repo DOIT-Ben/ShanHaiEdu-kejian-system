@@ -3,6 +3,10 @@
 from apps.api.ppt_rendering.errors import PptRenderingError
 from apps.api.ppt_rendering.models import (
     IMPLEMENTATION_VERSION,
+    MAX_BACKGROUND_BYTES,
+    MAX_ELEMENTS_PER_PAGE,
+    MAX_PAGES,
+    MAX_TOTAL_INPUT_BYTES,
     PPTX_MEDIA_TYPE,
     SLIDE_HEIGHT_EMU,
     SLIDE_WIDTH_EMU,
@@ -24,6 +28,10 @@ from apps.api.ppt_rendering.service import assemble_pages, export_pptx
 
 __all__ = [
     "IMPLEMENTATION_VERSION",
+    "MAX_BACKGROUND_BYTES",
+    "MAX_ELEMENTS_PER_PAGE",
+    "MAX_PAGES",
+    "MAX_TOTAL_INPUT_BYTES",
     "PPTX_MEDIA_TYPE",
     "SLIDE_HEIGHT_EMU",
     "SLIDE_WIDTH_EMU",

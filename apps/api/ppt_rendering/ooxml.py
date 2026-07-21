@@ -236,7 +236,12 @@ def _text_shape(shape_id: int, element: TextElement) -> str:
 
 def _native_shape(shape_id: int, element: ShapeElement) -> str:
     box = element.box
-    preset = "rect" if element.kind == "rectangle" else element.kind
+    preset = {
+        "rectangle": "rect",
+        "ellipse": "ellipse",
+        "line": "line",
+        "arrow": "line",
+    }[element.kind]
     fill = (
         f'<a:solidFill><a:srgbClr val="{element.fill_color}"/></a:solidFill>'
         if element.fill_color is not None and element.kind not in {"line", "arrow"}

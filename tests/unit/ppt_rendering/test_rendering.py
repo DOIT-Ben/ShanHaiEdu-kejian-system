@@ -5,7 +5,9 @@ from io import BytesIO
 from xml.etree import ElementTree
 from zipfile import ZipFile
 
-from apps.api.ppt_rendering import assemble_pages, export_pptx
+import pytest
+
+from apps.api.ppt_rendering import FontStyle, ShapeElement, assemble_pages, export_pptx
 from tests.unit.ppt_rendering.helpers import make_page, make_request
 
 NS = {
@@ -64,6 +66,12 @@ def test_formula_manifest_declares_editable_text_fallback() -> None:
     )
     assert formula.kind == "formula"
     assert formula.editability == "editable_text_fallback"
+    assert formula.text == "25% = 25 / 100"
+    assert formula.font is not None and formula.font.size_points == 18
+    shape = manifest.pages[0].elements[-1]
+    assert shape.fill_color == "FFD966"
+    assert shape.line_color == "C55A11"
+    assert shape.line_width_points == 2
 
 
 def test_export_escapes_user_text_and_all_xml_parts_are_well_formed() -> None:
@@ -80,3 +88,78 @@ def test_export_escapes_user_text_and_all_xml_parts_are_well_formed() -> None:
             ElementTree.fromstring(package.read(name))
         slide = ElementTree.fromstring(package.read("ppt/slides/slide1.xml"))
         assert "比较 25% < 1/2 & 为什么?" in [item.text for item in slide.findall(".//a:t", NS)]
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        {"text": "修改后的标题"},
+        {"font": FontStyle(family="SimSun", size_points=28, bold=True, color="17365D")},
+        {"font": FontStyle(size_points=30, bold=True, color="17365D")},
+        {"font": FontStyle(size_points=28, bold=False, color="17365D")},
+        {"font": FontStyle(size_points=28, bold=True, italic=True, color="17365D")},
+        {"font": FontStyle(size_points=28, bold=True, color="FF0000")},
+        {"font": FontStyle(size_points=28, bold=True, color="17365D", align="center")},
+    ],
+)
+def test_text_semantic_changes_change_content_hash(mutation: dict[str, object]) -> None:
+    source = make_page()
+    changed = source.elements[0].model_copy(update=mutation)
+    page = source.model_copy(update={"elements": (changed, *source.elements[1:])})
+
+    assert (
+        assemble_pages(make_request()).content_hash
+        != assemble_pages(make_request(pages=(page,))).content_hash
+    )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        {"fill_color": "00FF00"},
+        {"line_color": "0000FF"},
+        {"line_width_points": 4},
+    ],
+)
+def test_shape_style_changes_change_content_hash(mutation: dict[str, object]) -> None:
+    source = make_page()
+    changed = source.elements[-1].model_copy(update=mutation)
+    page = source.model_copy(update={"elements": (*source.elements[:-1], changed)})
+
+    assert (
+        assemble_pages(make_request()).content_hash
+        != assemble_pages(make_request(pages=(page,))).content_hash
+    )
+
+
+def test_all_native_shape_geometries_are_valid_drawingml() -> None:
+    source = make_page()
+    shapes = tuple(
+        ShapeElement(
+            element_key=kind,
+            kind=kind,
+            box=source.elements[-1].box,
+            fill_color="FFD966",
+            line_color="C55A11",
+        )
+        for kind in ("rectangle", "ellipse", "line", "arrow")
+    )
+    page = source.model_copy(update={"elements": shapes})
+
+    result = export_pptx(make_request(pages=(page,)))
+
+    with ZipFile(BytesIO(result.content)) as package:
+        slide = ElementTree.fromstring(package.read("ppt/slides/slide1.xml"))
+        rendered: dict[str, ElementTree.Element] = {}
+        for shape in slide.findall(".//p:sp", NS):
+            name = shape.find("./p:nvSpPr/p:cNvPr", NS)
+            geometry = shape.find("./p:spPr/a:prstGeom", NS)
+            assert name is not None and geometry is not None
+            rendered[name.attrib["name"]] = shape
+        assert rendered["rectangle"].find("./p:spPr/a:prstGeom", NS).attrib["prst"] == "rect"  # type: ignore[union-attr]
+        assert rendered["ellipse"].find("./p:spPr/a:prstGeom", NS).attrib["prst"] == "ellipse"  # type: ignore[union-attr]
+        assert rendered["line"].find("./p:spPr/a:prstGeom", NS).attrib["prst"] == "line"  # type: ignore[union-attr]
+        assert rendered["arrow"].find("./p:spPr/a:prstGeom", NS).attrib["prst"] == "line"  # type: ignore[union-attr]
+        assert rendered["line"].find("./p:spPr/a:ln/a:headEnd", NS) is None
+        arrow_head = rendered["arrow"].find("./p:spPr/a:ln/a:headEnd", NS)
+        assert arrow_head is not None and arrow_head.attrib["type"] == "triangle"
