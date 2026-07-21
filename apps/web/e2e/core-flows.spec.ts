@@ -28,6 +28,19 @@ test("三类九套选择不阻塞教案", async ({ page }) => {
   await expect(page.getByText("选择只决定课堂导入视频，不影响教案通过和 PPT 制作。")).toHaveCount(
     0,
   );
+  const detailsPanel = page.getByTestId("intro-details-panel");
+  await expect(detailsPanel.getByText("课堂从这个问题开始", { exact: true })).toBeVisible();
+  for (const label of [
+    "独立创意",
+    "开场钩子",
+    "最小课程回接",
+    "课堂首问",
+    "交接时刻",
+    "视频不得提前讲授",
+    "推荐理由",
+  ]) {
+    await expect(detailsPanel.getByText(label, { exact: true })).toHaveCount(0);
+  }
   const optionCards = page.getByRole("button", { name: /方案：/ });
   await expect(optionCards).toHaveCount(9);
   const firstRow = await optionCards.evaluateAll((cards) =>
@@ -44,6 +57,7 @@ test("三类九套选择不阻塞教案", async ({ page }) => {
   await page.reload();
   const selectedSummary = page.getByTestId("intro-selected-summary");
   await expect(selectedSummary).toBeInViewport();
+  await expect(page.getByText("查看开场与课堂回接", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "选择故事方案：失而复得的航海图" })).toBeVisible();
   await page.getByRole("button", { name: "选择故事方案：失而复得的航海图" }).click();
   await expect(selectedSummary).toContainText("失而复得的航海图");

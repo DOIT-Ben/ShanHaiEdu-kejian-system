@@ -246,25 +246,6 @@ export function IntroOptionsStep() {
             <p className="mt-1 line-clamp-1 text-sm leading-5 text-[var(--sh-ink-muted)]">
               {selected.concept}
             </p>
-            <details className="mt-1 text-sm text-[var(--sh-ink-default)] xl:hidden">
-              <summary className="cursor-pointer font-semibold text-[var(--sh-brand-700)]">
-                查看开场与课堂回接
-              </summary>
-              <div className="mt-2 space-y-2 border-t border-[var(--sh-line-subtle)] pt-2 leading-5">
-                <p>
-                  <strong>开场：</strong>
-                  {selected.hook}
-                </p>
-                <p>
-                  <strong>课堂首问：</strong>
-                  {selected.firstQuestion}
-                </p>
-                <p>
-                  <strong>课程回接：</strong>
-                  {selected.courseAnchor}
-                </p>
-              </div>
-            </details>
             {!previewIsAdopted ? (
               <Button className="mt-2 w-full md:hidden" onClick={adoptSelection} size="sm">
                 <Check aria-hidden="true" />
@@ -298,7 +279,7 @@ export function IntroOptionsStep() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold text-[var(--sh-brand-600)]">
-                {previewIsAdopted ? "当前采用" : "正在预览"} · 推荐度 {selected.score} 分
+                {previewIsAdopted ? "当前采用" : "正在预览"} · 约 {selected.duration} 秒
               </p>
               <h2 className="mt-1 text-xl font-bold text-[var(--sh-ink-strong)]">
                 {selected.title}
@@ -321,38 +302,16 @@ export function IntroOptionsStep() {
               </button>
             </div>
           </div>
-          <div className="mt-3 space-y-3 text-sm">
-            <section>
-              <h3 className="font-semibold text-[var(--sh-ink-strong)]">独立创意</h3>
-              <p className="mt-1 leading-6 text-[var(--sh-ink-muted)]">{selected.concept}</p>
-            </section>
-            <section>
-              <h3 className="font-semibold text-[var(--sh-ink-strong)]">开场钩子</h3>
-              <p className="mt-1 leading-6 text-[var(--sh-ink-muted)]">{selected.hook}</p>
-            </section>
-            <section className="rounded-[var(--sh-radius-sm)] bg-[var(--sh-warning-soft)] p-3">
-              <h3 className="font-semibold text-[var(--sh-ink-strong)]">最小课程回接</h3>
-              <p className="mt-2 leading-6 text-[var(--sh-ink-default)]">{selected.courseAnchor}</p>
-            </section>
-            <section>
-              <h3 className="font-semibold text-[var(--sh-ink-strong)]">课堂首问</h3>
-              <p className="mt-1 leading-6 text-[var(--sh-ink-muted)]">{selected.firstQuestion}</p>
-            </section>
-            <section>
-              <h3 className="font-semibold text-[var(--sh-ink-strong)]">交接时刻</h3>
-              <p className="mt-1 leading-6 text-[var(--sh-ink-muted)]">{selected.handoff}</p>
-            </section>
-            <section>
-              <h3 className="font-semibold text-[var(--sh-danger)]">视频不得提前讲授</h3>
-              <ul className="mt-1 list-inside list-disc text-[var(--sh-ink-muted)]">
-                {selected.mustNotPreteach.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </section>
-            <section className="border-t border-[var(--sh-line-subtle)] pt-4">
-              <h3 className="font-semibold text-[var(--sh-ink-strong)]">推荐理由</h3>
-              <p className="mt-1 leading-6 text-[var(--sh-ink-muted)]">{selected.reason}</p>
+          <div className="mt-4 space-y-4 text-sm leading-6">
+            <p className="text-[var(--sh-ink-default)]">{selected.concept}</p>
+            <p className="border-y border-[var(--sh-line-subtle)] py-3 text-[var(--sh-ink-muted)]">
+              {selected.hook}
+            </p>
+            <section className="border-l-2 border-[var(--sh-brand-400)] bg-[var(--sh-brand-50)] px-3 py-2.5">
+              <p className="text-xs font-semibold text-[var(--sh-brand-700)]">课堂从这个问题开始</p>
+              <p className="mt-1 font-medium text-[var(--sh-ink-strong)]">
+                {selected.firstQuestion}
+              </p>
             </section>
           </div>
         </aside>
