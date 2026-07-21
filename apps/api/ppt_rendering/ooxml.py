@@ -363,12 +363,7 @@ def _pres_props() -> str:
 
 def _view_props() -> str:
     return _xml(
-        f'<p:viewPr xmlns:a="{_A}" xmlns:r="{_R}" xmlns:p="{_P}" lastView="sldView">'
-        '<p:normalViewPr/><p:slideViewPr><p:cSldViewPr><p:cViewPr varScale="1">'
-        '<p:scale><a:sx n="100" d="100"/><a:sy n="100" d="100"/></p:scale>'
-        '<p:origin x="0" y="0"/></p:cViewPr><p:guideLst/></p:cSldViewPr></p:slideViewPr>'
-        '<p:notesTextViewPr><p:cViewPr><p:scale><a:sx n="100" d="100"/>'
-        '<a:sy n="100" d="100"/></p:scale><p:origin x="0" y="0"/></p:cViewPr></p:notesTextViewPr>'
+        f'<p:viewPr xmlns:a="{_A}" xmlns:r="{_R}" xmlns:p="{_P}">'
         '<p:gridSpacing cx="72008" cy="72008"/></p:viewPr>'
     )
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 import pytest
 
 from apps.api.ppt_rendering import (
@@ -13,6 +15,7 @@ from apps.api.ppt_rendering import (
     Box,
     CanvasSpec,
     PptRenderingError,
+    ShapeElement,
     TextElement,
     assemble_pages,
 )
@@ -169,6 +172,34 @@ def test_png_chunk_type_and_reserved_bit_are_validated(chunk_kind: bytes) -> Non
         assemble_pages(make_request(pages=(page,)))
 
 
+@pytest.mark.parametrize(
+    "content",
+    [
+        insert_png_chunks(
+            png_bytes(), before_kind=b"IDAT", chunks=((b"gAMA", b"\x00\x00\xb1\x8f"),)
+        ),
+        insert_png_chunks(
+            png_bytes(),
+            before_kind=b"IDAT",
+            chunks=((b"gAMA", b"\x00\x00\xb1\x8f"), (b"gAMA", b"\x00\x00\xb1\x8f")),
+        ),
+        insert_png_chunks(
+            png_bytes(), before_kind=b"IDAT", chunks=((b"sRGB", b"\x00"), (b"sRGB", b"\x00"))
+        ),
+        insert_png_chunks(png_bytes(), before_kind=b"IDAT", chunks=((b"gAMA", b"\x01"),)),
+        insert_png_chunks(
+            png_bytes(), before_kind=b"IEND", chunks=((b"gAMA", b"\x00\x00\xb1\x8f"),)
+        ),
+    ],
+)
+def test_png_v1_profile_rejects_unlisted_ancillary_chunks(content: bytes) -> None:
+    background = BackgroundImage(content=content, media_type="image/png")
+    page = make_page().model_copy(update={"backgrounds": (background,)})
+
+    with pytest.raises(PptRenderingError, match="PPT_BACKGROUND_IMAGE_INVALID"):
+        assemble_pages(make_request(pages=(page,)))
+
+
 def test_png_rejects_duplicate_transparency_singleton() -> None:
     content = insert_png_chunks(
         indexed_png_bytes(),
@@ -269,6 +300,24 @@ def test_all_jpeg_profiles_are_stably_unsupported() -> None:
             assemble_pages(make_request(pages=(page,)))
 
         assert caught.value.code == "PPT_BACKGROUND_IMAGE_PROFILE_UNSUPPORTED"
+
+
+@pytest.mark.parametrize("kind", ["line", "arrow"])
+def test_line_and_arrow_reject_unused_fill_semantics(kind: Literal["line", "arrow"]) -> None:
+    source = make_page()
+    shape = ShapeElement(
+        element_key=kind,
+        kind=kind,
+        box=source.elements[-1].box,
+        fill_color="FFD966",
+        line_color="C55A11",
+    )
+    page = source.model_copy(update={"elements": (shape,)})
+
+    with pytest.raises(PptRenderingError, match="PPT_SHAPE_FILL_UNSUPPORTED") as caught:
+        assemble_pages(make_request(pages=(page,)))
+
+    assert caught.value.code == "PPT_SHAPE_FILL_UNSUPPORTED"
 
 
 def test_page_key_lone_surrogate_has_stable_domain_error() -> None:

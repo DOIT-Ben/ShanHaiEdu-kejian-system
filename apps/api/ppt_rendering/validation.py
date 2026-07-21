@@ -121,10 +121,15 @@ def _validate_element(request: AssemblyRequest, element: TextElement | ShapeElem
             raise PptRenderingError("PPT_TEXT_REQUIRED", "text elements cannot be blank")
         if not _COLOR.fullmatch(element.font.color):
             raise PptRenderingError("PPT_COLOR_INVALID", "font color must be six hex digits")
-    elif not _COLOR.fullmatch(element.line_color) or (
-        element.fill_color is not None and not _COLOR.fullmatch(element.fill_color)
-    ):
-        raise PptRenderingError("PPT_COLOR_INVALID", "shape colors must be six hex digits")
+    else:
+        if element.kind in {"line", "arrow"} and element.fill_color is not None:
+            raise PptRenderingError(
+                "PPT_SHAPE_FILL_UNSUPPORTED", "line and arrow shapes do not accept fill_color"
+            )
+        if not _COLOR.fullmatch(element.line_color) or (
+            element.fill_color is not None and not _COLOR.fullmatch(element.fill_color)
+        ):
+            raise PptRenderingError("PPT_COLOR_INVALID", "shape colors must be six hex digits")
 
 
 def _manifest_page(page: PageSpec, image_info: ImageInfo) -> ManifestPage:

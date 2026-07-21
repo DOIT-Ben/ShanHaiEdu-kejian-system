@@ -1,6 +1,9 @@
 """Static DrawingML theme used by the pure PPTX writer."""
 
 _A = "http://schemas.openxmlformats.org/drawingml/2006/main"
+_SOLID_FILL = '<a:solidFill><a:schemeClr val="phClr"/></a:solidFill>'
+_LINE_STYLE = '<a:ln w="12700"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln>'
+_EFFECT_STYLE = "<a:effectStyle><a:effectLst/></a:effectStyle>"
 
 
 def theme_xml() -> str:
@@ -24,11 +27,9 @@ def theme_xml() -> str:
         '<a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="Aptos"/>'
         '<a:ea typeface="Microsoft YaHei"/><a:cs typeface=""/></a:minorFont>'
         '</a:fontScheme><a:fmtScheme name="Office"><a:fillStyleLst>'
-        '<a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst>'
-        '<a:lnStyleLst><a:ln w="12700"><a:solidFill><a:schemeClr val="phClr"/>'
-        "</a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle>"
-        "<a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst>"
-        '<a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst>'
+        f"{_SOLID_FILL * 3}</a:fillStyleLst><a:lnStyleLst>{_LINE_STYLE * 3}"
+        f"</a:lnStyleLst><a:effectStyleLst>{_EFFECT_STYLE * 3}</a:effectStyleLst>"
+        f"<a:bgFillStyleLst>{_SOLID_FILL * 3}</a:bgFillStyleLst>"
         "</a:fmtScheme></a:themeElements></a:theme>"
     )
     return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' + body

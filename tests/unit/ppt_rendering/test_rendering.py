@@ -91,6 +91,36 @@ def test_export_contains_one_full_slide_background_and_editable_native_objects()
         assert package.read("ppt/media/image1.png").startswith(b"\x89PNG")
 
 
+def test_theme_format_scheme_has_required_style_counts() -> None:
+    result = export_pptx(make_request())
+
+    with ZipFile(BytesIO(result.content)) as package:
+        theme = ElementTree.fromstring(package.read("ppt/theme/theme1.xml"))
+        format_scheme = theme.find("./a:themeElements/a:fmtScheme", NS)
+        assert format_scheme is not None
+        for list_name in (
+            "fillStyleLst",
+            "lnStyleLst",
+            "effectStyleLst",
+            "bgFillStyleLst",
+        ):
+            style_list = format_scheme.find(f"./a:{list_name}", NS)
+            assert style_list is not None
+            assert len(style_list) >= 3
+
+
+def test_view_properties_use_powerpoint_compatible_minimal_profile() -> None:
+    result = export_pptx(make_request())
+
+    with ZipFile(BytesIO(result.content)) as package:
+        view_properties = ElementTree.fromstring(package.read("ppt/viewProps.xml"))
+        children = list(view_properties)
+
+    assert len(children) == 1
+    assert children[0].tag == f"{{{NS['p']}}}gridSpacing"
+    assert children[0].attrib == {"cx": "72008", "cy": "72008"}
+
+
 def test_formula_manifest_declares_editable_text_fallback() -> None:
     manifest = assemble_pages(make_request())
 
@@ -172,7 +202,7 @@ def test_all_native_shape_geometries_are_valid_drawingml() -> None:
             element_key=kind,
             kind=kind,
             box=source.elements[-1].box,
-            fill_color="FFD966",
+            fill_color="FFD966" if kind in {"rectangle", "ellipse"} else None,
             line_color="C55A11",
         )
         for kind in ("rectangle", "ellipse", "line", "arrow")

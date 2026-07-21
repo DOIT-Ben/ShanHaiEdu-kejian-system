@@ -118,7 +118,7 @@ def _apply_png_chunk(state: _PngState, kind: bytes, payload: bytes) -> bool:
             raise _invalid_image()
         state.seen_iend = True
         return True
-    elif kind and kind[0] & 0x20 == 0:
+    else:
         raise _invalid_image()
     if state.seen_idat and kind != b"IDAT":
         state.idat_ended = True
