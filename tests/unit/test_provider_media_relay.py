@@ -141,3 +141,18 @@ def test_http_relay_serves_valid_image_without_caching(tmp_path: Path) -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=1)
+
+
+def test_expired_media_cleanup_is_scheduled_independently() -> None:
+    root = Path(__file__).resolve().parents[2]
+    service = (root / "infra/provider-media-relay/provider-media-cleanup.service").read_text(
+        encoding="utf-8"
+    )
+    timer = (root / "infra/provider-media-relay/provider-media-cleanup.timer").read_text(
+        encoding="utf-8"
+    )
+
+    assert "provider-media-cleanup" in service
+    assert "ReadWritePaths=/srv/shanhaiedu/runtime/provider-media" in service
+    assert "OnUnitActiveSec=60s" in timer
+    assert "Persistent=true" in timer

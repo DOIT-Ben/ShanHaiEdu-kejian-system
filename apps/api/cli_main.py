@@ -7,7 +7,12 @@ import asyncio
 from pathlib import Path
 from uuid import UUID
 
-from apps.api.cli import run_model_smoke, run_publish_golden_content, run_video_smoke
+from apps.api.cli import (
+    run_model_smoke,
+    run_provider_media_cleanup,
+    run_publish_golden_content,
+    run_video_smoke,
+)
 from apps.api.model_gateway.contracts import ModelCapability
 
 
@@ -35,6 +40,10 @@ def main() -> int:
         "publish-golden-content",
         help="publish the validated built-in content package and activate it for new projects",
     )
+    subparsers.add_parser(
+        "provider-media-cleanup",
+        help="remove expired opaque provider-media relay files",
+    )
     args = parser.parse_args()
     if args.command == "model-smoke":
         return asyncio.run(
@@ -57,4 +66,6 @@ def main() -> int:
         )
     if args.command == "publish-golden-content":
         return run_publish_golden_content()
+    if args.command == "provider-media-cleanup":
+        return run_provider_media_cleanup()
     return 2

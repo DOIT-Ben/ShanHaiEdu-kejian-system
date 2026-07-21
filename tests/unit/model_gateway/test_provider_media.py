@@ -110,6 +110,28 @@ def test_resolver_rejects_mismatched_or_tampered_object_bytes(tmp_path: Path) ->
     assert list(tmp_path.iterdir()) == []
 
 
+def test_resolver_rejects_mismatched_object_storage_media_type(tmp_path: Path) -> None:
+    organization_id = uuid4()
+    version_id = uuid4()
+    record = _record(organization_id=organization_id, version_id=version_id)
+    storage = FakeObjectStorage()
+    storage.put_bytes(
+        bucket=record.storage_bucket,
+        key=record.storage_key,
+        payload=PNG_BYTES,
+        media_type="application/octet-stream",
+    )
+    resolver = _resolver(tmp_path, FakeAssetReader(record), storage)
+
+    with pytest.raises(ProviderMediaResolutionError, match="integrity"):
+        resolver.resolve(
+            organization_id=organization_id,
+            reference=MediaReference(file_version_id=version_id, mime_type="image/png"),
+        )
+
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_resolver_removes_materialized_file_when_the_provider_url_is_too_long(
     tmp_path: Path,
 ) -> None:

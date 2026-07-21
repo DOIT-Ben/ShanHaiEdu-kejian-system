@@ -8,6 +8,7 @@ import re
 import tempfile
 import time
 from dataclasses import dataclass
+from itertools import islice
 from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
@@ -15,7 +16,7 @@ from uuid import UUID, uuid4
 from apps.api.assets.provider_media import ProviderMediaAssetReader, ProviderMediaAssetVersion
 from apps.api.model_gateway.contracts import MediaReference
 from apps.api.provider_media_relay import sign_media_path
-from apps.api.uploads.storage import ObjectStorage, ObjectStorageError
+from apps.api.uploads.storage import ObjectMetadata, ObjectStorage, ObjectStorageError
 
 _MIME_EXTENSIONS = {
     "image/png": ".png",
@@ -88,13 +89,13 @@ class ProviderMediaReferenceResolver:
         destination = self._config.relay_root / self._filename_for(asset.mime_type)
         temporary = self._temporary_path()
         try:
-            written = self._storage.download_to_path(
+            downloaded = self._storage.download_to_path(
                 bucket=asset.storage_bucket,
                 key=asset.storage_key,
                 destination=temporary,
                 max_bytes=self._config.max_file_bytes,
             )
-            self._validate_download(temporary, asset, written)
+            self._validate_download(temporary, asset, downloaded)
             os.chmod(temporary, 0o640)
             os.replace(temporary, destination)
         except (OSError, ObjectStorageError) as error:
@@ -112,18 +113,11 @@ class ProviderMediaReferenceResolver:
             raise
 
     def cleanup_expired(self, *, now: float | None = None) -> int:
-        cutoff = (time.time() if now is None else now) - self._config.ttl_seconds
-        removed = 0
-        for candidate in self._config.relay_root.iterdir():
-            if not _OPAQUE_FILENAME.fullmatch(candidate.name) or candidate.is_symlink():
-                continue
-            try:
-                if candidate.is_file() and candidate.stat().st_mtime <= cutoff:
-                    candidate.unlink()
-                    removed += 1
-            except OSError:
-                continue
-        return removed
+        return cleanup_expired_provider_media(
+            self._config.relay_root,
+            ttl_seconds=self._config.ttl_seconds,
+            now=now,
+        )
 
     def _validate_reference(
         self,
@@ -153,13 +147,17 @@ class ProviderMediaReferenceResolver:
         self,
         path: Path,
         asset: ProviderMediaAssetVersion,
-        written: int,
+        downloaded: ObjectMetadata,
     ) -> None:
         content = path.read_bytes()
         size = len(content)
         digest = hashlib.sha256(content).hexdigest()
         if (
-            written != asset.byte_size
+            downloaded.bucket != asset.storage_bucket
+            or downloaded.key != asset.storage_key
+            or downloaded.size_bytes != asset.byte_size
+            or _normalized_media_type(downloaded.media_type) != asset.mime_type
+            or downloaded.sha256 != asset.sha256
             or size != asset.byte_size
             or digest != asset.sha256
             or _detect_media_type(content) != asset.mime_type
@@ -191,3 +189,35 @@ def _detect_media_type(content: bytes) -> str | None:
     if header.startswith(b"RIFF") and header[8:12] == b"WEBP":
         return "image/webp"
     return None
+
+
+def _normalized_media_type(value: str) -> str:
+    return value.split(";", 1)[0].strip().lower()
+
+
+def cleanup_expired_provider_media(
+    relay_root: Path,
+    *,
+    ttl_seconds: int,
+    now: float | None = None,
+    scan_limit: int = 10_000,
+) -> int:
+    """Remove expired opaque relay files for request and scheduled cleanup paths."""
+
+    if ttl_seconds < 1 or scan_limit < 1:
+        raise ValueError("provider media cleanup bounds must be positive")
+    root = relay_root.resolve()
+    if not root.is_dir():
+        raise ValueError("relay_root must be an existing directory")
+    cutoff = (time.time() if now is None else now) - ttl_seconds
+    removed = 0
+    for candidate in islice(root.iterdir(), scan_limit):
+        if not _OPAQUE_FILENAME.fullmatch(candidate.name) or candidate.is_symlink():
+            continue
+        try:
+            if candidate.is_file() and candidate.stat().st_mtime <= cutoff:
+                candidate.unlink()
+                removed += 1
+        except OSError:
+            continue
+    return removed

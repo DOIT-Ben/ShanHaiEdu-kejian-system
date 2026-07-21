@@ -31,6 +31,7 @@ from apps.api.model_gateway.contracts import (
 from apps.api.model_gateway.factory import build_real_text_gateway, build_real_video_gateway
 from apps.api.model_gateway.fake import DeterministicFakeTextProvider
 from apps.api.model_gateway.gateway import ModelGateway
+from apps.api.model_gateway.provider_media import cleanup_expired_provider_media
 from apps.api.model_gateway.video_smoke import VideoProbeError, VideoProbeResult, probe_mp4
 from apps.api.model_gateway.video_smoke_media import (
     VideoSmokeMediaContext,
@@ -52,6 +53,20 @@ class _VideoSmokeOutcome:
     result: VideoGatewayResult
     file: GeneratedFileFact
     probe: VideoProbeResult
+
+
+def run_provider_media_cleanup() -> int:
+    """Delete expired opaque relay files without requiring a generation request."""
+
+    settings = get_settings()
+    if settings.provider_media_root is None:
+        return 1
+    removed = cleanup_expired_provider_media(
+        settings.provider_media_root,
+        ttl_seconds=settings.provider_media_max_ttl_seconds,
+    )
+    print(json.dumps({"conclusion": "passed", "removed": removed}, ensure_ascii=True))
+    return 0
 
 
 def run_publish_golden_content(*, database_url: str | None = None, root: Path = ROOT) -> int:
