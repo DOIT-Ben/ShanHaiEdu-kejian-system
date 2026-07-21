@@ -56,6 +56,21 @@ class Settings(BaseSettings):
         pattern=r"^[A-Z][A-Z0-9_]{2,127}$",
     )
     text_provider_timeout_seconds: float = Field(default=30, gt=0, le=120)
+    video_provider_name: str | None = None
+    video_provider_base_url: HttpUrl | None = None
+    video_provider_model: str | None = None
+    video_provider_secret_env: str = Field(
+        default="MODEL_GATEWAY_API_KEY",
+        pattern=r"^[A-Z][A-Z0-9_]{2,127}$",
+    )
+    video_provider_timeout_seconds: float = Field(default=120, gt=0, le=600)
+    video_provider_poll_seconds: float = Field(default=2, gt=0, le=60)
+    video_provider_max_wait_seconds: int = Field(default=300, ge=10, le=900)
+    video_provider_max_download_bytes: int = Field(
+        default=104_857_600,
+        ge=1,
+        le=1_073_741_824,
+    )
 
     @model_validator(mode="after")
     def require_production_dependencies(self) -> Self:
