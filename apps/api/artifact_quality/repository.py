@@ -7,6 +7,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from apps.api.artifact_quality.contracts import QualitySourceType
 from apps.api.artifact_quality.models import ArtifactQualityReport
 from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.permissions import ProjectAccessService
@@ -29,7 +30,8 @@ class ArtifactQualityReportRepository:
         self,
         *,
         project_id: UUID,
-        source_artifact_version_id: UUID,
+        source_type: QualitySourceType,
+        source_version_id: UUID,
         workflow_definition_version_id: UUID,
         validator_set_hash: str,
     ) -> ArtifactQualityReport | None:
@@ -38,11 +40,17 @@ class ArtifactQualityReportRepository:
                 project_id,
                 ProjectAction.VIEW,
             )
+        source_column = (
+            ArtifactQualityReport.source_artifact_version_id
+            if source_type == "artifact"
+            else ArtifactQualityReport.source_file_asset_version_id
+        )
         return self._session.scalar(
             select(ArtifactQualityReport).where(
                 ArtifactQualityReport.organization_id == self._actor.organization_id,
                 ArtifactQualityReport.project_id == project_id,
-                ArtifactQualityReport.source_artifact_version_id == source_artifact_version_id,
+                ArtifactQualityReport.source_type == source_type,
+                source_column == source_version_id,
                 ArtifactQualityReport.workflow_definition_version_id
                 == workflow_definition_version_id,
                 ArtifactQualityReport.validator_set_hash == validator_set_hash,

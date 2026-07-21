@@ -38,33 +38,57 @@ class ArtifactQualityService:
         technical_error: ArtifactQualityError | None = None
         result: ArtifactQualityReportResult | None = None
         with self._transactions.begin() as transaction:
-            context = transaction.prepare(node_run_id)
-            if context.existing_result is not None:
-                return context.existing_result
             try:
-                validators = self._validators.resolve(context.validator_refs)
-                outcomes = tuple(validator.validate(context) for validator in validators)
+                context = transaction.prepare(node_run_id)
             except Exception as exc:
-                failure_code = (
-                    exc.code
-                    if isinstance(exc, QualityValidatorRegistryError)
-                    else _TECHNICAL_FAILURE
-                )
-                transaction.fail_technical(context, code=failure_code)
+                failure_code = _error_code(exc)
+                self._fail_prepare(transaction, node_run_id, failure_code)
                 technical_error = ArtifactQualityError(
                     failure_code,
-                    "artifact quality validation failed technically",
+                    "artifact quality validation preparation failed technically",
                 )
                 technical_error.__cause__ = exc
             else:
-                conclusion: QualityConclusion = (
-                    "passed" if all(outcome.passed for outcome in outcomes) else "failed"
-                )
-                result = self._complete(transaction, context, conclusion, outcomes)
+                if context.existing_result is not None:
+                    return context.existing_result
+                try:
+                    validators = self._validators.resolve(context.validator_refs)
+                    outcomes = tuple(validator.validate(context) for validator in validators)
+                except Exception as exc:
+                    failure_code = (
+                        exc.code
+                        if isinstance(exc, QualityValidatorRegistryError)
+                        else _TECHNICAL_FAILURE
+                    )
+                    transaction.fail_technical(context, code=failure_code)
+                    technical_error = ArtifactQualityError(
+                        failure_code,
+                        "artifact quality validation failed technically",
+                    )
+                    technical_error.__cause__ = exc
+                else:
+                    conclusion: QualityConclusion = (
+                        "passed" if all(outcome.passed for outcome in outcomes) else "failed"
+                    )
+                    result = self._complete(transaction, context, conclusion, outcomes)
         if technical_error is not None:
             raise technical_error
         assert result is not None
         return result
+
+    @staticmethod
+    def _fail_prepare(
+        transaction: ArtifactQualityTransaction,
+        node_run_id: UUID,
+        code: str,
+    ) -> None:
+        try:
+            transaction.fail_prepare(node_run_id, code=code)
+        except Exception as exc:
+            raise ArtifactQualityError(
+                _COMMIT_FAILURE,
+                "artifact quality preparation failure could not be committed",
+            ) from exc
 
     @staticmethod
     def _complete(
@@ -87,3 +111,8 @@ class ArtifactQualityService:
                 code if isinstance(code, str) else _COMMIT_FAILURE,
                 "artifact quality report commit failed",
             ) from exc
+
+
+def _error_code(exc: Exception) -> str:
+    code = getattr(exc, "code", _TECHNICAL_FAILURE)
+    return code if isinstance(code, str) else _TECHNICAL_FAILURE

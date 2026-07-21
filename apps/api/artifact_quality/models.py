@@ -21,6 +21,13 @@ class ArtifactQualityReport(Base):
             name="source_content_hash_format",
         ),
         CheckConstraint(
+            "(source_type = 'artifact' AND source_artifact_version_id IS NOT NULL "
+            "AND source_file_asset_version_id IS NULL) OR "
+            "(source_type = 'asset' AND source_artifact_version_id IS NULL "
+            "AND source_file_asset_version_id IS NOT NULL)",
+            name="source_identity_exactly_one",
+        ),
+        CheckConstraint(
             "validator_set_hash ~ '^[0-9a-f]{64}$'",
             name="validator_set_hash_format",
         ),
@@ -47,6 +54,15 @@ class ArtifactQualityReport(Base):
             "workflow_definition_version_id",
             "validator_set_hash",
             unique=True,
+            postgresql_where="source_type = 'artifact'",
+        ),
+        Index(
+            "uq_artifact_quality_reports_asset_source_workflow_validators",
+            "source_file_asset_version_id",
+            "workflow_definition_version_id",
+            "validator_set_hash",
+            unique=True,
+            postgresql_where="source_type = 'asset'",
         ),
         Index(
             "uq_artifact_quality_reports_validate_node_run",
@@ -57,7 +73,9 @@ class ArtifactQualityReport(Base):
             "ix_artifact_quality_reports_project_source",
             "organization_id",
             "project_id",
+            "source_type",
             "source_artifact_version_id",
+            "source_file_asset_version_id",
         ),
     )
 
@@ -88,14 +106,22 @@ class ArtifactQualityReport(Base):
             ondelete="RESTRICT",
         ),
     )
-    source_artifact_version_id: Mapped[UUID] = mapped_column(
+    source_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    source_artifact_version_id: Mapped[UUID | None] = mapped_column(
         Uuid,
         ForeignKey(
             "artifact_versions.id",
             name="fk_artifact_quality_reports_source_version",
             ondelete="RESTRICT",
         ),
-        nullable=False,
+    )
+    source_file_asset_version_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey(
+            "file_asset_versions.id",
+            name="fk_artifact_quality_reports_source_file_asset_version",
+            ondelete="RESTRICT",
+        ),
     )
     source_content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     content_release_id: Mapped[UUID] = mapped_column(

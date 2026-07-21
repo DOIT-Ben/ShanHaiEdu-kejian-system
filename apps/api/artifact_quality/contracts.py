@@ -9,6 +9,7 @@ from typing import Any, Literal, Protocol
 from uuid import UUID
 
 QualityConclusion = Literal["passed", "failed"]
+QualitySourceType = Literal["artifact", "asset"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,7 +27,9 @@ class QualityValidationContext:
     content_release_id: UUID
     workflow_definition_version_id: UUID
     node_run_id: UUID
-    source_artifact_version_id: UUID
+    source_type: QualitySourceType
+    source_id: UUID
+    source_version_id: UUID
     source_content_hash: str
     source_content: Mapping[str, Any]
     validator_refs: tuple[ValidatorRef, ...]
@@ -69,6 +72,17 @@ class ArtifactQualityTransaction(Protocol):
     ) -> ArtifactQualityReportResult: ...
 
     def fail_technical(self, context: QualityValidationContext, *, code: str) -> None: ...
+
+    def fail_prepare(self, node_run_id: UUID, *, code: str) -> None: ...
+
+
+@dataclass(frozen=True, slots=True)
+class QualitySource:
+    source_type: QualitySourceType
+    source_id: UUID
+    source_version_id: UUID
+    content_hash: str
+    content: Mapping[str, Any]
 
 
 class ArtifactQualityTransactionFactory(Protocol):

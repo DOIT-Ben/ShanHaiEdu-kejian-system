@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
-from collections.abc import Callable, Generator, Mapping
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import asdict
 from typing import Any, cast
@@ -23,18 +21,21 @@ from apps.api.artifact_quality.contracts import (
     ArtifactQualityTransaction,
     ArtifactQualityTransactionFactory,
     QualityConclusion,
+    QualitySource,
     QualityValidationContext,
     ValidatorOutcome,
 )
 from apps.api.artifact_quality.models import ArtifactQualityReport
+from apps.api.artifact_quality.payloads import canonical_hash, plain_json
 from apps.api.artifact_quality.repository import ArtifactQualityReportRepository
-from apps.api.artifacts.execution_port import SqlAlchemyArtifactPort
+from apps.api.artifacts.quality_port import SqlAlchemyArtifactQualitySourcePort
+from apps.api.assets.quality_port import SqlAlchemyAssetQualitySourcePort
 from apps.api.identity.context import ActorContext
 from apps.api.ids import new_uuid7
 from apps.api.reliability.events import EventResource, EventWriter
 from apps.api.runtime_boundary.ports import WorkflowExecutionContext
 from apps.api.workflows.execution_port import SqlAlchemyWorkflowExecutionPort
-from apps.api.workflows.quality_port import SqlAlchemyQualityWorkflowPort
+from apps.api.workflows.quality_port import QualitySourceInput, SqlAlchemyQualityWorkflowPort
 from workflow.registry import BUILTIN_WORKFLOW_REGISTRY
 
 
@@ -81,7 +82,8 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
         self._actor = actor
         self._workflow = SqlAlchemyWorkflowExecutionPort(session, actor)
         self._quality_workflow = SqlAlchemyQualityWorkflowPort(session, actor)
-        self._artifacts = SqlAlchemyArtifactPort(session, actor)
+        self._artifact_sources = SqlAlchemyArtifactQualitySourcePort(session, actor)
+        self._asset_sources = SqlAlchemyAssetQualitySourcePort(session, actor)
         self._reports = ArtifactQualityReportRepository(session, actor)
         self._fault_injector = fault_injector
 
@@ -95,15 +97,16 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
             dict(self._workflow.published_graph(execution.workflow_definition_version_id))
         )
         binding = resolve_quality_report_binding(registered, execution.node_key)
-        version_id, snapshot_hash = self._quality_workflow.require_artifact_input(
+        source_input = self._quality_workflow.require_source_input(
             node_run_id,
             binding.source_input_ref,
         )
-        source = self._artifacts.load_frozen_versions(
+        source = self._resolve_source(
             execution,
-            {binding.source_input_ref: version_id},
-        )[binding.source_input_ref]
-        if source.content_hash != snapshot_hash:
+            binding,
+            source_input,
+        )
+        if source.content_hash != source_input.content_hash:
             raise ArtifactQualityTransactionError(
                 "QUALITY_SOURCE_HASH_MISMATCH",
                 "the frozen source hash does not match the exact artifact version",
@@ -114,7 +117,7 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
             self._require_same_fixed_identity(
                 existing,
                 execution,
-                source.artifact_version_id,
+                source,
                 source.content_hash,
                 binding,
             )
@@ -127,12 +130,39 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
             content_release_id=execution.content_release_id,
             workflow_definition_version_id=execution.workflow_definition_version_id,
             node_run_id=node_run_id,
-            source_artifact_version_id=source.artifact_version_id,
+            source_type=source.source_type,
+            source_id=source.source_id,
+            source_version_id=source.source_version_id,
             source_content_hash=source.content_hash,
             source_content=source.content,
             validator_refs=binding.validator_refs,
             validator_set_hash=binding.validator_set_hash,
             existing_result=result,
+        )
+
+    def _resolve_source(
+        self,
+        execution: WorkflowExecutionContext,
+        binding: QualityReportBinding,
+        source_input: QualitySourceInput,
+    ) -> QualitySource:
+        if source_input.source_type == "artifact":
+            return self._artifact_sources.load(
+                execution,
+                contract_ref=binding.source_input_ref,
+                source_id=source_input.source_id,
+                source_version_id=source_input.source_version_id,
+            )
+        if source_input.source_type == "asset":
+            return self._asset_sources.load(
+                execution,
+                contract_ref=binding.source_input_ref,
+                source_id=source_input.source_id,
+                source_version_id=source_input.source_version_id,
+            )
+        raise ArtifactQualityTransactionError(
+            "QUALITY_SOURCE_TYPE_UNSUPPORTED",
+            "the fixed quality source type is unsupported",
         )
 
     def complete(
@@ -154,7 +184,8 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
         self._lock_identity(context)
         existing = self._reports.get_exact(
             project_id=context.project_id,
-            source_artifact_version_id=context.source_artifact_version_id,
+            source_type=context.source_type,
+            source_version_id=context.source_version_id,
             workflow_definition_version_id=context.workflow_definition_version_id,
             validator_set_hash=context.validator_set_hash,
         )
@@ -165,7 +196,13 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
             organization_id=context.organization_id,
             project_id=context.project_id,
             lesson_unit_id=context.lesson_unit_id,
-            source_artifact_version_id=context.source_artifact_version_id,
+            source_type=context.source_type,
+            source_artifact_version_id=(
+                context.source_version_id if context.source_type == "artifact" else None
+            ),
+            source_file_asset_version_id=(
+                context.source_version_id if context.source_type == "asset" else None
+            ),
             source_content_hash=context.source_content_hash,
             content_release_id=context.content_release_id,
             workflow_definition_version_id=context.workflow_definition_version_id,
@@ -194,7 +231,8 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
             event_type="artifact.quality_validation.technical_failed",
             resource=EventResource(type="node_run", id=context.node_run_id),
             payload={
-                "source_artifact_version_id": str(context.source_artifact_version_id),
+                "source_type": context.source_type,
+                "source_version_id": str(context.source_version_id),
                 "workflow_definition_version_id": str(context.workflow_definition_version_id),
                 "validator_set_hash": context.validator_set_hash,
                 "error_code": code,
@@ -203,10 +241,30 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
         )
         self._fault_injector("after_event")
 
+    def fail_prepare(self, node_run_id: UUID, *, code: str) -> None:
+        routing = self._quality_workflow.fail_prepare(node_run_id, code=code)
+        if routing is None:
+            return
+        self._fault_injector("after_terminal")
+        EventWriter(self._session, routing.organization_id).append(
+            project_id=routing.project_id,
+            event_type="artifact.quality_validation.technical_failed",
+            resource=EventResource(type="node_run", id=node_run_id),
+            payload={
+                "content_release_id": str(routing.content_release_id),
+                "workflow_definition_version_id": str(routing.workflow_definition_version_id),
+                "error_code": code,
+                "failure_stage": "prepare",
+            },
+            request_id=None,
+        )
+        self._fault_injector("after_event")
+
     def _lock_identity(self, context: QualityValidationContext) -> None:
         identity = ":".join(
             (
-                str(context.source_artifact_version_id),
+                context.source_type,
+                str(context.source_version_id),
                 str(context.workflow_definition_version_id),
                 context.validator_set_hash,
             )
@@ -220,7 +278,7 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
     def _require_same_fixed_identity(
         existing: ArtifactQualityReport,
         execution: WorkflowExecutionContext,
-        source_artifact_version_id: UUID,
+        source: QualitySource,
         source_hash: str,
         binding: QualityReportBinding,
     ) -> None:
@@ -230,7 +288,8 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
             or existing.lesson_unit_id != execution.lesson_unit_id
             or existing.content_release_id != execution.content_release_id
             or existing.workflow_definition_version_id != execution.workflow_definition_version_id
-            or existing.source_artifact_version_id != source_artifact_version_id
+            or existing.source_type != source.source_type
+            or _source_version_id(existing) != source.source_version_id
             or existing.source_content_hash != source_hash
             or existing.validator_set_hash != binding.validator_set_hash
             or existing.validator_set_json != validator_set_payload(binding.validator_refs)
@@ -250,6 +309,8 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
     ) -> ArtifactQualityReportResult:
         if (
             existing.validate_node_run_id == context.node_run_id
+            and existing.source_type == context.source_type
+            and _source_version_id(existing) == context.source_version_id
             and existing.source_content_hash == context.source_content_hash
             and existing.content_release_id == context.content_release_id
             and existing.conclusion == conclusion
@@ -268,7 +329,8 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
             event_type=f"artifact.quality_report.{report.conclusion}",
             resource=EventResource(type="artifact_quality_report", id=report.id),
             payload={
-                "source_artifact_version_id": str(report.source_artifact_version_id),
+                "source_type": report.source_type,
+                "source_version_id": str(_source_version_id(report)),
                 "source_content_hash": report.source_content_hash,
                 "content_release_id": str(report.content_release_id),
                 "workflow_definition_version_id": str(report.workflow_definition_version_id),
@@ -295,28 +357,10 @@ def _validated_outcome_payload(
     for outcome in outcomes:
         validator = asdict(outcome.validator)
         findings.extend(
-            {"validator": validator, "finding": _plain_json(item)} for item in outcome.findings
+            {"validator": validator, "finding": plain_json(item)} for item in outcome.findings
         )
-        evidence.append({"validator": validator, "evidence": _plain_json(outcome.evidence)})
-    return findings, _canonical_hash(evidence)
-
-
-def _plain_json(value: Mapping[str, Any]) -> dict[str, Any]:
-    return cast(
-        dict[str, Any],
-        json.loads(json.dumps(value, sort_keys=True, ensure_ascii=True, allow_nan=False)),
-    )
-
-
-def _canonical_hash(value: object) -> str:
-    payload = json.dumps(
-        value,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=True,
-        allow_nan=False,
-    )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+        evidence.append({"validator": validator, "evidence": plain_json(outcome.evidence)})
+    return findings, canonical_hash(evidence)
 
 
 def _report_result(report: ArtifactQualityReport) -> ArtifactQualityReportResult:
@@ -325,6 +369,20 @@ def _report_result(report: ArtifactQualityReport) -> ArtifactQualityReportResult
         node_run_id=report.validate_node_run_id,
         conclusion=cast(QualityConclusion, report.conclusion),
     )
+
+
+def _source_version_id(report: ArtifactQualityReport) -> UUID:
+    value = (
+        report.source_artifact_version_id
+        if report.source_type == "artifact"
+        else report.source_file_asset_version_id
+    )
+    if value is None:
+        raise ArtifactQualityTransactionError(
+            "QUALITY_REPORT_SOURCE_INVALID",
+            "the persisted quality report has no exact source version",
+        )
+    return value
 
 
 def _ignore_fault_stage(_stage: str) -> None:

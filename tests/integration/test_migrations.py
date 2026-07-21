@@ -122,6 +122,7 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
         "fk_artifact_quality_reports_lesson_unit",
         "fk_artifact_quality_reports_organization",
         "fk_artifact_quality_reports_project",
+        "fk_artifact_quality_reports_source_file_asset_version",
         "fk_artifact_quality_reports_source_version",
         "fk_artifact_quality_reports_validate_node_run",
         "fk_artifact_quality_reports_workflow_version",
@@ -130,7 +131,12 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
         index["name"] for index in database_inspector.get_indexes("artifact_quality_reports")
     }
     assert "uq_artifact_quality_reports_source_workflow_validators" in quality_report_indexes
+    assert "uq_artifact_quality_reports_asset_source_workflow_validators" in quality_report_indexes
     assert "uq_artifact_quality_reports_validate_node_run" in quality_report_indexes
+    quality_report_columns = {
+        column["name"] for column in database_inspector.get_columns("artifact_quality_reports")
+    }
+    assert {"source_type", "source_file_asset_version_id"}.issubset(quality_report_columns)
     binding_indexes = {index["name"] for index in database_inspector.get_indexes("asset_bindings")}
     assert "uq_asset_bindings_active_slot_position" in binding_indexes
     with engine.connect() as connection:

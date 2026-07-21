@@ -28,12 +28,15 @@ from apps.api.artifact_quality.sqlalchemy import (
     SqlAlchemyArtifactQualityTransactionFactory,
 )
 from apps.api.artifacts.models import Artifact, ArtifactVersion
-from apps.api.database import build_engine, build_session_factory
+from apps.api.assets.models import FileAsset, FileAssetVersion
+from apps.api.database import build_engine, build_session_factory, utc_now
 from apps.api.identity.context import ActorContext, system_actor
+from apps.api.ids import new_uuid7
+from apps.api.lessons.models import LessonUnit
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.reliability.models import EventStreamEntry, OutboxEvent
-from apps.api.workflows.models import NodeRun, WorkflowRun
+from apps.api.workflows.models import BranchRun, NodeRun, WorkflowRun
 from apps.api.workflows.service import WorkflowRuntimeService
 from tests.integration.test_node_execution_runtime import (
     _seed_approved_artifact,  # pyright: ignore[reportPrivateUsage]
@@ -98,7 +101,8 @@ def test_quality_report_success_exact_query_and_replay_are_one_atomic_fact(
         assert _outbox_count(session, "artifact.quality_report.passed") == 1
         stored = ArtifactQualityReportRepository(session, seeded.actor).get_exact(
             project_id=seeded.project_id,
-            source_artifact_version_id=seeded.source_version_id,
+            source_type="artifact",
+            source_version_id=seeded.source_version_id,
             workflow_definition_version_id=_workflow_version_id(session, seeded.node_run_id),
             validator_set_hash=_binding().validator_set_hash,
         )
@@ -110,7 +114,9 @@ def test_quality_report_success_exact_query_and_replay_are_one_atomic_fact(
         assert stored.organization_id == seeded.actor.organization_id
         assert stored.project_id == seeded.project_id
         assert stored.lesson_unit_id is None
+        assert stored.source_type == "artifact"
         assert stored.source_artifact_version_id == source.id
+        assert stored.source_file_asset_version_id is None
         assert stored.source_content_hash == source.content_hash
         assert stored.content_release_id == run.content_release_id
         assert stored.workflow_definition_version_id == run.workflow_definition_version_id
@@ -124,12 +130,80 @@ def test_quality_report_success_exact_query_and_replay_are_one_atomic_fact(
         assert (
             ArtifactQualityReportRepository(session, seeded.actor).get_exact(
                 project_id=seeded.project_id,
-                source_artifact_version_id=seeded.source_version_id,
+                source_type="artifact",
+                source_version_id=seeded.source_version_id,
                 workflow_definition_version_id=_workflow_version_id(session, seeded.node_run_id),
                 validator_set_hash="f" * 64,
             )
             is None
         )
+
+
+@pytest.mark.parametrize(
+    ("node_key", "input_ref", "branch_key", "asset_kind", "mime_type"),
+    [
+        (
+            "ppt.final.validate",
+            "asset:pptx",
+            "ppt",
+            "pptx",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ),
+        (
+            "video.technical.validate",
+            "asset:video_final",
+            "video",
+            "video_final",
+            "video/mp4",
+        ),
+    ],
+)
+def test_published_media_quality_nodes_persist_exact_file_asset_report(
+    migrated_database_url: str,
+    node_key: str,
+    input_ref: str,
+    branch_key: str,
+    asset_kind: str,
+    mime_type: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_asset_quality_node(
+        factory,
+        node_key=node_key,
+        input_ref=input_ref,
+        branch_key=branch_key,
+        asset_kind=asset_kind,
+        mime_type=mime_type,
+    )
+    binding = _binding(node_key)
+    registry = InMemoryQualityValidatorRegistry(
+        {ref: FixtureValidator(ref) for ref in binding.validator_refs}
+    )
+
+    result = ArtifactQualityService(
+        SqlAlchemyArtifactQualityTransactionFactory(factory, seeded.actor),
+        registry,
+    ).execute(seeded.node_run_id)
+
+    assert result.conclusion == "passed"
+    with factory() as session:
+        node = session.get(NodeRun, seeded.node_run_id)
+        report = session.get(ArtifactQualityReport, result.report_id)
+        version = session.get(FileAssetVersion, seeded.source_version_id)
+        assert node is not None and node.status == NodeStatus.APPROVED.value
+        assert report is not None and version is not None
+        assert report.source_type == "asset"
+        assert report.source_artifact_version_id is None
+        assert report.source_file_asset_version_id == version.id
+        assert report.source_content_hash == version.sha256
+        stored = ArtifactQualityReportRepository(session, seeded.actor).get_exact(
+            project_id=seeded.project_id,
+            source_type="asset",
+            source_version_id=version.id,
+            workflow_definition_version_id=_workflow_version_id(session, seeded.node_run_id),
+            validator_set_hash=binding.validator_set_hash,
+        )
+        assert stored is not None and stored.id == report.id
 
 
 def test_quality_failure_persists_failed_report_and_failed_node(
@@ -237,6 +311,25 @@ def test_validator_technical_failure_fails_node_without_quality_report(
         assert _outbox_count(session, "artifact.quality_validation.technical_failed") == 1
 
 
+def test_prepare_hash_failure_fails_node_without_quality_report(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_quality_node(factory, snapshot_hash="f" * 64)
+
+    with pytest.raises(ArtifactQualityError) as captured:
+        _service(factory, seeded, passed=True).execute(seeded.node_run_id)
+
+    assert captured.value.code == "QUALITY_SOURCE_HASH_MISMATCH"
+    with factory() as session:
+        node = session.get(NodeRun, seeded.node_run_id)
+        assert node is not None and node.status == NodeStatus.FAILED.value
+        assert node.last_error_code == "QUALITY_SOURCE_HASH_MISMATCH"
+        assert session.scalar(select(func.count()).select_from(ArtifactQualityReport)) == 0
+        assert _event_count(session, "artifact.quality_validation.technical_failed") == 1
+        assert _outbox_count(session, "artifact.quality_validation.technical_failed") == 1
+
+
 def test_same_identity_from_another_node_with_different_payload_is_a_stable_conflict(
     migrated_database_url: str,
 ) -> None:
@@ -336,14 +429,16 @@ def test_cross_project_source_is_rejected_before_report_or_node_write(
         source_version_id=seeded.source_version_id,
     )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ArtifactQualityError) as captured:
         _service(factory, cross_project, passed=True).execute(node_run_id)
 
+    assert captured.value.code == "QUALITY_SOURCE_SCOPE_INVALID"
     with factory() as session:
         node = session.get(NodeRun, node_run_id)
-        assert node is not None and node.status == NodeStatus.READY.value
+        assert node is not None and node.status == NodeStatus.FAILED.value
         assert session.scalar(select(func.count()).select_from(ArtifactQualityReport)) == 0
         assert _event_count(session, "artifact.quality_report.passed") == 0
+        assert _event_count(session, "artifact.quality_validation.technical_failed") == 1
 
 
 def test_transaction_rejects_a_conclusion_that_disagrees_with_validator_outcomes(
@@ -397,6 +492,7 @@ def _seed_quality_node(
     factory: sessionmaker[Session],
     *,
     status: NodeStatus = NodeStatus.READY,
+    snapshot_hash: str | None = None,
 ) -> QualitySeed:
     runtime = _seed_runtime(factory)
     with factory() as session, session.begin():
@@ -427,7 +523,7 @@ def _seed_quality_node(
             source_type="artifact",
             source_id=source.artifact_id,
             source_version_id=source.id,
-            content_hash=source.content_hash,
+            content_hash=snapshot_hash or source.content_hash,
             snapshot=dict(source.content_json),
         )
     return QualitySeed(
@@ -435,6 +531,119 @@ def _seed_quality_node(
         project_id=runtime.project_id,
         node_run_id=node.id,
         source_version_id=source.id,
+    )
+
+
+def _seed_asset_quality_node(
+    factory: sessionmaker[Session],
+    *,
+    node_key: str,
+    input_ref: str,
+    branch_key: str,
+    asset_kind: str,
+    mime_type: str,
+) -> QualitySeed:
+    runtime = _seed_runtime(factory)
+    with factory() as session, session.begin():
+        run = session.get(WorkflowRun, runtime.workflow_run_id)
+        assert run is not None
+        lesson = LessonUnit(
+            id=new_uuid7(),
+            organization_id=runtime.actor.organization_id,
+            project_id=runtime.project_id,
+            lesson_key=f"QUALITY-{branch_key.upper()}",
+            position=1,
+            title=f"{branch_key} quality fixture",
+            scope_summary="Exact media quality source",
+            objective_summary="Persist a media quality report",
+            estimated_minutes=40,
+            source_division_version_id=runtime.upstream_version_id,
+            status="active",
+            created_by=runtime.actor.principal_id,
+            updated_by=runtime.actor.principal_id,
+        )
+        session.add(lesson)
+        session.flush()
+        branch = BranchRun(
+            id=new_uuid7(),
+            workflow_run_id=run.id,
+            lesson_unit_id=lesson.id,
+            branch_key=branch_key,
+            status="active",
+            created_by=runtime.actor.principal_id,
+            updated_by=runtime.actor.principal_id,
+        )
+        session.add(branch)
+        asset = FileAsset(
+            id=new_uuid7(),
+            organization_id=runtime.actor.organization_id,
+            asset_key=f"quality-{asset_kind}:{runtime.project_id}",
+            asset_kind=asset_kind,
+            current_version_id=None,
+            status="active",
+            retention_class="project",
+            created_by=runtime.actor.principal_id,
+            updated_by=runtime.actor.principal_id,
+        )
+        session.add(asset)
+        session.flush()
+        version = FileAssetVersion(
+            id=new_uuid7(),
+            organization_id=runtime.actor.organization_id,
+            file_asset_id=asset.id,
+            version_no=1,
+            storage_bucket="test-only",
+            storage_key=f"quality/{runtime.project_id}/{asset_kind}",
+            mime_type=mime_type,
+            byte_size=1024,
+            sha256="d" * 64,
+            etag=f"quality-{asset_kind}",
+            width=1280 if mime_type == "video/mp4" else None,
+            height=720 if mime_type == "video/mp4" else None,
+            duration_ms=60_000 if mime_type == "video/mp4" else None,
+            page_count=10 if asset_kind == "pptx" else None,
+            scan_status="clean",
+            metadata_json={"asset_kind": asset_kind},
+            derived_from_version_id=None,
+            created_at=utc_now(),
+            created_by=runtime.actor.principal_id,
+        )
+        session.add(version)
+        session.flush()
+        asset.current_version_id = version.id
+        node = NodeRun(
+            id=new_uuid7(),
+            organization_id=runtime.actor.organization_id,
+            workflow_run_id=run.id,
+            branch_run_id=branch.id,
+            node_key=node_key,
+            run_no=1,
+            status=NodeStatus.READY.value,
+            trigger_type="manual",
+            automation_policy_snapshot_json=run.automation_policy_snapshot_json,
+            created_by=runtime.actor.principal_id,
+            updated_by=runtime.actor.principal_id,
+        )
+        session.add(node)
+        session.flush()
+        WorkflowRuntimeService(session, runtime.actor).add_input_snapshot(
+            node.id,
+            input_key=input_ref,
+            source_type="asset",
+            source_id=asset.id,
+            source_version_id=version.id,
+            content_hash=version.sha256,
+            snapshot={
+                "mime_type": version.mime_type,
+                "byte_size": version.byte_size,
+                "sha256": version.sha256,
+            },
+        )
+    return QualitySeed(
+        actor=runtime.actor,
+        project_id=runtime.project_id,
+        node_run_id=node.id,
+        source_version_id=version.id,
     )
 
 
@@ -523,9 +732,9 @@ def _create_cross_project_source_node(
     return node.id
 
 
-def _binding() -> QualityReportBinding:
+def _binding(node_key: str = "lesson.division.validate") -> QualityReportBinding:
     registered = BUILTIN_WORKFLOW_REGISTRY.load(json.loads(CATALOG.read_text(encoding="utf-8")))
-    return resolve_quality_report_binding(registered, "lesson.division.validate")
+    return resolve_quality_report_binding(registered, node_key)
 
 
 def _artifact_id(session: Session, version_id: UUID) -> UUID:

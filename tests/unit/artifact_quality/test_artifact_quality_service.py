@@ -19,6 +19,7 @@ from apps.api.artifact_quality.service import ArtifactQualityError, ArtifactQual
 
 NODE_RUN_ID = UUID("10000000-0000-4000-8000-000000000133")
 SOURCE_VERSION_ID = UUID("10000000-0000-4000-8000-000000000134")
+SOURCE_ID = UUID("10000000-0000-4000-8000-000000000140")
 REPORT_ID = UUID("10000000-0000-4000-8000-000000000135")
 ORGANIZATION_ID = UUID("10000000-0000-4000-8000-000000000136")
 PROJECT_ID = UUID("10000000-0000-4000-8000-000000000137")
@@ -39,7 +40,9 @@ def validation_context() -> QualityValidationContext:
         content_release_id=CONTENT_RELEASE_ID,
         workflow_definition_version_id=WORKFLOW_VERSION_ID,
         node_run_id=NODE_RUN_ID,
-        source_artifact_version_id=SOURCE_VERSION_ID,
+        source_type="artifact",
+        source_id=SOURCE_ID,
+        source_version_id=SOURCE_VERSION_ID,
         source_content_hash="b" * 64,
         source_content={"title": "Fractions"},
         validator_refs=(VALIDATOR_REF,),
@@ -77,10 +80,13 @@ class FakeRegistry:
 class FakeTransaction:
     events: list[str]
     complete_error: Exception | None = None
+    prepare_error: Exception | None = None
 
     def prepare(self, node_run_id: UUID) -> QualityValidationContext:
         self.events.append("prepare")
         assert node_run_id == NODE_RUN_ID
+        if self.prepare_error is not None:
+            raise self.prepare_error
         return validation_context()
 
     def complete(
@@ -105,6 +111,10 @@ class FakeTransaction:
         self.events.append(f"technical:{code}")
         assert context == validation_context()
 
+    def fail_prepare(self, node_run_id: UUID, *, code: str) -> None:
+        self.events.append(f"prepare-technical:{code}")
+        assert node_run_id == NODE_RUN_ID
+
 
 class FakeTransactionFactory:
     def __init__(
@@ -112,15 +122,17 @@ class FakeTransactionFactory:
         events: list[str],
         *,
         complete_error: Exception | None = None,
+        prepare_error: Exception | None = None,
     ) -> None:
         self.events = events
         self.complete_error = complete_error
+        self.prepare_error = prepare_error
 
     @contextmanager
     def begin(self) -> Iterator[FakeTransaction]:
         self.events.append("tx:open")
         try:
-            yield FakeTransaction(self.events, self.complete_error)
+            yield FakeTransaction(self.events, self.complete_error, self.prepare_error)
         except Exception:
             self.events.append("tx:rollback")
             raise
@@ -178,6 +190,31 @@ def test_validator_exception_marks_node_failed_without_fabricating_report() -> N
         "resolve",
         "validate",
         "technical:QUALITY_VALIDATION_TECHNICAL_FAILURE",
+        "tx:commit",
+    ]
+
+
+def test_prepare_failure_marks_node_failed_in_the_same_transaction() -> None:
+    events: list[str] = []
+    service = ArtifactQualityService(
+        FakeTransactionFactory(
+            events,
+            prepare_error=QualityValidatorRegistryError(
+                "QUALITY_REPORT_BINDING_INVALID",
+                "fixed quality binding is invalid",
+            ),
+        ),
+        FakeRegistry(events, FakeValidator(events)),
+    )
+
+    with pytest.raises(ArtifactQualityError) as captured:
+        service.execute(NODE_RUN_ID)
+
+    assert captured.value.code == "QUALITY_REPORT_BINDING_INVALID"
+    assert events == [
+        "tx:open",
+        "prepare",
+        "prepare-technical:QUALITY_REPORT_BINDING_INVALID",
         "tx:commit",
     ]
 

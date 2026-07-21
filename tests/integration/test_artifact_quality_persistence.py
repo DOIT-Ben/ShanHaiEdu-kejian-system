@@ -38,7 +38,9 @@ _DIRECT_INSERT = text(
         organization_id,
         project_id,
         lesson_unit_id,
+        source_type,
         source_artifact_version_id,
+        source_file_asset_version_id,
         source_content_hash,
         content_release_id,
         workflow_definition_version_id,
@@ -55,7 +57,9 @@ _DIRECT_INSERT = text(
         :organization_id,
         :project_id,
         :lesson_unit_id,
+        :source_type,
         :source_artifact_version_id,
+        :source_file_asset_version_id,
         :source_content_hash,
         :content_release_id,
         :workflow_definition_version_id,
@@ -155,6 +159,8 @@ def test_quality_report_insert_rejects_every_mismatched_fixed_fact(
         )
     facts.update(
         report_id=REPORT_ID,
+        source_type="artifact",
+        source_file_asset_version_id=None,
         validator_set=validator_set,
         validator_set_hash=validator_set_hash,
         evidence_hash="c" * 64,
@@ -341,6 +347,8 @@ def _load_report_facts(
     validator_set, validator_set_hash = _validator_facts()
     facts.update(
         report_id=REPORT_ID,
+        source_type="artifact",
+        source_file_asset_version_id=None,
         validator_set=validator_set,
         validator_set_hash=validator_set_hash,
         evidence_hash="c" * 64,

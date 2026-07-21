@@ -21,6 +21,11 @@ from apps.api.workflows.quality_port import QualityNodeRoutingReader
 _NON_RETRYABLE_QUALITY_CODES = frozenset(
     {
         "QUALITY_REPORT_BINDING_INVALID",
+        "QUALITY_SOURCE_CONTRACT_UNKNOWN",
+        "QUALITY_SOURCE_HASH_MISMATCH",
+        "QUALITY_SOURCE_INPUT_MISSING",
+        "QUALITY_SOURCE_SCOPE_INVALID",
+        "QUALITY_SOURCE_TYPE_UNSUPPORTED",
         "QUALITY_VALIDATOR_UNAVAILABLE",
     }
 )

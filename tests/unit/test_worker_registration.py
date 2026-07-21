@@ -43,6 +43,10 @@ def test_artifact_quality_actor_uses_dramatiq_message_contract() -> None:
             0,
             type("InvalidBinding", (RuntimeError,), {"code": "QUALITY_REPORT_BINDING_INVALID"})(),
         )
+        assert not retry_when(
+            0,
+            type("InvalidSource", (RuntimeError,), {"code": "QUALITY_SOURCE_HASH_MISMATCH"})(),
+        )
         assert retry_when(0, RuntimeError("transient database failure"))
         assert not retry_when(5, RuntimeError("retry budget exhausted"))
     finally:
