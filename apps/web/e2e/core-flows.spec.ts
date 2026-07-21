@@ -167,7 +167,7 @@ test("PPT 正文按可用高度完整显示", async ({ page }, testInfo) => {
   await unlockWorkbenchStep(page, projectId, lessonId, "ppt-pages");
   await page.goto(`/app/projects/${projectId}/lessons/${lessonId}/work/ppt-pages`);
 
-  await expect(page.getByRole("button", { name: "查看检查结果" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "查看检查结果" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "查看参考内容" })).toBeVisible();
   await expect(page.getByRole("button", { name: "编辑内容要求" })).toBeVisible();
   const slideImage = page.locator('[role="img"] img');

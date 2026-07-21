@@ -3,7 +3,6 @@ import {
   BookOpen,
   ArrowRight,
   Check,
-  CheckCircle2,
   MoreHorizontal,
   PencilLine,
   Plus,
@@ -336,14 +335,6 @@ export function PptPagesStep() {
             <IconButton
               className="hidden sm:inline-grid"
               disabled={approved}
-              label="查看检查结果"
-              onClick={() => openContextDrawer("checks")}
-            >
-              <CheckCircle2 aria-hidden="true" />
-            </IconButton>
-            <IconButton
-              className="hidden sm:inline-grid"
-              disabled={approved}
               label="查看参考内容"
               onClick={() => openContextDrawer("references")}
             >
@@ -371,13 +362,6 @@ export function PptPagesStep() {
                   className="z-[80] min-w-48 rounded-[var(--sh-radius-md)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)] p-1.5 text-[var(--sh-ink-default)] shadow-[var(--sh-shadow-floating)]"
                   sideOffset={6}
                 >
-                  <DropdownMenu.Item
-                    className="flex cursor-pointer items-center gap-2 rounded-[var(--sh-radius-sm)] px-3 py-2 text-sm outline-none focus:bg-[var(--sh-surface-soft)]"
-                    onSelect={() => openContextDrawer("checks")}
-                  >
-                    <CheckCircle2 aria-hidden="true" className="size-4" />
-                    查看检查结果
-                  </DropdownMenu.Item>
                   <DropdownMenu.Item
                     className="flex cursor-pointer items-center gap-2 rounded-[var(--sh-radius-sm)] px-3 py-2 text-sm outline-none focus:bg-[var(--sh-surface-soft)]"
                     onSelect={() => openContextDrawer("references")}

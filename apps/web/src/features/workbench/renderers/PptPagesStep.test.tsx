@@ -71,31 +71,30 @@ describe("PptPagesStep delayed regeneration", () => {
     expect(getMockDraft<PptPagesDraft>(draftKey)?.value.pageRevisions).toMatchObject({ "2": 1 });
   });
 
-  it("工具名称与打开的内容面板一致", () => {
+  it("工具入口只保留有实际内容的面板", () => {
     renderStep();
 
-    fireEvent.click(screen.getByRole("button", { name: "查看检查结果" }));
+    expect(screen.queryByRole("button", { name: "查看检查结果" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "查看参考内容" }));
     expect(useWorkbenchUi.getState()).toMatchObject({
       contextDrawerOpen: true,
-      contextTab: "checks",
+      contextTab: "references",
     });
-    fireEvent.click(screen.getByRole("button", { name: "查看参考内容" }));
-    expect(useWorkbenchUi.getState().contextTab).toBe("references");
     fireEvent.click(screen.getByRole("button", { name: "编辑内容要求" }));
     expect(useWorkbenchUi.getState().contextTab).toBe("prompt");
   });
 
-  it("移动端把三个裸图标收进带文字的检查与编辑菜单", async () => {
+  it("移动端把可操作入口收进带文字的菜单", async () => {
     vi.useRealTimers();
     renderStep();
 
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "检查与编辑" }));
-    await user.click(screen.getByRole("menuitem", { name: "查看检查结果" }));
-
+    expect(screen.queryByRole("menuitem", { name: "查看检查结果" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "查看参考内容" }));
     expect(useWorkbenchUi.getState()).toMatchObject({
       contextDrawerOpen: true,
-      contextTab: "checks",
+      contextTab: "references",
     });
   });
 

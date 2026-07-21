@@ -39,13 +39,6 @@ export function MarkdownDocument({
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-[var(--sh-ink-strong)]">{title}</p>
-            <p className="text-xs text-[var(--sh-ink-muted)]">
-              {readOnly
-                ? "内容已确认；重新编辑前保持锁定"
-                : dirty
-                  ? "有修改尚未保存"
-                  : "内容已保存，可继续阅读或编辑"}
-            </p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">

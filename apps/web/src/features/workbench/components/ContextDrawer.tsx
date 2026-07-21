@@ -1,5 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { BookOpen, CheckCircle2, History, LoaderCircle, Settings2, X } from "lucide-react";
+import { BookOpen, History, LoaderCircle, Settings2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { createTopicIntroOptions, introOptions } from "@/features/intro-options/data";
@@ -29,11 +29,6 @@ const tabContent = {
     title: "内容要求",
     icon: Settings2,
     body: "写下你希望重点调整的内容。课程范围和适龄要求会保持不变。",
-  },
-  checks: {
-    title: "检查结果",
-    icon: CheckCircle2,
-    body: "知识范围、数学表达、必填结构和提前讲授检查已通过。仍有 2 条表达建议需要你判断。",
   },
   history: {
     title: "历史记录",

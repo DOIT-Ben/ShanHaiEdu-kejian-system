@@ -3,7 +3,7 @@ import { create } from "zustand";
 type WorkbenchUiState = {
   sidebarCollapsed: boolean;
   contextDrawerOpen: boolean;
-  contextTab: "references" | "prompt" | "checks" | "history";
+  contextTab: "references" | "prompt" | "history";
   toggleSidebar: () => void;
   closeContextDrawer: () => void;
   openContextDrawer: (tab: WorkbenchUiState["contextTab"]) => void;

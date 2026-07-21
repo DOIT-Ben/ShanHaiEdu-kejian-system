@@ -67,7 +67,8 @@ test("母版剧本增加场次并刷新后保留", async ({ page }) => {
   await expect(page.getByRole("button", { name: "增加场次" })).toBeVisible();
 });
 
-test("封面重新生成和下载预览均有结果", async ({ page }) => {
+test("封面重新生成和下载预览均有结果", async ({ page }, testInfo) => {
+  await page.setViewportSize({ height: 900, width: 1280 });
   await loginAsTeacher(page);
   await unlockWorkbenchStep(page, projectId, lessonId, "ppt-cover");
   await page.goto(`${workUrl}/ppt-cover`);
@@ -79,6 +80,11 @@ test("封面重新生成和下载预览均有结果", async ({ page }) => {
   expect(download.suggestedFilename()).toMatch(/\.svg$/);
   await page.getByRole("button", { name: "采用这张封面" }).click();
   await expect(page.getByRole("button", { name: "选择百格光窗" })).toBeDisabled();
+  await expect(page.getByRole("link", { name: "制作 PPT 正文" })).toBeVisible();
+  await page.screenshot({
+    animations: "disabled",
+    path: testInfo.outputPath("ppt-cover-horizontal-candidates-1280.png"),
+  });
   await page.getByRole("button", { name: "重新选择封面" }).click();
   await expect(page.getByRole("button", { name: "选择百格光窗" })).toBeEnabled();
 });
@@ -89,9 +95,7 @@ test("资产检查和视频生成进入任务中心", async ({ page }) => {
   await page.goto(`${workUrl}/video-assets`);
   await page.getByRole("button", { name: "重新检查资产清单" }).click();
   await expect(page.getByText("资产清单已重新检查")).toBeVisible();
-  await page.getByRole("button", { name: "检查待生成内容" }).click();
-  await expect(page.getByRole("dialog", { name: "检查结果" })).toBeVisible();
-  await page.getByRole("button", { name: "关闭面板" }).click();
+  await expect(page.getByRole("button", { name: "检查待生成内容" })).toHaveCount(0);
   await unlockWorkbenchStep(page, projectId, lessonId, "final-video");
   await page.goto(`${workUrl}/final-video`);
   await page.getByRole("button", { name: "开始生成视频" }).click();

@@ -2,7 +2,6 @@ import { ArrowRight, CheckCircle2, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getDemoVideoSceneSource } from "@/features/home/components/VideoScenePreview";
-import { useWorkbenchUi } from "@/features/workbench/model/workbenchUi";
 import { StaleContentNotice } from "@/features/workbench/components/StaleContentNotice";
 import { WorkbenchPageFrame } from "@/features/workbench/components/WorkbenchPageFrame";
 import {
@@ -39,7 +38,6 @@ export function VideoAssetsStep() {
     : assets.filter((asset) => asset.status === "ready").length;
   const pendingCount = assets.length - readyCount;
   const [message, setMessage] = useState("");
-  const { openContextDrawer } = useWorkbenchUi();
   return (
     <WorkbenchPageFrame>
       <FocusPageHeader
@@ -142,9 +140,6 @@ export function VideoAssetsStep() {
         >
           <RefreshCw aria-hidden="true" />
           重新检查资产清单
-        </Button>
-        <Button onClick={() => openContextDrawer("checks")} variant="quiet">
-          检查待生成内容
         </Button>
       </div>
       {message ? (

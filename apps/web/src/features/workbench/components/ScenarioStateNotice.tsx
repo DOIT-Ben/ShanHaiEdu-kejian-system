@@ -81,9 +81,6 @@ export function ScenarioStateNotice({ scenario }: { scenario: string | null }) {
           <Button onClick={() => resolveScenario("keep-stale")} size="sm" variant="secondary">
             继续使用当前版本
           </Button>
-          <Button onClick={() => openContextDrawer("checks")} size="sm" variant="quiet">
-            查看影响范围
-          </Button>
         </div>
       </div>
     );

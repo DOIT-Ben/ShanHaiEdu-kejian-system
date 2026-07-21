@@ -26,7 +26,6 @@ import {
   saveFinalVideoMediaConfirmation,
   validateSubtitleFile,
 } from "@/features/workbench/lib/videoMedia";
-import { useWorkbenchUi } from "@/features/workbench/model/workbenchUi";
 import { WorkbenchPageFrame } from "@/features/workbench/components/WorkbenchPageFrame";
 import {
   createMockTask,
@@ -161,7 +160,6 @@ export function FinalVideoStep() {
     "idle",
   );
   const [videoReloadKey, setVideoReloadKey] = useState(0);
-  const { openContextDrawer } = useWorkbenchUi();
   useEffect(() => {
     if (!rendering) synthesisLock.current = false;
   }, [rendering]);
@@ -513,11 +511,6 @@ export function FinalVideoStep() {
             下载关键帧说明
           </Button>
         )}
-        {videoReady ? (
-          <Button onClick={() => openContextDrawer("checks")} size="sm" variant="quiet">
-            查看检查项
-          </Button>
-        ) : null}
         <Button
           disabled={rendering || cancellationPending}
           onClick={startSynthesis}

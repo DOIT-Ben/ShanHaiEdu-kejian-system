@@ -1,11 +1,4 @@
-import {
-  ArrowRight,
-  Check,
-  History,
-  MessageSquareText,
-  PencilLine,
-  SearchCheck,
-} from "lucide-react";
+import { ArrowRight, Check, History, MessageSquareText, PencilLine } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { createLessonPlanData, lessonPlanData } from "@/features/content-definition/fixtures";
@@ -174,9 +167,6 @@ export function LessonPlanStep() {
           <>
             <IconButton label="查看参考内容" onClick={() => openContextDrawer("references")}>
               <MessageSquareText aria-hidden="true" />
-            </IconButton>
-            <IconButton label="查看检查结果" onClick={() => openContextDrawer("checks")}>
-              <SearchCheck aria-hidden="true" />
             </IconButton>
             <IconButton label="查看历史记录" onClick={() => openContextDrawer("history")}>
               <History aria-hidden="true" />
