@@ -62,9 +62,7 @@ def build_lesson_fanout_plan(
         LessonBranchFanoutPlan(
             branch_key=branch_key,
             entrypoint_node_keys=tuple(node_key for node_key, _ in sorted(values)),
-            entrypoint_dependencies=tuple(
-                dependencies for _, dependencies in sorted(values)
-            ),
+            entrypoint_dependencies=tuple(dependencies for _, dependencies in sorted(values)),
         )
         for branch_key, values in sorted(entrypoints.items())
     )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from threading import Barrier
 from uuid import UUID
 
@@ -121,10 +122,12 @@ def _submit_replacement(
         draft = repository.get_draft(seeded.artifact_id, "main")
         current = session.get(ArtifactVersion, seeded.version_id)
         assert draft is not None and current is not None
-        replacement_content = dict(current.content_json)
-        replacement_content["scope_summary"] = (
-            f"{replacement_content['scope_summary']} (concurrent replacement)"
-        )
+        replacement_content = deepcopy(current.content_json)
+        teaching_content = replacement_content.get("teaching_content")
+        assert isinstance(teaching_content, dict)
+        teaching_scope = teaching_content.get("teaching_scope")
+        assert isinstance(teaching_scope, str)
+        teaching_content["teaching_scope"] = f"{teaching_scope} (concurrent replacement)"
         saved = ArtifactService(session, seeded.actor).save_draft(
             seeded.artifact_id,
             "main",

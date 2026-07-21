@@ -160,44 +160,12 @@ def _schema_findings(content: Mapping[str, Any]) -> list[dict[str, Any]]:
     keys: list[str] = []
     positions: list[int] = []
     for index, unit in enumerate(units):
-        path = f"/lesson_units/{index}"
-        key = unit.get("lesson_unit_key")
-        if isinstance(key, str) and key.strip() and len(key) <= 80:
+        unit_findings, key, position = _unit_schema_findings(unit, index)
+        findings.extend(unit_findings)
+        if key is not None:
             keys.append(key)
-        else:
-            findings.append(
-                _finding("LESSON_UNIT_KEY_INVALID", "lesson_unit_key is invalid", path)
-            )
-        position = unit.get("position")
-        if type(position) is int and position > 0:
+        if position is not None:
             positions.append(position)
-        else:
-            findings.append(_finding("LESSON_POSITION_INVALID", "position is invalid", path))
-        for field in _REQUIRED_UNIT_TEXT_FIELDS:
-            value = unit.get(field)
-            if type(value) is not str or not value.strip():
-                code = (
-                    "LESSON_CORE_OUTCOME_EMPTY"
-                    if field == "core_learning_outcome"
-                    else "LESSON_FIELD_REQUIRED"
-                )
-                findings.append(_finding(code, f"{field} must be non-empty", f"{path}/{field}"))
-        duration = unit.get("duration_minutes")
-        if type(duration) is not int or not 30 <= duration <= 60:
-            findings.append(
-                _finding(
-                    "LESSON_CAPACITY_INVALID",
-                    "duration_minutes must be between 30 and 60",
-                    f"{path}/duration_minutes",
-                )
-            )
-        for field in _UNORDERED_UNIT_LIST_FIELDS:
-            values = unit.get(field)
-            if not _non_empty_unique_strings(values):
-                findings.append(
-                    _finding("LESSON_FIELD_REQUIRED", f"{field} is invalid", f"{path}/{field}")
-                )
-
     if len(keys) != len(set(keys)):
         findings.append(
             _finding("LESSON_UNIT_KEY_DUPLICATE", "lesson_unit_key values must be unique")
@@ -210,6 +178,47 @@ def _schema_findings(content: Mapping[str, Any]) -> list[dict[str, Any]]:
             )
         )
     return findings
+
+
+def _unit_schema_findings(
+    unit: Mapping[str, Any],
+    index: int,
+) -> tuple[list[dict[str, Any]], str | None, int | None]:
+    findings: list[dict[str, Any]] = []
+    path = f"/lesson_units/{index}"
+    raw_key = unit.get("lesson_unit_key")
+    key = raw_key if isinstance(raw_key, str) and raw_key.strip() and len(raw_key) <= 80 else None
+    if key is None:
+        findings.append(_finding("LESSON_UNIT_KEY_INVALID", "lesson_unit_key is invalid", path))
+    raw_position = unit.get("position")
+    position = raw_position if type(raw_position) is int and raw_position > 0 else None
+    if position is None:
+        findings.append(_finding("LESSON_POSITION_INVALID", "position is invalid", path))
+    for field in _REQUIRED_UNIT_TEXT_FIELDS:
+        value = unit.get(field)
+        if type(value) is not str or not value.strip():
+            code = (
+                "LESSON_CORE_OUTCOME_EMPTY"
+                if field == "core_learning_outcome"
+                else "LESSON_FIELD_REQUIRED"
+            )
+            findings.append(_finding(code, f"{field} must be non-empty", f"{path}/{field}"))
+    duration = unit.get("duration_minutes")
+    if type(duration) is not int or not 30 <= duration <= 60:
+        findings.append(
+            _finding(
+                "LESSON_CAPACITY_INVALID",
+                "duration_minutes must be between 30 and 60",
+                f"{path}/duration_minutes",
+            )
+        )
+    for field in _UNORDERED_UNIT_LIST_FIELDS:
+        values = unit.get(field)
+        if not _non_empty_unique_strings(values):
+            findings.append(
+                _finding("LESSON_FIELD_REQUIRED", f"{field} is invalid", f"{path}/{field}")
+            )
+    return findings, key, position
 
 
 def _coverage_findings(
@@ -250,9 +259,7 @@ def _coverage_findings(
             )
         )
     coverage = content.get("coverage_check")
-    coverage_values = (
-        cast(Mapping[str, Any], coverage) if isinstance(coverage, Mapping) else None
-    )
+    coverage_values = cast(Mapping[str, Any], coverage) if isinstance(coverage, Mapping) else None
     if coverage_values is None or coverage_values.get("all_evidence_covered") is not True:
         findings.append(
             _finding("MATERIAL_EVIDENCE_OMITTED", "coverage_check does not confirm coverage")
@@ -327,9 +334,11 @@ def _non_empty_unique_strings(value: object) -> bool:
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         return False
     values = list(cast(Sequence[object], value))
-    return bool(values) and all(isinstance(item, str) and item.strip() for item in values) and len(
-        set(values)
-    ) == len(values)
+    return (
+        bool(values)
+        and all(isinstance(item, str) and item.strip() for item in values)
+        and len(set(values)) == len(values)
+    )
 
 
 def _finding(

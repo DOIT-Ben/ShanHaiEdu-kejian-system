@@ -96,9 +96,7 @@ def test_active_node_blocks_lesson_archive_until_cancellation_finishes(
                 archived_lesson_unit_ids=(),
                 request_id="req-fanout",
             )
-            node = session.scalar(
-                select(NodeRun).where(NodeRun.node_key == "lesson_plan.generate")
-            )
+            node = session.scalar(select(NodeRun).where(NodeRun.node_key == "lesson_plan.generate"))
             assert node is not None
             node.status = "running"
 

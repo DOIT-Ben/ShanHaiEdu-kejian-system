@@ -28,6 +28,7 @@ from apps.api.artifact_quality.contracts import (
 from apps.api.artifact_quality.models import ArtifactQualityReport
 from apps.api.artifact_quality.payloads import canonical_hash, plain_json
 from apps.api.artifact_quality.repository import ArtifactQualityReportRepository
+from apps.api.artifact_quality.supporting_inputs import resolve_quality_supporting_inputs
 from apps.api.artifacts.quality_port import SqlAlchemyArtifactQualitySourcePort
 from apps.api.assets.quality_port import SqlAlchemyAssetQualitySourcePort
 from apps.api.identity.context import ActorContext
@@ -111,7 +112,13 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
                 "QUALITY_SOURCE_HASH_MISMATCH",
                 "the frozen source hash does not match the exact artifact version",
             )
-        supporting_inputs = self._resolve_supporting_inputs(execution, binding, node_run_id)
+        supporting_inputs = resolve_quality_supporting_inputs(
+            execution,
+            binding,
+            node_run_id,
+            self._quality_workflow,
+            self._asset_sources,
+        )
         existing = self._reports.get_for_node(node_run_id)
         result = None if existing is None else _report_result(existing)
         if existing is not None:
@@ -141,32 +148,6 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
             supporting_inputs=supporting_inputs,
             existing_result=result,
         )
-
-    def _resolve_supporting_inputs(
-        self,
-        execution: WorkflowExecutionContext,
-        binding: QualityReportBinding,
-        node_run_id: UUID,
-    ) -> dict[str, dict[str, Any]]:
-        resolved: dict[str, dict[str, Any]] = {}
-        for contract_ref in binding.supporting_input_refs:
-            source_input = self._quality_workflow.require_supporting_input(
-                node_run_id,
-                contract_ref,
-            )
-            source = self._asset_sources.load_supporting(
-                execution.project_id,
-                contract_ref=contract_ref,
-                source_id=source_input.source_id,
-                source_version_id=source_input.source_version_id,
-            )
-            if source.content_hash != source_input.content_hash:
-                raise ArtifactQualityTransactionError(
-                    "QUALITY_SUPPORTING_HASH_MISMATCH",
-                    "the frozen supporting-input hash does not match the exact source",
-                )
-            resolved[contract_ref] = dict(source.content)
-        return resolved
 
     def _resolve_source(
         self,

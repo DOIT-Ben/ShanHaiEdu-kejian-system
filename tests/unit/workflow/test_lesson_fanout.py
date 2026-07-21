@@ -8,9 +8,7 @@ from apps.api.workflows.lesson_fanout import build_lesson_fanout_plan
 from workflow.registry import BUILTIN_WORKFLOW_REGISTRY
 
 ROOT = Path(__file__).resolve().parents[3]
-CATALOG = (
-    ROOT / "contracts/fixtures/workflow-node-generation-bindings/primary-math-courseware.json"
-)
+CATALOG = ROOT / "contracts/fixtures/workflow-node-generation-bindings/primary-math-courseware.json"
 
 
 def test_fanout_plan_consumes_only_published_scope_branch_entrypoint_and_dependencies() -> None:

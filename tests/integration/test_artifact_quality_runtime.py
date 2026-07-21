@@ -36,7 +36,7 @@ from apps.api.lessons.models import LessonUnit
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.reliability.models import EventStreamEntry, OutboxEvent
-from apps.api.workflows.models import BranchRun, NodeRun, WorkflowRun
+from apps.api.workflows.models import BranchRun, NodeInputSnapshot, NodeRun, WorkflowRun
 from apps.api.workflows.service import WorkflowRuntimeService
 from tests.integration.test_node_execution_runtime import (
     _seed_approved_artifact,  # pyright: ignore[reportPrivateUsage]
@@ -330,6 +330,24 @@ def test_prepare_hash_failure_fails_node_without_quality_report(
         assert _outbox_count(session, "artifact.quality_validation.technical_failed") == 1
 
 
+def test_missing_required_supporting_input_fails_node_without_quality_report(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_quality_node(factory, include_supporting_input=False)
+
+    with pytest.raises(ArtifactQualityError) as captured:
+        _service(factory, seeded, passed=True).execute(seeded.node_run_id)
+
+    assert captured.value.code == "QUALITY_SUPPORTING_INPUT_MISSING"
+    with factory() as session:
+        node = session.get(NodeRun, seeded.node_run_id)
+        assert node is not None and node.status == NodeStatus.FAILED.value
+        assert session.scalar(select(func.count()).select_from(ArtifactQualityReport)) == 0
+        assert _event_count(session, "artifact.quality_validation.technical_failed") == 1
+        assert _outbox_count(session, "artifact.quality_validation.technical_failed") == 1
+
+
 def test_same_identity_from_another_node_with_different_payload_is_a_stable_conflict(
     migrated_database_url: str,
 ) -> None:
@@ -493,6 +511,7 @@ def _seed_quality_node(
     *,
     status: NodeStatus = NodeStatus.READY,
     snapshot_hash: str | None = None,
+    include_supporting_input: bool = True,
 ) -> QualitySeed:
     runtime = _seed_runtime(factory)
     with factory() as session, session.begin():
@@ -526,6 +545,16 @@ def _seed_quality_node(
             content_hash=snapshot_hash or source.content_hash,
             snapshot=dict(source.content_json),
         )
+        if include_supporting_input:
+            workflow.add_input_snapshot(
+                node.id,
+                input_key="content:material_evidence",
+                source_type="material_parse",
+                source_id=runtime.source_material_id,
+                source_version_id=runtime.material_parse_version_id,
+                content_hash=runtime.material_evidence_hash,
+                snapshot=dict(runtime.material_evidence),
+            )
     return QualitySeed(
         actor=runtime.actor,
         project_id=runtime.project_id,
@@ -672,7 +701,13 @@ def _create_replay_node(factory: sessionmaker[Session], seeded: QualitySeed) -> 
     with factory() as session, session.begin():
         first_node = session.get(NodeRun, seeded.node_run_id)
         source = session.get(ArtifactVersion, seeded.source_version_id)
-        assert first_node is not None and source is not None
+        supporting = session.scalar(
+            select(NodeInputSnapshot).where(
+                NodeInputSnapshot.node_run_id == seeded.node_run_id,
+                NodeInputSnapshot.input_key == "content:material_evidence",
+            )
+        )
+        assert first_node is not None and source is not None and supporting is not None
         workflow = WorkflowRuntimeService(session, seeded.actor)
         node = workflow.create_project_node_run(
             first_node.workflow_run_id,
@@ -687,6 +722,15 @@ def _create_replay_node(factory: sessionmaker[Session], seeded: QualitySeed) -> 
             source_version_id=source.id,
             content_hash=source.content_hash,
             snapshot=dict(source.content_json),
+        )
+        workflow.add_input_snapshot(
+            node.id,
+            input_key=supporting.input_key,
+            source_type=supporting.source_type,
+            source_id=supporting.source_id,
+            source_version_id=supporting.source_version_id,
+            content_hash=supporting.content_hash,
+            snapshot=dict(supporting.snapshot_json),
         )
     return node.id
 

@@ -9,10 +9,10 @@ from sqlalchemy.orm import Session
 
 from apps.api.artifact_quality.contracts import QualitySource
 from apps.api.assets.execution_port import AssetExecutionPortError
-from apps.api.assets.models import FileAsset, FileAssetVersion, MaterialParseVersion
+from apps.api.assets.models import FileAsset, FileAssetVersion
+from apps.api.assets.repository import FileAssetRepository
 from apps.api.identity.context import ActorContext
 from apps.api.runtime_boundary.ports import WorkflowExecutionContext
-from apps.api.uploads.models import SourceMaterial
 
 
 class SqlAlchemyAssetQualitySourcePort:
@@ -87,25 +87,16 @@ class SqlAlchemyAssetQualitySourcePort:
                 "QUALITY_SUPPORTING_CONTRACT_UNKNOWN",
                 "the quality supporting-input contract is not registered",
             )
-        row = self._session.execute(
-            select(MaterialParseVersion, SourceMaterial)
-            .join(SourceMaterial, SourceMaterial.id == MaterialParseVersion.source_material_id)
-            .where(
-                MaterialParseVersion.id == source_version_id,
-                MaterialParseVersion.organization_id == self._actor.organization_id,
-                MaterialParseVersion.source_material_id == source_id,
-                MaterialParseVersion.status == "succeeded",
-                SourceMaterial.organization_id == self._actor.organization_id,
-                SourceMaterial.project_id == project_id,
-                SourceMaterial.deleted_at.is_(None),
-            )
-        ).one_or_none()
-        if row is None:
+        version = FileAssetRepository(self._session, self._actor).get_succeeded_parse_for_project(
+            project_id,
+            source_id,
+            source_version_id,
+        )
+        if version is None:
             raise AssetExecutionPortError(
                 "QUALITY_SUPPORTING_SCOPE_INVALID",
                 "the exact material evidence is unavailable in the fixed project scope",
             )
-        version, material = row
         if version.content_json is None or version.text_checksum is None:
             raise AssetExecutionPortError(
                 "QUALITY_SUPPORTING_SOURCE_INVALID",
@@ -113,7 +104,7 @@ class SqlAlchemyAssetQualitySourcePort:
             )
         return QualitySource(
             source_type="asset",
-            source_id=material.id,
+            source_id=version.source_material_id,
             source_version_id=version.id,
             content_hash=version.text_checksum,
             content=version.content_json,
