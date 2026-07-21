@@ -162,6 +162,50 @@ def test_resolver_removes_materialized_file_when_the_provider_url_is_too_long(
     assert list(tmp_path.iterdir()) == []
 
 
+@pytest.mark.parametrize(
+    "secret",
+    [
+        "",
+        "a1" * 31 + "a",
+        "a1" * 32 + "a",
+        "g1" * 32,
+        "a" * 64,
+        "0123456789abcdef" * 4,
+        "PLACEHOLDER_REPLACE_WITH_A_UNIQUE_64_HEX_CHARACTER_SECRET",
+    ],
+)
+def test_resolver_rejects_invalid_signing_secret_without_disclosure(
+    tmp_path: Path,
+    secret: str,
+) -> None:
+    with pytest.raises(ValueError) as error:
+        ProviderMediaResolverConfig(
+            relay_root=tmp_path,
+            public_base_url="https://relay.test/provider-media",
+            signing_secret=secret,
+            ttl_seconds=60,
+            max_file_bytes=1_024,
+        )
+
+    assert "signing_secret is invalid" in str(error.value)
+    if secret:
+        assert secret not in str(error.value)
+
+
+def test_resolver_accepts_mixed_case_64_hex_secret_without_normalizing(tmp_path: Path) -> None:
+    secret = "Aa1b" * 16
+
+    config = ProviderMediaResolverConfig(
+        relay_root=tmp_path,
+        public_base_url="https://relay.test/provider-media",
+        signing_secret=secret,
+        ttl_seconds=60,
+        max_file_bytes=1_024,
+    )
+
+    assert config.signing_secret == secret
+
+
 def test_resolver_removes_only_expired_opaque_relay_files(tmp_path: Path) -> None:
     stale = tmp_path / f"{'a' * 32}.png"
     stale.write_bytes(PNG_BYTES)

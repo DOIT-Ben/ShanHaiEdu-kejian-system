@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 from pathlib import Path
 from threading import Thread
 from urllib.error import HTTPError
@@ -19,15 +20,63 @@ from apps.api.provider_media_relay import (
 PNG_BYTES = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mNk+M/wHwAF/gL+3MxZ5wAAAABJRU5ErkJggg=="
 )
+VALID_SIGNING_SECRET = hashlib.sha256(b"provider-media-relay-test").hexdigest()
 
 
 def relay_config(root: Path, *, max_file_bytes: int = 1_024) -> ProviderMediaRelayConfig:
     return ProviderMediaRelayConfig(
         root=root,
-        signing_secret="test-placeholder-provider-media-signing-secret",
+        signing_secret=VALID_SIGNING_SECRET,
         max_ttl_seconds=300,
         max_file_bytes=max_file_bytes,
     )
+
+
+@pytest.mark.parametrize(
+    "secret",
+    [
+        "",
+        "a1" * 31 + "a",
+        "a1" * 32 + "a",
+        "g1" * 32,
+        "a" * 64,
+        "0123456789abcdef" * 4,
+        "PLACEHOLDER_REPLACE_WITH_A_UNIQUE_64_HEX_CHARACTER_SECRET",
+    ],
+)
+def test_relay_rejects_invalid_signing_secret_without_disclosure(
+    tmp_path: Path,
+    secret: str,
+) -> None:
+    with pytest.raises(ValueError) as error:
+        ProviderMediaRelayConfig(
+            root=tmp_path,
+            signing_secret=secret,
+            max_ttl_seconds=300,
+            max_file_bytes=1_024,
+        )
+
+    assert "signing_secret is invalid" in str(error.value)
+    if secret:
+        assert secret not in str(error.value)
+
+    with pytest.raises(ValueError, match="signing_secret is invalid") as signing_error:
+        sign_media_path("frame.png", expires_at=1_100, secret=secret)
+    if secret:
+        assert secret not in str(signing_error.value)
+
+
+def test_relay_accepts_mixed_case_64_hex_secret_without_normalizing(tmp_path: Path) -> None:
+    secret = "Aa1b" * 16
+
+    config = ProviderMediaRelayConfig(
+        root=tmp_path,
+        signing_secret=secret,
+        max_ttl_seconds=300,
+        max_file_bytes=1_024,
+    )
+
+    assert config.signing_secret == secret
 
 
 def test_valid_signed_image_resolves_to_a_private_file(tmp_path: Path) -> None:
@@ -158,6 +207,9 @@ def test_expired_media_cleanup_is_scheduled_independently() -> None:
     cleanup_env = (
         root / "infra/provider-media-relay/provider-media-cleanup.env.example"
     ).read_text(encoding="utf-8")
+    relay_env = (root / "infra/provider-media-relay/provider-media-relay.env.example").read_text(
+        encoding="utf-8"
+    )
     runbook = (root / "infra/provider-media-relay/README.md").read_text(encoding="utf-8")
 
     assert "User=shanhai-relay" in relay_service
@@ -167,8 +219,41 @@ def test_expired_media_cleanup_is_scheduled_independently() -> None:
     assert "provider-media-cleanup.env" in service
     assert "provider-media-relay.env" not in service
     assert "SIGNING_SECRET" not in cleanup_env
+    assert "SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET=" not in relay_env
     assert "ReadWritePaths=/srv/shanhaiedu/runtime/provider-media" in service
     assert "OnUnitActiveSec=60s" in timer
     assert "Persistent=true" in timer
     assert "systemctl restart shanhai-provider-media-relay.service" in runbook
     assert "/proc/${relay_pid}/environ" in runbook
+    assert "git rev-parse origin/main" in runbook
+    assert "sha256sum apps/api/provider_media_relay.py" in runbook
+    assert "sha256sum /opt/shanhaiedu/provider-media-relay/provider_media_relay.py" in runbook
+    assert "date -u +%Y-%m-%dT%H:%M:%SZ" in runbook
+
+
+def test_relay_deploy_provenance_fails_closed_before_mutation() -> None:
+    root = Path(__file__).resolve().parents[2]
+    runbook = (root / "infra/provider-media-relay/README.md").read_text(encoding="utf-8")
+    stale_checkout_check = 'test "$(git rev-parse HEAD)" = "${deployment_origin_main_sha}"'
+    dirty_source_check = (
+        'git show "${deployment_origin_main_sha}:apps/api/provider_media_relay.py" '
+        "| cmp --silent - apps/api/provider_media_relay.py"
+    )
+    installed_blob_check = (
+        'git show "${deployment_origin_main_sha}:apps/api/provider_media_relay.py" '
+        "| cmp --silent - /opt/shanhaiedu/provider-media-relay/provider_media_relay.py"
+    )
+    relay_install = (
+        "install -m 0555 -o root -g root apps/api/provider_media_relay.py "
+        "/opt/shanhaiedu/provider-media-relay/provider_media_relay.py"
+    )
+    first_mutation = runbook.index("id -u shanhai-relay")
+    first_install = runbook.index("install -d -m 0755")
+    restart = runbook.index("systemctl restart shanhai-provider-media-relay.service")
+
+    assert runbook.index("set -euo pipefail") < runbook.index(stale_checkout_check)
+    assert runbook.index(stale_checkout_check) < first_mutation < first_install
+    assert runbook.index(dirty_source_check) < first_mutation
+    assert runbook.index(relay_install) < runbook.index(installed_blob_check) < restart
+    assert 'test "${relay_source_sha256}" = "${relay_blob_sha256}"' in runbook
+    assert 'test "${relay_installed_sha256}" = "${relay_blob_sha256}"' in runbook

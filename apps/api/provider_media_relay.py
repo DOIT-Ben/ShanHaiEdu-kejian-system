@@ -27,6 +27,12 @@ _ALLOWED_MEDIA_TYPES = {
     ".webp": "image/webp",
 }
 _FILENAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,254}", re.ASCII)
+_SIGNING_SECRET_PATTERN = re.compile(r"[0-9A-Fa-f]{64}", re.ASCII)
+_PUBLIC_SIGNING_SECRET_PLACEHOLDERS = frozenset(
+    {
+        "0123456789abcdef" * 4,
+    }
+)
 _MAX_EXPIRY_DIGITS = 20
 _LOOPBACK_HOST = "127.0.0.1"
 
@@ -43,8 +49,7 @@ class ProviderMediaRelayConfig:
     max_file_bytes: int
 
     def __post_init__(self) -> None:
-        if not self.signing_secret:
-            raise ValueError("signing_secret must not be empty")
+        validate_provider_media_signing_secret(self.signing_secret)
         if not 1 <= self.max_ttl_seconds <= 3_600:
             raise ValueError("max_ttl_seconds must be between 1 and 3600")
         if self.max_file_bytes < 1:
@@ -70,11 +75,23 @@ def sign_media_path(filename: str, *, expires_at: int, secret: str) -> str:
     _require_safe_filename(filename)
     if expires_at <= 0:
         raise ValueError("expires_at must be positive")
-    if not secret:
-        raise ValueError("secret must not be empty")
+    validate_provider_media_signing_secret(secret)
     expires = str(expires_at)
     signature = _signature_for(filename, expires, secret)
     return f"/{quote(filename, safe='')}?{urlencode({'expires': expires, 'signature': signature})}"
+
+
+def validate_provider_media_signing_secret(secret: str) -> str:
+    """Return an unchanged strong relay secret or fail without disclosing it."""
+
+    normalized_for_policy = secret.casefold()
+    if (
+        _SIGNING_SECRET_PATTERN.fullmatch(secret) is None
+        or len(set(normalized_for_policy)) == 1
+        or normalized_for_policy in _PUBLIC_SIGNING_SECRET_PLACEHOLDERS
+    ):
+        raise ValueError("signing_secret is invalid")
+    return secret
 
 
 def resolve_media_request(
