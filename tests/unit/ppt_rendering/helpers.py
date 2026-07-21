@@ -66,6 +66,25 @@ def jpeg_bytes() -> bytes:
     )
 
 
+def indexed_png_bytes(*, width: int = 160, height: int = 90) -> bytes:
+    """Build a valid 8-bit indexed-color PNG with a two-color palette."""
+
+    def chunk(kind: bytes, payload: bytes) -> bytes:
+        body = kind + payload
+        return struct.pack(">I", len(payload)) + body + struct.pack(">I", zlib.crc32(body))
+
+    header = struct.pack(">IIBBBBB", width, height, 8, 3, 0, 0, 0)
+    palette = bytes((245, 248, 255, 23, 54, 93))
+    row = b"\x00" + bytes(index % 2 for index in range(width))
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", header)
+        + chunk(b"PLTE", palette)
+        + chunk(b"IDAT", zlib.compress(row * height))
+        + chunk(b"IEND", b"")
+    )
+
+
 def make_page(*, page_key: str = "page-1", position: int = 1) -> PageSpec:
     return PageSpec(
         page_key=page_key,

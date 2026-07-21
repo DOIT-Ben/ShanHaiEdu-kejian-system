@@ -15,7 +15,13 @@ from apps.api.ppt_rendering import (
     TextElement,
     assemble_pages,
 )
-from tests.unit.ppt_rendering.helpers import jpeg_bytes, make_page, make_request, png_bytes
+from tests.unit.ppt_rendering.helpers import (
+    indexed_png_bytes,
+    jpeg_bytes,
+    make_page,
+    make_request,
+    png_bytes,
+)
 
 
 @pytest.mark.parametrize(
@@ -155,15 +161,43 @@ def test_png_crc_corruption_is_rejected() -> None:
         assemble_pages(make_request(pages=(page,)))
 
 
+def test_valid_indexed_color_png_is_accepted() -> None:
+    background = BackgroundImage(content=indexed_png_bytes(), media_type="image/png")
+    page = make_page().model_copy(update={"backgrounds": (background,)})
+
+    manifest = assemble_pages(make_request(pages=(page,)))
+
+    assert manifest.pages[0].background_width == 160
+    assert manifest.pages[0].background_height == 90
+
+
+def test_forged_jpeg_with_bogus_sof_and_empty_scan_is_rejected() -> None:
+    forged = b"\xff\xd8\xff\xc0\x00\x08\x08\x00\x5a\x00\xa0\x00\xff\xda\x00\x02\xff\xd9"
+    background = BackgroundImage(content=forged, media_type="image/jpeg")
+    page = make_page().model_copy(update={"backgrounds": (background,)})
+
+    with pytest.raises(PptRenderingError, match="PPT_BACKGROUND_IMAGE_INVALID"):
+        assemble_pages(make_request(pages=(page,)))
+
+
+def test_page_key_lone_surrogate_has_stable_domain_error() -> None:
+    page = make_page().model_copy(update={"page_key": "page-\ud800"})
+
+    with pytest.raises(PptRenderingError, match="PPT_TEXT_ENCODING_INVALID") as caught:
+        assemble_pages(make_request(pages=(page,)))
+
+    assert caught.value.code == "PPT_TEXT_ENCODING_INVALID"
+
+
 @pytest.mark.parametrize(
-    "update",
+    ("update", "code"),
     [
-        {"element_key": "invalid\x00name"},
-        {"text": "invalid\x01text"},
-        {"font": {"family": "invalid\ud800font"}},
+        ({"element_key": "invalid\x00name"}, "PPT_XML_TEXT_INVALID"),
+        ({"text": "invalid\x01text"}, "PPT_XML_TEXT_INVALID"),
+        ({"font": {"family": "invalid\ud800font"}}, "PPT_TEXT_ENCODING_INVALID"),
     ],
 )
-def test_xml_10_illegal_characters_are_rejected(update: dict[str, object]) -> None:
+def test_xml_10_illegal_characters_are_rejected(update: dict[str, object], code: str) -> None:
     source = make_page()
     title = source.elements[0]
     if "font" in update:
@@ -172,7 +206,7 @@ def test_xml_10_illegal_characters_are_rejected(update: dict[str, object]) -> No
     invalid = title.model_copy(update=update)
     page = source.model_copy(update={"elements": (invalid, *source.elements[1:])})
 
-    with pytest.raises(PptRenderingError, match="PPT_XML_TEXT_INVALID"):
+    with pytest.raises(PptRenderingError, match=code):
         assemble_pages(make_request(pages=(page,)))
 
 

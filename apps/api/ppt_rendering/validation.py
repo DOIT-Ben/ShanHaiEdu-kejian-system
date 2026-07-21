@@ -50,6 +50,7 @@ def build_manifest(request: AssemblyRequest) -> AssemblyManifest:
 
 
 def _validate_request(request: AssemblyRequest) -> tuple[ImageInfo, ...]:
+    _validate_hash_text_encoding(request)
     _validate_limits(request)
     canvas = request.canvas
     if canvas.width != SLIDE_WIDTH_EMU or canvas.height != SLIDE_HEIGHT_EMU:
@@ -188,10 +189,38 @@ def _validate_limits(request: AssemblyRequest) -> None:
 
 
 def _encoded_size(value: str) -> int:
-    return len(value.encode("utf-8", errors="surrogatepass"))
+    return len(value.encode("utf-8"))
+
+
+def _validate_hash_text_encoding(request: AssemblyRequest) -> None:
+    for page in request.pages:
+        _validate_utf8(page.page_key)
+        for background in page.backgrounds:
+            _validate_utf8(background.media_type)
+        for element in page.elements:
+            _validate_utf8(element.element_key)
+            _validate_utf8(element.kind)
+            if isinstance(element, TextElement):
+                _validate_utf8(element.text)
+                _validate_utf8(element.font.family)
+                _validate_utf8(element.font.color)
+            else:
+                _validate_utf8(element.line_color)
+                if element.fill_color is not None:
+                    _validate_utf8(element.fill_color)
+
+
+def _validate_utf8(value: str) -> None:
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise PptRenderingError(
+            "PPT_TEXT_ENCODING_INVALID", "identity or hashed text is not valid UTF-8"
+        ) from exc
 
 
 def _validate_xml_text(value: str) -> None:
+    _validate_utf8(value)
     for character in value:
         codepoint = ord(character)
         if codepoint in {0x09, 0x0A, 0x0D}:
