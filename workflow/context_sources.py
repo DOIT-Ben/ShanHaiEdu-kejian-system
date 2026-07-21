@@ -63,7 +63,7 @@ CONTEXT_SOURCE_REGISTRY = MappingProxyType(
             "video",
         ),
         "video.clips.approved_versions": ContextSourceDefinition(
-            "artifact", "asset:video_selected_clips", ("video_shot_generation",), "lesson", "video"
+            "asset", "asset:video_selected_clips"
         ),
         "video.master_script.approved_version": ContextSourceDefinition(
             "artifact", "approval:video_master_script", ("video_master_script",), "lesson", "video"

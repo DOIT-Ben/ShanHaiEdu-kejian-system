@@ -91,6 +91,9 @@ def execution_snapshot(
     snapshots: FrozenSnapshotRefs,
     upstream: Mapping[str, ArtifactContextVersion],
     reference_assets: Sequence[Mapping[str, str]],
+    *,
+    target_slots: Sequence[str] = (),
+    reference_assets_authorized: bool = False,
 ) -> dict[str, Any]:
     return {
         "content_release_id": str(execution.content_release_id),
@@ -98,11 +101,14 @@ def execution_snapshot(
         "node_key": execution.node_key,
         "context_hash": snapshots.context_hash,
         "prompt_hash": snapshots.prompt_hash,
+        "model_request": compiled.request.model_dump(mode="json"),
         "context": list(compiled.context.bindings),
         "upstream_artifacts": {
             key: str(value.artifact_version_id) for key, value in upstream.items()
         },
         "reference_assets": list(reference_assets),
+        "reference_assets_authorized": reference_assets_authorized,
+        "target_slots": list(target_slots),
     }
 
 

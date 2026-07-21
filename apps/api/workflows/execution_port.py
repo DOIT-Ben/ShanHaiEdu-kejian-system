@@ -230,6 +230,41 @@ class SqlAlchemyWorkflowExecutionPort:
                 "the node run is frozen for another execution request",
             )
 
+    def frozen_execution_snapshot(self, node_run_id: UUID, request_id: str) -> dict[str, Any]:
+        payload = self.find_frozen_execution_snapshot(node_run_id, request_id)
+        if payload is None:
+            raise WorkflowExecutionPortError(
+                "NODE_EXECUTION_IDEMPOTENCY_CONFLICT",
+                "the node run is not frozen for this execution request",
+            )
+        return payload
+
+    def find_frozen_execution_snapshot(
+        self,
+        node_run_id: UUID,
+        request_id: str,
+    ) -> dict[str, Any] | None:
+        existing = self._session.scalar(
+            select(NodeInputSnapshot).where(
+                NodeInputSnapshot.node_run_id == node_run_id,
+                NodeInputSnapshot.input_key == _EXECUTION_INPUT_KEY,
+            )
+        )
+        if existing is None:
+            return None
+        if existing.snapshot_json.get("request_id") != request_id:
+            raise WorkflowExecutionPortError(
+                "NODE_EXECUTION_IDEMPOTENCY_CONFLICT",
+                "the node run is not frozen for this execution request",
+            )
+        payload = _plain_json(existing.snapshot_json)
+        if existing.content_hash != _content_hash(payload):
+            raise WorkflowExecutionPortError(
+                "NODE_EXECUTION_FROZEN_INPUT_INVALID",
+                "the frozen execution snapshot integrity check failed",
+            )
+        return payload
+
     def start(self, node_run_id: UUID) -> None:
         node = self._repository.get_node(node_run_id, for_update=True)
         if node is None:

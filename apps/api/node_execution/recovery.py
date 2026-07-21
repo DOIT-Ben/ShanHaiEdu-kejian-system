@@ -61,7 +61,11 @@ class SqlAlchemyRecoveryFactStore:
         )
         if fact is None:
             return "missing"
-        return "expired" if fact.expires_at <= database_wall_clock(self._session) else "available"
+        if fact.expires_at <= database_wall_clock(self._session):
+            self._session.delete(fact)
+            self._session.flush()
+            return "expired"
+        return "available"
 
     def rebind_owner(
         self,

@@ -125,6 +125,53 @@ class SqlAlchemyArtifactPort:
                     "a frozen upstream artifact is no longer the current approved version",
                 )
 
+    def load_frozen_versions(
+        self,
+        execution: WorkflowExecutionContext,
+        refs: dict[str, UUID],
+    ) -> dict[str, ArtifactContextVersion]:
+        values: dict[str, ArtifactContextVersion] = {}
+        for contract_ref, version_id in refs.items():
+            definition = resolve_artifact_source(contract_ref)
+            if definition is None:
+                raise ArtifactExecutionPortError(
+                    "NODE_EXECUTION_CONTEXT_SOURCE_UNKNOWN",
+                    "the frozen artifact source is not registered",
+                )
+            row = self._session.execute(
+                select(ArtifactVersion, Artifact)
+                .join(Artifact, Artifact.id == ArtifactVersion.artifact_id)
+                .where(
+                    ArtifactVersion.id == version_id,
+                    ArtifactVersion.organization_id == self._actor.organization_id,
+                    Artifact.organization_id == self._actor.organization_id,
+                    Artifact.project_id == execution.project_id,
+                    (
+                        Artifact.lesson_unit_id == execution.lesson_unit_id
+                        if definition.scope == "lesson"
+                        else Artifact.lesson_unit_id.is_(None)
+                    ),
+                    Artifact.branch_key == definition.branch_key,
+                    Artifact.artifact_type.in_(definition.artifact_types),
+                )
+            ).one_or_none()
+            if row is None:
+                raise ArtifactExecutionPortError(
+                    "NODE_EXECUTION_FROZEN_UPSTREAM_MISSING",
+                    "a frozen upstream artifact version is unavailable",
+                )
+            version, artifact = row
+            values[contract_ref] = ArtifactContextVersion(
+                project_id=execution.project_id,
+                lesson_unit_id=artifact.lesson_unit_id,
+                artifact_version_id=version.id,
+                contract_ref=contract_ref,
+                artifact_type=artifact.artifact_type,
+                content=version.content_json,
+                content_hash=version.content_hash,
+            )
+        return values
+
     def persist_generated(self, write: GeneratedArtifactWrite) -> ArtifactWriteResult:
         ProjectAccessService(self._session, self._actor).require(
             write.project_id,

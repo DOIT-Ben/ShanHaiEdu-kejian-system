@@ -36,6 +36,7 @@ from apps.api.node_execution.contracts import NodeExecutionError, PreparedNodeEx
 from apps.api.node_execution.fake import DeterministicNodeOutputProvider
 from apps.api.node_execution.materials import collect_upstream_artifacts
 from apps.api.node_execution.models import NodeExecutionRecoveryFact
+from apps.api.node_execution.prompt_plan import NodePromptPlanError
 from apps.api.node_execution.service import NodeExecutionService
 from apps.api.node_execution.sqlalchemy import SqlAlchemyNodeExecutionTransactionFactory
 from apps.api.node_execution.structured_output import validate_structured_output
@@ -244,6 +245,49 @@ async def test_cancel_requested_after_model_success_rolls_back_t2(
             select(GenerationAttempt).where(GenerationAttempt.node_run_id == seeded.node_run_id)
         )
         assert attempt is not None and attempt.status == "cancelled"
+        usage = session.scalar(
+            select(UsageRecord).where(UsageRecord.generation_attempt_id == attempt.id)
+        )
+        assert usage is not None
+        assert usage.input_units_json["prompt_tokens"] == 8
+        assert usage.output_units_json["completion_tokens"] == 4
+        assert usage.output_units_json["total_tokens"] == 12
+        assert usage.actual_cost == 0
+        assert session.scalar(select(func.count()).select_from(NodeExecutionRecoveryFact)) == 0
+
+
+async def test_invalid_output_records_known_usage_without_artifact(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_runtime(factory)
+    provider = DeterministicNodeOutputProvider({"unexpected": True})
+    service = NodeExecutionService(
+        SqlAlchemyNodeExecutionTransactionFactory(factory, seeded.actor),
+        ModelGateway(
+            {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: provider},
+            audit_sink=SqlAlchemyAttemptAuditSink(factory),
+        ),
+    )
+
+    with pytest.raises(NodeExecutionError) as caught:
+        await service.execute(seeded.node_run_id, request_id="issue-89-invalid-output-usage")
+
+    assert caught.value.code == "MODEL_OUTPUT_SCHEMA_INVALID"
+    with factory() as session:
+        attempt = session.scalar(
+            select(GenerationAttempt).where(GenerationAttempt.node_run_id == seeded.node_run_id)
+        )
+        assert attempt is not None and attempt.status == "failed"
+        usage = session.scalar(
+            select(UsageRecord).where(UsageRecord.generation_attempt_id == attempt.id)
+        )
+        assert usage is not None
+        assert usage.input_units_json["prompt_tokens"] == 8
+        assert usage.output_units_json["completion_tokens"] == 4
+        assert usage.output_units_json["total_tokens"] == 12
+        assert usage.actual_cost == 0
+        assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 0
         assert session.scalar(select(func.count()).select_from(NodeExecutionRecoveryFact)) == 0
 
 
@@ -357,6 +401,62 @@ async def test_worker_recovery_after_t1_does_not_repeat_provider_call(
     with factory() as session:
         assert _count(session, GenerationAttempt, "node_run_id", seeded.node_run_id) == 1
         assert _count(session, UsageRecord, "node_run_id", seeded.node_run_id) == 1
+
+
+async def test_worker_recovery_after_t1_uses_frozen_prompt_before_upstream_stale(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_runtime(factory)
+    transactions = SqlAlchemyNodeExecutionTransactionFactory(factory, seeded.actor)
+    with transactions.begin() as transaction:
+        transaction.prepare(seeded.node_run_id, "issue-89-recover-frozen-stale")
+    with factory() as session, session.begin():
+        source = session.get(ArtifactVersion, seeded.upstream_version_id)
+        lease = session.get(NodeExecutionLease, seeded.node_run_id)
+        assert source is not None and lease is not None
+        replacement = ArtifactVersion(
+            id=new_uuid7(),
+            organization_id=seeded.actor.organization_id,
+            artifact_id=source.artifact_id,
+            version_no=2,
+            content_json={"replacement": True},
+            content_hash=canonical_content_hash({"replacement": True}),
+            render_summary_json={},
+            source_kind="manual",
+            source_node_run_id=None,
+            context_snapshot_id=None,
+            prompt_snapshot_id=None,
+            validation_report_json={"valid": True},
+            created_by=seeded.actor.principal_id,
+        )
+        session.add(replacement)
+        session.flush()
+        artifact = session.get(Artifact, source.artifact_id)
+        assert artifact is not None
+        artifact.current_approved_version_id = replacement.id
+        lease.lease_expires_at = utc_now() - timedelta(seconds=1)
+
+    provider = DeterministicNodeOutputProvider(seeded.output)
+    service = NodeExecutionService(
+        transactions,
+        ModelGateway(
+            {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: provider},
+            audit_sink=SqlAlchemyAttemptAuditSink(factory),
+        ),
+    )
+    with pytest.raises(NodeExecutionError) as caught:
+        await service.execute(
+            seeded.node_run_id,
+            request_id="issue-89-recover-frozen-stale",
+        )
+
+    assert caught.value.code == "NODE_EXECUTION_UPSTREAM_STALE"
+    assert provider.calls == 1
+    with factory() as session:
+        node = session.get(NodeRun, seeded.node_run_id)
+        assert node is not None and node.status == NodeStatus.FAILED.value
+        assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 0
 
 
 async def test_successful_attempt_before_t2_recovers_from_isolated_fact_without_second_attempt(
@@ -498,6 +598,57 @@ async def test_checkpoint_failure_rolls_back_attempt_usage_and_recovery_fact(
         assert session.scalar(select(func.count()).select_from(NodeExecutionRecoveryFact)) == 0
 
 
+async def test_service_checkpoint_failure_records_known_usage_once(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_runtime(factory)
+
+    def fault(stage: str) -> None:
+        if stage == "after_recovery_fact":
+            raise RuntimeError("test service checkpoint rollback")
+
+    service = NodeExecutionService(
+        SqlAlchemyNodeExecutionTransactionFactory(
+            factory,
+            seeded.actor,
+            fault_injector=fault,
+        ),
+        ModelGateway(
+            {
+                ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: (
+                    DeterministicNodeOutputProvider(seeded.output)
+                )
+            },
+            audit_sink=SqlAlchemyAttemptAuditSink(factory),
+        ),
+    )
+
+    with pytest.raises(NodeExecutionError) as caught:
+        await service.execute(
+            seeded.node_run_id,
+            request_id="issue-89-service-checkpoint-usage",
+        )
+
+    assert caught.value.code == "NODE_EXECUTION_CHECKPOINT_FAILED"
+    with factory() as session:
+        attempt = session.scalar(
+            select(GenerationAttempt).where(GenerationAttempt.node_run_id == seeded.node_run_id)
+        )
+        assert attempt is not None and attempt.status == "failed"
+        usage = session.scalar(
+            select(UsageRecord).where(UsageRecord.generation_attempt_id == attempt.id)
+        )
+        assert usage is not None
+        assert usage.input_units_json["prompt_tokens"] == 8
+        assert usage.output_units_json["completion_tokens"] == 4
+        assert usage.output_units_json["total_tokens"] == 12
+        assert usage.actual_cost == 0
+        assert _count(session, UsageRecord, "node_run_id", seeded.node_run_id) == 1
+        assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 0
+        assert session.scalar(select(func.count()).select_from(NodeExecutionRecoveryFact)) == 0
+
+
 async def test_tampered_recovery_fact_is_rejected_without_provider_replay(
     migrated_database_url: str,
 ) -> None:
@@ -575,6 +726,7 @@ async def test_expired_recovery_fact_fails_closed_without_provider_replay(
         node = session.get(NodeRun, seeded.node_run_id)
         assert node is not None and node.status == NodeStatus.FAILED.value
         assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 0
+        assert session.scalar(select(func.count()).select_from(NodeExecutionRecoveryFact)) == 0
 
 
 async def test_frozen_upstream_change_blocks_recovery_t2(
@@ -614,6 +766,62 @@ async def test_frozen_upstream_change_blocks_recovery_t2(
         with transactions.begin() as transaction:
             transaction.commit(prepared)
     assert caught.value.code == "NODE_EXECUTION_UPSTREAM_STALE"
+    with factory() as session:
+        assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 0
+
+
+async def test_recovery_uses_frozen_inputs_then_rejects_changed_upstream(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_runtime(factory)
+    transactions, _ = await _checkpoint_recovery_fact(
+        factory,
+        seeded,
+        "issue-89-real-recovery-upstream-stale",
+    )
+    with factory() as session, session.begin():
+        source = session.get(ArtifactVersion, seeded.upstream_version_id)
+        lease = session.get(NodeExecutionLease, seeded.node_run_id)
+        assert source is not None and lease is not None
+        replacement = ArtifactVersion(
+            id=new_uuid7(),
+            organization_id=seeded.actor.organization_id,
+            artifact_id=source.artifact_id,
+            version_no=2,
+            content_json={"replacement": True},
+            content_hash=canonical_content_hash({"replacement": True}),
+            render_summary_json={},
+            source_kind="manual",
+            source_node_run_id=None,
+            context_snapshot_id=None,
+            prompt_snapshot_id=None,
+            validation_report_json={"valid": True},
+            created_by=seeded.actor.principal_id,
+        )
+        session.add(replacement)
+        session.flush()
+        artifact = session.get(Artifact, source.artifact_id)
+        assert artifact is not None
+        artifact.current_approved_version_id = replacement.id
+        lease.lease_expires_at = utc_now() - timedelta(seconds=1)
+
+    provider = DeterministicNodeOutputProvider(seeded.output)
+    service = NodeExecutionService(
+        transactions,
+        ModelGateway(
+            {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: provider},
+            audit_sink=SqlAlchemyAttemptAuditSink(factory),
+        ),
+    )
+    with pytest.raises(NodeExecutionError) as caught:
+        await service.execute(
+            seeded.node_run_id,
+            request_id="issue-89-real-recovery-upstream-stale",
+        )
+
+    assert caught.value.code == "NODE_EXECUTION_UPSTREAM_STALE"
+    assert provider.calls == 0
     with factory() as session:
         assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 0
 
@@ -726,6 +934,108 @@ async def test_prepare_claims_one_worker_before_attempt_start(
             transaction.prepare(seeded.node_run_id, "issue-89-owner")
 
     assert caught.value.code == "NODE_EXECUTION_IN_FLIGHT"
+
+
+async def test_video_shot_candidates_cannot_satisfy_selected_clips_context(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_runtime(factory)
+    with factory() as session, session.begin():
+        run = session.get(WorkflowRun, seeded.workflow_run_id)
+        definition = session.scalar(select(ContentDefinitionVersion))
+        assert run is not None and definition is not None
+        lesson = LessonUnit(
+            id=new_uuid7(),
+            organization_id=seeded.actor.organization_id,
+            project_id=seeded.project_id,
+            lesson_key="LESSON-SELECTED-CLIPS",
+            position=1,
+            title="Selected clips gate",
+            scope_summary="Selected clips must be explicit",
+            objective_summary="Reject candidate-only context",
+            estimated_minutes=40,
+            source_division_version_id=seeded.upstream_version_id,
+            status="active",
+            created_by=seeded.actor.principal_id,
+            updated_by=seeded.actor.principal_id,
+        )
+        session.add(lesson)
+        session.flush()
+        branch = BranchRun(
+            id=new_uuid7(),
+            workflow_run_id=run.id,
+            lesson_unit_id=lesson.id,
+            branch_key="video",
+            status="active",
+            created_by=seeded.actor.principal_id,
+            updated_by=seeded.actor.principal_id,
+        )
+        session.add(branch)
+        session.flush()
+        node = NodeRun(
+            id=new_uuid7(),
+            organization_id=seeded.actor.organization_id,
+            workflow_run_id=run.id,
+            branch_run_id=branch.id,
+            node_key="audio.plan.generate",
+            run_no=1,
+            status=NodeStatus.READY.value,
+            trigger_type="manual",
+            automation_policy_snapshot_json=run.automation_policy_snapshot_json,
+            created_by=seeded.actor.principal_id,
+            updated_by=seeded.actor.principal_id,
+        )
+        session.add(node)
+        _seed_approved_artifact(
+            session,
+            seeded.actor,
+            seeded.project_id,
+            definition.id,
+            artifact_key="selected-clips-intro",
+            artifact_type="intro_selection",
+            branch_key="intro_options",
+            lesson_unit_id=lesson.id,
+        )
+        _seed_approved_artifact(
+            session,
+            seeded.actor,
+            seeded.project_id,
+            definition.id,
+            artifact_key="selected-clips-master-script",
+            artifact_type="video_master_script",
+            branch_key="video",
+            lesson_unit_id=lesson.id,
+        )
+        _seed_approved_artifact(
+            session,
+            seeded.actor,
+            seeded.project_id,
+            definition.id,
+            artifact_key="unselected-video-candidate",
+            artifact_type="video_shot_generation",
+            branch_key="video",
+            lesson_unit_id=lesson.id,
+        )
+
+    provider = DeterministicNodeOutputProvider({})
+    service = NodeExecutionService(
+        SqlAlchemyNodeExecutionTransactionFactory(factory, seeded.actor),
+        ModelGateway(
+            {ModelCapability.TEXT_STRUCTURED_AUDIO_PLAN: provider},
+            audit_sink=SqlAlchemyAttemptAuditSink(factory),
+        ),
+    )
+    with pytest.raises(NodePromptPlanError) as caught:
+        await service.execute(node.id, request_id="issue-89-selected-clips-fail-closed")
+
+    assert caught.value.code == "CONTEXT_REQUIRED_MISSING"
+    assert provider.calls == 0
+    with factory() as session:
+        assert _count(session, GenerationAttempt, "node_run_id", node.id) == 0
+        assert _count(session, ArtifactVersion, "source_node_run_id", node.id) == 0
+        assert _count(session, PromptSnapshot, "node_run_id", node.id) == 0
+        assert _count(session, ContextSnapshot, "node_run_id", node.id) == 0
 
 
 async def test_failed_attempt_can_retry_with_same_frozen_inputs(

@@ -21,7 +21,7 @@ from apps.api.jobs.service import (
     GenerationJobBinding,
     GenerationJobCancellationReader,
 )
-from apps.api.model_gateway.attempt_success import complete_attempt_success
+from apps.api.model_gateway.attempt_success import bounded, complete_attempt_success
 from apps.api.model_gateway.audit_contracts import (
     AttemptCompletion,
     AttemptHeartbeat,
@@ -195,6 +195,7 @@ class SqlAlchemyAttemptAuditSink:
         error: ModelGatewayError,
         *,
         latency_ms: int,
+        result: AttemptSuccessAudit | None = None,
     ) -> None:
         with self._session_factory() as session, session.begin():
             attempt = self._require_owned_running(session, lease, context)
@@ -224,18 +225,10 @@ class SqlAlchemyAttemptAuditSink:
             attempt.latency_ms = latency_ms
             attempt.lease_owner = None
             attempt.lease_expires_at = None
-            session.add(
-                self._usage_record(
-                    attempt,
-                    context,
-                    input_units={"prompt_tokens": 0},
-                    output_units={"completion_tokens": 0, "total_tokens": 0},
-                    actual_cost=None,
-                    currency="USD",
-                    latency_ms=latency_ms,
-                    provider_model=attempt.provider_model,
-                )
-            )
+            if result is not None:
+                attempt.provider_request_id = bounded(result.provider_request_id, 255)
+                attempt.provider_task_id = bounded(result.provider_task_id, 255)
+            session.add(self._failed_usage(attempt, context, result, latency_ms))
 
     @staticmethod
     def _require_owned_running(
@@ -283,6 +276,40 @@ class SqlAlchemyAttemptAuditSink:
             project_id=attempt.project_id,
         )
         return binding in GenerationJobCancellationReader(session).requested_bindings({binding})
+
+    def _failed_usage(
+        self,
+        attempt: GenerationAttempt,
+        context: ModelAuditContext,
+        result: AttemptSuccessAudit | None,
+        latency_ms: int,
+    ) -> UsageRecord:
+        input_units = (
+            {**result.usage.input_units, "prompt_tokens": result.usage.prompt_tokens}
+            if result is not None
+            else {"prompt_tokens": 0}
+        )
+        output_units = (
+            {
+                **result.usage.output_units,
+                "completion_tokens": result.usage.completion_tokens,
+                "total_tokens": result.usage.total_tokens,
+            }
+            if result is not None
+            else {"completion_tokens": 0, "total_tokens": 0}
+        )
+        return self._usage_record(
+            attempt,
+            context,
+            input_units=input_units,
+            output_units=output_units,
+            actual_cost=result.usage.cost if result is not None else None,
+            currency=result.usage.currency if result is not None else "USD",
+            latency_ms=latency_ms,
+            provider_model=(
+                bounded(result.actual_model, 160) if result is not None else attempt.provider_model
+            ),
+        )
 
     @staticmethod
     def _allocate_attempt_no(session: Session, node_run_id: UUID) -> int:

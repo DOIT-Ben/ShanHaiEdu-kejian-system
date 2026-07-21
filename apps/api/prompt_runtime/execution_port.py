@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from apps.api.identity.context import ActorContext
@@ -52,3 +53,28 @@ class SqlAlchemyPromptSnapshotPort:
                 "NODE_EXECUTION_SNAPSHOT_MISMATCH",
                 "a frozen prompt or context snapshot is no longer valid",
             )
+
+    def load_frozen(self, node_run_id: UUID) -> FrozenSnapshotRefs:
+        context = self._session.scalar(
+            select(ContextSnapshot).where(
+                ContextSnapshot.organization_id == self._actor.organization_id,
+                ContextSnapshot.node_run_id == node_run_id,
+            )
+        )
+        prompt = self._session.scalar(
+            select(PromptSnapshot).where(
+                PromptSnapshot.organization_id == self._actor.organization_id,
+                PromptSnapshot.node_run_id == node_run_id,
+            )
+        )
+        if context is None or prompt is None or prompt.context_snapshot_id != context.id:
+            raise PromptSnapshotError(
+                "NODE_EXECUTION_SNAPSHOT_MISMATCH",
+                "the frozen prompt and context snapshots are unavailable",
+            )
+        return FrozenSnapshotRefs(
+            context_snapshot_id=context.id,
+            prompt_snapshot_id=prompt.id,
+            context_hash=context.content_hash,
+            prompt_hash=prompt.content_hash,
+        )

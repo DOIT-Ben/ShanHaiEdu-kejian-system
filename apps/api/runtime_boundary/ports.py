@@ -305,6 +305,12 @@ class ArtifactPort(Protocol):
         upstream: dict[str, ArtifactContextVersion],
     ) -> None: ...
 
+    def load_frozen_versions(
+        self,
+        execution: WorkflowExecutionContext,
+        refs: dict[str, UUID],
+    ) -> dict[str, ArtifactContextVersion]: ...
+
     def persist_generated(self, write: GeneratedArtifactWrite) -> ArtifactWriteResult: ...
 
 
@@ -328,6 +334,8 @@ class PromptSnapshotPort(Protocol):
     ) -> FrozenSnapshotRefs: ...
 
     def verify(self, refs: FrozenSnapshotRefs) -> None: ...
+
+    def load_frozen(self, node_run_id: UUID) -> FrozenSnapshotRefs: ...
 
 
 class ModelInvocationPort(Protocol):

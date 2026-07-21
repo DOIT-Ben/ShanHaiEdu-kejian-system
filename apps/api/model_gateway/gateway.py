@@ -135,6 +135,7 @@ class ModelGateway:
             pending.audit_context,
             ModelGatewayError(code, retryable=False),
             latency_ms=pending.result.latency_ms,
+            result=pending.success_audit,
         )
 
     async def generate_image(
