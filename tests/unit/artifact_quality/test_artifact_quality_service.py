@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 from uuid import UUID
 
@@ -206,3 +206,32 @@ def test_report_or_terminal_event_failure_rolls_back_the_whole_transaction() -> 
         "complete:passed",
         "tx:rollback",
     ]
+
+
+def test_committed_replay_returns_without_resolving_or_running_validators() -> None:
+    events: list[str] = []
+    existing = ArtifactQualityReportResult(
+        report_id=REPORT_ID,
+        node_run_id=NODE_RUN_ID,
+        conclusion="passed",
+    )
+    context = validation_context()
+
+    class ReplayTransaction(FakeTransaction):
+        def prepare(self, node_run_id: UUID) -> QualityValidationContext:
+            self.events.append("prepare")
+            assert node_run_id == NODE_RUN_ID
+            return replace(context, existing_result=existing)
+
+    class ReplayFactory(FakeTransactionFactory):
+        @contextmanager
+        def begin(self) -> Iterator[FakeTransaction]:
+            self.events.append("tx:open")
+            yield ReplayTransaction(self.events)
+            self.events.append("tx:commit")
+
+    validator = FakeValidator(events, error=AssertionError("must not run"))
+    service = ArtifactQualityService(ReplayFactory(events), FakeRegistry(events, validator))
+
+    assert service.execute(NODE_RUN_ID) == existing
+    assert events == ["tx:open", "prepare", "tx:commit"]

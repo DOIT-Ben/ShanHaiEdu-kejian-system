@@ -107,7 +107,13 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
         existing = self._reports.get_for_node(node_run_id)
         result = None if existing is None else _report_result(existing)
         if existing is not None:
-            self._require_same_fixed_identity(existing, execution, source.content_hash, binding)
+            self._require_same_fixed_identity(
+                existing,
+                execution,
+                source.artifact_version_id,
+                source.content_hash,
+                binding,
+            )
         else:
             self._workflow.start(node_run_id)
         return QualityValidationContext(
@@ -132,6 +138,14 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
         conclusion: QualityConclusion,
         outcomes: tuple[ValidatorOutcome, ...],
     ) -> ArtifactQualityReportResult:
+        expected_conclusion: QualityConclusion = (
+            "passed" if all(outcome.passed for outcome in outcomes) else "failed"
+        )
+        if conclusion != expected_conclusion:
+            raise ArtifactQualityTransactionError(
+                "QUALITY_CONCLUSION_MISMATCH",
+                "quality conclusion does not match validator outcomes",
+            )
         findings, evidence_hash = _validated_outcome_payload(context, outcomes)
         self._lock_identity(context)
         existing = self._reports.get_exact(
@@ -202,6 +216,7 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
     def _require_same_fixed_identity(
         existing: ArtifactQualityReport,
         execution: WorkflowExecutionContext,
+        source_artifact_version_id: UUID,
         source_hash: str,
         binding: QualityReportBinding,
     ) -> None:
@@ -211,8 +226,10 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
             or existing.lesson_unit_id != execution.lesson_unit_id
             or existing.content_release_id != execution.content_release_id
             or existing.workflow_definition_version_id != execution.workflow_definition_version_id
+            or existing.source_artifact_version_id != source_artifact_version_id
             or existing.source_content_hash != source_hash
             or existing.validator_set_hash != binding.validator_set_hash
+            or existing.validator_set_json != validator_set_payload(binding.validator_refs)
         ):
             raise ArtifactQualityTransactionError(
                 "QUALITY_REPORT_IDEMPOTENCY_CONFLICT",

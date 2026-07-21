@@ -20,7 +20,10 @@ from apps.api.artifact_quality.models import ArtifactQualityReport
 from apps.api.artifact_quality.registry import InMemoryQualityValidatorRegistry
 from apps.api.artifact_quality.repository import ArtifactQualityReportRepository
 from apps.api.artifact_quality.service import ArtifactQualityError, ArtifactQualityService
-from apps.api.artifact_quality.sqlalchemy import SqlAlchemyArtifactQualityTransactionFactory
+from apps.api.artifact_quality.sqlalchemy import (
+    ArtifactQualityTransactionError,
+    SqlAlchemyArtifactQualityTransactionFactory,
+)
 from apps.api.artifacts.models import Artifact, ArtifactVersion
 from apps.api.database import build_engine, build_session_factory
 from apps.api.identity.context import ActorContext
@@ -197,6 +200,28 @@ def test_cross_project_source_is_rejected_before_report_or_node_write(
         assert node is not None and node.status == NodeStatus.READY.value
         assert session.scalar(select(func.count()).select_from(ArtifactQualityReport)) == 0
         assert session.scalar(select(func.count()).select_from(EventStreamEntry)) == 0
+
+
+def test_transaction_rejects_a_conclusion_that_disagrees_with_validator_outcomes(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_quality_node(factory)
+    transactions = SqlAlchemyArtifactQualityTransactionFactory(factory, seeded.actor)
+
+    with pytest.raises(ArtifactQualityTransactionError) as captured:
+        with transactions.begin() as transaction:
+            context = transaction.prepare(seeded.node_run_id)
+            outcomes = tuple(
+                FixtureValidator(ref).validate(context) for ref in context.validator_refs
+            )
+            transaction.complete(context, conclusion="failed", outcomes=outcomes)
+
+    assert captured.value.code == "QUALITY_CONCLUSION_MISMATCH"
+    with factory() as session:
+        node = session.get(NodeRun, seeded.node_run_id)
+        assert node is not None and node.status == NodeStatus.READY.value
+        assert session.scalar(select(func.count()).select_from(ArtifactQualityReport)) == 0
 
 
 @pytest.mark.parametrize("fault_stage", ["after_report", "after_terminal", "after_event"])
