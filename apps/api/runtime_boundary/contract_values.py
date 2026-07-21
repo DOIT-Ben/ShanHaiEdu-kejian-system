@@ -67,6 +67,21 @@ def freeze_json_value(value: object) -> Any:
     raise ArtifactInvariantError("JSON values must be finite and JSON-compatible")
 
 
+def plain_json_value(value: object) -> Any:
+    """Materialize an immutable JSON contract value for persistence adapters."""
+
+    if isinstance(value, Mapping):
+        result: dict[str, Any] = {}
+        for key, child in cast(Mapping[object, object], value).items():
+            if type(key) is not str:
+                raise ArtifactInvariantError("JSON mapping keys must be strings")
+            result[key] = plain_json_value(child)
+        return result
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return [plain_json_value(child) for child in cast(Sequence[object], value)]
+    return value
+
+
 def require_uuid(value: object, message: str) -> None:
     if not isinstance(value, UUID):
         raise ArtifactInvariantError(message)

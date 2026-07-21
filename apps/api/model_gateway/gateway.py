@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 
 from apps.api.model_gateway.attempt_lifecycle import AttemptExecutionCoordinator
-from apps.api.model_gateway.audit_contracts import AttemptAuditSink
+from apps.api.model_gateway.audit_contracts import AttemptAuditSink, AttemptSuccessAudit
 from apps.api.model_gateway.contracts import (
     GatewayErrorCode,
     ImageGatewayResult,
@@ -24,6 +24,7 @@ from apps.api.model_gateway.contracts import (
     VideoPollRequest,
     VideoProviderResult,
 )
+from apps.api.model_gateway.pending import PendingTextGeneration
 from apps.api.model_gateway.ports import (
     CancellationToken,
     ImageProvider,
@@ -61,6 +62,35 @@ class ModelGateway:
         cancellation: CancellationToken | None = None,
         audit_context: ModelAuditContext | None = None,
     ) -> TextGatewayResult:
+        pending = await self.generate_text_pending(
+            request,
+            cancellation=cancellation,
+            audit_context=audit_context,
+        )
+        self._attempts.complete_success(
+            request,
+            self._text_routes[request.capability],
+            TextProviderResult(
+                text=pending.result.text,
+                provider_request_id=pending.result.provider_request_id,
+                actual_model=pending.result.actual_model,
+                finish_reason=pending.result.finish_reason,
+                usage=pending.result.usage,
+            ),
+            pending.lease,
+            pending.audit_context,
+            latency_ms=pending.result.latency_ms,
+            failure_code=GatewayErrorCode.AUDIT_UNAVAILABLE,
+        )
+        return pending.result
+
+    async def generate_text_pending(
+        self,
+        request: TextModelRequest,
+        *,
+        cancellation: CancellationToken | None = None,
+        audit_context: ModelAuditContext | None = None,
+    ) -> PendingTextGeneration:
         provider, result, attempt_id, latency_ms = await self._attempts.execute(
             request,
             self._text_routes,
@@ -70,26 +100,42 @@ class ModelGateway:
             cancellation=cancellation,
             audit_context=audit_context,
         )
-        self._attempts.complete_success(
-            request,
-            provider,
-            result,
-            attempt_id,
-            audit_context,
-            latency_ms=latency_ms,
-            failure_code=GatewayErrorCode.AUDIT_UNAVAILABLE,
-        )
         route = self._route(request.capability, provider)
         log_success(request, provider, route, result, latency_ms)
-        return TextGatewayResult(
-            request_id=request.request_id,
-            text=result.text,
-            route=route,
-            provider_request_id=result.provider_request_id,
-            actual_model=result.actual_model,
-            finish_reason=result.finish_reason,
-            usage=result.usage,
-            latency_ms=latency_ms,
+        return PendingTextGeneration(
+            result=TextGatewayResult(
+                request_id=request.request_id,
+                text=result.text,
+                route=route,
+                provider_request_id=result.provider_request_id,
+                actual_model=result.actual_model,
+                finish_reason=result.finish_reason,
+                usage=result.usage,
+                latency_ms=latency_ms,
+            ),
+            lease=attempt_id,
+            audit_context=audit_context,
+            success_audit=AttemptSuccessAudit(
+                provider_request_id=result.provider_request_id,
+                provider_task_id=None,
+                actual_model=result.actual_model,
+                finish_reason=result.finish_reason,
+                usage=result.usage,
+            ),
+        )
+
+    def fail_text_pending(
+        self,
+        pending: PendingTextGeneration,
+        *,
+        code: GatewayErrorCode = GatewayErrorCode.INVALID_RESPONSE,
+    ) -> None:
+        self._attempts.best_effort_fail(
+            pending.lease,
+            pending.audit_context,
+            ModelGatewayError(code, retryable=False),
+            latency_ms=pending.result.latency_ms,
+            result=pending.success_audit,
         )
 
     async def generate_image(

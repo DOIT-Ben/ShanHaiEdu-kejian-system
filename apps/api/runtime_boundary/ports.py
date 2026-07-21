@@ -287,17 +287,41 @@ class WorkflowExecutionPort(Protocol):
 
     def transition(self, node_run_id: UUID, target: NodeStatus) -> None: ...
 
+    def claim_execution_owner(self, node_run_id: UUID, owner_token: str) -> None: ...
+
+    def owns_execution_owner(self, node_run_id: UUID, owner_token: str) -> bool: ...
+
+    def release_execution_owner(self, node_run_id: UUID, owner_token: str) -> None: ...
+
 
 class ArtifactPort(Protocol):
     def list_context_versions(
-        self, project_id: UUID, source: str
+        self, execution: WorkflowExecutionContext, source: str
     ) -> tuple[ArtifactContextVersion, ...]: ...
+
+    def verify_frozen_versions(
+        self,
+        execution: WorkflowExecutionContext,
+        upstream: dict[str, ArtifactContextVersion],
+    ) -> None: ...
+
+    def load_frozen_versions(
+        self,
+        execution: WorkflowExecutionContext,
+        refs: dict[str, UUID],
+    ) -> dict[str, ArtifactContextVersion]: ...
 
     def persist_generated(self, write: GeneratedArtifactWrite) -> ArtifactWriteResult: ...
 
 
 class AssetPort(Protocol):
     def list_context_items(self, project_id: UUID, source: str) -> tuple[AssetContextItem, ...]: ...
+
+    def freeze_reference_assets(
+        self,
+        definition: RuntimeNodeDefinition,
+        execution: WorkflowExecutionContext,
+    ) -> ReferenceAssetAuthorization | None: ...
 
 
 class PromptSnapshotPort(Protocol):
@@ -308,6 +332,10 @@ class PromptSnapshotPort(Protocol):
         context: AssembledContext,
         prompt: CompiledPrompt,
     ) -> FrozenSnapshotRefs: ...
+
+    def verify(self, refs: FrozenSnapshotRefs) -> None: ...
+
+    def load_frozen(self, node_run_id: UUID) -> FrozenSnapshotRefs: ...
 
 
 class ModelInvocationPort(Protocol):

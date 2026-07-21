@@ -167,7 +167,31 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
             )
             == 1
         )
-    assert ScriptDirectory.from_config(config).get_current_head() == "f2a7b9c1d304"
+    package_columns = {
+        column["name"] for column in database_inspector.get_columns("creation_packages")
+    }
+    package_indexes = {
+        index["name"] for index in database_inspector.get_indexes("creation_packages")
+    }
+    package_foreign_keys = {
+        foreign_key["name"]
+        for foreign_key in database_inspector.get_foreign_keys("creation_packages")
+    }
+    assert {"source_artifact_version_id", "lesson_unit_id"}.issubset(package_columns)
+    assert "ix_creation_packages_source_artifact_version" in package_indexes
+    assert {
+        "fk_creation_packages_source_artifact_version",
+        "fk_creation_packages_lesson_unit",
+    }.issubset(package_foreign_keys)
+    package_item_columns = {
+        column["name"] for column in database_inspector.get_columns("creation_package_items")
+    }
+    assert "reference_assets_json" in package_item_columns
+    lease_columns = {
+        column["name"] for column in database_inspector.get_columns("node_execution_leases")
+    }
+    assert {"node_run_id", "owner_token", "lease_expires_at"}.issubset(lease_columns)
+    assert ScriptDirectory.from_config(config).get_current_head() == "g1b2c3d4e5f6"
     previous = os.environ.get("SHANHAI_DATABASE_URL")
     os.environ["SHANHAI_DATABASE_URL"] = postgres_database_url
     try:

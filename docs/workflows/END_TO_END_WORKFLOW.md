@@ -51,7 +51,7 @@ flowchart TD
 - 教师可读投影和GenerationTemplate引用；
 - 逻辑模型能力和风格预设，不含Provider名称、密钥或私有参数。
 
-每个`model_generation`节点还声明不可变Artifact输出投影；未声明`creation_package`的模型节点只形成Artifact，声明该投影的模型节点在Artifact版本落库取得版本ID后再形成CreationPackage。13个`deterministic`节点和12个`human_gate`节点不属于这条模型输出投影编译路径；其中`delivery.package`等确定性节点仍由各自平台执行器负责。这些声明不等于#89执行器、真实Provider或业务validator已经实现。
+每个`model_generation`节点还声明不可变Artifact输出投影；未声明`creation_package`的模型节点只形成Artifact，声明该投影的模型节点在Artifact版本落库取得版本ID后再形成CreationPackage。13个`deterministic`节点和12个`human_gate`节点不属于这条模型输出投影编译路径；其中`delivery.package`等确定性节点仍由各自平台执行器负责。#89已经实现通用模型节点的确定性Fake执行、恢复和原子写回，但不代表真实Provider、媒体Adapter或业务validator已经实现。
 
 旧v1 Release继续固定原有工作流语义；仅当调用方要求消费其未声明的v2输出投影时，才以`WORKFLOW_RELEASE_UNSUPPORTED`拒绝，不能把该错误扩大为旧工作流整体不可启动。
 

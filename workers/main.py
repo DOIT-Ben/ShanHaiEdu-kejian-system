@@ -15,21 +15,22 @@ from dramatiq.worker import Worker
 from apps.api.database import build_engine, build_session_factory
 from apps.api.health import build_readiness_service
 from apps.api.logging import configure_logging
-from apps.api.model_gateway.attempt_recovery import AttemptRecoveryCoordinator
 from apps.api.reliability.models import OutboxEvent
 from apps.api.reliability.outbox import OutboxDispatcher
 from apps.api.settings import get_settings
+from workers.recovery import WorkerRecoveryCoordinator
 
 logger = logging.getLogger(__name__)
 
 
-def _run_startup_recovery(coordinator: AttemptRecoveryCoordinator) -> None:
+def _run_startup_recovery(coordinator: WorkerRecoveryCoordinator) -> None:
     result = coordinator.reconcile()
     logger.info(
         "generation_attempt_startup_recovery_completed",
         extra={
             "cancellation_requests": result.cancellation_requests,
-            "recovered": result.recovered,
+            "recovered_attempts": result.recovered_attempts,
+            "expired_recovery_facts": result.expired_recovery_facts,
         },
     )
 
@@ -76,19 +77,19 @@ def run_worker(*, check_only: bool) -> int:
         lease_seconds=settings.worker_lease_seconds,
         retry_seconds=settings.outbox_retry_seconds,
     )
-    attempt_recovery = AttemptRecoveryCoordinator(factory)
+    recovery = WorkerRecoveryCoordinator(factory)
 
     def publish(event: OutboxEvent) -> None:
         if event.topic == "generation.job.queued":
             process_generation_job.send(str(event.aggregate_id))
 
     worker = Worker(broker, worker_threads=2)
-    _run_startup_recovery(attempt_recovery)
+    _run_startup_recovery(recovery)
     worker.start()
     logger.info("worker_booted", extra={"ready": True, "task_processing_enabled": True})
     try:
         while True:
-            attempt_recovery.reconcile()
+            recovery.reconcile()
             dispatcher.dispatch_batch(publish)
             time.sleep(settings.outbox_poll_seconds)
     except KeyboardInterrupt:
