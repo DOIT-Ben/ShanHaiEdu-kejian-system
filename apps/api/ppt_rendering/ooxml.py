@@ -34,12 +34,9 @@ def render_pptx(request: AssemblyRequest) -> bytes:
         "ppt/slideLayouts/_rels/slideLayout1.xml.rels": _slide_layout_rels().encode(),
     }
     for position, page in enumerate(request.pages, start=1):
-        extension = "png" if page.backgrounds[0].media_type == "image/png" else "jpg"
-        files[f"ppt/media/image{position}.{extension}"] = page.backgrounds[0].content
+        files[f"ppt/media/image{position}.png"] = page.backgrounds[0].content
         files[f"ppt/slides/slide{position}.xml"] = _slide(page).encode()
-        files[f"ppt/slides/_rels/slide{position}.xml.rels"] = _slide_rels(
-            position, extension
-        ).encode()
+        files[f"ppt/slides/_rels/slide{position}.xml.rels"] = _slide_rels(position).encode()
 
     output = BytesIO()
     with ZipFile(output, "w", compression=ZIP_DEFLATED, compresslevel=9) as package:
@@ -60,8 +57,6 @@ def _content_types(request: AssemblyRequest) -> str:
     ]
     if "image/png" in image_defaults:
         defaults.append('<Default Extension="png" ContentType="image/png"/>')
-    if "image/jpeg" in image_defaults:
-        defaults.append('<Default Extension="jpg" ContentType="image/jpeg"/>')
     overrides = [
         (
             "/ppt/presentation.xml",
@@ -258,12 +253,12 @@ def _native_shape(shape_id: int, element: ShapeElement) -> str:
     )
 
 
-def _slide_rels(position: int, extension: str) -> str:
+def _slide_rels(position: int) -> str:
     return _relationships(
         (
             "rId1",
             "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
-            f"../media/image{position}.{extension}",
+            f"../media/image{position}.png",
         ),
         (
             "rId2",

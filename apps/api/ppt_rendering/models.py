@@ -14,6 +14,7 @@ MAX_PAGES = 60
 MAX_ELEMENTS_PER_PAGE = 200
 MAX_BACKGROUND_BYTES = 16 * 1024 * 1024
 MAX_TOTAL_INPUT_BYTES = 128 * 1024 * 1024
+SUPPORTED_BACKGROUND_MEDIA_TYPES: tuple[Literal["image/png"], ...] = ("image/png",)
 
 ElementKey = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
 PageKey = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
@@ -54,8 +55,12 @@ class FontStyle(_FrozenModel):
 
 
 class BackgroundImage(_FrozenModel):
+    """JPEG remains a recognized discriminator so the Core can reject it stably."""
+
     content: bytes = Field(min_length=1)
-    media_type: Literal["image/png", "image/jpeg"]
+    media_type: Literal["image/png", "image/jpeg"] = Field(
+        description="V1 supports image/png; image/jpeg returns a stable unsupported-profile error"
+    )
 
 
 class TextElement(_FrozenModel):

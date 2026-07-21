@@ -66,7 +66,9 @@ def jpeg_bytes() -> bytes:
     )
 
 
-def indexed_png_bytes(*, width: int = 160, height: int = 90) -> bytes:
+def indexed_png_bytes(
+    *, width: int = 160, height: int = 90, pixel_index: int | None = None
+) -> bytes:
     """Build a valid 8-bit indexed-color PNG with a two-color palette."""
 
     def chunk(kind: bytes, payload: bytes) -> bytes:
@@ -75,7 +77,12 @@ def indexed_png_bytes(*, width: int = 160, height: int = 90) -> bytes:
 
     header = struct.pack(">IIBBBBB", width, height, 8, 3, 0, 0, 0)
     palette = bytes((245, 248, 255, 23, 54, 93))
-    row = b"\x00" + bytes(index % 2 for index in range(width))
+    indexes = (
+        bytes((pixel_index,)) * width
+        if pixel_index is not None
+        else bytes(index % 2 for index in range(width))
+    )
+    row = b"\x00" + indexes
     return (
         b"\x89PNG\r\n\x1a\n"
         + chunk(b"IHDR", header)

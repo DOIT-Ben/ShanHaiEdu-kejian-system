@@ -7,6 +7,7 @@ from apps.api.ppt_rendering import (
     MAX_ELEMENTS_PER_PAGE,
     MAX_PAGES,
     MAX_TOTAL_INPUT_BYTES,
+    SUPPORTED_BACKGROUND_MEDIA_TYPES,
     AssemblyRequest,
     BackgroundImage,
     Box,
@@ -120,8 +121,8 @@ def test_duplicate_element_keys_are_rejected() -> None:
     ("content", "media_type", "code"),
     [
         (png_bytes()[:-1], "image/png", "PPT_BACKGROUND_IMAGE_INVALID"),
-        (jpeg_bytes()[:-1], "image/jpeg", "PPT_BACKGROUND_IMAGE_INVALID"),
-        (png_bytes(), "image/jpeg", "PPT_BACKGROUND_IMAGE_INVALID"),
+        (jpeg_bytes()[:-1], "image/jpeg", "PPT_BACKGROUND_IMAGE_PROFILE_UNSUPPORTED"),
+        (png_bytes(), "image/jpeg", "PPT_BACKGROUND_IMAGE_PROFILE_UNSUPPORTED"),
         (png_bytes(width=2, height=2), "image/png", "PPT_BACKGROUND_ASPECT_RATIO_INVALID"),
     ],
 )
@@ -137,12 +138,8 @@ def test_background_image_integrity_and_aspect_ratio_fail_closed(
     assert caught.value.code == code
 
 
-@pytest.mark.parametrize(
-    ("content", "media_type"),
-    [(png_bytes(), "image/png"), (jpeg_bytes(), "image/jpeg")],
-)
-def test_valid_png_and_jpeg_dimensions_are_recorded(content: bytes, media_type: str) -> None:
-    background = BackgroundImage.model_construct(content=content, media_type=media_type)
+def test_valid_png_dimensions_are_recorded() -> None:
+    background = BackgroundImage(content=png_bytes(), media_type="image/png")
     page = make_page().model_copy(update={"backgrounds": (background,)})
 
     manifest = assemble_pages(make_request(pages=(page,)))
@@ -171,13 +168,27 @@ def test_valid_indexed_color_png_is_accepted() -> None:
     assert manifest.pages[0].background_height == 90
 
 
-def test_forged_jpeg_with_bogus_sof_and_empty_scan_is_rejected() -> None:
-    forged = b"\xff\xd8\xff\xc0\x00\x08\x08\x00\x5a\x00\xa0\x00\xff\xda\x00\x02\xff\xd9"
-    background = BackgroundImage(content=forged, media_type="image/jpeg")
+def test_indexed_color_png_rejects_palette_index_out_of_range() -> None:
+    background = BackgroundImage(content=indexed_png_bytes(pixel_index=2), media_type="image/png")
     page = make_page().model_copy(update={"backgrounds": (background,)})
 
     with pytest.raises(PptRenderingError, match="PPT_BACKGROUND_IMAGE_INVALID"):
         assemble_pages(make_request(pages=(page,)))
+
+
+def test_all_jpeg_profiles_are_stably_unsupported() -> None:
+    assert SUPPORTED_BACKGROUND_MEDIA_TYPES == ("image/png",)
+    forged = b"\xff\xd8\xff\xc0\x00\x08\x08\x00\x5a\x00\xa0\x00\xff\xda\x00\x02\xff\xd9"
+    for content in (jpeg_bytes(), forged):
+        background = BackgroundImage(content=content, media_type="image/jpeg")
+        page = make_page().model_copy(update={"backgrounds": (background,)})
+
+        with pytest.raises(
+            PptRenderingError, match="PPT_BACKGROUND_IMAGE_PROFILE_UNSUPPORTED"
+        ) as caught:
+            assemble_pages(make_request(pages=(page,)))
+
+        assert caught.value.code == "PPT_BACKGROUND_IMAGE_PROFILE_UNSUPPORTED"
 
 
 def test_page_key_lone_surrogate_has_stable_domain_error() -> None:

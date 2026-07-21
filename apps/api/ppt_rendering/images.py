@@ -1,4 +1,4 @@
-"""Dependency-free structural validation for supported background images."""
+"""Dependency-free validation for the frozen PNG background profile."""
 
 from __future__ import annotations
 
@@ -10,21 +10,6 @@ from apps.api.ppt_rendering.errors import PptRenderingError
 from apps.api.ppt_rendering.models import BackgroundImage
 
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
-_JPEG_SOF_MARKERS = {
-    0xC0,
-    0xC1,
-    0xC2,
-    0xC3,
-    0xC5,
-    0xC6,
-    0xC7,
-    0xC9,
-    0xCA,
-    0xCB,
-    0xCD,
-    0xCE,
-    0xCF,
-}
 _MAX_IMAGE_PIXELS = 20_000_000
 
 
@@ -32,13 +17,6 @@ _MAX_IMAGE_PIXELS = 20_000_000
 class ImageInfo:
     width: int
     height: int
-
-
-@dataclass(frozen=True)
-class _JpegFrame:
-    info: ImageInfo
-    component_ids: tuple[int, ...]
-    quantization_ids: tuple[int, ...]
 
 
 @dataclass
@@ -54,12 +32,13 @@ class _PngState:
 
 
 def inspect_background(background: BackgroundImage) -> ImageInfo:
-    try:
-        info = (
-            _inspect_png(background.content)
-            if background.media_type == "image/png"
-            else _inspect_jpeg(background.content)
+    if background.media_type != "image/png":
+        raise PptRenderingError(
+            "PPT_BACKGROUND_IMAGE_PROFILE_UNSUPPORTED",
+            "the V1 render core accepts only validated PNG backgrounds",
         )
+    try:
+        info = _inspect_png(background.content)
     except (IndexError, struct.error, zlib.error) as exc:
         raise _invalid_image() from exc
     if info.width * 9 != info.height * 16:
@@ -97,7 +76,7 @@ def _inspect_png(data: bytes) -> ImageInfo:
         or (state.color_type == 3 and not state.palette_entries)
     ):
         raise _invalid_image()
-    _validate_png_pixels(bytes(state.compressed), state.info, state.bits_per_pixel)
+    _validate_png_pixels(state)
     return state.info
 
 
@@ -124,12 +103,7 @@ def _apply_png_chunk(state: _PngState, kind: bytes, payload: bytes) -> bool:
     elif kind == b"PLTE":
         _apply_png_palette(state, payload)
     elif kind == b"IDAT":
-        if state.info is None or state.idat_ended:
-            raise _invalid_image()
-        if state.color_type == 3 and not state.palette_entries:
-            raise _invalid_image()
-        state.seen_idat = True
-        state.compressed.extend(payload)
+        _apply_png_data(state, payload)
     elif kind == b"tRNS":
         if state.seen_idat or state.color_type != 3 or not state.palette_entries:
             raise _invalid_image()
@@ -172,13 +146,32 @@ def _apply_png_palette(state: _PngState, payload: bytes) -> None:
         raise _invalid_image()
 
 
-def _validate_png_pixels(compressed: bytes, info: ImageInfo, bits_per_pixel: int) -> None:
-    if info.width <= 0 or info.height <= 0 or info.width * info.height > _MAX_IMAGE_PIXELS:
+def _apply_png_data(state: _PngState, payload: bytes) -> None:
+    if state.info is None or state.idat_ended:
+        raise _invalid_image()
+    if state.color_type == 3 and not state.palette_entries:
+        raise _invalid_image()
+    state.seen_idat = True
+    state.compressed.extend(payload)
+
+
+def _validate_png_pixels(state: _PngState) -> None:
+    info = state.info
+    if info is None or info.width <= 0 or info.height <= 0:
+        raise _invalid_image()
+    if info.width * info.height > _MAX_IMAGE_PIXELS:
         raise PptRenderingError(
             "PPT_BACKGROUND_DIMENSIONS_INVALID", "background dimensions are outside limits"
         )
-    expected_row = (info.width * bits_per_pixel + 7) // 8 + 1
-    expected_size = expected_row * info.height
+    row_size = (info.width * state.bits_per_pixel + 7) // 8
+    expected_size = (row_size + 1) * info.height
+    pixels = _decompress_png(bytes(state.compressed), expected_size)
+    rows = _unfilter_png_rows(pixels, row_size, state.bits_per_pixel, info.height)
+    if state.color_type == 3:
+        _validate_palette_indices(rows, info.width, state.bit_depth, state.palette_entries)
+
+
+def _decompress_png(compressed: bytes, expected_size: int) -> bytes:
     decoder = zlib.decompressobj()
     pixels = decoder.decompress(compressed, expected_size + 1)
     if decoder.unconsumed_tail or len(pixels) > expected_size:
@@ -186,184 +179,69 @@ def _validate_png_pixels(compressed: bytes, info: ImageInfo, bits_per_pixel: int
     pixels += decoder.flush()
     if not decoder.eof or decoder.unused_data or len(pixels) != expected_size:
         raise _invalid_image()
-    if any(pixels[row * expected_row] > 4 for row in range(info.height)):
-        raise _invalid_image()
+    return pixels
 
 
-def _inspect_jpeg(data: bytes) -> ImageInfo:
-    if len(data) < 6 or not data.startswith(b"\xff\xd8"):
-        raise _invalid_image()
-    offset = 2
-    frame: _JpegFrame | None = None
-    quantization_tables: set[int] = set()
-    dc_tables: set[int] = set()
-    ac_tables: set[int] = set()
-    while offset < len(data):
-        marker, offset = _next_jpeg_marker(data, offset)
-        if marker == 0x01:
-            continue
-        if marker in {0xD8, 0xD9, *range(0xD0, 0xD8)}:
+def _unfilter_png_rows(
+    pixels: bytes, row_size: int, bits_per_pixel: int, height: int
+) -> tuple[bytes, ...]:
+    rows: list[bytes] = []
+    previous = bytes(row_size)
+    filter_bytes = max(1, (bits_per_pixel + 7) // 8)
+    stride = row_size + 1
+    for row_number in range(height):
+        offset = row_number * stride
+        filter_type = pixels[offset]
+        if filter_type > 4:
             raise _invalid_image()
-        if offset + 2 > len(data):
-            raise _invalid_image()
-        length = struct.unpack_from(">H", data, offset)[0]
-        if length < 2 or offset + length > len(data):
-            raise _invalid_image()
-        segment = data[offset + 2 : offset + length]
-        if marker in _JPEG_SOF_MARKERS:
-            if marker != 0xC0 or frame is not None:
-                raise _invalid_image()
-            frame = _parse_jpeg_frame(segment)
-        elif marker == 0xDB:
-            quantization_tables.update(_parse_quantization_tables(segment))
-        elif marker == 0xC4:
-            segment_dc, segment_ac = _parse_huffman_tables(segment)
-            dc_tables.update(segment_dc)
-            ac_tables.update(segment_ac)
-        offset += length
-        if marker == 0xDA:
-            _validate_jpeg_scan_header(segment, frame, quantization_tables, dc_tables, ac_tables)
-            return _finish_jpeg_scan(data, offset, frame)
-    raise _invalid_image()
+        raw = pixels[offset + 1 : offset + stride]
+        reconstructed = _unfilter_png_row(raw, previous, filter_bytes, filter_type)
+        rows.append(reconstructed)
+        previous = reconstructed
+    return tuple(rows)
 
 
-def _parse_jpeg_frame(segment: bytes) -> _JpegFrame:
-    if len(segment) < 6 or segment[0] != 8:
-        raise _invalid_image()
-    height, width = struct.unpack_from(">HH", segment, 1)
-    component_count = segment[5]
-    if component_count not in {1, 3} or len(segment) != 6 + component_count * 3:
-        raise _invalid_image()
-    component_ids: list[int] = []
-    quantization_ids: list[int] = []
-    for position in range(component_count):
-        component_id, sampling, table_id = segment[6 + position * 3 : 9 + position * 3]
-        horizontal, vertical = sampling >> 4, sampling & 0x0F
-        if (
-            component_id in component_ids
-            or not 1 <= horizontal <= 4
-            or not 1 <= vertical <= 4
-            or table_id > 3
-        ):
-            raise _invalid_image()
-        component_ids.append(component_id)
-        quantization_ids.append(table_id)
-    return _JpegFrame(
-        info=ImageInfo(width=width, height=height),
-        component_ids=tuple(component_ids),
-        quantization_ids=tuple(quantization_ids),
+def _unfilter_png_row(raw: bytes, previous: bytes, bpp: int, filter_type: int) -> bytes:
+    result = bytearray(len(raw))
+    for index, value in enumerate(raw):
+        left = result[index - bpp] if index >= bpp else 0
+        above = previous[index]
+        upper_left = previous[index - bpp] if index >= bpp else 0
+        predictor = {
+            0: 0,
+            1: left,
+            2: above,
+            3: (left + above) // 2,
+            4: _paeth(left, above, upper_left),
+        }[filter_type]
+        result[index] = (value + predictor) & 0xFF
+    return bytes(result)
+
+
+def _paeth(left: int, above: int, upper_left: int) -> int:
+    estimate = left + above - upper_left
+    distances = (
+        (abs(estimate - left), left),
+        (abs(estimate - above), above),
+        (abs(estimate - upper_left), upper_left),
     )
+    return min(distances, key=lambda item: item[0])[1]
 
 
-def _parse_quantization_tables(segment: bytes) -> set[int]:
-    table_ids: set[int] = set()
-    offset = 0
-    while offset < len(segment):
-        descriptor = segment[offset]
-        precision, table_id = descriptor >> 4, descriptor & 0x0F
-        table_size = 64 * (2 if precision else 1)
-        end = offset + 1 + table_size
-        if precision not in {0, 1} or table_id > 3 or end > len(segment):
-            raise _invalid_image()
-        values = segment[offset + 1 : end]
-        if table_id in table_ids or _quantization_has_zero(values, precision):
-            raise _invalid_image()
-        table_ids.add(table_id)
-        offset = end
-    if not table_ids:
-        raise _invalid_image()
-    return table_ids
-
-
-def _quantization_has_zero(values: bytes, precision: int) -> bool:
-    if precision == 0:
-        return 0 in values
-    return any(struct.unpack_from(">H", values, offset)[0] == 0 for offset in range(0, 128, 2))
-
-
-def _parse_huffman_tables(segment: bytes) -> tuple[set[int], set[int]]:
-    dc_tables: set[int] = set()
-    ac_tables: set[int] = set()
-    offset = 0
-    while offset < len(segment):
-        if offset + 17 > len(segment):
-            raise _invalid_image()
-        descriptor = segment[offset]
-        table_class, table_id = descriptor >> 4, descriptor & 0x0F
-        symbol_count = sum(segment[offset + 1 : offset + 17])
-        end = offset + 17 + symbol_count
-        target = dc_tables if table_class == 0 else ac_tables
-        if table_class not in {0, 1} or table_id > 3 or not symbol_count or end > len(segment):
-            raise _invalid_image()
-        if table_id in target:
-            raise _invalid_image()
-        target.add(table_id)
-        offset = end
-    return dc_tables, ac_tables
-
-
-def _validate_jpeg_scan_header(
-    segment: bytes,
-    frame: _JpegFrame | None,
-    quantization_tables: set[int],
-    dc_tables: set[int],
-    ac_tables: set[int],
+def _validate_palette_indices(
+    rows: tuple[bytes, ...], width: int, bit_depth: int, palette_entries: int
 ) -> None:
-    if frame is None or not segment:
-        raise _invalid_image()
-    component_count = segment[0]
-    if component_count != len(frame.component_ids) or len(segment) != 1 + component_count * 2 + 3:
-        raise _invalid_image()
-    selectors: list[int] = []
-    for position in range(component_count):
-        component_id, tables = segment[1 + position * 2 : 3 + position * 2]
-        dc_table, ac_table = tables >> 4, tables & 0x0F
-        if component_id in selectors or dc_table not in dc_tables or ac_table not in ac_tables:
-            raise _invalid_image()
-        selectors.append(component_id)
-    if set(selectors) != set(frame.component_ids):
-        raise _invalid_image()
-    if not set(frame.quantization_ids) <= quantization_tables or segment[-3:] != b"\x00\x3f\x00":
-        raise _invalid_image()
-
-
-def _next_jpeg_marker(data: bytes, offset: int) -> tuple[int, int]:
-    if offset >= len(data) or data[offset] != 0xFF:
-        raise _invalid_image()
-    while offset < len(data) and data[offset] == 0xFF:
-        offset += 1
-    if offset >= len(data) or data[offset] == 0x00:
-        raise _invalid_image()
-    return data[offset], offset + 1
-
-
-def _finish_jpeg_scan(data: bytes, offset: int, frame: _JpegFrame | None) -> ImageInfo:
-    if frame is None:
-        raise _invalid_image()
-    entropy_bytes = 0
-    while offset < len(data) - 1:
-        if data[offset] != 0xFF:
-            entropy_bytes += 1
-            offset += 1
-            continue
-        marker = data[offset + 1]
-        if marker == 0x00:
-            entropy_bytes += 1
-            offset += 2
-            continue
-        if 0xD0 <= marker <= 0xD7:
-            offset += 2
-            continue
-        if marker == 0xFF:
-            offset += 1
-            continue
-        if marker == 0xD9 and offset + 2 == len(data) and entropy_bytes:
-            return frame.info
-        raise _invalid_image()
-    raise _invalid_image()
+    mask = (1 << bit_depth) - 1
+    for row in rows:
+        for position in range(width):
+            bit_position = position * bit_depth
+            shift = 8 - bit_depth - bit_position % 8
+            palette_index = (row[bit_position // 8] >> shift) & mask
+            if palette_index >= palette_entries:
+                raise _invalid_image()
 
 
 def _invalid_image() -> PptRenderingError:
     return PptRenderingError(
-        "PPT_BACKGROUND_IMAGE_INVALID", "background image is malformed or truncated"
+        "PPT_BACKGROUND_IMAGE_INVALID", "background PNG is malformed or truncated"
     )
