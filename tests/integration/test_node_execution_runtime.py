@@ -1551,6 +1551,7 @@ def _seed_runtime(factory: sessionmaker[Session]) -> RuntimeSeed:
             project.id,
             definition.id,
             output,
+            material,
         )
         node = WorkflowRuntimeService(session, actor).create_project_node_run(
             run.id,
@@ -1697,7 +1698,13 @@ def _seed_approved_scope(
     project_id: UUID,
     definition_id: UUID,
     content: dict[str, object],
+    material: MaterialContextSeed,
 ) -> ArtifactVersion:
+    scope_content = {
+        **content,
+        "source_material_id": str(material.source_material_id),
+        "material_parse_version_id": str(material.material_parse_version_id),
+    }
     return _seed_approved_artifact(
         session,
         actor,
@@ -1707,7 +1714,7 @@ def _seed_approved_scope(
         artifact_type="material_scope",
         branch_key="project",
         lesson_unit_id=None,
-        content=content,
+        content=scope_content,
     )
 
 

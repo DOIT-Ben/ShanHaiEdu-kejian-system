@@ -229,7 +229,7 @@
             "source": "material.approved_parse",
             "required": true,
             "exposure": "full",
-            "max_items": 50,
+            "max_items": 1,
             "max_bytes": 500000
           },
           {

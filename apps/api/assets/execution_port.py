@@ -11,12 +11,13 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from apps.api.assets.models import FileAsset, FileAssetVersion
+from apps.api.assets.models import FileAsset, FileAssetVersion, MaterialParseVersion
 from apps.api.assets.project_models import ProjectAssetSlot
 from apps.api.assets.repository import FileAssetRepository
 from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.permissions import ProjectAccessService
 from apps.api.runtime_boundary.ports import (
+    ArtifactContextVersion,
     AssetContextItem,
     ReferenceAssetAuthorization,
     RuntimeNodeDefinition,
@@ -41,6 +42,8 @@ class SqlAlchemyAssetPort:
         self,
         project_id: UUID,
         source: str,
+        *,
+        artifact_context: Mapping[str, tuple[ArtifactContextVersion, ...]],
     ) -> tuple[AssetContextItem, ...]:
         ProjectAccessService(self._session, self._actor).require(
             project_id,
@@ -48,6 +51,7 @@ class SqlAlchemyAssetPort:
         )
         if source == "material.approved_parse":
             rows = self._repository.list_succeeded_parses_for_project(project_id)
+            rows = self._select_material_scope_parse(rows, artifact_context)
             return tuple(
                 AssetContextItem(
                     source_id=parse.source_material_id,
@@ -87,6 +91,41 @@ class SqlAlchemyAssetPort:
                 for asset, version in rows
             )
         return ()
+
+    @staticmethod
+    def _select_material_scope_parse(
+        rows: list[MaterialParseVersion],
+        artifact_context: Mapping[str, tuple[ArtifactContextVersion, ...]],
+    ) -> list[MaterialParseVersion]:
+        scope_source = "material_scope.approved_version"
+        if scope_source not in artifact_context:
+            return rows
+        scopes = artifact_context[scope_source]
+        if len(scopes) != 1:
+            raise AssetExecutionPortError(
+                "NODE_EXECUTION_MATERIAL_SCOPE_INVALID",
+                "the approved material scope must resolve to exactly one version",
+            )
+        content = scopes[0].content
+        try:
+            source_material_id = UUID(str(content["source_material_id"]))
+            parse_version_id = UUID(str(content["material_parse_version_id"]))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise AssetExecutionPortError(
+                "NODE_EXECUTION_MATERIAL_SCOPE_INVALID",
+                "the approved material scope has no exact material parse identity",
+            ) from exc
+        selected = [
+            row
+            for row in rows
+            if row.id == parse_version_id and row.source_material_id == source_material_id
+        ]
+        if len(selected) != 1:
+            raise AssetExecutionPortError(
+                "NODE_EXECUTION_MATERIAL_SCOPE_INVALID",
+                "the approved material scope exact parse is unavailable",
+            )
+        return selected
 
     def authorize_target_slots(
         self,

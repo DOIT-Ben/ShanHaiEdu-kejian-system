@@ -50,3 +50,19 @@ def build_lesson_fanout_plan(
         )
         for branch_key, values in sorted(entrypoints.items())
     )
+
+
+def validate_lesson_fanout_targets(
+    targets: tuple[LessonFanoutTarget, ...],
+    archived_lesson_unit_ids: tuple[UUID, ...],
+    expected_branches: set[str],
+) -> None:
+    lesson_ids = [target.lesson_unit_id for target in targets]
+    if len(lesson_ids) != len(set(lesson_ids)):
+        raise ValueError("Lesson fanout targets are duplicated.")
+    if len(archived_lesson_unit_ids) != len(set(archived_lesson_unit_ids)):
+        raise ValueError("Lesson fanout archive targets are duplicated.")
+    if set(lesson_ids) & set(archived_lesson_unit_ids):
+        raise ValueError("Lesson fanout targets cannot be active and archived together.")
+    if any(set(target.branch_enabled) != expected_branches for target in targets):
+        raise ValueError("Lesson branch configuration does not match the fixed workflow.")

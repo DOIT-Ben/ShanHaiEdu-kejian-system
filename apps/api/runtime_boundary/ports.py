@@ -315,7 +315,13 @@ class ArtifactPort(Protocol):
 
 
 class AssetPort(Protocol):
-    def list_context_items(self, project_id: UUID, source: str) -> tuple[AssetContextItem, ...]: ...
+    def list_context_items(
+        self,
+        project_id: UUID,
+        source: str,
+        *,
+        artifact_context: Mapping[str, tuple[ArtifactContextVersion, ...]],
+    ) -> tuple[AssetContextItem, ...]: ...
 
     def freeze_reference_assets(
         self,

@@ -19,6 +19,7 @@ from apps.api.artifacts.domain import canonical_content_hash
 from apps.api.artifacts.models import Approval, Artifact, ArtifactRelation, ArtifactVersion
 from apps.api.artifacts.relation_service import ArtifactRelationService
 from apps.api.artifacts.service import ArtifactService
+from apps.api.assets.execution_port import AssetExecutionPortError
 from apps.api.assets.models import FileAsset, FileAssetVersion, MaterialParseVersion
 from apps.api.content_runtime.models import ContentDefinitionVersion
 from apps.api.content_runtime.package_source import load_builtin_courseware_release
@@ -32,6 +33,7 @@ from apps.api.lessons.division_runtime import diff_lesson_divisions
 from apps.api.lessons.models import LessonBranchConfig, LessonUnit
 from apps.api.lessons.runtime_service import LessonDivisionRuntimeService
 from apps.api.model_gateway.audit import SqlAlchemyAttemptAuditSink
+from apps.api.model_gateway.audit_models import GenerationAttempt, UsageRecord
 from apps.api.model_gateway.contracts import ModelCapability
 from apps.api.model_gateway.gateway import ModelGateway
 from apps.api.node_execution.fake import DeterministicNodeOutputProvider
@@ -46,6 +48,10 @@ from apps.api.prompt_runtime.lesson_context_port import (
 from apps.api.prompt_runtime.models import ContextSnapshot
 from apps.api.reliability.models import EventStreamEntry
 from apps.api.uploads.models import SourceMaterial
+from apps.api.workflows.execution_port import (
+    SqlAlchemyWorkflowExecutionPort,
+    WorkflowExecutionPortError,
+)
 from apps.api.workflows.models import BranchRun, NodeInputSnapshot, NodeRun
 from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
 from tests.fakes.identity import seed_test_actor
@@ -63,6 +69,8 @@ class PreparedApproval:
     validate_node_id: UUID
     gate_node_id: UUID
     report_id: UUID
+    material_parse_version_id: UUID
+    scope_version_id: UUID
 
 
 async def test_generated_validated_approved_division_atomically_materializes_lesson_runtime(
@@ -107,6 +115,59 @@ async def test_generated_validated_approved_division_atomically_materializes_les
         assert "artifact.version.approved" in event_types
 
 
+async def test_stale_submitted_division_cannot_be_approved_or_materialized(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
+    output = build_golden_branch_source_outputs(case)["lesson.division.generate"]
+    prepared = await _prepare_approval(factory, case, output)
+
+    with factory() as session, session.begin():
+        ArtifactService(session, prepared.actor).review(
+            prepared.scope_version_id,
+            action="revoke",
+            comment="The approved material scope was withdrawn.",
+            request_id="issue-125-revoke-scope-before-approval",
+        )
+
+    with factory() as session:
+        version = session.get(ArtifactVersion, prepared.version_id)
+        assert version is not None
+        division = session.get(Artifact, version.artifact_id)
+        assert division is not None
+        assert division.status == "stale"
+        assert division.current_submitted_version_id == prepared.version_id
+        assert session.get(NodeRun, prepared.gate_node_id).status == "review_required"
+        session.rollback()
+
+        with pytest.raises(ApiError) as caught:
+            with session.begin():
+                ArtifactService(session, prepared.actor).review(
+                    prepared.version_id,
+                    action="approve",
+                    comment="Must not approve a stale submitted division.",
+                    request_id="issue-125-reject-stale-submitted",
+                )
+        assert caught.value.code == "ARTIFACT_STATE_CONFLICT"
+        session.rollback()
+
+        assert session.scalar(select(func.count()).select_from(LessonUnit)) == 0
+        assert session.scalar(select(func.count()).select_from(BranchRun)) == 0
+        assert session.get(NodeRun, prepared.gate_node_id).status == "review_required"
+        assert (
+            session.scalar(
+                select(func.count())
+                .select_from(Approval)
+                .where(
+                    Approval.artifact_version_id == prepared.version_id,
+                    Approval.action == "approve",
+                )
+            )
+            == 0
+        )
+
+
 async def test_generation_freezes_approved_scope_and_teacher_constraints(
     migrated_database_url: str,
 ) -> None:
@@ -140,6 +201,92 @@ async def test_generation_freezes_approved_scope_and_teacher_constraints(
             "EV-MAT-03",
             "EV-MAT-04",
         ]
+
+
+async def test_generation_selects_the_exact_parse_declared_by_approved_scope(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
+    output = build_golden_branch_source_outputs(case)["lesson.division.generate"]
+
+    prepared = await _prepare_approval(factory, case, output, add_second_parse=True)
+
+    with factory() as session:
+        context = session.scalar(
+            select(ContextSnapshot).where(ContextSnapshot.node_run_id == prepared.generate_node_id)
+        )
+        assert context is not None
+        bindings = {
+            binding["source"]: binding["items"] for binding in context.bindings_json["bindings"]
+        }
+        material_items = bindings["material.approved_parse"]
+        assert len(material_items) == 1
+        assert material_items[0]["source_version_id"] == str(prepared.material_parse_version_id)
+
+
+async def test_missing_exact_parse_selection_fails_before_provider_or_audit_facts(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
+    output = build_golden_branch_source_outputs(case)["lesson.division.generate"]
+    with factory() as session, session.begin():
+        actor = seed_test_actor(session)
+        published = ContentReleasePublisher(session).publish(
+            load_builtin_courseware_release(ROOT),
+            published_by=actor.principal_id,
+        )
+        project = ProjectRepository(session, actor).create(
+            CreateProjectRequest(title="Invalid exact parse scope", knowledge_point="1-5")
+        )
+        definition = session.scalar(
+            select(ContentDefinitionVersion).where(
+                ContentDefinitionVersion.content_package_version_id
+                == published.content_package_version_id,
+                ContentDefinitionVersion.definition_key == "lesson.division.generate.output",
+            )
+        )
+        assert definition is not None
+        _seed_material_and_scope(
+            session,
+            actor,
+            project.id,
+            definition.id,
+            case,
+            approved_evidence_keys=None,
+            include_exact_parse_binding=False,
+            add_second_parse=True,
+        )
+        nodes = LessonDivisionRuntimeService(session, actor).initialize(project.id)
+
+    provider = DeterministicNodeOutputProvider(output)
+    execution = NodeExecutionService(
+        SqlAlchemyNodeExecutionTransactionFactory(factory, actor),
+        ModelGateway(
+            {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: provider},
+            audit_sink=SqlAlchemyAttemptAuditSink(factory),
+        ),
+    )
+    with pytest.raises(AssetExecutionPortError) as caught:
+        await execution.execute(
+            nodes.generate_node_run_id,
+            request_id="issue-125-missing-exact-parse",
+        )
+    assert caught.value.code == "NODE_EXECUTION_MATERIAL_SCOPE_INVALID"
+    assert provider.calls == 0
+
+    with factory() as session:
+        assert session.scalar(select(func.count()).select_from(GenerationAttempt)) == 0
+        assert session.scalar(select(func.count()).select_from(UsageRecord)) == 0
+        assert (
+            session.scalar(
+                select(func.count())
+                .select_from(Artifact)
+                .where(Artifact.artifact_type == "lesson_division")
+            )
+            == 0
+        )
 
 
 async def test_quality_coverage_uses_exact_approved_scope_not_the_whole_parse(
@@ -547,6 +694,85 @@ async def test_unchanged_relation_carries_forward_then_stales_on_third_version_c
         assert session.get(Artifact, downstream["LESSON-03"]).status == "stale"
 
 
+async def test_archived_stable_key_readd_reuses_lesson_but_not_old_node_run(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
+    base = build_golden_branch_source_outputs(case)["lesson.division.generate"]
+    first_output = _four_lesson_output(base)
+    prepared = await _prepare_approval(factory, case, first_output)
+    with factory() as session, session.begin():
+        ArtifactService(session, prepared.actor).review(
+            prepared.version_id,
+            action="approve",
+            comment="Approve lifecycle v1",
+            request_id="issue-125-lifecycle-v1",
+        )
+        lesson = session.scalar(select(LessonUnit).where(LessonUnit.lesson_key == "LESSON-02"))
+        assert lesson is not None
+        lesson_id = lesson.id
+        branch = session.scalar(
+            select(BranchRun).where(
+                BranchRun.lesson_unit_id == lesson_id,
+                BranchRun.branch_key == "lesson_plan",
+            )
+        )
+        assert branch is not None
+        branch_id = branch.id
+        old_node = session.scalar(
+            select(NodeRun).where(
+                NodeRun.branch_run_id == branch_id,
+                NodeRun.node_key == "lesson_plan.generate",
+            )
+        )
+        assert old_node is not None and old_node.status == "ready"
+        old_node_id = old_node.id
+
+    second_output = deepcopy(first_output)
+    second_output["lesson_units"][1]["lesson_unit_key"] = "LESSON-05"
+    second_output["lesson_units"][1]["title"] = "Temporary replacement"
+    await _execute_revision(factory, prepared, second_output)
+
+    with factory() as session:
+        lesson = session.get(LessonUnit, lesson_id)
+        branch = session.get(BranchRun, branch_id)
+        assert lesson is not None and lesson.status == "archived"
+        assert branch is not None and branch.status == "cancelled"
+
+    third_output = deepcopy(second_output)
+    third_output["lesson_units"][1] = deepcopy(first_output["lesson_units"][1])
+    await _execute_revision(factory, prepared, third_output)
+
+    with factory() as session:
+        lesson = session.scalar(select(LessonUnit).where(LessonUnit.lesson_key == "LESSON-02"))
+        branch = session.scalar(
+            select(BranchRun).where(
+                BranchRun.lesson_unit_id == lesson_id,
+                BranchRun.branch_key == "lesson_plan",
+            )
+        )
+        nodes = list(
+            session.scalars(
+                select(NodeRun)
+                .where(
+                    NodeRun.branch_run_id == branch_id,
+                    NodeRun.node_key == "lesson_plan.generate",
+                )
+                .order_by(NodeRun.run_no)
+            )
+        )
+        assert lesson is not None and lesson.id == lesson_id and lesson.status == "active"
+        assert branch is not None and branch.id == branch_id and branch.status == "active"
+        assert [(node.run_no, node.status) for node in nodes] == [
+            (1, "disabled"),
+            (2, "ready"),
+        ]
+        with pytest.raises(WorkflowExecutionPortError) as caught:
+            SqlAlchemyWorkflowExecutionPort(session, prepared.actor).start(old_node_id)
+        assert caught.value.code == "NODE_EXECUTION_STATE_CONFLICT"
+
+
 async def _execute_revision(
     factory: sessionmaker[Session],
     prepared: PreparedApproval,
@@ -679,6 +905,7 @@ async def _prepare_approval(
     output: dict[str, object],
     *,
     approved_evidence_keys: tuple[str, ...] | None = None,
+    add_second_parse: bool = False,
 ) -> PreparedApproval:
     with factory() as session, session.begin():
         actor = seed_test_actor(session)
@@ -697,13 +924,14 @@ async def _prepare_approval(
             )
         )
         assert definition is not None
-        _seed_material_and_scope(
+        material_parse_version_id, scope_version_id = _seed_material_and_scope(
             session,
             actor,
             project.id,
             definition.id,
             case,
             approved_evidence_keys=approved_evidence_keys,
+            add_second_parse=add_second_parse,
         )
         nodes = LessonDivisionRuntimeService(session, actor).initialize(project.id)
     execution = NodeExecutionService(
@@ -754,6 +982,8 @@ async def _prepare_approval(
         validate_node_id=validate_id,
         gate_node_id=gate_id,
         report_id=quality.report_id,
+        material_parse_version_id=material_parse_version_id,
+        scope_version_id=scope_version_id,
     )
 
 
@@ -765,7 +995,9 @@ def _seed_material_and_scope(
     case,
     *,
     approved_evidence_keys: tuple[str, ...] | None,
-) -> None:
+    include_exact_parse_binding: bool = True,
+    add_second_parse: bool = False,
+) -> tuple[UUID, UUID]:
     asset = FileAsset(
         id=new_uuid7(),
         organization_id=actor.organization_id,
@@ -847,6 +1079,32 @@ def _seed_material_and_scope(
     )
     session.add(parse)
     session.flush()
+    if add_second_parse:
+        second_content = deepcopy(material_content)
+        second_content["parse_revision"] = 2
+        session.add(
+            MaterialParseVersion(
+                id=new_uuid7(),
+                organization_id=actor.organization_id,
+                source_material_id=material.id,
+                file_asset_version_id=file_version.id,
+                generation_job_id=None,
+                version_no=2,
+                status="succeeded",
+                parser_name="issue-125-fake",
+                parser_version="2",
+                content_json=second_content,
+                page_count=3,
+                text_checksum=canonical_content_hash(second_content),
+                validation_report_json={"valid": True},
+                error_code=None,
+                created_at=utc_now(),
+                started_at=utc_now(),
+                completed_at=utc_now(),
+                created_by=actor.principal_id,
+                updated_by=actor.principal_id,
+            )
+        )
     scope_content = {
         "knowledge_point": "1-5",
         "knowledge_boundary": case["knowledge_boundary"],
@@ -860,6 +1118,13 @@ def _seed_material_and_scope(
         "lesson_type_preferences": ["new_learning"],
         "special_requirements": "Keep the approved knowledge boundary.",
     }
+    if include_exact_parse_binding:
+        scope_content.update(
+            {
+                "source_material_id": str(material.id),
+                "material_parse_version_id": str(parse.id),
+            }
+        )
     scope = Artifact(
         id=new_uuid7(),
         organization_id=actor.organization_id,
@@ -894,3 +1159,4 @@ def _seed_material_and_scope(
     session.add(scope_version)
     session.flush()
     scope.current_approved_version_id = scope_version.id
+    return parse.id, scope_version.id

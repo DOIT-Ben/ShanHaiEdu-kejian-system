@@ -16,6 +16,7 @@ from apps.api.lessons.domain import (
     BranchConfigurationChange,
     BranchKey,
 )
+from apps.api.lessons.models import LessonUnit
 from apps.api.lessons.repository import LessonRepository
 from apps.api.lessons.service import LessonService
 from apps.api.projects.repository import ProjectRepository
@@ -108,6 +109,9 @@ def test_active_node_blocks_lesson_archive_until_cancellation_finishes(
             node = session.scalar(select(NodeRun).where(NodeRun.node_key == "lesson_plan.generate"))
             assert node is not None
             node.status = "running"
+            lesson = session.get(LessonUnit, lesson_id)
+            assert lesson is not None
+            lesson.status = "archived"
 
         with pytest.raises(ApiError) as caught:
             with session.begin():
@@ -137,6 +141,142 @@ def test_active_node_blocks_lesson_archive_until_cancellation_finishes(
 
         assert set(session.scalars(select(BranchRun.status))) == {"cancelled"}
         assert session.get(NodeRun, node.id).status == "cancelled"
+
+
+@pytest.mark.parametrize(
+    ("old_status", "retired_status"),
+    [
+        ("draft", "skipped"),
+        ("failed", "skipped"),
+        ("stale", "skipped"),
+        ("paused", "cancelled"),
+        ("partially_completed", "skipped"),
+    ],
+)
+def test_branch_reenable_retires_old_entrypoint_and_creates_new_run(
+    migrated_database_url: str,
+    old_status: str,
+    retired_status: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session, session.begin():
+        actor, run_id, lesson_id = _seed_lesson(session)
+        LessonWorkflowFanoutService(session, actor).synchronize(
+            run_id,
+            targets=_targets(session, actor, lesson_id),
+            archived_lesson_unit_ids=(),
+            request_id="req-branch-lifecycle",
+        )
+        old = session.scalar(select(NodeRun).where(NodeRun.node_key == "intro.generate_options"))
+        lesson = LessonRepository(session, actor).get(lesson_id)
+        assert old is not None and lesson is not None
+        old.status = old_status
+        LessonService(session, actor).update_branches(
+            lesson_id,
+            expected_version=lesson.lock_version,
+            changes={
+                BranchKey.INTRO_OPTIONS: BranchConfigurationChange(
+                    enabled=False,
+                    settings={},
+                )
+            },
+            request_id="req-disable-before-reenable",
+        )
+        LessonService(session, actor).update_branches(
+            lesson_id,
+            expected_version=lesson.lock_version,
+            changes={
+                BranchKey.INTRO_OPTIONS: BranchConfigurationChange(
+                    enabled=True,
+                    settings={},
+                )
+            },
+            request_id="req-reenable",
+        )
+
+    with factory() as session:
+        nodes = list(
+            session.scalars(
+                select(NodeRun)
+                .where(NodeRun.node_key == "intro.generate_options")
+                .order_by(NodeRun.run_no)
+            )
+        )
+        assert [(node.run_no, node.status) for node in nodes] == [
+            (1, retired_status),
+            (2, "ready"),
+        ]
+
+
+def test_fanout_rejects_cross_project_lesson_targets_before_writes(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session:
+        with session.begin():
+            actor, run_id, _lesson_id = _seed_lesson(session)
+            other_project = ProjectRepository(session, actor).create(
+                CreateProjectRequest(title="Other project", knowledge_point="Other")
+            )
+            other_lesson = LessonService(session, actor).synchronize_approved_division(
+                other_project.id,
+                ApprovedLessonDivision(
+                    version_id=UUID("20000000-0000-4000-8000-000000000125"),
+                    lessons=(
+                        ApprovedLessonItem(
+                            lesson_key="OTHER-LESSON",
+                            position=1,
+                            title="Other lesson",
+                            scope_summary="Other scope",
+                            objective_summary="Other objective",
+                            estimated_minutes=40,
+                        ),
+                    ),
+                ),
+                request_id="req-other-lesson",
+            )[0]
+            other_target = _targets(session, actor, other_lesson.id)
+
+        with pytest.raises(ApiError) as caught:
+            with session.begin():
+                LessonWorkflowFanoutService(session, actor).synchronize(
+                    run_id,
+                    targets=other_target,
+                    archived_lesson_unit_ids=(),
+                    request_id="req-cross-project-target",
+                )
+        assert caught.value.code == "LESSON_FANOUT_INVALID"
+        session.rollback()
+        assert session.scalar(select(func.count()).select_from(BranchRun)) == 0
+        assert session.scalar(select(func.count()).select_from(NodeRun)) == 0
+
+
+def test_fanout_rejects_duplicate_or_overlapping_archive_ids(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session:
+        with session.begin():
+            actor, run_id, lesson_id = _seed_lesson(session)
+            target = _targets(session, actor, lesson_id)
+
+        for targets, archived in (
+            (target, (lesson_id,)),
+            ((), (lesson_id, lesson_id)),
+        ):
+            with pytest.raises(ApiError) as caught:
+                with session.begin():
+                    LessonWorkflowFanoutService(session, actor).synchronize(
+                        run_id,
+                        targets=targets,
+                        archived_lesson_unit_ids=archived,
+                        request_id="req-invalid-archive-scope",
+                    )
+            assert caught.value.code == "LESSON_FANOUT_INVALID"
+            session.rollback()
+
+        assert session.scalar(select(func.count()).select_from(BranchRun)) == 0
+        assert session.scalar(select(func.count()).select_from(NodeRun)) == 0
 
 
 def test_branch_update_disables_existing_ready_entrypoint(
@@ -234,7 +374,7 @@ def test_active_entrypoint_blocks_disable_until_cancelled_then_retry_succeeds(
             .limit(1)
         )
         assert branch is not None and branch.status == "disabled"
-        assert latest is not None and latest.status == "disabled"
+        assert latest is not None and latest.status == "cancelled"
 
 
 def test_execution_context_rejects_ready_node_on_disabled_branch(

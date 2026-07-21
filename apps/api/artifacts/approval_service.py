@@ -113,8 +113,10 @@ class ArtifactApprovalService:
         existing = self._repository.latest_action(version.id, ApprovalAction.APPROVE.value)
         if artifact.current_approved_version_id == version.id and existing is not None:
             return existing
-        if artifact.current_submitted_version_id != version.id:
-            raise self._state_conflict("Only the current submitted version can be approved.")
+        if artifact.status != "in_review" or artifact.current_submitted_version_id != version.id:
+            raise self._state_conflict(
+                "Only the current submitted version in review can be approved."
+            )
         project = self._require_project(artifact.project_id, for_update=False)
         previous_version_id = artifact.current_approved_version_id
         quality_evidence, stale_ids, stale_node_ids = prepare_declared_approval(

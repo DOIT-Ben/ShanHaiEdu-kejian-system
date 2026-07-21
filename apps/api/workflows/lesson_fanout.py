@@ -1,5 +1,3 @@
-"""Published-topology lesson branch fanout contracts and SQL application service."""
-
 from __future__ import annotations
 
 from uuid import UUID
@@ -12,16 +10,21 @@ from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.permissions import ProjectAccessService
 from apps.api.ids import new_uuid7
+from apps.api.lessons.fanout_port import (
+    LessonFanoutScopeError,
+    SqlAlchemyLessonFanoutScopePort,
+)
 from apps.api.reliability.events import EventResource, EventWriter
+from apps.api.workflows.branch_lifecycle import BranchNodeActiveError, BranchNodeLifecycle
 from apps.api.workflows.lesson_fanout_contracts import (
     LessonBranchFanoutPlan,
     LessonFanoutResult,
     LessonFanoutTarget,
     build_lesson_fanout_plan,
+    validate_lesson_fanout_targets,
 )
 from apps.api.workflows.models import BranchRun, NodeRun, WorkflowDefinitionVersion, WorkflowRun
 from apps.api.workflows.repository import WorkflowRuntimeRepository
-from apps.api.workflows.service import WorkflowRuntimeService
 from workflow.node_state import NodeStatus
 from workflow.registry import BUILTIN_WORKFLOW_REGISTRY
 
@@ -37,6 +40,7 @@ class LessonWorkflowFanoutService:
         self._session = session
         self._actor = actor
         self._repository = WorkflowRuntimeRepository(session, actor)
+        self._lifecycle = BranchNodeLifecycle(session, actor)
 
     def synchronize(
         self,
@@ -59,6 +63,7 @@ class LessonWorkflowFanoutService:
             targets=targets,
             archived_lesson_unit_ids=archived_lesson_unit_ids,
             request_id=request_id,
+            review_completion=False,
         )
 
     def synchronize_declared_approval(
@@ -81,6 +86,7 @@ class LessonWorkflowFanoutService:
             targets=targets,
             archived_lesson_unit_ids=archived_lesson_unit_ids,
             request_id=request_id,
+            review_completion=True,
         )
 
     def synchronize_lesson_configuration(
@@ -103,6 +109,7 @@ class LessonWorkflowFanoutService:
             targets=(target,),
             archived_lesson_unit_ids=(),
             request_id=request_id,
+            review_completion=False,
         )
 
     def _synchronize_run(
@@ -112,16 +119,14 @@ class LessonWorkflowFanoutService:
         targets: tuple[LessonFanoutTarget, ...],
         archived_lesson_unit_ids: tuple[UUID, ...],
         request_id: str | None,
+        review_completion: bool,
     ) -> LessonFanoutResult:
-        workflow = self._session.get(WorkflowDefinitionVersion, run.workflow_definition_version_id)
-        if workflow is None or workflow.status != "published":
-            raise self._invalid("The fixed workflow definition is unavailable.")
-        registered = BUILTIN_WORKFLOW_REGISTRY.load(workflow.graph_json)
-        plans = build_lesson_fanout_plan(registered)
-        expected_branches = {plan.branch_key for plan in plans}
-        self._validate_targets(targets, expected_branches)
-
-        archived_count = self._archive_branches(run.id, archived_lesson_unit_ids)
+        plans = self._validated_plans(run, targets, archived_lesson_unit_ids)
+        archived_count = self._archive_branches(
+            run.id,
+            archived_lesson_unit_ids,
+            review_completion=review_completion,
+        )
         created_branches = 0
         created_nodes = 0
         for target in sorted(targets, key=lambda item: str(item.lesson_unit_id)):
@@ -131,8 +136,11 @@ class LessonWorkflowFanoutService:
                     target.lesson_unit_id,
                     plan.branch_key,
                     enabled=target.branch_enabled[plan.branch_key],
+                    review_completion=review_completion,
                 )
                 created_branches += int(created)
+                if not target.branch_enabled[plan.branch_key] and not created:
+                    continue
                 created_nodes += self._ensure_entrypoints(
                     run,
                     branch,
@@ -154,6 +162,36 @@ class LessonWorkflowFanoutService:
             )
         return LessonFanoutResult(created_branches, created_nodes, archived_count)
 
+    def _validated_plans(
+        self,
+        run: WorkflowRun,
+        targets: tuple[LessonFanoutTarget, ...],
+        archived_lesson_unit_ids: tuple[UUID, ...],
+    ) -> tuple[LessonBranchFanoutPlan, ...]:
+        workflow = self._session.get(WorkflowDefinitionVersion, run.workflow_definition_version_id)
+        if workflow is None or workflow.status != "published":
+            raise self._invalid("The fixed workflow definition is unavailable.")
+        registered = BUILTIN_WORKFLOW_REGISTRY.load(workflow.graph_json)
+        plans = build_lesson_fanout_plan(registered)
+        expected_branches = {plan.branch_key for plan in plans}
+        try:
+            validate_lesson_fanout_targets(
+                targets,
+                archived_lesson_unit_ids,
+                expected_branches,
+            )
+        except ValueError as exc:
+            raise self._invalid(str(exc)) from exc
+        try:
+            SqlAlchemyLessonFanoutScopePort(self._session, self._actor).require_scope(
+                run.project_id,
+                active_ids=tuple(target.lesson_unit_id for target in targets),
+                archived_ids=archived_lesson_unit_ids,
+            )
+        except LessonFanoutScopeError as exc:
+            raise self._invalid(str(exc)) from exc
+        return plans
+
     def lock_archivable(
         self,
         workflow_run_id: UUID,
@@ -167,16 +205,23 @@ class LessonWorkflowFanoutService:
         self,
         workflow_run_id: UUID,
         lesson_unit_ids: tuple[UUID, ...],
+        *,
+        review_completion: bool,
     ) -> int:
         branches = self._lock_archive_branches(workflow_run_id, lesson_unit_ids)
         changed = 0
         now = utc_now()
         for branch in branches:
+            retired = self._lifecycle.retire(
+                branch.id,
+                review_completion=review_completion,
+            )
             if branch.status == "cancelled":
+                changed += int(retired > 0)
                 continue
             branch.status = "cancelled"
             branch.completed_at = now
-            self._touch(branch)
+            self._lifecycle.touch(branch)
             changed += 1
         self._session.flush()
         return changed
@@ -232,6 +277,7 @@ class LessonWorkflowFanoutService:
         branch_key: str,
         *,
         enabled: bool,
+        review_completion: bool,
     ) -> tuple[BranchRun, bool]:
         branch = self._session.scalar(
             select(BranchRun)
@@ -245,14 +291,25 @@ class LessonWorkflowFanoutService:
         )
         desired = "active" if enabled else "disabled"
         if branch is not None:
-            if not enabled:
-                self._require_branch_idle(branch.id)
+            if not enabled or branch.status != desired:
+                try:
+                    self._lifecycle.require_idle(branch.id)
+                except BranchNodeActiveError as exc:
+                    raise ApiError(
+                        status_code=409,
+                        code="LESSON_BRANCH_EXECUTION_ACTIVE",
+                        message="Cancel active lesson executions before disabling the branch.",
+                    ) from exc
+                self._lifecycle.retire(
+                    branch.id,
+                    review_completion=review_completion,
+                )
             if branch.status != desired:
                 branch.status = desired
                 branch.completed_at = None
                 if enabled and branch.started_at is None:
                     branch.started_at = utc_now()
-                self._touch(branch)
+                self._lifecycle.touch(branch)
             return branch, False
         branch = BranchRun(
             id=new_uuid7(),
@@ -298,7 +355,7 @@ class LessonWorkflowFanoutService:
                 .with_for_update(of=NodeRun)
             )
             desired = NodeStatus.READY.value if enabled else NodeStatus.DISABLED.value
-            if self._reuse_existing_entrypoint(existing, desired, enabled=enabled):
+            if self._reuse_existing_entrypoint(existing, desired):
                 continue
             node = NodeRun(
                 id=new_uuid7(),
@@ -322,66 +379,16 @@ class LessonWorkflowFanoutService:
         self,
         existing: NodeRun | None,
         desired: str,
-        *,
-        enabled: bool,
     ) -> bool:
         if existing is None:
             return False
         if existing.status == desired:
-            return True
-        if not enabled and existing.status in {
-            NodeStatus.NOT_READY.value,
-            NodeStatus.READY.value,
-        }:
-            WorkflowRuntimeService(self._session, self._actor).transition_node(
-                existing.id,
-                NodeStatus.DISABLED,
-            )
             return True
         return existing.status not in {
             NodeStatus.DISABLED.value,
             NodeStatus.CANCELLED.value,
             NodeStatus.SKIPPED.value,
         }
-
-    def _require_branch_idle(self, branch_run_id: UUID) -> None:
-        active = self._session.scalar(
-            select(NodeRun.id)
-            .where(
-                NodeRun.branch_run_id == branch_run_id,
-                NodeRun.organization_id == self._actor.organization_id,
-                NodeRun.status.in_(_ACTIVE_EXECUTION_STATUSES),
-                NodeRun.deleted_at.is_(None),
-            )
-            .order_by(NodeRun.id)
-            .limit(1)
-            .with_for_update()
-        )
-        if active is not None:
-            raise ApiError(
-                status_code=409,
-                code="LESSON_BRANCH_EXECUTION_ACTIVE",
-                message="Cancel active lesson executions before disabling the branch.",
-            )
-
-    @staticmethod
-    def _validate_targets(
-        targets: tuple[LessonFanoutTarget, ...],
-        expected_branches: set[str],
-    ) -> None:
-        lesson_ids = [target.lesson_unit_id for target in targets]
-        if len(lesson_ids) != len(set(lesson_ids)):
-            raise LessonWorkflowFanoutService._invalid("Lesson fanout targets are duplicated.")
-        for target in targets:
-            if set(target.branch_enabled) != expected_branches:
-                raise LessonWorkflowFanoutService._invalid(
-                    "Lesson branch configuration does not match the fixed workflow."
-                )
-
-    def _touch(self, record: BranchRun) -> None:
-        record.updated_at = utc_now()
-        record.updated_by = self._actor.principal_id
-        record.lock_version += 1
 
     @staticmethod
     def _not_found() -> ApiError:
