@@ -53,6 +53,7 @@ This service exposes one short-lived, signed PNG/JPEG/WebP GET path to an extern
 Create a runtime-only test frame. It is not an application asset and must be removed after the check.
 
 ```bash
+set -euo pipefail
 base64 -d > /srv/shanhaiedu/runtime/provider-media/provider-relay-smoke.png <<'EOF'
 iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mNk+M/wHwAF/gL+3MxZ5wAAAABJRU5ErkJggg==
 EOF
@@ -63,6 +64,7 @@ chmod 0640 /srv/shanhaiedu/runtime/provider-media/provider-relay-smoke.png
 Generate and consume a URL without printing it or putting it in a shell command line:
 
 ```bash
+set -euo pipefail
 set -a
 . /etc/shanhaiedu/provider-media-relay.env
 set +a
