@@ -52,9 +52,14 @@ describe("ProjectStepNavigation active step visibility", () => {
     if (!scrollContainer) throw new Error("未找到流程滚动容器");
     scrollContainer.scrollTop = 20;
     elementScroll.mockClear();
+    const indicatorBefore = screen.getByTestId("project-step-active-indicator");
+    const transformBefore = indicatorBefore.style.transform;
     await userEvent.click(screen.getByRole("link", { name: /生成课堂导入视频/ }));
     await waitFor(() => expect(scrollContainer.scrollTop).toBe(208));
     expect(elementScroll).toHaveBeenCalledWith({ behavior: "smooth", top: 208 });
+    const indicatorAfter = screen.getByTestId("project-step-active-indicator");
+    expect(indicatorAfter).toBe(indicatorBefore);
+    expect(indicatorAfter.style.transform).not.toBe(transformBefore);
     expect(windowScroll).not.toHaveBeenCalled();
   });
 

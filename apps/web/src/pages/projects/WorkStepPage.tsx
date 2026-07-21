@@ -1,5 +1,4 @@
 import type { ComponentType } from "react";
-import { motion, useReducedMotion } from "framer-motion";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { LockKeyhole } from "lucide-react";
 import { FineStoryboardStep } from "@/features/workbench/renderers/FineStoryboardStep";
@@ -50,7 +49,6 @@ export function WorkStepPage() {
   const { lessonId = "", projectId = "", stepKey = "lesson-plan" } = useParams();
   const [searchParams] = useSearchParams();
   const runtime = useMockRuntime();
-  const reduceMotion = useReducedMotion();
   const scenario = searchParams.get("scenario");
   const Renderer = nodeRendererRegistry[stepKey];
   if (scenario === "forbidden") {
@@ -119,16 +117,13 @@ export function WorkStepPage() {
     );
   }
   return (
-    <motion.div
-      animate={{ opacity: 1, x: 0 }}
+    <div
       data-step-key={stepKey}
-      data-testid="work-step-transition"
-      initial={reduceMotion ? false : { opacity: 0.72, x: 12 }}
+      data-testid="work-step-content"
       key={`${projectId}:${lessonId}:${stepKey}`}
-      transition={{ duration: reduceMotion ? 0 : 0.18, ease: [0.2, 0, 0, 1] }}
     >
       <ScenarioStateNotice scenario={scenario} />
       <Renderer />
-    </motion.div>
+    </div>
   );
 }

@@ -12,7 +12,7 @@ import {
   Play,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Link, Outlet, useParams } from "react-router-dom";
 import { ContextDrawer } from "@/features/workbench/components/ContextDrawer";
 import { ProjectStepNavigation } from "@/features/workbench/components/ProjectStepNavigation";
@@ -38,7 +38,6 @@ export function ProjectWorkbenchLayout() {
   const { sidebarCollapsed, toggleSidebar } = useWorkbenchUi();
   const [mobileOpen, setMobileOpen] = useState(false);
   const mobileFlowTriggerRef = useRef<HTMLButtonElement>(null);
-  const workbenchContentRef = useRef<HTMLElement>(null);
   const runtime = useMockRuntime();
   const project = runtime.projects.find((item) => item.id === projectId);
   const lesson = getApprovedProjectLessons(runtime, projectId).find((item) => item.id === lessonId);
@@ -52,16 +51,6 @@ export function ProjectWorkbenchLayout() {
   const previousStepKey = getPreviousWorkbenchStepKey(stepKey);
   const previousStep = workflowSteps.find((item) => item.key === previousStepKey);
   useProjectEvents(projectId);
-
-  useEffect(() => {
-    const content = workbenchContentRef.current;
-    if (!content) return;
-    const frame = window.requestAnimationFrame(() => {
-      content.scrollTo({ top: 0 });
-      content.focus({ preventScroll: true });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [stepKey]);
 
   return (
     <div
@@ -193,8 +182,6 @@ export function ProjectWorkbenchLayout() {
         <section
           className="h-full min-w-0 flex-1 overflow-y-auto outline-none"
           data-testid="workbench-content"
-          ref={workbenchContentRef}
-          tabIndex={-1}
         >
           <Outlet />
         </section>

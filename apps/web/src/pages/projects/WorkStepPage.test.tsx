@@ -64,10 +64,7 @@ describe("WorkStepPage route isolation", () => {
     expect(screen.getByRole("textbox", { name: "教案正文" })).not.toHaveValue(
       "课时 A 的未保存内容",
     );
-    expect(screen.getByTestId("work-step-transition")).toHaveAttribute(
-      "data-step-key",
-      "lesson-plan",
-    );
+    expect(screen.getByTestId("work-step-content")).toHaveAttribute("data-step-key", "lesson-plan");
   });
 
   it("前置步骤未确认时只显示解锁入口", () => {
