@@ -52,13 +52,15 @@ class SqlAlchemyWorkflowExecutionPort:
         node_run_id: UUID,
         *,
         for_update: bool,
+        lock_run: bool = True,
     ) -> WorkflowExecutionContext:
-        node, run = self._require_node_and_run(node_run_id, for_update=for_update)
-        ProjectAccessService(self._session, self._actor).require(
-            run.project_id,
-            ProjectAction.GENERATE,
-            for_update=for_update,
-        )
+        node, run = self._require_node_and_run(node_run_id, for_update, lock_run)
+        if not self._actor.is_system:
+            ProjectAccessService(self._session, self._actor).require(
+                run.project_id,
+                ProjectAction.GENERATE,
+                for_update=for_update,
+            )
         definition = self._published_node(run.workflow_definition_version_id, node.node_key)
         branch_key, lesson_key, lesson_unit_id = self._scope_facts(node, run, definition)
         return WorkflowExecutionContext(
@@ -78,8 +80,8 @@ class SqlAlchemyWorkflowExecutionPort:
     def _require_node_and_run(
         self,
         node_run_id: UUID,
-        *,
         for_update: bool,
+        lock_run: bool,
     ) -> tuple[NodeRun, WorkflowRun]:
         node = self._repository.get_node(node_run_id, for_update=for_update)
         if node is None:
@@ -87,7 +89,8 @@ class SqlAlchemyWorkflowExecutionPort:
                 "NODE_EXECUTION_NOT_FOUND",
                 "the node run was not found",
             )
-        run = self._repository.get_run(node.workflow_run_id, for_update=for_update)
+        lock_run_for_update = for_update and lock_run
+        run = self._repository.get_run(node.workflow_run_id, for_update=lock_run_for_update)
         if run is None:
             raise WorkflowExecutionPortError(
                 "NODE_EXECUTION_NOT_FOUND",

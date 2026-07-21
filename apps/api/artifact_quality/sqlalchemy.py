@@ -86,7 +86,11 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
         self._fault_injector = fault_injector
 
     def prepare(self, node_run_id: UUID) -> QualityValidationContext:
-        execution = self._workflow.require_context(node_run_id, for_update=True)
+        execution = self._workflow.require_context(
+            node_run_id,
+            for_update=True,
+            lock_run=False,
+        )
         registered = BUILTIN_WORKFLOW_REGISTRY.load(
             dict(self._workflow.published_graph(execution.workflow_definition_version_id))
         )

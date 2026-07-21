@@ -7,9 +7,52 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
 from apps.api.database import build_engine, build_session_factory
+from apps.api.projects.repository import ProjectRepository
+from apps.api.projects.schemas import CreateProjectRequest
 from tests.integration.test_node_execution_runtime import _seed_runtime
 
 REPORT_ID = UUID("10000000-0000-4000-8000-000000000133")
+MISMATCH_ID = UUID("20000000-0000-4000-8000-000000000133")
+
+_DIRECT_INSERT = text(
+    """
+    INSERT INTO artifact_quality_reports (
+        id,
+        organization_id,
+        project_id,
+        lesson_unit_id,
+        source_artifact_version_id,
+        source_content_hash,
+        content_release_id,
+        workflow_definition_version_id,
+        validate_node_run_id,
+        validator_set_json,
+        validator_set_hash,
+        conclusion,
+        findings_json,
+        evidence_hash,
+        created_at,
+        created_by
+    ) VALUES (
+        :report_id,
+        :organization_id,
+        :project_id,
+        :lesson_unit_id,
+        :source_artifact_version_id,
+        :source_content_hash,
+        :content_release_id,
+        :workflow_definition_version_id,
+        :validate_node_run_id,
+        CAST(:validator_set AS jsonb),
+        :validator_set_hash,
+        'passed',
+        CAST('[]' AS jsonb),
+        :evidence_hash,
+        now(),
+        :created_by
+    )
+    """
+)
 
 
 def test_quality_report_rows_reject_update_and_delete_with_stable_sqlstate(
@@ -86,3 +129,82 @@ def test_quality_report_rows_reject_update_and_delete_with_stable_sqlstate(
             with engine.begin() as connection:
                 connection.execute(text(statement), {"report_id": REPORT_ID})
         assert getattr(captured.value.orig, "sqlstate", None) == "23514"
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "organization_id",
+        "project_id",
+        "lesson_unit_id",
+        "source_artifact_version_id",
+        "source_content_hash",
+        "content_release_id",
+        "workflow_definition_version_id",
+        "validate_node_run_id",
+    ],
+)
+def test_quality_report_insert_rejects_every_mismatched_fixed_fact(
+    migrated_database_url: str,
+    field: str,
+) -> None:
+    engine = build_engine(migrated_database_url)
+    factory = build_session_factory(engine)
+    seeded = _seed_runtime(factory)
+    with factory() as session, session.begin():
+        other_project = ProjectRepository(session, seeded.actor).create(
+            CreateProjectRequest(title="Other scope", knowledge_point="Mismatch")
+        )
+
+    with engine.connect() as connection:
+        facts = dict(
+            connection.execute(
+                text(
+                    """
+                    SELECT
+                        artifact_versions.organization_id,
+                        workflow_runs.project_id,
+                        artifacts.lesson_unit_id,
+                        artifact_versions.id AS source_artifact_version_id,
+                        artifact_versions.content_hash AS source_content_hash,
+                        workflow_runs.content_release_id,
+                        workflow_runs.workflow_definition_version_id,
+                        node_runs.id AS validate_node_run_id
+                    FROM artifact_versions
+                    JOIN artifacts ON artifacts.id = artifact_versions.artifact_id
+                    JOIN node_runs ON node_runs.id = :node_run_id
+                    JOIN workflow_runs ON workflow_runs.id = node_runs.workflow_run_id
+                    WHERE artifact_versions.id = :source_version_id
+                    """
+                ),
+                {
+                    "node_run_id": seeded.node_run_id,
+                    "source_version_id": seeded.upstream_version_id,
+                },
+            )
+            .mappings()
+            .one()
+        )
+    facts.update(
+        report_id=REPORT_ID,
+        validator_set=(
+            '[{"implementation_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","key":"validator.fixture",'
+            '"semantic_version":"1.0.0"}]'
+        ),
+        validator_set_hash="b" * 64,
+        evidence_hash="c" * 64,
+        created_by=seeded.actor.principal_id,
+    )
+    facts[field] = (
+        "d" * 64
+        if field == "source_content_hash"
+        else other_project.id
+        if field == "project_id"
+        else MISMATCH_ID
+    )
+
+    with pytest.raises(DBAPIError) as captured:
+        with engine.begin() as connection:
+            connection.execute(_DIRECT_INSERT, facts)
+    assert getattr(captured.value.orig, "sqlstate", None) == "23514"

@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
+from threading import Barrier
 from uuid import UUID
 
 import pytest
@@ -26,16 +28,18 @@ from apps.api.artifact_quality.sqlalchemy import (
 )
 from apps.api.artifacts.models import Artifact, ArtifactVersion
 from apps.api.database import build_engine, build_session_factory
-from apps.api.identity.context import ActorContext
+from apps.api.identity.context import ActorContext, system_actor
+from apps.api.ids import new_uuid7
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.reliability.models import EventStreamEntry, OutboxEvent
-from apps.api.workflows.models import NodeRun
+from apps.api.workflows.models import NodeRun, WorkflowRun
 from apps.api.workflows.service import WorkflowRuntimeService
 from tests.integration.test_node_execution_runtime import (
     _seed_approved_artifact,  # pyright: ignore[reportPrivateUsage]
     _seed_runtime,  # pyright: ignore[reportPrivateUsage]
 )
+from workers.artifact_quality import execute_artifact_quality_node
 from workflow.node_state import NodeStatus
 from workflow.registry import BUILTIN_WORKFLOW_REGISTRY
 
@@ -88,8 +92,10 @@ def test_quality_report_success_exact_query_and_replay_are_one_atomic_fact(
         node = session.get(NodeRun, seeded.node_run_id)
         assert node is not None and node.status == NodeStatus.APPROVED.value
         assert session.scalar(select(func.count()).select_from(ArtifactQualityReport)) == 1
-        assert session.scalar(select(func.count()).select_from(EventStreamEntry)) == 1
-        assert session.scalar(select(func.count()).select_from(OutboxEvent)) == 1
+        assert _event_count(session, "artifact.quality_validation.queued") == 1
+        assert _event_count(session, "artifact.quality_report.passed") == 1
+        assert _outbox_count(session, "artifact.quality_validation.queued") == 1
+        assert _outbox_count(session, "artifact.quality_report.passed") == 1
         stored = ArtifactQualityReportRepository(session, seeded.actor).get_exact(
             project_id=seeded.project_id,
             source_artifact_version_id=seeded.source_version_id,
@@ -97,6 +103,24 @@ def test_quality_report_success_exact_query_and_replay_are_one_atomic_fact(
             validator_set_hash=_binding().validator_set_hash,
         )
         assert stored is not None and stored.id == first.report_id
+        source = session.get(ArtifactVersion, seeded.source_version_id)
+        run = session.get(WorkflowRun, node.workflow_run_id)
+        binding = _binding()
+        assert source is not None and run is not None
+        assert stored.organization_id == seeded.actor.organization_id
+        assert stored.project_id == seeded.project_id
+        assert stored.lesson_unit_id is None
+        assert stored.source_artifact_version_id == source.id
+        assert stored.source_content_hash == source.content_hash
+        assert stored.content_release_id == run.content_release_id
+        assert stored.workflow_definition_version_id == run.workflow_definition_version_id
+        assert stored.validate_node_run_id == node.id
+        assert stored.validator_set_hash == binding.validator_set_hash
+        assert stored.validator_set_json == [asdict(item) for item in binding.validator_refs]
+        assert stored.conclusion == "passed"
+        assert stored.findings_json == []
+        assert len(stored.evidence_hash) == 64
+        assert stored.created_by == seeded.actor.principal_id
         assert (
             ArtifactQualityReportRepository(session, seeded.actor).get_exact(
                 project_id=seeded.project_id,
@@ -125,6 +149,29 @@ def test_quality_failure_persists_failed_report_and_failed_node(
         assert report.findings_json[0]["finding"]["code"] == "FIXTURE_QUALITY_FAILED"
 
 
+def test_worker_composition_executes_the_queued_quality_node(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_quality_node(factory)
+    binding = _binding()
+    registry = InMemoryQualityValidatorRegistry(
+        {ref: FixtureValidator(ref) for ref in binding.validator_refs}
+    )
+
+    result = execute_artifact_quality_node(
+        migrated_database_url,
+        seeded.node_run_id,
+        registry,
+    )
+
+    assert result is not None and result.conclusion == "passed"
+    with factory() as session:
+        node = session.get(NodeRun, seeded.node_run_id)
+        assert node is not None and node.status == NodeStatus.APPROVED.value
+        assert session.scalar(select(func.count()).select_from(ArtifactQualityReport)) == 1
+
+
 def test_validator_technical_failure_fails_node_without_quality_report(
     migrated_database_url: str,
 ) -> None:
@@ -150,8 +197,8 @@ def test_validator_technical_failure_fails_node_without_quality_report(
         node = session.get(NodeRun, seeded.node_run_id)
         assert node is not None and node.status == NodeStatus.FAILED.value
         assert session.scalar(select(func.count()).select_from(ArtifactQualityReport)) == 0
-        assert session.scalar(select(func.count()).select_from(EventStreamEntry)) == 1
-        assert session.scalar(select(func.count()).select_from(OutboxEvent)) == 1
+        assert _event_count(session, "artifact.quality_validation.technical_failed") == 1
+        assert _outbox_count(session, "artifact.quality_validation.technical_failed") == 1
 
 
 def test_same_identity_from_another_node_with_different_payload_is_a_stable_conflict(
@@ -176,7 +223,52 @@ def test_same_identity_from_another_node_with_different_payload_is_a_stable_conf
         node = session.get(NodeRun, second_node_id)
         assert node is not None and node.status == NodeStatus.READY.value
         assert session.scalar(select(func.count()).select_from(ArtifactQualityReport)) == 1
-        assert session.scalar(select(func.count()).select_from(EventStreamEntry)) == 1
+        assert _event_count(session, "artifact.quality_report.passed") == 1
+
+
+def test_concurrent_nodes_for_one_identity_return_one_report_and_one_stable_conflict(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_quality_node(factory)
+    worker_actor = system_actor(seeded.actor.organization_id)
+    transactions = SqlAlchemyArtifactQualityTransactionFactory(factory, worker_actor)
+    with transactions.begin() as transaction:
+        first_context = transaction.prepare(seeded.node_run_id)
+    second_node_id = _seed_concurrent_running_node(factory, seeded)
+    second_context = replace(first_context, node_run_id=second_node_id, existing_result=None)
+    outcomes = tuple(
+        FixtureValidator(ref).validate(first_context) for ref in first_context.validator_refs
+    )
+    barrier = Barrier(2)
+
+    def complete(context: QualityValidationContext):
+        try:
+            barrier.wait(timeout=10)
+            with transactions.begin() as transaction:
+                return transaction.complete(
+                    context,
+                    conclusion="passed",
+                    outcomes=outcomes,
+                )
+        except Exception as exc:
+            return exc
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(complete, (first_context, second_context)))
+
+    reports = [item for item in results if not isinstance(item, Exception)]
+    errors = [item for item in results if isinstance(item, ArtifactQualityTransactionError)]
+    diagnostics = [
+        (type(item).__name__, getattr(item, "code", None), repr(item.__cause__))
+        for item in results
+        if isinstance(item, Exception)
+    ]
+    assert len(reports) == 1, diagnostics
+    assert len(errors) == 1
+    assert errors[0].code == "QUALITY_REPORT_IDEMPOTENCY_CONFLICT"
+    with factory() as session:
+        assert session.scalar(select(func.count()).select_from(ArtifactQualityReport)) == 1
 
 
 def test_cross_project_source_is_rejected_before_report_or_node_write(
@@ -199,7 +291,7 @@ def test_cross_project_source_is_rejected_before_report_or_node_write(
         node = session.get(NodeRun, node_run_id)
         assert node is not None and node.status == NodeStatus.READY.value
         assert session.scalar(select(func.count()).select_from(ArtifactQualityReport)) == 0
-        assert session.scalar(select(func.count()).select_from(EventStreamEntry)) == 0
+        assert _event_count(session, "artifact.quality_report.passed") == 0
 
 
 def test_transaction_rejects_a_conclusion_that_disagrees_with_validator_outcomes(
@@ -245,8 +337,8 @@ def test_any_quality_commit_fault_rolls_back_report_node_and_events(
         node = session.get(NodeRun, seeded.node_run_id)
         assert node is not None and node.status == NodeStatus.READY.value
         assert session.scalar(select(func.count()).select_from(ArtifactQualityReport)) == 0
-        assert session.scalar(select(func.count()).select_from(EventStreamEntry)) == 0
-        assert session.scalar(select(func.count()).select_from(OutboxEvent)) == 0
+        assert _event_count(session, "artifact.quality_report.passed") == 0
+        assert _outbox_count(session, "artifact.quality_report.passed") == 0
 
 
 def _seed_quality_node(factory: sessionmaker[Session]) -> QualitySeed:
@@ -334,6 +426,31 @@ def _create_replay_node(factory: sessionmaker[Session], seeded: QualitySeed) -> 
     return node.id
 
 
+def _seed_concurrent_running_node(
+    factory: sessionmaker[Session],
+    seeded: QualitySeed,
+) -> UUID:
+    with factory() as session, session.begin():
+        first = session.get(NodeRun, seeded.node_run_id)
+        assert first is not None
+        node = NodeRun(
+            id=new_uuid7(),
+            organization_id=first.organization_id,
+            workflow_run_id=first.workflow_run_id,
+            branch_run_id=first.branch_run_id,
+            node_key="quality.concurrent.fixture",
+            run_no=1,
+            status=NodeStatus.RUNNING.value,
+            trigger_type="system",
+            automation_policy_snapshot_json=first.automation_policy_snapshot_json,
+            created_by=seeded.actor.principal_id,
+            updated_by=seeded.actor.principal_id,
+        )
+        session.add(node)
+        session.flush()
+    return node.id
+
+
 def _create_cross_project_source_node(
     factory: sessionmaker[Session],
     seeded: QualitySeed,
@@ -396,3 +513,23 @@ def _workflow_version_id(session: Session, node_run_id: UUID) -> UUID:
     run = session.get(WorkflowRun, node.workflow_run_id)
     assert run is not None
     return run.workflow_definition_version_id
+
+
+def _event_count(session: Session, event_type: str) -> int:
+    return int(
+        session.scalar(
+            select(func.count())
+            .select_from(EventStreamEntry)
+            .where(EventStreamEntry.event_type == event_type)
+        )
+        or 0
+    )
+
+
+def _outbox_count(session: Session, topic: str) -> int:
+    return int(
+        session.scalar(
+            select(func.count()).select_from(OutboxEvent).where(OutboxEvent.topic == topic)
+        )
+        or 0
+    )

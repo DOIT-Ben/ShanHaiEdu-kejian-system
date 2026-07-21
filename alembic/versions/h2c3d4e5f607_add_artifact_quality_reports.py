@@ -16,6 +16,8 @@ depends_on: str | Sequence[str] | None = None
 
 _IMMUTABILITY_FUNCTION = "reject_artifact_quality_report_mutation"
 _IMMUTABILITY_TRIGGER = "trg_artifact_quality_reports_immutable"
+_SCOPE_FUNCTION = "validate_artifact_quality_report_scope"
+_SCOPE_TRIGGER = "trg_artifact_quality_reports_scope"
 
 
 def upgrade() -> None:
@@ -142,6 +144,76 @@ def upgrade() -> None:
     )
     op.execute(
         f"""
+        CREATE FUNCTION {_SCOPE_FUNCTION}() RETURNS trigger AS $$
+        DECLARE
+          source_version_organization uuid;
+          source_artifact_organization uuid;
+          source_project uuid;
+          source_lesson uuid;
+          source_hash text;
+          node_organization uuid;
+          run_organization uuid;
+          node_project uuid;
+          node_lesson uuid;
+          node_release uuid;
+          node_workflow uuid;
+        BEGIN
+          SELECT artifact_versions.organization_id,
+                 artifacts.organization_id,
+                 artifacts.project_id,
+                 artifacts.lesson_unit_id,
+                 artifact_versions.content_hash
+          INTO source_version_organization,
+               source_artifact_organization,
+               source_project,
+               source_lesson,
+               source_hash
+          FROM artifact_versions
+          JOIN artifacts ON artifacts.id = artifact_versions.artifact_id
+          WHERE artifact_versions.id = NEW.source_artifact_version_id;
+
+          SELECT node_runs.organization_id,
+                 workflow_runs.organization_id,
+                 workflow_runs.project_id,
+                 branch_runs.lesson_unit_id,
+                 workflow_runs.content_release_id,
+                 workflow_runs.workflow_definition_version_id
+          INTO node_organization,
+               run_organization,
+               node_project,
+               node_lesson,
+               node_release,
+               node_workflow
+          FROM node_runs
+          JOIN workflow_runs ON workflow_runs.id = node_runs.workflow_run_id
+          LEFT JOIN branch_runs ON branch_runs.id = node_runs.branch_run_id
+          WHERE node_runs.id = NEW.validate_node_run_id;
+
+          IF source_version_organization IS NULL
+             OR node_organization IS NULL
+             OR NEW.organization_id IS DISTINCT FROM source_version_organization
+             OR NEW.organization_id IS DISTINCT FROM source_artifact_organization
+             OR NEW.organization_id IS DISTINCT FROM node_organization
+             OR NEW.organization_id IS DISTINCT FROM run_organization
+             OR NEW.project_id IS DISTINCT FROM source_project
+             OR NEW.project_id IS DISTINCT FROM node_project
+             OR NEW.lesson_unit_id IS DISTINCT FROM source_lesson
+             OR NEW.lesson_unit_id IS DISTINCT FROM node_lesson
+             OR NEW.source_content_hash IS DISTINCT FROM source_hash
+             OR NEW.content_release_id IS DISTINCT FROM node_release
+             OR NEW.workflow_definition_version_id IS DISTINCT FROM node_workflow THEN
+            RAISE EXCEPTION USING
+              ERRCODE = '23514',
+              MESSAGE = 'artifact quality report scope does not match its fixed facts';
+          END IF;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+
+        CREATE TRIGGER {_SCOPE_TRIGGER}
+        BEFORE INSERT ON artifact_quality_reports
+        FOR EACH ROW EXECUTE FUNCTION {_SCOPE_FUNCTION}();
+
         CREATE FUNCTION {_IMMUTABILITY_FUNCTION}() RETURNS trigger AS $$
         BEGIN
           RAISE EXCEPTION USING
@@ -160,6 +232,8 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute(f"DROP TRIGGER IF EXISTS {_IMMUTABILITY_TRIGGER} ON artifact_quality_reports")
     op.execute(f"DROP FUNCTION IF EXISTS {_IMMUTABILITY_FUNCTION}()")
+    op.execute(f"DROP TRIGGER IF EXISTS {_SCOPE_TRIGGER} ON artifact_quality_reports")
+    op.execute(f"DROP FUNCTION IF EXISTS {_SCOPE_FUNCTION}()")
     op.drop_index(
         "ix_artifact_quality_reports_project_source",
         table_name="artifact_quality_reports",

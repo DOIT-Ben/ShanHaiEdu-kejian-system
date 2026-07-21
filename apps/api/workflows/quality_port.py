@@ -13,7 +13,7 @@ from apps.api.workflows.execution_port import (
     SqlAlchemyWorkflowExecutionPort,
     WorkflowExecutionPortError,
 )
-from apps.api.workflows.models import NodeInputSnapshot
+from apps.api.workflows.models import NodeInputSnapshot, NodeRun
 from apps.api.workflows.repository import WorkflowRuntimeRepository
 from workflow.node_state import NodeStatus
 
@@ -58,3 +58,18 @@ class SqlAlchemyQualityWorkflowPort:
             node.last_error_code = "QUALITY_VALIDATION_FAILED"
         node.finished_at = utc_now()
         self._session.flush()
+
+
+class QualityNodeRoutingReader:
+    """Resolve only the tenant needed to construct a scoped worker actor."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def organization_id(self, node_run_id: UUID) -> UUID | None:
+        return self._session.scalar(
+            select(NodeRun.organization_id).where(
+                NodeRun.id == node_run_id,
+                NodeRun.deleted_at.is_(None),
+            )
+        )

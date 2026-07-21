@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import cast
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -11,6 +13,7 @@ from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.permissions import ProjectAccessService
 from apps.api.ids import new_uuid7
 from apps.api.projects.policy_service import AutomationPolicyService
+from apps.api.reliability.events import EventResource, EventWriter
 from apps.api.workflows.models import (
     NodeInputSnapshot,
     NodeRun,
@@ -135,15 +138,17 @@ class WorkflowRuntimeService:
         )
         self._session.add(record)
         self._session.flush()
+        self._queue_quality_validation_if_ready(node, run, input_key)
         return record
 
     def transition_node(self, node_run_id: UUID, target: NodeStatus) -> NodeRun:
         node = self._require_node(node_run_id, for_update=True)
         run = self._require_run(node.workflow_run_id)
-        ProjectAccessService(self._session, self._actor).require(
-            run.project_id,
-            ProjectAction.EDIT,
-        )
+        if not self._actor.is_system:
+            ProjectAccessService(self._session, self._actor).require(
+                run.project_id,
+                ProjectAction.EDIT,
+            )
         try:
             ensure_node_transition(NodeStatus(node.status), target)
         except NodeStateError as exc:
@@ -189,3 +194,31 @@ class WorkflowRuntimeService:
         if definition is None or definition.status != "published":
             raise WorkflowRuntimeError("project workflow definition is not published")
         return BUILTIN_WORKFLOW_REGISTRY.load(definition.graph_json)
+
+    def _queue_quality_validation_if_ready(
+        self,
+        node: NodeRun,
+        run: WorkflowRun,
+        input_key: str,
+    ) -> None:
+        registered = self._load_registered_workflow(run.workflow_definition_version_id)
+        definition = registered.node_by_key.get(node.node_key)
+        persistence = (
+            definition.binding.get("quality_report_persistence") if definition is not None else None
+        )
+        if not isinstance(persistence, Mapping):
+            return
+        values = cast(Mapping[str, object], persistence)
+        if values.get("source_input_ref") != input_key:
+            return
+        EventWriter(self._session, self._actor.organization_id).append(
+            project_id=run.project_id,
+            event_type="artifact.quality_validation.queued",
+            resource=EventResource(type="node_run", id=node.id),
+            payload={
+                "node_run_id": str(node.id),
+                "content_release_id": str(run.content_release_id),
+                "workflow_definition_version_id": str(run.workflow_definition_version_id),
+            },
+            request_id=None,
+        )

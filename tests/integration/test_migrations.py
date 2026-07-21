@@ -138,11 +138,14 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
             connection.scalar(
                 text(
                     "SELECT count(*) FROM pg_trigger "
-                    "WHERE tgname = 'trg_artifact_quality_reports_immutable' "
+                    "WHERE tgname IN ("
+                    "'trg_artifact_quality_reports_immutable', "
+                    "'trg_artifact_quality_reports_scope'"
+                    ") "
                     "AND NOT tgisinternal"
                 )
             )
-            == 1
+            == 2
         )
         assert (
             connection.scalar(

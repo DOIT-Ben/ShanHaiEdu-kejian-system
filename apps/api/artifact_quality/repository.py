@@ -33,10 +33,11 @@ class ArtifactQualityReportRepository:
         workflow_definition_version_id: UUID,
         validator_set_hash: str,
     ) -> ArtifactQualityReport | None:
-        ProjectAccessService(self._session, self._actor).require(
-            project_id,
-            ProjectAction.VIEW,
-        )
+        if not self._actor.is_system:
+            ProjectAccessService(self._session, self._actor).require(
+                project_id,
+                ProjectAction.VIEW,
+            )
         return self._session.scalar(
             select(ArtifactQualityReport).where(
                 ArtifactQualityReport.organization_id == self._actor.organization_id,
