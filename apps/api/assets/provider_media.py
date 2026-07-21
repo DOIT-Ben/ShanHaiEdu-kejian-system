@@ -46,6 +46,9 @@ class SqlAlchemyProviderMediaAssetReader:
         organization_id: UUID,
         file_version_id: UUID,
     ) -> ProviderMediaAssetVersion | None:
+        # The shared session factory disables autoflush. Persist a same-transaction
+        # revocation before deciding whether provider-visible media is still eligible.
+        self._session.flush()
         row = self._session.execute(
             select(FileAssetVersion)
             .join(FileAsset, FileAsset.id == FileAssetVersion.file_asset_id)
