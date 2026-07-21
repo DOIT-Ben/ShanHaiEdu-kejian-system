@@ -26,6 +26,15 @@ describe("ProjectStepNavigation active step visibility", () => {
       return DOMRect.fromRect({ height: 44, width: 220, x: 0, y: 0 });
     });
     const windowScroll = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    const elementScroll = vi.fn(function (this: HTMLElement, options?: ScrollToOptions | number) {
+      if (typeof options === "object" && typeof options.top === "number") {
+        this.scrollTop = options.top;
+      }
+    });
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: elementScroll,
+    });
     const { container } = render(
       <div data-step-scroll-container>
         <MemoryRouter initialEntries={[`${base}/lesson-plan`]}>
@@ -42,8 +51,10 @@ describe("ProjectStepNavigation active step visibility", () => {
     const scrollContainer = container.querySelector<HTMLElement>("[data-step-scroll-container]");
     if (!scrollContainer) throw new Error("未找到流程滚动容器");
     scrollContainer.scrollTop = 20;
+    elementScroll.mockClear();
     await userEvent.click(screen.getByRole("link", { name: /生成课堂导入视频/ }));
-    await waitFor(() => expect(scrollContainer.scrollTop).toBe(80));
+    await waitFor(() => expect(scrollContainer.scrollTop).toBe(208));
+    expect(elementScroll).toHaveBeenCalledWith({ behavior: "smooth", top: 208 });
     expect(windowScroll).not.toHaveBeenCalled();
   });
 });

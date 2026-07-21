@@ -52,13 +52,12 @@ export function ProjectWorkbenchLayout() {
     const content = workbenchContentRef.current;
     if (!content) return;
     const frame = window.requestAnimationFrame(() => {
-      const topbar = Number.parseFloat(
-        getComputedStyle(document.documentElement).getPropertyValue("--sh-topbar-height"),
-      );
-      const contentTop = content.getBoundingClientRect().top + window.scrollY;
-      window.scrollTo({
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-        top: Math.max(0, contentTop - (Number.isFinite(topbar) ? topbar : 56) - 52),
+      const reducedMotion =
+        typeof window.matchMedia === "function" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      content.scrollTo({
+        behavior: reducedMotion ? "auto" : "smooth",
+        top: 0,
       });
       content.focus({ preventScroll: true });
     });
@@ -67,10 +66,10 @@ export function ProjectWorkbenchLayout() {
 
   return (
     <div
-      className="relative flex min-h-[calc(100dvh-var(--sh-topbar-height))] flex-col bg-[var(--sh-surface-canvas)]"
+      className="relative flex h-[calc(100dvh-var(--sh-topbar-height))] flex-col overflow-hidden bg-[var(--sh-surface-canvas)]"
       data-testid="project-workbench"
     >
-      <header className="sticky top-[var(--sh-topbar-height)] z-30 flex min-h-[52px] items-center gap-2 border-b border-[var(--sh-line-default)] bg-[var(--sh-surface-canvas)]/96 px-3 shadow-[var(--sh-shadow-card)] backdrop-blur-sm md:gap-3 md:px-5">
+      <header className="z-30 flex min-h-[52px] shrink-0 items-center gap-2 border-b border-[var(--sh-line-default)] bg-[var(--sh-surface-canvas)]/96 px-3 shadow-[var(--sh-shadow-card)] backdrop-blur-sm md:gap-3 md:px-5">
         <Link
           aria-label="返回项目"
           className="inline-grid size-10 shrink-0 place-items-center rounded-[var(--sh-radius-sm)] text-[var(--sh-ink-muted)] hover:bg-[var(--sh-surface-soft)] hover:text-[var(--sh-ink-strong)]"
@@ -157,10 +156,10 @@ export function ProjectWorkbenchLayout() {
         </Button>
       </header>
 
-      <div className="flex flex-1 items-start">
+      <div className="flex min-h-0 flex-1 items-stretch overflow-hidden">
         <aside
           className={cn(
-            "hidden shrink-0 border-r border-[var(--sh-line-default)] bg-[var(--sh-brand-50)] transition-[width] duration-[var(--sh-duration-normal)] md:sticky md:top-[calc(var(--sh-topbar-height)+52px)] md:block md:max-h-[calc(100dvh-var(--sh-topbar-height)-52px)] md:overflow-y-auto",
+            "hidden h-full shrink-0 overflow-y-auto border-r border-[var(--sh-line-default)] bg-[var(--sh-brand-50)] transition-[width] duration-[var(--sh-duration-normal)] md:block",
             sidebarCollapsed ? "w-16" : "w-[var(--sh-project-sidebar-width)]",
           )}
           data-step-scroll-container
@@ -178,7 +177,7 @@ export function ProjectWorkbenchLayout() {
         </aside>
 
         <section
-          className="min-w-0 flex-1 outline-none"
+          className="h-full min-w-0 flex-1 overflow-y-auto outline-none"
           data-testid="workbench-content"
           ref={workbenchContentRef}
           tabIndex={-1}

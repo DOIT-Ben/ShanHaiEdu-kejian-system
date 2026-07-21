@@ -17,7 +17,7 @@ export function TaskStatusBar({ projectId }: { projectId: string }) {
   if (activeCount === 0 && actionCount === 0) return null;
 
   return (
-    <div className="flex min-h-8 items-center border-t border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] px-4 py-1 text-xs text-[var(--sh-ink-muted)]">
+    <div className="flex min-h-8 shrink-0 items-center border-t border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] px-4 py-1 text-xs text-[var(--sh-ink-muted)]">
       {activeCount > 0 ? (
         <Link
           className="flex items-center gap-1.5 font-medium text-[var(--sh-brand-700)] hover:underline"

@@ -41,15 +41,23 @@ export function ProjectStepNavigation({
     if (!activeStep || !scrollContainer) return;
     const itemRect = activeStep.getBoundingClientRect();
     const containerRect = scrollContainer.getBoundingClientRect();
-    if (itemRect.top < containerRect.top) {
-      scrollContainer.scrollTop -= containerRect.top - itemRect.top;
-    } else if (itemRect.bottom > containerRect.bottom) {
-      scrollContainer.scrollTop += itemRect.bottom - containerRect.bottom;
-    }
+    if (containerRect.height <= 0) return;
+    const itemCenter = itemRect.top + itemRect.height / 2;
+    const containerCenter = containerRect.top + containerRect.height / 2;
+    const reducedMotion =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    scrollContainer.scrollTo({
+      behavior: reducedMotion ? "auto" : "smooth",
+      top: Math.max(0, scrollContainer.scrollTop + itemCenter - containerCenter),
+    });
   }, [currentPath]);
 
   return (
-    <nav aria-label="课时制作流程" className="px-2 pb-6">
+    <nav
+      aria-label="课时制作流程"
+      className="px-2 pb-[calc((100dvh-var(--sh-topbar-height)-52px)/2)]"
+    >
       {projectSteps.map((group) => (
         <div className="mb-5" key={group.group}>
           {!collapsed ? (
