@@ -218,7 +218,7 @@ async def _execute_video_smoke(
                 duration_seconds=duration_seconds,
             )
         )
-        result = await _wait_for_video_completion(gateway, settings, submitted)
+        result = await wait_for_video_completion(gateway, settings, submitted)
         if result.status != VideoOperationStatus.SUCCEEDED or len(result.files) != 1:
             raise ModelGatewayError(GatewayErrorCode.REJECTED, retryable=False)
         file = result.files[0]
@@ -234,19 +234,23 @@ async def _execute_video_smoke(
         await provider.aclose()
 
 
-async def _wait_for_video_completion(
+async def wait_for_video_completion(
     gateway: ModelGateway,
     settings: Settings,
     result: VideoGatewayResult,
 ) -> VideoGatewayResult:
-    deadline = asyncio.get_running_loop().time() + settings.video_provider_max_wait_seconds
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + settings.video_provider_max_wait_seconds
     while result.status in {VideoOperationStatus.SUBMITTED, VideoOperationStatus.POLLING}:
-        if asyncio.get_running_loop().time() >= deadline:
+        remaining_seconds = deadline - loop.time()
+        if remaining_seconds <= 0:
             raise ModelGatewayError(GatewayErrorCode.TIMEOUT, retryable=True)
         provider_task_id = result.provider_task_id
         if provider_task_id is None:
             raise ModelGatewayError(GatewayErrorCode.INVALID_RESPONSE, retryable=False)
-        await asyncio.sleep(settings.video_provider_poll_seconds)
+        await asyncio.sleep(min(settings.video_provider_poll_seconds, remaining_seconds))
+        if loop.time() >= deadline:
+            raise ModelGatewayError(GatewayErrorCode.TIMEOUT, retryable=True)
         result = await gateway.poll_video(
             VideoPollRequest(
                 capability=VIDEO_SMOKE_CAPABILITY,
