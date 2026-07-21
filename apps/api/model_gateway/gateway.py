@@ -192,9 +192,18 @@ class ModelGateway:
         ):
             raise ModelGatewayError(GatewayErrorCode.INVALID_RESPONSE, retryable=False)
         organization_id = media_organization_id or audit_organization_id
+        if request.references:
+
+            async def invoke(provider: VideoProvider) -> VideoProviderResult:
+                return await provider.submit(request, organization_id=organization_id)
+        else:
+
+            async def invoke(provider: VideoProvider) -> VideoProviderResult:
+                return await provider.submit(request)
+
         return await self._run_video(
             request,
-            lambda provider: provider.submit(request, organization_id=organization_id),
+            invoke,
             operation_kind="video_submit",
             cancellation=cancellation,
             audit_context=audit_context,
