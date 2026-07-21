@@ -59,6 +59,7 @@ def run_worker(*, check_only: bool) -> int:
 
     broker = RedisBroker(url=settings.redis_url.get_secret_value())
     dramatiq.set_broker(broker)
+    from workers.artifact_quality import process_artifact_quality_node
     from workers.tasks import process_generation_job
 
     if check_only:
@@ -82,6 +83,8 @@ def run_worker(*, check_only: bool) -> int:
     def publish(event: OutboxEvent) -> None:
         if event.topic == "generation.job.queued":
             process_generation_job.send(str(event.aggregate_id))
+        elif event.topic == "artifact.quality_validation.queued":
+            process_artifact_quality_node.send(str(event.aggregate_id))
 
     worker = Worker(broker, worker_threads=2)
     _run_startup_recovery(recovery)
