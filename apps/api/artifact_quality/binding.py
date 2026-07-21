@@ -22,6 +22,7 @@ class QualityReportBindingError(ValueError):
 @dataclass(frozen=True, slots=True)
 class QualityReportBinding:
     source_input_ref: str
+    supporting_input_refs: tuple[str, ...]
     validator_refs: tuple[ValidatorRef, ...]
     validator_set_hash: str
 
@@ -38,9 +39,22 @@ def resolve_quality_report_binding(
         raise _invalid("the fixed node has no quality-report persistence binding")
     values = cast(Mapping[str, object], persistence)
     source_input_ref = values.get("source_input_ref")
+    raw_supporting_refs = values.get("supporting_input_refs", ())
     raw_refs = values.get("validator_refs")
-    if type(source_input_ref) is not str or not isinstance(raw_refs, (list, tuple)):
+    if (
+        type(source_input_ref) is not str
+        or not isinstance(raw_supporting_refs, (list, tuple))
+        or not isinstance(raw_refs, (list, tuple))
+    ):
         raise _invalid("the fixed quality-report binding is invalid")
+    supporting_refs = tuple(cast(list[str] | tuple[str, ...], raw_supporting_refs))
+    if (
+        any(type(item) is not str for item in supporting_refs)
+        or len(set(supporting_refs)) != len(supporting_refs)
+        or source_input_ref in supporting_refs
+        or any(item not in node.input_contract_refs for item in supporting_refs)
+    ):
+        raise _invalid("the fixed quality supporting inputs are invalid")
     refs = tuple(
         _validator_ref(registered, node, raw)
         for raw in cast(list[object] | tuple[object, ...], raw_refs)
@@ -48,6 +62,7 @@ def resolve_quality_report_binding(
     canonical = canonical_validator_refs(refs)
     return QualityReportBinding(
         source_input_ref=source_input_ref,
+        supporting_input_refs=tuple(sorted(supporting_refs)),
         validator_refs=canonical,
         validator_set_hash=validator_set_hash(canonical),
     )

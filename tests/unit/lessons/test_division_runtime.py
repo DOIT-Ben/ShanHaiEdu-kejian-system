@@ -5,7 +5,7 @@ from uuid import UUID
 
 import pytest
 
-from apps.api.artifact_quality.contracts import QualityValidationContext
+from apps.api.artifact_quality.contracts import QualityValidationContext, ValidatorOutcome
 from apps.api.lessons.division_runtime import (
     LESSON_DIVISION_COVERAGE_REF,
     LESSON_DIVISION_SCHEMA_REF,
@@ -84,9 +84,8 @@ def validation_context(content: dict[str, object]) -> QualityValidationContext:
     )
 
 
-def finding_codes(outcome: object) -> set[str]:
-    findings = getattr(outcome, "findings")
-    return {str(item["code"]) for item in findings}
+def finding_codes(outcome: ValidatorOutcome) -> set[str]:
+    return {str(item["code"]) for item in outcome.findings}
 
 
 def test_valid_division_maps_lesson_unit_key_to_domain_lesson_key() -> None:
@@ -176,14 +175,16 @@ def test_coverage_validator_rejects_omitted_duplicate_out_of_scope_and_overlap(
 
 
 def test_stable_key_diff_ignores_reorder_but_selects_changed_and_archived_keys() -> None:
-    previous = division_content(
-        lesson_unit("LESSON-01", 1),
-        lesson_unit("LESSON-02", 2),
-        lesson_unit("LESSON-03", 3),
-    )
+    first = lesson_unit("LESSON-01", 1)
+    second = lesson_unit("LESSON-02", 2)
+    previous = division_content(first, second, lesson_unit("LESSON-03", 3))
+    reordered_second = deepcopy(second)
+    reordered_second["position"] = 1
+    reordered_first = deepcopy(first)
+    reordered_first["position"] = 2
     current = division_content(
-        deepcopy(lesson_unit("LESSON-02", 1)),
-        deepcopy(lesson_unit("LESSON-01", 2)),
+        reordered_second,
+        reordered_first,
         lesson_unit("LESSON-04", 3),
     )
     current["lesson_units"][1]["core_learning_outcome"] = "A materially changed outcome"

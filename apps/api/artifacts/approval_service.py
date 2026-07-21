@@ -20,6 +20,7 @@ from apps.api.identity.context import ActorContext, ProjectAction, ProjectRole
 from apps.api.identity.models import ProjectMember
 from apps.api.identity.permissions import ProjectAccessService
 from apps.api.ids import new_uuid7
+from apps.api.lessons.approval_port import LessonDivisionApprovalPort
 from apps.api.projects.models import Project
 from apps.api.reliability.events import EventResource, EventWriter
 
@@ -126,6 +127,13 @@ class ArtifactApprovalService:
             workflow_definition_version_id=project.workflow_definition_version_id,
         )
         previous_version_id = artifact.current_approved_version_id
+        completion = LessonDivisionApprovalPort(self._session, self._actor).apply(
+            artifact,
+            version,
+            previous_version_id=previous_version_id,
+            project=project,
+            request_id=request_id,
+        )
         approval = self._record(
             version, ApprovalAction.APPROVE, comment, quality_evidence, policy_snapshot
         )
@@ -134,7 +142,11 @@ class ArtifactApprovalService:
         artifact.status = "approved"
         artifact.stale_reason_json = None
         self._session.flush()
-        stale_ids, stale_node_ids = self._relations.propagate_stale(previous_version_id, version.id)
+        stale_ids, stale_node_ids = self._relations.propagate_stale(
+            previous_version_id,
+            version.id,
+            selection=completion.stale_selection if completion is not None else None,
+        )
         CreationPackageStalenessService(
             self._session, self._actor.organization_id
         ).mark_source_nodes_stale(stale_node_ids)

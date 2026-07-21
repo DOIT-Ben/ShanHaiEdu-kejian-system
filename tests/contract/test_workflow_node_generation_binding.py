@@ -443,6 +443,20 @@ def test_output_persistence_forbids_implicit_or_extra_targets() -> None:
     assert caught.value.code == "NODE_BINDING_ARTIFACT_CONTENT_INVALID"
 
 
+def test_lesson_division_declares_approval_completion_without_runtime_inference() -> None:
+    catalog = load_catalog()
+    persistence = node_by_key(catalog, "lesson.division.generate")["output_persistence"]
+
+    assert persistence["approval_completion"] == {
+        "kind": "lesson_unit_sync",
+        "collection_pointer": "/lesson_units",
+        "stable_key_field": "lesson_unit_key",
+    }
+
+    persistence["approval_completion"]["stable_key_field"] = "id"
+    assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
+
+
 def test_semantic_validator_rejects_reference_asset_schema_bypasses() -> None:
     catalog = load_catalog()
     mapping = node_by_key(catalog, "ppt.body_asset_prompts.generate")["output_persistence"][
@@ -580,7 +594,7 @@ def test_catalog_hash_is_deterministic_for_semantically_identical_objects() -> N
     assert first_validated.canonical_json == second_validated.canonical_json
     assert first_validated.content_hash == second_validated.content_hash
     assert first_validated.content_hash == (
-        "205a7c2c2e7053269f52f9c2a8f138c77d02f039f37cb19d8d19f11a5e405f9a"
+        "345e58e9b08f1ec4dd78fe385f155054178cb746b2fdf106d0ea45255fdd802a"
     )
 
 

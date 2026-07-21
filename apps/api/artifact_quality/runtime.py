@@ -4,8 +4,17 @@ from __future__ import annotations
 
 from apps.api.artifact_quality.contracts import QualityValidator, ValidatorRef
 from apps.api.artifact_quality.registry import InMemoryQualityValidatorRegistry
+from apps.api.lessons.division_runtime import (
+    LESSON_DIVISION_COVERAGE_REF,
+    LESSON_DIVISION_SCHEMA_REF,
+    LessonDivisionCoverageValidator,
+    LessonDivisionSchemaValidator,
+)
 
-_VALIDATORS: dict[ValidatorRef, QualityValidator] = {}
+_VALIDATORS: dict[ValidatorRef, QualityValidator] = {
+    LESSON_DIVISION_SCHEMA_REF: LessonDivisionSchemaValidator(),
+    LESSON_DIVISION_COVERAGE_REF: LessonDivisionCoverageValidator(),
+}
 
 
 def register_runtime_quality_validator(ref: ValidatorRef, validator: QualityValidator) -> None:

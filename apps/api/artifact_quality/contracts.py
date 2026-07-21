@@ -4,12 +4,16 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 from uuid import UUID
 
 QualityConclusion = Literal["passed", "failed"]
 QualitySourceType = Literal["artifact", "asset"]
+
+
+def _empty_supporting_inputs() -> Mapping[str, Mapping[str, Any]]:
+    return {}
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +38,9 @@ class QualityValidationContext:
     source_content: Mapping[str, Any]
     validator_refs: tuple[ValidatorRef, ...]
     validator_set_hash: str
+    supporting_inputs: Mapping[str, Mapping[str, Any]] = field(
+        default_factory=_empty_supporting_inputs
+    )
     existing_result: ArtifactQualityReportResult | None = None
 
 
