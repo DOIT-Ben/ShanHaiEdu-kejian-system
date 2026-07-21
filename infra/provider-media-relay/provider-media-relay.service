@@ -1,0 +1,28 @@
+[Unit]
+Description=ShanHaiEdu controlled provider media relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=shanhai-dev
+Group=shanhai-dev
+WorkingDirectory=/srv/shanhaiedu/repository
+EnvironmentFile=/etc/shanhaiedu/provider-media-relay.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/srv/shanhaiedu/repository/.venv/bin/python -m apps.api.provider_media_relay --host 127.0.0.1 --port 8201
+Restart=on-failure
+RestartSec=2
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadOnlyPaths=/srv/shanhaiedu/runtime/provider-media
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target
