@@ -217,6 +217,9 @@ class SqlAlchemyWorkflowExecutionPort:
     def release_execution_owner(self, node_run_id: UUID, owner_token: str) -> None:
         self._execution_leases.release(node_run_id, owner_token)
 
+    def clear_execution_owner(self, node_run_id: UUID) -> None:
+        self._execution_leases.discard(node_run_id)
+
     def require_execution_request(self, node_run_id: UUID, request_id: str) -> None:
         existing = self._session.scalar(
             select(NodeInputSnapshot).where(
@@ -229,15 +232,6 @@ class SqlAlchemyWorkflowExecutionPort:
                 "NODE_EXECUTION_IDEMPOTENCY_CONFLICT",
                 "the node run is frozen for another execution request",
             )
-
-    def frozen_execution_snapshot(self, node_run_id: UUID, request_id: str) -> dict[str, Any]:
-        payload = self.find_frozen_execution_snapshot(node_run_id, request_id)
-        if payload is None:
-            raise WorkflowExecutionPortError(
-                "NODE_EXECUTION_IDEMPOTENCY_CONFLICT",
-                "the node run is not frozen for this execution request",
-            )
-        return payload
 
     def find_frozen_execution_snapshot(
         self,

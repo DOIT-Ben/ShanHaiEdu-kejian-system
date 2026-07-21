@@ -66,6 +66,12 @@ class SqlAlchemyNodeExecutionLeasePort:
         self._session.delete(lease)
         self._session.flush()
 
+    def discard(self, node_run_id: UUID) -> None:
+        lease = self._locked(node_run_id)
+        if lease is not None:
+            self._session.delete(lease)
+            self._session.flush()
+
     def _locked(self, node_run_id: UUID) -> NodeExecutionLease | None:
         return self._session.scalar(
             select(NodeExecutionLease)

@@ -56,6 +56,7 @@ from apps.api.workflows.models import (
 from apps.api.workflows.service import WorkflowRuntimeService
 from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
 from tests.fakes.identity import seed_test_actor
+from workers.recovery import WorkerRecoveryCoordinator
 from workflow.node_state import NodeStatus
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -207,6 +208,81 @@ async def test_cancelled_node_has_no_attempt_or_artifact(
         assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 0
         assert _count(session, GenerationAttempt, "node_run_id", seeded.node_run_id) == 0
         assert _count(session, UsageRecord, "node_run_id", seeded.node_run_id) == 0
+
+
+async def test_cancel_requested_before_execution_terminalizes_without_provider(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_runtime(factory)
+    with factory() as session, session.begin():
+        runtime = WorkflowRuntimeService(session, seeded.actor)
+        runtime.transition_node(seeded.node_run_id, NodeStatus.QUEUED)
+        runtime.transition_node(seeded.node_run_id, NodeStatus.CANCEL_REQUESTED)
+
+    provider = DeterministicNodeOutputProvider(seeded.output)
+    service = NodeExecutionService(
+        SqlAlchemyNodeExecutionTransactionFactory(factory, seeded.actor),
+        ModelGateway(
+            {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: provider},
+            audit_sink=SqlAlchemyAttemptAuditSink(factory),
+        ),
+    )
+    with pytest.raises(NodeExecutionError) as caught:
+        await service.execute(seeded.node_run_id, request_id="issue-89-precancelled")
+
+    assert caught.value.code == "NODE_EXECUTION_CANCEL_REQUESTED"
+    assert provider.calls == 0
+    with factory() as session:
+        node = session.get(NodeRun, seeded.node_run_id)
+        assert node is not None and node.status == NodeStatus.CANCELLED.value
+        assert _count(session, GenerationAttempt, "node_run_id", seeded.node_run_id) == 0
+        assert _count(session, UsageRecord, "node_run_id", seeded.node_run_id) == 0
+        assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 0
+        assert _count(session, PromptSnapshot, "node_run_id", seeded.node_run_id) == 0
+        assert _count(session, ContextSnapshot, "node_run_id", seeded.node_run_id) == 0
+
+
+async def test_cancel_requested_before_recovery_discards_fact_without_provider(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_runtime(factory)
+    transactions, _ = await _checkpoint_recovery_fact(
+        factory,
+        seeded,
+        "issue-89-precancelled-recovery",
+    )
+    with factory() as session, session.begin():
+        WorkflowRuntimeService(session, seeded.actor).transition_node(
+            seeded.node_run_id,
+            NodeStatus.CANCEL_REQUESTED,
+        )
+
+    provider = DeterministicNodeOutputProvider(seeded.output)
+    service = NodeExecutionService(
+        transactions,
+        ModelGateway(
+            {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: provider},
+            audit_sink=SqlAlchemyAttemptAuditSink(factory),
+        ),
+    )
+    with pytest.raises(NodeExecutionError) as caught:
+        await service.execute(
+            seeded.node_run_id,
+            request_id="issue-89-precancelled-recovery",
+        )
+
+    assert caught.value.code == "NODE_EXECUTION_CANCEL_REQUESTED"
+    assert provider.calls == 0
+    with factory() as session:
+        node = session.get(NodeRun, seeded.node_run_id)
+        assert node is not None and node.status == NodeStatus.CANCELLED.value
+        assert _count(session, GenerationAttempt, "node_run_id", seeded.node_run_id) == 1
+        assert _count(session, UsageRecord, "node_run_id", seeded.node_run_id) == 1
+        assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 0
+        assert session.scalar(select(func.count()).select_from(NodeExecutionRecoveryFact)) == 0
+        assert session.get(NodeExecutionLease, seeded.node_run_id) is None
 
 
 async def test_cancel_requested_after_model_success_rolls_back_t2(
@@ -727,6 +803,68 @@ async def test_expired_recovery_fact_fails_closed_without_provider_replay(
         assert node is not None and node.status == NodeStatus.FAILED.value
         assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 0
         assert session.scalar(select(func.count()).select_from(NodeExecutionRecoveryFact)) == 0
+
+
+async def test_abandoned_recovery_fact_is_removed_by_retention_sweep(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_runtime(factory)
+    await _checkpoint_recovery_fact(factory, seeded, "issue-89-abandoned-retention")
+    with factory() as session, session.begin():
+        fact = session.scalar(select(NodeExecutionRecoveryFact).with_for_update())
+        assert fact is not None
+        fact.expires_at = utc_now() - timedelta(seconds=1)
+
+    coordinator = WorkerRecoveryCoordinator(factory)
+    assert coordinator.reconcile(limit=10).expired_recovery_facts == 1
+    assert coordinator.reconcile(limit=10).expired_recovery_facts == 0
+    with factory() as session:
+        assert session.scalar(select(func.count()).select_from(NodeExecutionRecoveryFact)) == 0
+        assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 0
+
+
+async def test_recovery_fact_expiring_between_prepare_and_t2_is_deleted(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_runtime(factory)
+    transactions, _ = await _checkpoint_recovery_fact(
+        factory,
+        seeded,
+        "issue-89-expire-during-t2",
+    )
+    with factory() as session, session.begin():
+        lease = session.get(NodeExecutionLease, seeded.node_run_id)
+        assert lease is not None
+        lease.lease_expires_at = utc_now() - timedelta(seconds=1)
+    with transactions.begin() as transaction:
+        recovered = transaction.prepare(seeded.node_run_id, "issue-89-expire-during-t2")
+    with factory() as session, session.begin():
+        fact = session.scalar(select(NodeExecutionRecoveryFact).with_for_update())
+        assert fact is not None
+        fact.expires_at = utc_now() - timedelta(seconds=1)
+
+    service = NodeExecutionService(
+        transactions,
+        ModelGateway(
+            {
+                ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: (
+                    DeterministicNodeOutputProvider(seeded.output)
+                )
+            },
+            audit_sink=SqlAlchemyAttemptAuditSink(factory),
+        ),
+    )
+    with pytest.raises(NodeExecutionError) as caught:
+        service._commit(recovered)
+
+    assert caught.value.code == "NODE_EXECUTION_RECOVERY_EXPIRED"
+    with factory() as session:
+        node = session.get(NodeRun, seeded.node_run_id)
+        assert node is not None and node.status == NodeStatus.FAILED.value
+        assert session.scalar(select(func.count()).select_from(NodeExecutionRecoveryFact)) == 0
+        assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 0
 
 
 async def test_frozen_upstream_change_blocks_recovery_t2(

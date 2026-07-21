@@ -48,7 +48,9 @@ from apps.api.node_execution.recovery import SqlAlchemyRecoveryFactStore
 from apps.api.node_execution.transaction_steps import (
     claim_execution_owner,
     persist_execution_outputs,
+    prepare_cancel_requested_execution,
     prepare_committed_execution,
+    terminalize_execution_failure,
 )
 from apps.api.prompt_runtime.execution_port import SqlAlchemyPromptSnapshotPort
 from apps.api.runtime_boundary.ports import PromptSnapshotPort, WorkflowExecutionContext
@@ -112,6 +114,8 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
 
     def prepare(self, node_run_id: UUID, request_id: str) -> PreparedNodeExecution:
         execution = self._workflow.require_context(node_run_id, for_update=True)
+        if execution.status == NodeStatus.CANCEL_REQUESTED.value:
+            return prepare_cancel_requested_execution(execution, request_id, self._actor.user_id)
         committed_version_id = self._workflow.committed_artifact(node_run_id)
         if committed_version_id is not None:
             self._workflow.require_execution_request(node_run_id, request_id)
@@ -380,17 +384,12 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
         code: str,
         cancelled: bool,
     ) -> None:
-        owner_token = execution.execution_owner_token
-        if owner_token is not None:
-            if not self._workflow.owns_execution_owner(execution.node_run_id, owner_token):
-                return
-            self._workflow.release_execution_owner(execution.node_run_id, owner_token)
-        if cancelled or code == "NODE_EXECUTION_RECOVERY_EXPIRED":
-            self._recovery.discard(execution.node_run_id)
-        self._workflow.terminalize(
-            execution.node_run_id,
+        terminalize_execution_failure(
+            execution=execution,
             code=code,
             cancelled=cancelled,
+            workflow=self._workflow,
+            recovery=self._recovery,
         )
 
 

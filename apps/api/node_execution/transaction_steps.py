@@ -23,6 +23,7 @@ from .contracts import (
     PreparedNodeExecution,
 )
 from .materials import audit_context, placeholder_request
+from .recovery import SqlAlchemyRecoveryFactStore
 
 
 def claim_execution_owner(
@@ -38,6 +39,30 @@ def claim_execution_owner(
             str(exc),
         ) from exc
     return owner_token
+
+
+def terminalize_execution_failure(
+    *,
+    execution: PreparedNodeExecution,
+    code: str,
+    cancelled: bool,
+    workflow: SqlAlchemyWorkflowExecutionPort,
+    recovery: SqlAlchemyRecoveryFactStore,
+) -> None:
+    owner_token = execution.execution_owner_token
+    if owner_token is not None:
+        if not workflow.owns_execution_owner(execution.node_run_id, owner_token):
+            return
+        workflow.release_execution_owner(execution.node_run_id, owner_token)
+    elif cancelled:
+        workflow.clear_execution_owner(execution.node_run_id)
+    if cancelled or code == "NODE_EXECUTION_RECOVERY_EXPIRED":
+        recovery.discard(execution.node_run_id)
+    workflow.terminalize(
+        execution.node_run_id,
+        code=code,
+        cancelled=cancelled,
+    )
 
 
 def prepare_committed_execution(
@@ -69,6 +94,21 @@ def prepare_committed_execution(
             attempt_id=evidence.attempt_id,
             usage_id=evidence.usage_id,
         ),
+    )
+
+
+def prepare_cancel_requested_execution(
+    execution: WorkflowExecutionContext,
+    request_id: str,
+    user_id: UUID | None,
+) -> PreparedNodeExecution:
+    return PreparedNodeExecution(
+        node_run_id=execution.node_run_id,
+        request=placeholder_request(request_id),
+        audit_context=audit_context(execution, user_id),
+        output_schema={},
+        pre_model_error_code="NODE_EXECUTION_CANCEL_REQUESTED",
+        pre_model_error_message="the node run was cancelled before execution",
     )
 
 

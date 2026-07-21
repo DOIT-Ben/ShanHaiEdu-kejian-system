@@ -45,7 +45,11 @@ class NodeExecutionService:
             return self._validate_and_commit(prepared, None)
         if prepared.pre_model_error_code is not None:
             message = prepared.pre_model_error_message or "node execution cannot invoke the model"
-            self._terminalize(prepared, prepared.pre_model_error_code, cancelled=False)
+            self._terminalize(
+                prepared,
+                prepared.pre_model_error_code,
+                cancelled=prepared.pre_model_error_code == "NODE_EXECUTION_CANCEL_REQUESTED",
+            )
             raise NodeExecutionError(prepared.pre_model_error_code, message)
         try:
             pending = await self._model.generate_text_pending(
