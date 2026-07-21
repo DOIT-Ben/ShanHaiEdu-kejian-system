@@ -129,6 +129,7 @@ export function ProjectStepNavigation({
                 data-current={externallyActive ? "true" : undefined}
                 key={item.key}
                 onClick={onNavigate}
+                preventScrollReset
                 ref={externallyActive || currentPath === stepPath ? activeStepRef : undefined}
                 title={collapsed ? item.label : undefined}
                 to={stepPath}
