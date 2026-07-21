@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowUp, ImagePlus, LoaderCircle, PencilLine, Settings2, X } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CreationParameterBar } from "@/features/creation-studio/CreationParameterBar";
 import type {
   CreationSettings,
@@ -17,6 +17,18 @@ function generationLabel(type: StudioType, stage: CreationStage, primaryLabel: s
   if (stage === "draft") return primaryLabel;
   if (stage === "running") return "正在创作";
   return type === "image" ? "按新要求再画一组" : "按新要求再做一组";
+}
+
+function resizePromptToContent(prompt: HTMLTextAreaElement | null) {
+  if (!prompt) return;
+  const compact = window.innerWidth < 640;
+  const minimumHeight = compact ? 64 : 56;
+  const viewportLimit = Math.floor(window.innerHeight * (compact ? 0.3 : 0.34));
+  const maximumHeight = Math.max(minimumHeight, Math.min(compact ? 240 : 320, viewportLimit));
+  prompt.style.height = "0px";
+  const contentHeight = Math.max(prompt.scrollHeight, minimumHeight);
+  prompt.style.height = `${String(Math.min(contentHeight, maximumHeight))}px`;
+  prompt.style.overflowY = contentHeight > maximumHeight ? "auto" : "hidden";
 }
 
 export function CreationComposer({
@@ -53,6 +65,7 @@ export function CreationComposer({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const reduceMotion = useReducedMotion();
   const referenceInputRef = useRef<HTMLInputElement>(null);
+  const promptInputRef = useRef<HTMLTextAreaElement>(null);
   const settingsPanelRef = useRef<HTMLDivElement>(null);
   const settingsTriggerRef = useRef<HTMLButtonElement>(null);
   const running = stage === "running";
@@ -97,6 +110,16 @@ export function CreationComposer({
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [advancedOpen, onAdvancedOpenChange, settingsOpen]);
+
+  useLayoutEffect(() => {
+    resizePromptToContent(promptInputRef.current);
+  }, [description]);
+
+  useEffect(() => {
+    const resizePrompt = () => resizePromptToContent(promptInputRef.current);
+    window.addEventListener("resize", resizePrompt);
+    return () => window.removeEventListener("resize", resizePrompt);
+  }, []);
 
   const toggleSettings = () => {
     onAdvancedOpenChange(false);
@@ -177,7 +200,7 @@ export function CreationComposer({
       </AnimatePresence>
 
       <div
-        className="relative mx-auto max-w-[1040px] rounded-[var(--sh-radius-md)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)]/96 p-2.5 shadow-[var(--sh-shadow-modal)] backdrop-blur-xl transition-[border-color,box-shadow] focus-within:border-[var(--sh-brand-300)] focus-within:shadow-[var(--sh-shadow-focus)]"
+        className="relative mx-auto w-full max-w-[1200px] rounded-[var(--sh-radius-md)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)]/96 p-2.5 shadow-[var(--sh-shadow-modal)] backdrop-blur-xl transition-[border-color,box-shadow] focus-within:border-[var(--sh-brand-300)] focus-within:shadow-[var(--sh-shadow-focus)]"
         data-testid="creation-composer-panel"
       >
         <label className="block min-w-0">
@@ -185,7 +208,7 @@ export function CreationComposer({
           <textarea
             aria-keyshortcuts="Enter"
             aria-label={inputLabel}
-            className="sh-creation-prompt min-h-20 max-h-32 w-full resize-none bg-transparent px-2 py-1.5 text-sm leading-6 text-[var(--sh-ink-default)] outline-none placeholder:text-[var(--sh-ink-faint)] disabled:cursor-wait disabled:opacity-65 sm:min-h-14 sm:max-h-24"
+            className="sh-creation-prompt min-h-16 w-full resize-none overflow-y-hidden bg-transparent px-2 py-1.5 text-sm leading-6 text-[var(--sh-ink-default)] outline-none placeholder:text-[var(--sh-ink-faint)] disabled:cursor-wait disabled:opacity-65 sm:min-h-14"
             disabled={running}
             onChange={(event) => onDescriptionChange(event.target.value)}
             onKeyDown={(event) => {
@@ -196,6 +219,8 @@ export function CreationComposer({
               if (canGenerate) generate();
             }}
             placeholder="描述画面、动作、风格或希望调整的地方……"
+            ref={promptInputRef}
+            rows={1}
             value={description}
           />
         </label>

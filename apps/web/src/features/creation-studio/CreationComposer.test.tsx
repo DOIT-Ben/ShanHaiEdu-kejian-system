@@ -107,4 +107,21 @@ describe("CreationComposer", () => {
 
     expect(onGenerate).not.toHaveBeenCalled();
   });
+
+  it("提示词随内容增长并在达到视口上限后内部滚动", async () => {
+    render(<ComposerHarness onGenerate={() => undefined} />);
+
+    const prompt = screen.getByRole("textbox", { name: "画面内容" });
+    Object.defineProperty(prompt, "scrollHeight", { configurable: true, value: 180 });
+    fireEvent.change(prompt, { target: { value: "第一段\n第二段\n第三段\n第四段" } });
+    await waitFor(() => expect(prompt.style.height).toBe("180px"));
+    expect(prompt.style.overflowY).toBe("hidden");
+
+    Object.defineProperty(prompt, "scrollHeight", { configurable: true, value: 640 });
+    fireEvent.change(prompt, {
+      target: { value: "第一段\n第二段\n第三段\n第四段\n更多课堂要求" },
+    });
+    await waitFor(() => expect(Number.parseFloat(prompt.style.height)).toBeLessThanOrEqual(320));
+    expect(prompt.style.overflowY).toBe("auto");
+  });
 });

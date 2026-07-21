@@ -48,9 +48,8 @@ textarea::placeholder {
 }
 
 .sh-creation-prompt:focus-visible {
-  outline: 2px solid var(--sh-focus-ring-color);
-  outline-offset: 2px;
-  box-shadow: var(--sh-shadow-focus);
+  outline: none;
+  box-shadow: none;
 }
 
 select,
@@ -139,7 +138,6 @@ input {
 
   .sh-creation-studio .sh-creation-prompt {
     min-height: 44px;
-    max-height: 44px;
     padding-bottom: 6px;
     padding-top: 6px;
   }

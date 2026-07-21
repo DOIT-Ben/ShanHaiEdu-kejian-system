@@ -255,6 +255,35 @@ test("1440×900 使用上方展示区和底部悬浮输入台", async ({ page })
   await expectNoA11yViolations(page);
 });
 
+test("长提示词自动扩展输入台并保留主画布空间", async ({ page }) => {
+  await page.setViewportSize({ height: 900, width: 1440 });
+  await openReadyImageStudio(page);
+
+  const prompt = page.getByRole("textbox", { name: "创作要求" });
+  const composer = page.getByTestId("creation-composer-panel");
+  const shortPromptBox = await prompt.boundingBox();
+  await prompt.fill(
+    Array.from(
+      { length: 18 },
+      (_, index) => `第 ${String(index + 1)} 项课堂画面要求：保留主体层次并明确学生观察重点。`,
+    ).join("\n"),
+  );
+  const longPromptBox = await prompt.boundingBox();
+  const composerBox = await composer.boundingBox();
+  const promptMetrics = await prompt.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    overflowY: getComputedStyle(element).overflowY,
+    scrollHeight: element.scrollHeight,
+  }));
+
+  expect(longPromptBox?.height ?? 0).toBeGreaterThan(shortPromptBox?.height ?? 0);
+  expect(longPromptBox?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(320);
+  expect(promptMetrics.scrollHeight).toBeGreaterThan(promptMetrics.clientHeight);
+  expect(promptMetrics.overflowY).toBe("auto");
+  expect((composerBox?.y ?? 900) + (composerBox?.height ?? 0)).toBeLessThanOrEqual(900);
+  await expect(page.getByRole("button", { name: "按新要求再画一组" })).toBeInViewport();
+});
+
 test("1280×800 首屏可查看结果并直接在底部调整", async ({ page }) => {
   await page.setViewportSize({ height: 800, width: 1280 });
   await openReadyImageStudio(page);
