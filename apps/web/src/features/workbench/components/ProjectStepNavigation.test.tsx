@@ -1,53 +1,49 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProjectStepNavigation } from "@/features/workbench/components/ProjectStepNavigation";
 import { resetMockRuntime } from "@/shared/api/mocks/runtime";
 import { demoLessonId, demoProjectId } from "@/shared/data/mockData";
 
-const scrollIntoView = vi.fn();
-const originalScrollIntoView = Object.getOwnPropertyDescriptor(
-  HTMLElement.prototype,
-  "scrollIntoView",
-);
-
 describe("ProjectStepNavigation active step visibility", () => {
-  beforeAll(() => {
-    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
-      configurable: true,
-      value: scrollIntoView,
-    });
-  });
-
   beforeEach(() => {
+    vi.restoreAllMocks();
     resetMockRuntime();
-    scrollIntoView.mockClear();
   });
 
-  afterAll(() => {
-    if (originalScrollIntoView) {
-      Object.defineProperty(HTMLElement.prototype, "scrollIntoView", originalScrollIntoView);
-    } else {
-      Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
-    }
-  });
-
-  it("打开后把当前制作步骤滚入流程视口", async () => {
+  it("切换步骤时只滚动流程栏，不带动整个页面", async () => {
     const base = `/app/projects/${demoProjectId}/lessons/${demoLessonId}/work`;
-    render(
-      <MemoryRouter initialEntries={[`${base}/final-video`]}>
-        <Routes>
-          <Route
-            element={<ProjectStepNavigation base={base} />}
-            path="/app/projects/:projectId/lessons/:lessonId/work/:stepKey"
-          />
-        </Routes>
-      </MemoryRouter>,
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      if (this.hasAttribute("data-step-scroll-container")) {
+        return DOMRect.fromRect({ height: 300, width: 240, x: 0, y: 0 });
+      }
+      if (this.textContent.includes("生成课堂导入视频")) {
+        return DOMRect.fromRect({ height: 44, width: 220, x: 0, y: 316 });
+      }
+      return DOMRect.fromRect({ height: 44, width: 220, x: 0, y: 0 });
+    });
+    const windowScroll = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    const { container } = render(
+      <div data-step-scroll-container>
+        <MemoryRouter initialEntries={[`${base}/lesson-plan`]}>
+          <Routes>
+            <Route
+              element={<ProjectStepNavigation base={base} />}
+              path="/app/projects/:projectId/lessons/:lessonId/work/:stepKey"
+            />
+          </Routes>
+        </MemoryRouter>
+      </div>,
     );
 
-    expect(screen.getByRole("link", { name: /生成课堂导入视频.*当前/ })).toBeInTheDocument();
-    await waitFor(() =>
-      expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", inline: "nearest" }),
-    );
+    const scrollContainer = container.querySelector<HTMLElement>("[data-step-scroll-container]");
+    if (!scrollContainer) throw new Error("未找到流程滚动容器");
+    scrollContainer.scrollTop = 20;
+    await userEvent.click(screen.getByRole("link", { name: /生成课堂导入视频/ }));
+    await waitFor(() => expect(scrollContainer.scrollTop).toBe(80));
+    expect(windowScroll).not.toHaveBeenCalled();
   });
 });

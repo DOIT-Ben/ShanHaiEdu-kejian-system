@@ -11,7 +11,7 @@ import {
   Play,
   X,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useParams } from "react-router-dom";
 import { ContextDrawer } from "@/features/workbench/components/ContextDrawer";
 import { ProjectStepNavigation } from "@/features/workbench/components/ProjectStepNavigation";
@@ -36,6 +36,7 @@ export function ProjectWorkbenchLayout() {
   const { sidebarCollapsed, toggleSidebar } = useWorkbenchUi();
   const [mobileOpen, setMobileOpen] = useState(false);
   const mobileFlowTriggerRef = useRef<HTMLButtonElement>(null);
+  const workbenchContentRef = useRef<HTMLElement>(null);
   const runtime = useMockRuntime();
   const project = runtime.projects.find((item) => item.id === projectId);
   const lesson = getApprovedProjectLessons(runtime, projectId).find((item) => item.id === lessonId);
@@ -46,6 +47,23 @@ export function ProjectWorkbenchLayout() {
   const automationMode = project?.automation_mode ?? "assisted";
   const base = `/app/projects/${projectId}/lessons/${lessonId}/work`;
   useProjectEvents(projectId);
+
+  useEffect(() => {
+    const content = workbenchContentRef.current;
+    if (!content) return;
+    const frame = window.requestAnimationFrame(() => {
+      const topbar = Number.parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue("--sh-topbar-height"),
+      );
+      const contentTop = content.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        top: Math.max(0, contentTop - (Number.isFinite(topbar) ? topbar : 56) - 52),
+      });
+      content.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [stepKey]);
 
   return (
     <div
@@ -145,6 +163,7 @@ export function ProjectWorkbenchLayout() {
             "hidden shrink-0 border-r border-[var(--sh-line-default)] bg-[var(--sh-brand-50)] transition-[width] duration-[var(--sh-duration-normal)] md:sticky md:top-[calc(var(--sh-topbar-height)+52px)] md:block md:max-h-[calc(100dvh-var(--sh-topbar-height)-52px)] md:overflow-y-auto",
             sidebarCollapsed ? "w-16" : "w-[var(--sh-project-sidebar-width)]",
           )}
+          data-step-scroll-container
         >
           <div className="flex h-12 items-center justify-end px-3">
             <IconButton label={sidebarCollapsed ? "展开流程" : "收起流程"} onClick={toggleSidebar}>
@@ -158,7 +177,12 @@ export function ProjectWorkbenchLayout() {
           <ProjectStepNavigation base={base} collapsed={sidebarCollapsed} />
         </aside>
 
-        <section className="min-w-0 flex-1" data-testid="workbench-content">
+        <section
+          className="min-w-0 flex-1 outline-none"
+          data-testid="workbench-content"
+          ref={workbenchContentRef}
+          tabIndex={-1}
+        >
           <Outlet />
         </section>
       </div>
@@ -169,6 +193,7 @@ export function ProjectWorkbenchLayout() {
           <Dialog.Overlay className="fixed inset-0 z-50 bg-[var(--sh-overlay-scrim)]" />
           <Dialog.Content
             className="fixed inset-y-0 left-0 z-50 w-[min(86vw,320px)] overflow-y-auto bg-[var(--sh-surface-elevated)] p-3 shadow-[var(--sh-shadow-modal)] md:hidden"
+            data-step-scroll-container
             onCloseAutoFocus={(event) => {
               event.preventDefault();
               mobileFlowTriggerRef.current?.focus();

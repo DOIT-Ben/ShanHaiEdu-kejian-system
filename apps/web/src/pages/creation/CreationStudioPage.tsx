@@ -16,13 +16,22 @@ import {
   type StudioType,
 } from "@/features/creation-studio/model";
 import { PromptReviewDialog } from "@/features/creation-studio/PromptReviewDialog";
+import { ProjectCreationPackageBar } from "@/features/creation-studio/ProjectCreationPackageBar";
+import { createProjectVideoAssetPackage } from "@/features/creation-studio/projectCreationPackage";
 import { studioRegistry } from "@/features/creation-studio/registry";
 import {
   SaveToProjectDialog,
   type SaveResultDescriptor,
 } from "@/features/save-to-project/SaveToProjectDialog";
-import { saveMockDraft, useMockRuntime } from "@/shared/api/mocks/runtime";
-import { saveMockResult } from "@/shared/api/mocks/savedResults";
+import {
+  getMockRuntimeState,
+  saveMockDraft,
+  updateMockNodeState,
+  useMockRuntime,
+} from "@/shared/api/mocks/runtime";
+import { listMockSavedResults, saveMockResult } from "@/shared/api/mocks/savedResults";
+import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
+import { markVideoAssetsDependentsStale } from "@/features/workbench/lib/invalidateDependents";
 
 const creationStages: CreationStage[] = ["draft", "running", "ready", "adopted", "saved"];
 
@@ -52,10 +61,25 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
   const config = studioRegistry[type];
   const runtime = useMockRuntime();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const stateKey = `creation:${type}:state`;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedProjectId = searchParams.get("projectId") ?? undefined;
+  const requestedLessonId = searchParams.get("lessonId") ?? undefined;
+  const packageMode = type === "image" && searchParams.get("package") === "video-assets";
+  const packageItems = useMemo(
+    () =>
+      packageMode && requestedProjectId && requestedLessonId
+        ? createProjectVideoAssetPackage(runtime, requestedProjectId, requestedLessonId)
+        : [],
+    [packageMode, requestedLessonId, requestedProjectId, runtime],
+  );
+  const requestedAssetId = searchParams.get("assetId") ?? packageItems[0]?.id;
+  const packageItem = packageItems.find((item) => item.id === requestedAssetId);
+  const stateKey =
+    packageItem && requestedProjectId && requestedLessonId
+      ? `creation:${type}:project:${requestedProjectId}:lesson:${requestedLessonId}:package:video-assets:item:${packageItem.id}`
+      : `creation:${type}:state`;
   const stored = runtime.drafts[stateKey]?.value as Partial<SavedCreation> | undefined;
-  const fallbackDescription = getCreationDescription(type);
+  const fallbackDescription = packageItem?.prompt ?? getCreationDescription(type);
   const stage = creationStages.includes(stored?.stage as CreationStage)
     ? (stored?.stage as CreationStage)
     : "draft";
@@ -69,18 +93,22 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
   const description =
     typeof stored?.description === "string" ? stored.description : fallbackDescription;
   const savedTarget = typeof stored?.savedTarget === "string" ? stored.savedTarget : undefined;
-  const projectId = searchParams.get("projectId") ?? stored?.projectId;
+  const projectId = requestedProjectId ?? stored?.projectId;
   const project = runtime.projects.find((item) => item.id === projectId);
+  const lesson =
+    projectId && requestedLessonId
+      ? getApprovedProjectLessons(runtime, projectId).find((item) => item.id === requestedLessonId)
+      : undefined;
   const settings = useMemo<CreationSettings>(
     () => ({
       candidateCount,
       duration: stored?.settings?.duration ?? "10",
       model: stored?.settings?.model ?? "balanced",
-      ratio: stored?.settings?.ratio ?? (type === "image" ? "auto" : "16:9"),
+      ratio: stored?.settings?.ratio ?? packageItem?.ratio ?? (type === "image" ? "auto" : "16:9"),
       referenceName: stored?.settings?.referenceName ?? "",
-      style: stored?.settings?.style ?? "paper",
+      style: stored?.settings?.style ?? packageItem?.style ?? "paper",
     }),
-    [candidateCount, stored?.settings, type],
+    [candidateCount, packageItem, stored?.settings, type],
   );
   const advancedSettings = useMemo<CreationAdvancedSettings>(
     () => ({
@@ -102,6 +130,19 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
   const mainRef = useRef<HTMLElement>(null);
   const descriptionLabel =
     type === "video" ? "画面怎样变化" : type === "presentation" ? "课件主题与课堂用途" : "画面内容";
+  const savedSlotKeys = useMemo(
+    () =>
+      new Set(
+        projectId ? listMockSavedResults(runtime, projectId).map((item) => item.slotKey) : [],
+      ),
+    [projectId, runtime],
+  );
+
+  useEffect(() => {
+    if (!packageItem) return;
+    mainRef.current?.scrollTo({ top: 0 });
+    mainRef.current?.focus({ preventScroll: true });
+  }, [packageItem]);
 
   const updateCreation = (patch: Partial<SavedCreation>) => {
     saveMockDraft(stateKey, {
@@ -164,9 +205,11 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
   };
 
   const result: SaveResultDescriptor = {
-    id: buildCreationResultId(type, generation, candidate),
+    id: `${buildCreationResultId(type, generation, candidate)}${packageItem ? `-${packageItem.id}` : ""}`,
     preview: { candidate, generation, ratio: settings.ratio },
-    title: `${config.title} · 作品 ${String(candidate + 1)}`,
+    title: packageItem
+      ? `${packageItem.title} · 作品 ${String(candidate + 1)}`
+      : `${config.title} · 作品 ${String(candidate + 1)}`,
     type: type === "presentation" ? "ppt_page" : type,
   };
   const sharedSlot =
@@ -177,13 +220,13 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
         : { key: "project.shared-presentations", label: "项目通用课件" };
   const saveToKnownProject = (targetProjectId: string) => {
     const savedResult = saveMockResult({
-      lessonLabel: "独立创作",
+      lessonLabel: lesson?.title ?? "独立创作",
       projectId: targetProjectId,
       ...(result.preview ? { preview: result.preview } : {}),
-      replaceMode: "append",
+      replaceMode: packageItem ? "replace" : "append",
       resultId: result.id,
-      slotKey: `${sharedSlot.key}:${result.id}`,
-      slotLabel: sharedSlot.label,
+      slotKey: packageItem?.slotKey ?? `${sharedSlot.key}:${result.id}`,
+      slotLabel: packageItem?.slotLabel ?? sharedSlot.label,
       title: result.title,
       type: result.type,
     });
@@ -193,10 +236,44 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
       savedTarget: `${projectTitle ?? "目标项目"} · ${savedResult.slotLabel}`,
       stage: "saved",
     });
+    if (packageItem && requestedLessonId) {
+      const latestRuntime = getMockRuntimeState();
+      const packageResultIds = Object.fromEntries(
+        listMockSavedResults(latestRuntime, targetProjectId)
+          .filter((item) =>
+            packageItems.some((packageAsset) => packageAsset.slotKey === item.slotKey),
+          )
+          .map((item) => [
+            packageItems.find((packageAsset) => packageAsset.slotKey === item.slotKey)?.id ??
+              item.slotKey,
+            item.resultId,
+          ]),
+      );
+      const allAssetsApproved = packageItems.every((item) => item.id in packageResultIds);
+      const approvedKey = `project:${targetProjectId}:lesson:${requestedLessonId}:video-assets:approved`;
+      const previous = latestRuntime.drafts[approvedKey]?.value as
+        { resultIds?: Record<string, string> } | undefined;
+      if (allAssetsApproved) {
+        if (JSON.stringify(previous?.resultIds ?? {}) !== JSON.stringify(packageResultIds)) {
+          markVideoAssetsDependentsStale(latestRuntime, targetProjectId, requestedLessonId);
+        }
+        saveMockDraft(
+          approvedKey,
+          { resultIds: packageResultIds },
+          { lessonId: requestedLessonId, nodeKey: "video-assets", projectId: targetProjectId },
+        );
+      }
+      updateMockNodeState(targetProjectId, requestedLessonId, "video-assets", {
+        stale_reason: null,
+        status: allAssetsApproved ? "approved" : "review_required",
+        title: "制作镜头图片",
+      });
+    }
   };
   const advance = () => {
     if (stage === "ready") {
-      updateCreation({ stage: "adopted" });
+      if (packageItem && projectId) saveToKnownProject(projectId);
+      else updateCreation({ stage: "adopted" });
     } else if (stage === "adopted") {
       if (projectId) saveToKnownProject(projectId);
       else setSaveOpen(true);
@@ -218,9 +295,13 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
     >
       <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)]/88 px-4 backdrop-blur-sm md:px-6">
         <Link
-          aria-label="返回创作中心"
+          aria-label={packageItem ? "返回项目工作台" : "返回创作中心"}
           className="grid size-9 place-items-center rounded-[var(--sh-radius-sm)] text-[var(--sh-ink-muted)] hover:bg-[var(--sh-surface-soft)]"
-          to="/app/creation"
+          to={
+            packageItem && projectId && requestedLessonId
+              ? `/app/projects/${projectId}/lessons/${requestedLessonId}/work/video-assets`
+              : "/app/creation"
+          }
         >
           <ChevronLeft aria-hidden="true" className="size-5" />
         </Link>
@@ -240,41 +321,56 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
 
       <section
         aria-label="创作工作区"
-        className="min-h-0 flex-1 overflow-y-auto px-4 py-2.5 md:px-6"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-2.5 md:px-6"
         ref={mainRef}
+        tabIndex={-1}
       >
-        {stage === "draft" ? (
-          <CreationSetupPanel settings={settings} type={type} />
-        ) : (
-          <CreationResultsPanel
-            candidate={candidate}
-            candidateCount={Math.max(1, Number.parseInt(settings.candidateCount, 10) || 3)}
-            generation={generation}
-            hasUnappliedChanges={hasUnappliedChanges}
-            onAdvance={advance}
-            onCandidateChange={changeCandidate}
-            onDownload={() => {
-              void downloadCreationResult({
-                candidate,
-                ratio: settings.ratio,
-                title: config.title,
-                type,
-              });
+        {packageItem ? (
+          <ProjectCreationPackageBar
+            activeId={packageItem.id}
+            items={packageItems}
+            onSelect={(assetId) => {
+              const next = new URLSearchParams(searchParams);
+              next.set("assetId", assetId);
+              setSearchParams(next, { replace: true });
             }}
-            onViewProjectAssets={
-              projectId
-                ? () => {
-                    void navigate(`/app/projects/${projectId}/results`);
-                  }
-                : undefined
-            }
-            ratio={settings.ratio}
-            saveTriggerRef={saveTriggerRef}
-            savedTarget={savedTarget}
-            stage={stage}
-            type={type}
+            savedSlotKeys={savedSlotKeys}
           />
-        )}
+        ) : null}
+        <div className="min-h-0 flex-1">
+          {stage === "draft" ? (
+            <CreationSetupPanel settings={settings} type={type} />
+          ) : (
+            <CreationResultsPanel
+              candidate={candidate}
+              candidateCount={Math.max(1, Number.parseInt(settings.candidateCount, 10) || 3)}
+              generation={generation}
+              hasUnappliedChanges={hasUnappliedChanges}
+              onAdvance={advance}
+              onCandidateChange={changeCandidate}
+              onDownload={() => {
+                void downloadCreationResult({
+                  candidate,
+                  ratio: settings.ratio,
+                  title: config.title,
+                  type,
+                });
+              }}
+              onViewProjectAssets={
+                projectId
+                  ? () => {
+                      void navigate(`/app/projects/${projectId}/results`);
+                    }
+                  : undefined
+              }
+              ratio={settings.ratio}
+              saveTriggerRef={saveTriggerRef}
+              savedTarget={savedTarget}
+              stage={stage}
+              type={type}
+            />
+          )}
+        </div>
       </section>
 
       <CreationComposer

@@ -90,7 +90,7 @@ export function CreationHomePage() {
           <section className="mt-5 grid gap-4 lg:grid-cols-[1fr_0.72fr]">
             <Link
               className="group flex items-center gap-4 rounded-[var(--sh-radius-lg)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-4 shadow-[var(--sh-shadow-card)] transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[var(--sh-shadow-hover)]"
-              to={`/app/projects/${demoProjectId}/lessons/${demoLessonId}/creation-batches/video-assets-${demoProjectId}--lesson--${demoLessonId}`}
+              to={`/app/creation/images?projectId=${encodeURIComponent(demoProjectId)}&lessonId=${encodeURIComponent(demoLessonId)}&package=video-assets&assetId=character`}
             >
               <span className="grid size-12 shrink-0 place-items-center rounded-[var(--sh-radius-md)] bg-[var(--sh-success-soft)] text-[var(--sh-success)]">
                 <PackageOpen aria-hidden="true" className="size-5" />

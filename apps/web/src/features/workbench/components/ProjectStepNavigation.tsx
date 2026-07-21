@@ -36,7 +36,16 @@ export function ProjectStepNavigation({
   const currentPath = location.pathname.replace(/\/$/, "");
 
   useEffect(() => {
-    activeStepRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const activeStep = activeStepRef.current;
+    const scrollContainer = activeStep?.closest<HTMLElement>("[data-step-scroll-container]");
+    if (!activeStep || !scrollContainer) return;
+    const itemRect = activeStep.getBoundingClientRect();
+    const containerRect = scrollContainer.getBoundingClientRect();
+    if (itemRect.top < containerRect.top) {
+      scrollContainer.scrollTop -= containerRect.top - itemRect.top;
+    } else if (itemRect.bottom > containerRect.bottom) {
+      scrollContainer.scrollTop += itemRect.bottom - containerRect.bottom;
+    }
   }, [currentPath]);
 
   return (
