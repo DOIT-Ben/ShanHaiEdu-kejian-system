@@ -41,6 +41,7 @@ export function ProjectStepNavigation({
   const location = useLocation();
   const navigationRef = useRef<HTMLElement>(null);
   const activeStepRef = useRef<HTMLAnchorElement>(null);
+  const preservedScrollTopRef = useRef<number | null>(null);
   const [indicatorPosition, setIndicatorPosition] = useState<{
     height: number;
     top: number;
@@ -51,6 +52,11 @@ export function ProjectStepNavigation({
   useLayoutEffect(() => {
     const activeStep = activeStepRef.current;
     const navigation = navigationRef.current;
+    const scrollContainer = navigation?.closest<HTMLElement>("[data-step-scroll-container]");
+    if (scrollContainer && preservedScrollTopRef.current !== null) {
+      scrollContainer.scrollTop = preservedScrollTopRef.current;
+      preservedScrollTopRef.current = null;
+    }
     if (!activeStep || !navigation) return;
     const activeRect = activeStep.getBoundingClientRect();
     const navigationRect = navigation.getBoundingClientRect();
@@ -59,6 +65,14 @@ export function ProjectStepNavigation({
       top: activeRect.top - navigationRect.top,
     });
   }, [activeStepKey, collapsed, currentPath]);
+
+  const handleNavigate = () => {
+    const scrollContainer = navigationRef.current?.closest<HTMLElement>(
+      "[data-step-scroll-container]",
+    );
+    if (scrollContainer) preservedScrollTopRef.current = scrollContainer.scrollTop;
+    onNavigate?.();
+  };
 
   useEffect(() => {
     const activeStep = activeStepRef.current;
@@ -128,7 +142,7 @@ export function ProjectStepNavigation({
                 }}
                 data-current={externallyActive ? "true" : undefined}
                 key={item.key}
-                onClick={onNavigate}
+                onClick={handleNavigate}
                 preventScrollReset
                 ref={externallyActive || currentPath === stepPath ? activeStepRef : undefined}
                 title={collapsed ? item.label : undefined}

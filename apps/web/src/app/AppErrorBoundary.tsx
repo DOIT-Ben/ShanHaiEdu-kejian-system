@@ -1,6 +1,5 @@
 import { Component, type PropsWithChildren } from "react";
 import { RefreshCcw } from "lucide-react";
-import { useLocation } from "react-router-dom";
 import { Button } from "@/shared/ui/Button";
 
 type AppErrorBoundaryState = { failed: boolean };
@@ -48,6 +47,5 @@ export class AppErrorBoundary extends Component<PropsWithChildren, AppErrorBound
 }
 
 export function RouteErrorBoundary({ children }: PropsWithChildren) {
-  const location = useLocation();
-  return <AppErrorBoundary key={location.key}>{children}</AppErrorBoundary>;
+  return <AppErrorBoundary>{children}</AppErrorBoundary>;
 }

@@ -60,6 +60,7 @@ describe("ProjectStepNavigation active step visibility", () => {
     const indicatorAfter = screen.getByTestId("project-step-active-indicator");
     expect(indicatorAfter).toBe(indicatorBefore);
     expect(indicatorAfter.style.transform).not.toBe(transformBefore);
+    expect(scrollContainer.scrollTop).toBe(20);
     expect(windowScroll).not.toHaveBeenCalled();
   });
 
