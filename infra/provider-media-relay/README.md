@@ -27,7 +27,7 @@ This service exposes one short-lived, signed PNG/JPEG/WebP GET path to an extern
 
    If `shanhai-relay` already exists, verify it is a locked system account with no interactive shell instead of recreating it. The relay runs root-owned installed code as `shanhai-relay` with the `shanhai-dev` group so it can read opaque `0640` relay files without sharing a UID or writable executable code with the producer.
 
-2. Edit `/etc/shanhaiedu/provider-media-relay.env` only on the server. Replace the placeholder with a unique random 64-hex-character secret. Keep `SHANHAI_PROVIDER_MEDIA_ROOT` on the dedicated runtime directory and use a TTL no greater than 300 seconds. When migrating from a relay that ran under the producer UID, rotate the signing secret before restart because the previous process environment must be treated as exposed to that UID. Keep `/etc/shanhaiedu/provider-media-cleanup.env` limited to the non-sensitive root and TTL values.
+2. Edit `/etc/shanhaiedu/provider-media-relay.env` only on the server. Generate 32 random bytes with an approved cryptographic random source, encode them as exactly 64 hexadecimal characters, and write the `SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET` assignment directly to the root-only file without printing the value or placing it in shell history. The checked-in example deliberately contains no signing-secret assignment and cannot start the relay by itself. Do not use repeated characters, published examples, placeholders, or values copied from another environment. Keep `SHANHAI_PROVIDER_MEDIA_ROOT` on the dedicated runtime directory and use a TTL no greater than 300 seconds. When migrating from a relay that ran under the producer UID, rotate the signing secret before restart because the previous process environment must be treated as exposed to that UID. Keep `/etc/shanhaiedu/provider-media-cleanup.env` limited to the non-sensitive root and TTL values.
 
 3. Install the relay, independent expiry-cleanup timer, and Nginx location. Back up the exact vhost before modifying it:
 
@@ -66,6 +66,22 @@ This service exposes one short-lived, signed PNG/JPEG/WebP GET path to an extern
    ```
 
    The explicit restart is mandatory for an existing active deployment: `enable --now` alone does not replace the old process identity, code path, environment, or signing secret.
+
+6. From the canonical checkout, verify and record the non-secret deployment provenance. The deployed checkout must equal the fetched `origin/main`, and the installed relay must be byte-for-byte identical to that checkout. Record these three values with the operations evidence for #165; never include environment contents or the signing secret:
+
+   ```bash
+   cd /srv/shanhaiedu/repository
+   git fetch origin --prune
+   deployment_origin_main_sha="$(git rev-parse origin/main)"
+   test "$(git rev-parse HEAD)" = "${deployment_origin_main_sha}"
+   relay_source_sha256="$(sha256sum apps/api/provider_media_relay.py | cut -d ' ' -f 1)"
+   relay_installed_sha256="$(sha256sum /opt/shanhaiedu/provider-media-relay/provider_media_relay.py | cut -d ' ' -f 1)"
+   test "${relay_source_sha256}" = "${relay_installed_sha256}"
+   validation_time_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+   printf 'origin/main=%s\nrelay-sha256=%s\nvalidated-at=%s\n' \
+     "${deployment_origin_main_sha}" "${relay_installed_sha256}" "${validation_time_utc}"
+   unset deployment_origin_main_sha relay_source_sha256 relay_installed_sha256 validation_time_utc
+   ```
 
 ## HTTPS Smoke
 

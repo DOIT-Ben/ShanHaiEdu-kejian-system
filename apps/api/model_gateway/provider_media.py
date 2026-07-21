@@ -14,7 +14,10 @@ from uuid import UUID, uuid4
 
 from apps.api.assets.provider_media import ProviderMediaAssetReader, ProviderMediaAssetVersion
 from apps.api.model_gateway.contracts import MediaReference
-from apps.api.provider_media_relay import sign_media_path
+from apps.api.provider_media_relay import (
+    sign_media_path,
+    validate_provider_media_signing_secret,
+)
 from apps.api.uploads.storage import ObjectMetadata, ObjectStorage, ObjectStorageError
 
 _MIME_EXTENSIONS = {
@@ -43,8 +46,7 @@ class ProviderMediaResolverConfig:
         root = self.relay_root.resolve()
         if not root.is_dir():
             raise ValueError("relay_root must be an existing directory")
-        if not self.signing_secret:
-            raise ValueError("signing_secret must not be empty")
+        validate_provider_media_signing_secret(self.signing_secret)
         if not 1 <= self.ttl_seconds <= 3_600:
             raise ValueError("ttl_seconds must be between 1 and 3600")
         if self.max_file_bytes < 1:
