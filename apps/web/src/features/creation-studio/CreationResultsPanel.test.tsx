@@ -15,6 +15,7 @@ function renderResults(overrides: Partial<ComponentProps<typeof CreationResultsP
         onAdvance={vi.fn()}
         onCandidateChange={vi.fn()}
         onDownload={vi.fn()}
+        prompt="制作一张果汁标签课堂观察图"
         ratio="1:1"
         stage="ready"
         type="image"
@@ -37,6 +38,9 @@ describe("CreationResultsPanel", () => {
       "data-layout",
       "conversation",
     );
+    expect(screen.getByTestId("creation-user-message")).toHaveClass("self-end");
+    expect(screen.getByTestId("creation-assistant-message")).toHaveClass("self-start");
+    expect(screen.getByText("制作一张果汁标签课堂观察图")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "上一张作品" })).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "下一张作品" }));

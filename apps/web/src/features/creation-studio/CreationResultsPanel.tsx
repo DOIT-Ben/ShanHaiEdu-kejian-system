@@ -35,7 +35,15 @@ type CreationResultsPanelProps = {
   onCandidateChange: (candidate: number) => void;
   onDownload: () => void;
   onViewProjectAssets?: () => void;
+  prompt: string;
   saveTriggerRef?: Ref<HTMLButtonElement>;
+  history?: CreationHistoryTurn[];
+};
+export type CreationHistoryTurn = {
+  candidate: number;
+  generation: number;
+  prompt: string;
+  ratio: string;
 };
 type PreviewContext = Pick<
   CreationResultsPanelProps,
@@ -166,11 +174,13 @@ export function CreationResultsPanel({
   onCandidateChange,
   onDownload,
   onViewProjectAssets,
+  prompt,
   ratio,
   saveTriggerRef,
   savedTarget,
   stage,
   type,
+  history = [],
 }: CreationResultsPanelProps) {
   const [compareOpen, setCompareOpen] = useState(false);
   const [enlargedOpen, setEnlargedOpen] = useState(false);
@@ -249,163 +259,194 @@ export function CreationResultsPanel({
     <section
       aria-busy={running}
       aria-label="创作结果"
-      className={`mx-auto flex w-full ${workspaceWidth} flex-col justify-start`}
+      className={`mx-auto flex w-full ${workspaceWidth} flex-col justify-start gap-5`}
       data-layout="conversation"
       data-generation={generation}
       data-testid="creation-output-region"
     >
+      {history.map((turn) => (
+        <div
+          className="flex w-full flex-col gap-3"
+          key={`${String(turn.generation)}-${turn.prompt}`}
+        >
+          <div className="max-w-[min(78%,640px)] self-end rounded-[var(--sh-radius-md)] bg-[var(--sh-brand-50)] px-4 py-2.5 text-sm leading-6 text-[var(--sh-ink-strong)]">
+            {turn.prompt}
+          </div>
+          <div className="flex max-w-[760px] self-start gap-2.5">
+            <span className="mt-1 size-7 shrink-0 rounded-full border border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)] shadow-[var(--sh-shadow-card)]" />
+            <div className={type === "image" ? "w-[min(100%,360px)]" : "w-[min(100%,620px)]"}>
+              <CreativeResultVisual
+                ratio={turn.ratio}
+                type={type}
+                variant={(turn.candidate + turn.generation) % 3}
+              />
+            </div>
+          </div>
+        </div>
+      ))}
       <div
-        className={
-          fullscreen
-            ? "flex h-screen w-screen flex-col justify-center overflow-auto bg-[var(--sh-surface-elevated)] p-6"
-            : "max-w-[820px] rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-2.5 shadow-[var(--sh-shadow-card)]"
-        }
-        data-testid="creation-preview-panel"
-        ref={previewRef}
+        className="max-w-[min(78%,640px)] self-end rounded-[var(--sh-radius-md)] bg-[var(--sh-brand-50)] px-4 py-2.5 text-sm leading-6 text-[var(--sh-ink-strong)] shadow-[var(--sh-shadow-card)]"
+        data-testid="creation-user-message"
       >
-        <div className="creation-preview-toolbar mb-1.5 flex flex-wrap items-center justify-between gap-2 px-1">
-          <p className="flex min-w-0 items-center gap-2 text-sm font-semibold text-[var(--sh-ink-strong)]">
-            <span
-              className={`grid size-6 shrink-0 place-items-center rounded-full ${running ? "bg-[var(--sh-brand-50)] text-[var(--sh-brand-700)]" : "bg-[var(--sh-success-soft)] text-[var(--sh-success-strong)]"}`}
-            >
-              {running ? (
-                <LoaderCircle
-                  aria-hidden="true"
-                  className="size-3.5 animate-spin motion-reduce:animate-none"
-                />
-              ) : (
-                <Check aria-hidden="true" className="size-3.5" />
-              )}
-            </span>
-            <span className="truncate">
-              {running
-                ? queued
-                  ? "作品已进入队列"
-                  : "正在创作新作品"
-                : `${currentLabel} ${String(candidate + 1)} / ${String(candidateCount)}`}
-            </span>
-            <span className="shrink-0 text-xs font-medium text-[var(--sh-ink-muted)]">
-              {running
-                ? queued
-                  ? "等待前一项完成"
-                  : `生成 ${String(candidateCount)} ${itemLabel}`
-                : type === "video"
-                  ? `${String(candidateCount)} 张关键帧`
-                  : `${String(candidateCount)} 个作品`}
-            </span>
-          </p>
-          <div aria-label="预览工具" className="flex flex-wrap items-center justify-end gap-1">
-            <IconButton
-              className="size-9"
-              disabled={running || candidate === 0}
-              label={`上一张${candidateDisplayLabel}`}
-              onClick={() => changeCandidate(candidate - 1)}
-            >
-              <ChevronLeft aria-hidden="true" />
-            </IconButton>
-            <IconButton
-              className="size-9"
-              disabled={running || candidate >= candidateCount - 1}
-              label={`下一张${candidateDisplayLabel}`}
-              onClick={() => changeCandidate(candidate + 1)}
-            >
-              <ChevronRight aria-hidden="true" />
-            </IconButton>
-            <span className="px-2 text-xs font-medium text-[var(--sh-ink-muted)]">
-              {getCreationRatioLabel(ratio)}
-            </span>
-            <IconButton
-              className="size-9"
-              disabled={running}
-              label="放大查看"
-              onClick={() => setEnlargedOpen(true)}
-            >
-              <Expand aria-hidden="true" />
-            </IconButton>
-            <IconButton
-              className="size-9"
-              disabled={running}
-              label={fullscreen ? "退出全屏" : "全屏查看"}
-              onClick={() => void toggleFullscreen()}
-            >
-              {fullscreen ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
-            </IconButton>
-            <Button
-              disabled={running || candidateCount < 2}
-              onClick={() => setCompareOpen(true)}
-              size="sm"
-              variant="quiet"
-            >
-              <Columns3 aria-hidden="true" />
-              对比作品
-            </Button>
-            {primaryAction}
-          </div>
-        </div>
-        <div className="grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_88px]">
+        {prompt}
+      </div>
+      <div className="flex w-full self-start gap-2.5" data-testid="creation-assistant-message">
+        <span className="mt-1 size-7 shrink-0 rounded-full border border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)] shadow-[var(--sh-shadow-card)]" />
+        <div className="min-w-0 flex-1">
           <div
-            className={`mx-auto ${visualWidth}`}
-            data-creation-type={type}
-            data-render-generation={renderedGeneration}
-            data-testid="creation-main-visual"
+            className={
+              fullscreen
+                ? "flex h-screen w-screen flex-col justify-center overflow-auto bg-[var(--sh-surface-elevated)] p-6"
+                : "max-w-[820px] rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-2.5 shadow-[var(--sh-shadow-card)]"
+            }
+            data-testid="creation-preview-panel"
+            ref={previewRef}
           >
-            <CreationResultCanvas
-              candidate={candidate}
-              generation={renderedGeneration}
-              ratio={ratio}
-              running={running}
-              type={type}
-            />
-          </div>
-          <div
-            aria-label={candidateAriaLabel}
-            className="flex min-w-0 gap-2 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0"
-          >
-            {candidates.map((item) => (
-              <button
-                aria-label={`${candidateAriaLabel} ${String(item + 1)}`}
-                aria-pressed={candidate === item}
-                className={`w-[76px] shrink-0 rounded-[var(--sh-radius-sm)] border bg-[var(--sh-surface-elevated)] p-1 text-left transition-[border-color,box-shadow] disabled:cursor-wait disabled:opacity-55 md:w-[88px] ${candidate === item ? "border-[var(--sh-brand-500)] ring-2 ring-[var(--sh-brand-100)]" : "border-[var(--sh-line-default)]"}`}
-                disabled={running}
-                key={item}
-                onClick={() => changeCandidate(item)}
-                type="button"
-              >
-                <CreativeResultVisual
-                  loading="lazy"
-                  ratio={ratio}
-                  type={type}
-                  variant={(item + renderedGeneration) % 3}
-                />
-                <span className="mt-1 block text-center text-[11px] font-semibold text-[var(--sh-ink-strong)]">
-                  {candidateDisplayLabel} {item + 1}
+            <div className="creation-preview-toolbar mb-1.5 flex flex-wrap items-center justify-between gap-2 px-1">
+              <p className="flex min-w-0 items-center gap-2 text-sm font-semibold text-[var(--sh-ink-strong)]">
+                <span
+                  className={`grid size-6 shrink-0 place-items-center rounded-full ${running ? "bg-[var(--sh-brand-50)] text-[var(--sh-brand-700)]" : "bg-[var(--sh-success-soft)] text-[var(--sh-success-strong)]"}`}
+                >
+                  {running ? (
+                    <LoaderCircle
+                      aria-hidden="true"
+                      className="size-3.5 animate-spin motion-reduce:animate-none"
+                    />
+                  ) : (
+                    <Check aria-hidden="true" className="size-3.5" />
+                  )}
                 </span>
-              </button>
-            ))}
+                <span className="truncate">
+                  {running
+                    ? queued
+                      ? "作品已进入队列"
+                      : "正在创作新作品"
+                    : `${currentLabel} ${String(candidate + 1)} / ${String(candidateCount)}`}
+                </span>
+                <span className="shrink-0 text-xs font-medium text-[var(--sh-ink-muted)]">
+                  {running
+                    ? queued
+                      ? "等待前一项完成"
+                      : `生成 ${String(candidateCount)} ${itemLabel}`
+                    : type === "video"
+                      ? `${String(candidateCount)} 张关键帧`
+                      : `${String(candidateCount)} 个作品`}
+                </span>
+              </p>
+              <div aria-label="预览工具" className="flex flex-wrap items-center justify-end gap-1">
+                <IconButton
+                  className="size-9"
+                  disabled={running || candidate === 0}
+                  label={`上一张${candidateDisplayLabel}`}
+                  onClick={() => changeCandidate(candidate - 1)}
+                >
+                  <ChevronLeft aria-hidden="true" />
+                </IconButton>
+                <IconButton
+                  className="size-9"
+                  disabled={running || candidate >= candidateCount - 1}
+                  label={`下一张${candidateDisplayLabel}`}
+                  onClick={() => changeCandidate(candidate + 1)}
+                >
+                  <ChevronRight aria-hidden="true" />
+                </IconButton>
+                <span className="px-2 text-xs font-medium text-[var(--sh-ink-muted)]">
+                  {getCreationRatioLabel(ratio)}
+                </span>
+                <IconButton
+                  className="size-9"
+                  disabled={running}
+                  label="放大查看"
+                  onClick={() => setEnlargedOpen(true)}
+                >
+                  <Expand aria-hidden="true" />
+                </IconButton>
+                <IconButton
+                  className="size-9"
+                  disabled={running}
+                  label={fullscreen ? "退出全屏" : "全屏查看"}
+                  onClick={() => void toggleFullscreen()}
+                >
+                  {fullscreen ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
+                </IconButton>
+                <Button
+                  disabled={running || candidateCount < 2}
+                  onClick={() => setCompareOpen(true)}
+                  size="sm"
+                  variant="quiet"
+                >
+                  <Columns3 aria-hidden="true" />
+                  对比作品
+                </Button>
+                {primaryAction}
+              </div>
+            </div>
+            <div className="grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_88px]">
+              <div
+                className={`mx-auto ${visualWidth}`}
+                data-creation-type={type}
+                data-render-generation={renderedGeneration}
+                data-testid="creation-main-visual"
+              >
+                <CreationResultCanvas
+                  candidate={candidate}
+                  generation={renderedGeneration}
+                  ratio={ratio}
+                  running={running}
+                  type={type}
+                />
+              </div>
+              <div
+                aria-label={candidateAriaLabel}
+                className="flex min-w-0 gap-2 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0"
+              >
+                {candidates.map((item) => (
+                  <button
+                    aria-label={`${candidateAriaLabel} ${String(item + 1)}`}
+                    aria-pressed={candidate === item}
+                    className={`w-[76px] shrink-0 rounded-[var(--sh-radius-sm)] border bg-[var(--sh-surface-elevated)] p-1 text-left transition-[border-color,box-shadow] disabled:cursor-wait disabled:opacity-55 md:w-[88px] ${candidate === item ? "border-[var(--sh-brand-500)] ring-2 ring-[var(--sh-brand-100)]" : "border-[var(--sh-line-default)]"}`}
+                    disabled={running}
+                    key={item}
+                    onClick={() => changeCandidate(item)}
+                    type="button"
+                  >
+                    <CreativeResultVisual
+                      loading="lazy"
+                      ratio={ratio}
+                      type={type}
+                      variant={(item + renderedGeneration) % 3}
+                    />
+                    <span className="mt-1 block text-center text-[11px] font-semibold text-[var(--sh-ink-strong)]">
+                      {candidateDisplayLabel} {item + 1}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <span />
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-          <Button disabled={running} onClick={onDownload} variant="quiet">
-            <Download aria-hidden="true" />
-            {downloadLabel}
-          </Button>
-        </div>
-      </div>
-      {stage === "saved" ? (
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-[var(--sh-radius-sm)] bg-[var(--sh-success-soft)] px-3 py-1.5">
-          <p className="text-sm font-semibold text-[var(--sh-ink-strong)]">
-            已挂载到“{savedTarget ?? "目标项目"}”。
-          </p>
-          {onViewProjectAssets ? (
-            <Button onClick={onViewProjectAssets} size="sm" variant="quiet">
-              查看项目资产
-            </Button>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <span />
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              <Button disabled={running} onClick={onDownload} variant="quiet">
+                <Download aria-hidden="true" />
+                {downloadLabel}
+              </Button>
+            </div>
+          </div>
+          {stage === "saved" ? (
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-[var(--sh-radius-sm)] bg-[var(--sh-success-soft)] px-3 py-1.5">
+              <p className="text-sm font-semibold text-[var(--sh-ink-strong)]">
+                已挂载到“{savedTarget ?? "目标项目"}”。
+              </p>
+              {onViewProjectAssets ? (
+                <Button onClick={onViewProjectAssets} size="sm" variant="quiet">
+                  查看项目资产
+                </Button>
+              ) : null}
+            </div>
           ) : null}
         </div>
-      ) : null}
+      </div>
       <EnlargedPreview
         candidate={candidate}
         generation={renderedGeneration}

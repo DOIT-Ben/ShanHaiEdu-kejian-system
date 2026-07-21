@@ -19,7 +19,7 @@ describe("FineStoryboardStep media truth", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("button", { name: "确认当前关键帧" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认当前分镜" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "关键帧参考 1" })).toBeInTheDocument();
     expect(screen.getAllByText(/视频尚未生成/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/备选片段|合成完整视频|采用这个结果/)).not.toBeInTheDocument();

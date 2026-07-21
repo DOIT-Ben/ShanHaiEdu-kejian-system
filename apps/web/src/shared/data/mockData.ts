@@ -86,6 +86,7 @@ export const projectSteps: Array<{
     group: "做 PPT",
     items: [
       { key: "ppt-outline", label: "安排页面", status: "not_ready" },
+      { key: "ppt-design", label: "逐页设计稿", status: "not_ready" },
       { key: "ppt-cover", label: "设计封面", status: "not_ready" },
       { key: "ppt-pages", label: "制作正文", status: "not_ready" },
       { key: "ppt-export", label: "导出 PPT", status: "not_ready" },
@@ -97,8 +98,9 @@ export const projectSteps: Array<{
       { key: "master-script", label: "编写母版剧本", status: "ready" },
       { key: "rough-storyboard", label: "安排故事镜头", status: "not_ready" },
       { key: "video-style", label: "确定画面风格", status: "not_ready" },
+      { key: "video-asset-plan", label: "规划图片资产", status: "not_ready" },
       { key: "video-assets", label: "制作镜头图片", status: "not_ready" },
-      { key: "fine-storyboard", label: "选择关键帧参考", status: "not_ready" },
+      { key: "fine-storyboard", label: "设计分镜提示词", status: "not_ready" },
       { key: "final-video", label: "生成课堂导入视频", status: "not_ready" },
     ],
   },

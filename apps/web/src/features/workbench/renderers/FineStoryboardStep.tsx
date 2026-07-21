@@ -26,10 +26,12 @@ import { demoProjectId } from "@/shared/data/mockData";
 function approvedStoryboardContent(value: {
   adoptedShots?: string[];
   candidateByShot?: Record<string, number>;
+  promptByShot?: Record<string, string>;
 }) {
   return {
     adoptedShots: value.adoptedShots ?? [],
     candidateByShot: value.candidateByShot ?? {},
+    promptByShot: value.promptByShot ?? {},
   };
 }
 
@@ -57,6 +59,7 @@ export function FineStoryboardStep() {
         adoptedShots?: string[];
         candidateByShot?: Record<string, number>;
         preparedShots?: string[];
+        promptByShot?: Record<string, string>;
         retryCounts?: Record<string, number>;
         selectedShot?: number;
       }
@@ -73,6 +76,9 @@ export function FineStoryboardStep() {
   const allAdopted = shots.every((item) => saved?.adoptedShots?.includes(item.id));
   const canAdopt = ["approved", "ready", "review_required"].includes(effectiveShotStatus);
   const selectedCandidate = saved?.candidateByShot?.[shot.id] ?? 1;
+  const currentPrompt =
+    saved?.promptByShot?.[shot.id] ??
+    `${shot.beat}。镜头采用${shot.movement}，时长 ${String(shot.duration)} 秒。引用已批准的人物、场景、道具和当前关键帧，保持角色造型、光线、配色与前后镜头连续；画面无水印、Logo、乱码和无关文字。`;
   const [message, setMessage] = useState("");
   const videoStudioUrl = `/app/creation/videos?projectId=${encodeURIComponent(projectId)}&lessonId=${encodeURIComponent(lessonId)}&package=video-shots&itemId=shot-1`;
   const updateStoryboard = (
@@ -83,6 +89,7 @@ export function FineStoryboardStep() {
       adoptedShots: saved?.adoptedShots ?? [],
       candidateByShot: saved?.candidateByShot ?? {},
       preparedShots: saved?.preparedShots ?? [],
+      promptByShot: saved?.promptByShot ?? {},
       retryCounts: saved?.retryCounts ?? {},
       selectedShot: selected,
       ...patch,
@@ -115,7 +122,7 @@ export function FineStoryboardStep() {
       updateMockNodeState(projectId, lessonId, "fine-storyboard", {
         stale_reason: null,
         status: nextApproved ? "approved" : "review_required",
-        title: "选择关键帧参考",
+        title: "设计分镜提示词",
       });
     }
   };
@@ -145,7 +152,7 @@ export function FineStoryboardStep() {
                 updateMockNodeState(projectId, lessonId, "fine-storyboard", {
                   stale_reason: null,
                   status: "approved",
-                  title: "选择关键帧参考",
+                  title: "设计分镜提示词",
                 });
                 void navigate(videoStudioUrl);
               }}
@@ -161,17 +168,17 @@ export function FineStoryboardStep() {
             </Button>
           ) : (
             <Button disabled={!canAdopt} onClick={confirmCurrentAndContinue} size="md">
-              {approved ? "打开视频创作台" : canAdopt ? "确认当前关键帧" : "关键帧尚未准备好"}
+              {approved ? "打开视频创作台" : canAdopt ? "确认当前分镜" : "参考资产尚未准备好"}
               {approved ? <ArrowRight aria-hidden="true" /> : <Check aria-hidden="true" />}
             </Button>
           )
         }
-        eyebrow="当前要做：选择关键帧参考"
+        eyebrow="当前要做：设计视频分镜提示词"
         hideEyebrow
         status={
           <StatusBadge status={stale ? "stale" : approved ? "approved" : effectiveShotStatus} />
         }
-        title={`${demo ? demoVideoTitle : topic} · 已选择 ${String(saved?.adoptedShots?.length ?? 0)}/${String(shots.length)} 个关键帧`}
+        title={`${demo ? demoVideoTitle : topic} · 已确认 ${String(saved?.adoptedShots?.length ?? 0)}/${String(shots.length)} 条分镜`}
       />
       {stale ? <StaleContentNotice reason={nodeState.stale_reason?.summary} /> : null}
       <div className="mt-4 grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)_240px]">
@@ -238,18 +245,29 @@ export function FineStoryboardStep() {
           </div>
         </section>
         <aside className="h-fit rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-4">
-          <h2 className="font-semibold text-[var(--sh-ink-strong)]">关键帧说明</h2>
+          <h2 className="font-semibold text-[var(--sh-ink-strong)]">视频生成提示词</h2>
           <div className="mt-4 space-y-4 text-sm">
             <div>
               <p className="flex items-center gap-1.5 text-xs font-semibold text-[var(--sh-ink-muted)]">
                 <Image aria-hidden="true" className="size-3.5" />
-                主要画面
+                当前分镜
               </p>
               <textarea
-                aria-label="主要画面"
-                className="mt-1 min-h-24 w-full resize-y rounded-[var(--sh-radius-sm)] border border-transparent bg-[var(--sh-surface-soft)] p-2 outline-none focus:border-[var(--sh-brand-500)]"
-                value={shot.beat}
-                readOnly
+                aria-label="视频生成提示词"
+                className="mt-1 min-h-40 w-full resize-y rounded-[var(--sh-radius-sm)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-paper)] p-2 text-sm leading-6 outline-none focus:border-[var(--sh-brand-500)]"
+                onChange={(event) =>
+                  updateStoryboard(
+                    {
+                      adoptedShots: (saved?.adoptedShots ?? []).filter((id) => id !== shot.id),
+                      promptByShot: {
+                        ...(saved?.promptByShot ?? {}),
+                        [shot.id]: event.target.value,
+                      },
+                    },
+                    false,
+                  )
+                }
+                value={currentPrompt}
               />
             </div>
             <p className="flex items-start gap-2">

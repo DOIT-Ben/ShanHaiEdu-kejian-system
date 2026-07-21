@@ -102,16 +102,19 @@ export function PptCoverStep() {
         title={`${demo ? "认识百分数" : topic} · 封面`}
       />
       {stale ? <StaleContentNotice reason={nodeState.stale_reason?.summary} /> : null}
-      <div className="mt-3 space-y-3">
+      <div
+        className="mt-3 grid items-start gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.65fr)]"
+        data-layout="split-preview"
+      >
         <section className="flex min-h-0 items-center justify-center rounded-[var(--sh-radius-md)] bg-[var(--sh-surface-stage)] p-3 md:p-4">
           <div
-            className="w-full max-w-[min(960px,max(280px,calc((100dvh-450px)*1.7778)))] shadow-[var(--sh-shadow-floating)]"
+            className="w-full max-w-[720px] shadow-[var(--sh-shadow-floating)]"
             data-testid="ppt-cover-preview"
           >
             <CoverVisual candidate={selected} demo={demo} topic={topic} />
           </div>
         </section>
-        <aside className="mx-auto w-full max-w-[720px]">
+        <aside className="flex w-full min-w-0 flex-col">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <div>
               <p className="text-sm font-semibold text-[var(--sh-ink-strong)]">选择封面</p>
@@ -148,36 +151,36 @@ export function PptCoverStep() {
           <p aria-live="polite" className="sr-only" role="status">
             {message}
           </p>
+          <div className="mt-3 flex flex-wrap gap-2 border-t border-[var(--sh-line-subtle)] pt-3">
+            <Button onClick={() => openContextDrawer("prompt")} variant="secondary">
+              提出修改
+            </Button>
+            <Button
+              onClick={() => {
+                const nextId = (selectedId % availableCandidates.length) + 1;
+                selectCover(nextId);
+                setMessage("已生成并切换到新的备选封面");
+              }}
+              variant="quiet"
+            >
+              <RefreshCw aria-hidden="true" />
+              重新生成
+            </Button>
+            <Button
+              onClick={() =>
+                downloadExampleFile(
+                  `${demo ? "认识百分数" : topic}_备选封面${String(selectedId)}.svg`,
+                  `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720"><rect width="1280" height="720" fill="#6B5344"/><circle cx="1030" cy="170" r="90" fill="#C98A5C"/><text x="110" y="280" fill="#FFF9F2" font-size="76" font-family="sans-serif" font-weight="700">${(demo ? "认识百分数" : topic).replace(/[&<>"']/g, "")}</text><text x="110" y="370" fill="#E8DCCE" font-size="34" font-family="sans-serif">${selected.label.replace(/[&<>"']/g, "")}</text></svg>`,
+                  "image/svg+xml;charset=utf-8",
+                )
+              }
+              variant="quiet"
+            >
+              <Download aria-hidden="true" />
+              下载预览
+            </Button>
+          </div>
         </aside>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button onClick={() => openContextDrawer("prompt")} variant="secondary">
-          提出修改
-        </Button>
-        <Button
-          onClick={() => {
-            const nextId = (selectedId % availableCandidates.length) + 1;
-            selectCover(nextId);
-            setMessage("已生成并切换到新的备选封面");
-          }}
-          variant="quiet"
-        >
-          <RefreshCw aria-hidden="true" />
-          重新生成
-        </Button>
-        <Button
-          onClick={() =>
-            downloadExampleFile(
-              `${demo ? "认识百分数" : topic}_备选封面${String(selectedId)}.svg`,
-              `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720"><rect width="1280" height="720" fill="#6B5344"/><circle cx="1030" cy="170" r="90" fill="#C98A5C"/><text x="110" y="280" fill="#FFF9F2" font-size="76" font-family="sans-serif" font-weight="700">${(demo ? "认识百分数" : topic).replace(/[&<>"']/g, "")}</text><text x="110" y="370" fill="#E8DCCE" font-size="34" font-family="sans-serif">${selected.label.replace(/[&<>"']/g, "")}</text></svg>`,
-              "image/svg+xml;charset=utf-8",
-            )
-          }
-          variant="quiet"
-        >
-          <Download aria-hidden="true" />
-          下载预览
-        </Button>
       </div>
     </WorkbenchPageFrame>
   );

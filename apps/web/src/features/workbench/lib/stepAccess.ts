@@ -50,6 +50,12 @@ const stepRequirements: Record<string, StepRequirement> = {
     toStep: "lesson-plan",
   },
   "ppt-cover": {
+    actionLabel: "去确认逐页设计稿",
+    dependencyKey: "ppt-design",
+    title: "先确认逐页设计稿",
+    toStep: "ppt-design",
+  },
+  "ppt-design": {
     actionLabel: "去确认页面安排",
     dependencyKey: "ppt-outline",
     title: "先确认页面安排",
@@ -86,6 +92,12 @@ const stepRequirements: Record<string, StepRequirement> = {
     toStep: "rough-storyboard",
   },
   "video-assets": {
+    actionLabel: "去确认图片资产规划",
+    dependencyKey: "video-asset-plan",
+    title: "先确认图片资产规划",
+    toStep: "video-asset-plan",
+  },
+  "video-asset-plan": {
     actionLabel: "去确定画面风格",
     dependencyKey: "video-style",
     title: "先确定画面风格",
@@ -98,9 +110,9 @@ const stepRequirements: Record<string, StepRequirement> = {
     toStep: "video-assets",
   },
   "final-video": {
-    actionLabel: "去选择关键帧参考",
+    actionLabel: "去确认分镜提示词",
     dependencyKey: "fine-storyboard",
-    title: "先选择关键帧参考",
+    title: "先确认分镜提示词",
     toStep: "fine-storyboard",
   },
 };

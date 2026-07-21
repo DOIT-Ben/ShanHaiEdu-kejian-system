@@ -7,12 +7,14 @@ import { IntroOptionsStep } from "@/features/workbench/renderers/IntroOptionsSte
 import { LessonPlanStep } from "@/features/workbench/renderers/LessonPlanStep";
 import { MasterScriptStep } from "@/features/workbench/renderers/MasterScriptStep";
 import { PptCoverStep } from "@/features/workbench/renderers/PptCoverStep";
+import { PptDesignStep } from "@/features/workbench/renderers/PptDesignStep";
 import { PptExportStep } from "@/features/workbench/renderers/PptExportStep";
 import { PptOutlineStep } from "@/features/workbench/renderers/PptOutlineStep";
 import { PptPagesStep } from "@/features/workbench/renderers/PptPagesStep";
 import { PreparationStep } from "@/features/workbench/renderers/PreparationStep";
 import { RoughStoryboardStep } from "@/features/workbench/renderers/RoughStoryboardStep";
 import { VideoAssetsStep } from "@/features/workbench/renderers/VideoAssetsStep";
+import { VideoAssetPlanStep } from "@/features/workbench/renderers/VideoAssetPlanStep";
 import { VideoStyleStep } from "@/features/workbench/renderers/VideoStyleStep";
 import { ScenarioStateNotice } from "@/features/workbench/components/ScenarioStateNotice";
 import { getWorkbenchStepBlocker } from "@/features/workbench/lib/stepAccess";
@@ -33,12 +35,14 @@ const nodeRendererRegistry: Record<string, ComponentType> = {
   "intro-selection": IntroOptionsStep,
   "ppt-outline": PptOutlineStep,
   "ppt-cover": PptCoverStep,
+  "ppt-design": PptDesignStep,
   "ppt-pages": PptPagesStep,
   "ppt-export": PptExportStep,
   "master-script": MasterScriptStep,
   "rough-storyboard": RoughStoryboardStep,
   "video-style": VideoStyleStep,
   "video-assets": VideoAssetsStep,
+  "video-asset-plan": VideoAssetPlanStep,
   "fine-storyboard": FineStoryboardStep,
   "final-video": FinalVideoStep,
 };

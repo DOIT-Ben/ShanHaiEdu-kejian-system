@@ -179,8 +179,8 @@ export function PptOutlineStep() {
                 重新编辑页面安排
               </Button>
               <Button asChild size="md">
-                <Link to={`/app/projects/${projectId}/lessons/${lessonId}/work/ppt-cover`}>
-                  选择课件封面
+                <Link to={`/app/projects/${projectId}/lessons/${lessonId}/work/ppt-design`}>
+                  查看逐页设计稿
                   <ArrowRight aria-hidden="true" />
                 </Link>
               </Button>

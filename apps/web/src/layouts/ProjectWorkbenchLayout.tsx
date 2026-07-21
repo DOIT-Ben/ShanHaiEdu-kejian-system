@@ -28,9 +28,8 @@ import { Button } from "@/shared/ui/Button";
 import { IconButton } from "@/shared/ui/IconButton";
 
 const automationOptions = [
-  { label: "每步确认", value: "manual" },
-  { label: "系统先准备", value: "assisted" },
-  { label: "自动推进", value: "automatic" },
+  { label: "逐步确认", value: "assisted" },
+  { label: "自动完成", value: "automatic" },
 ] as const;
 
 export function ProjectWorkbenchLayout() {
@@ -46,6 +45,7 @@ export function ProjectWorkbenchLayout() {
     projectSteps.flatMap((group) => group.items).find((item) => item.key === stepKey)?.label ??
     "当前步骤";
   const automationMode = project?.automation_mode ?? "assisted";
+  const publicAutomationMode = automationMode === "automatic" ? "automatic" : "assisted";
   const base = `/app/projects/${projectId}/lessons/${lessonId}/work`;
   const workflowSteps = projectSteps.flatMap((group) => group.items);
   const previousStepKey = getPreviousWorkbenchStepKey(stepKey);
@@ -113,7 +113,7 @@ export function ProjectWorkbenchLayout() {
                     automation_mode: value as "manual" | "assisted" | "automatic",
                   })
                 }
-                value={automationMode}
+                value={publicAutomationMode}
               >
                 {automationOptions.map((option) => (
                   <DropdownMenu.RadioItem

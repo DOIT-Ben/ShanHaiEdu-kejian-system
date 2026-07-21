@@ -1,4 +1,4 @@
-import { CreativeResultVisual } from "@/features/creation-studio/CreativeResultVisual";
+import { Image, Presentation, Video } from "lucide-react";
 import type { CreationSettings, StudioType } from "@/features/creation-studio/model";
 
 export function CreationSetupPanel({
@@ -8,29 +8,21 @@ export function CreationSetupPanel({
   settings: CreationSettings;
   type: StudioType;
 }) {
-  const visualWidth =
-    type === "image"
-      ? "w-[min(100%,280px)] md:w-[clamp(300px,28vw,380px)]"
-      : type === "video"
-        ? "w-full max-w-[520px]"
-        : "w-full max-w-[620px]";
-  const workspaceWidth = type === "image" ? "max-w-[760px]" : "max-w-[900px]";
-
+  const Icon = type === "image" ? Image : type === "video" ? Video : Presentation;
+  const label = type === "image" ? "图片创作" : type === "video" ? "视频创作" : "PPT 创作";
   return (
     <section
       aria-label="作品展示区"
-      className={`mx-auto flex h-full min-h-0 w-full ${workspaceWidth} items-center justify-center`}
+      className="mx-auto flex h-full min-h-[240px] w-full max-w-[980px] items-start pt-[min(12vh,96px)]"
       data-testid="creation-output-region"
     >
-      <div
-        className="flex h-full min-h-0 w-full items-center justify-center py-2"
-        data-testid="creation-preview-panel"
-      >
-        <div className={`relative mx-auto ${visualWidth}`} data-testid="creation-main-visual">
-          <div className="overflow-hidden rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] shadow-[var(--sh-shadow-card)]">
-            <CreativeResultVisual ratio={settings.ratio} type={type} variant={0} />
-          </div>
-        </div>
+      <div className="flex max-w-md items-center gap-3 text-[var(--sh-ink-muted)]">
+        <span className="grid size-9 shrink-0 place-items-center rounded-full border border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)] shadow-[var(--sh-shadow-card)]">
+          <Icon aria-hidden="true" className="size-4" />
+        </span>
+        <p className="text-sm">
+          {label} · {settings.ratio === "auto" ? "自动比例" : settings.ratio}
+        </p>
       </div>
     </section>
   );

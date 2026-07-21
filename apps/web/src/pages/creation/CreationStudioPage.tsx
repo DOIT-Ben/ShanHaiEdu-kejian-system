@@ -14,7 +14,10 @@ import {
 } from "@/features/creation-studio/creationQueue";
 import { ImageEditDialog } from "@/features/creation-studio/ImageEditDialog";
 import { ProjectAssetDrawer } from "@/features/creation-studio/ProjectAssetDrawer";
-import { CreationResultsPanel } from "@/features/creation-studio/CreationResultsPanel";
+import {
+  CreationResultsPanel,
+  type CreationHistoryTurn,
+} from "@/features/creation-studio/CreationResultsPanel";
 import { CreationSetupPanel } from "@/features/creation-studio/CreationSetupPanel";
 import { downloadCreationResult } from "@/features/creation-studio/downloadCreationResult";
 import {
@@ -62,6 +65,7 @@ type SavedCreation = {
   description: string;
   generation: number;
   hasUnappliedChanges: boolean;
+  history: CreationHistoryTurn[];
   projectId?: string;
   savedTarget?: string;
   settings: CreationSettings;
@@ -82,7 +86,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
   const config = studioRegistry[type];
   const runtime = useMockRuntime();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const requestedProjectId = searchParams.get("projectId") ?? undefined;
   const requestedLessonId = searchParams.get("lessonId") ?? undefined;
   const requestedPackage = searchParams.get("package");
@@ -95,17 +99,21 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
       ? createProjectVideoShotPackage(runtime, requestedProjectId, requestedLessonId)
       : createProjectVideoAssetPackage(runtime, requestedProjectId, requestedLessonId);
   }, [packageMode, requestedLessonId, requestedProjectId, runtime, type]);
-  const requestedItemId =
-    searchParams.get("itemId") ??
-    searchParams.get("assetId") ??
-    searchParams.get("shotId") ??
-    packageItems[0]?.id;
-  const packageItem = packageItems.find((item) => item.id === requestedItemId);
   const packageKind = requestedPackage ?? "standalone";
   const packageStatePrefix =
     requestedProjectId && requestedLessonId
       ? `creation:${type}:project:${requestedProjectId}:lesson:${requestedLessonId}:package:${packageKind}`
       : undefined;
+  const workspaceKey = packageStatePrefix ? `${packageStatePrefix}:workspace` : undefined;
+  const workspaceState = (workspaceKey ? runtime.drafts[workspaceKey]?.value : undefined) as
+    { activeItemId?: string } | undefined;
+  const requestedItemId =
+    workspaceState?.activeItemId ??
+    searchParams.get("itemId") ??
+    searchParams.get("assetId") ??
+    searchParams.get("shotId") ??
+    packageItems[0]?.id;
+  const packageItem = packageItems.find((item) => item.id === requestedItemId);
   const packageItemStateKey = (itemId: string) =>
     packageStatePrefix ? `${packageStatePrefix}:item:${itemId}` : `creation:${type}:state`;
   const stateKey =
@@ -128,6 +136,10 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
   );
   const generation = typeof stored?.generation === "number" ? stored.generation : 0;
   const hasUnappliedChanges = stored?.hasUnappliedChanges === true;
+  const history = useMemo(
+    () => (Array.isArray(stored?.history) ? stored.history : []),
+    [stored?.history],
+  );
   const description =
     typeof stored?.description === "string" ? stored.description : fallbackDescription;
   const savedTarget = typeof stored?.savedTarget === "string" ? stored.savedTarget : undefined;
@@ -178,11 +190,6 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
     [projectId, runtime],
   );
 
-  useEffect(() => {
-    if (!packageItem) return;
-    mainRef.current?.focus({ preventScroll: true });
-  }, [packageItem]);
-
   const updateCreation = (patch: Partial<SavedCreation>) => {
     saveMockDraft(stateKey, {
       advancedSettings,
@@ -190,6 +197,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
       description,
       generation,
       hasUnappliedChanges,
+      history,
       ...(projectId ? { projectId } : {}),
       settings,
       stage,
@@ -215,6 +223,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
         description,
         generation,
         hasUnappliedChanges: false,
+        history,
         ...(projectId ? { projectId } : {}),
         settings,
         stage: "ready",
@@ -226,6 +235,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
     candidate,
     description,
     generation,
+    history,
     packageMode,
     projectId,
     settings,
@@ -281,10 +291,15 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
         ? "running"
         : "queued"
       : "running";
+    const nextHistory =
+      generation > 0 && ["ready", "adopted", "saved"].includes(stage)
+        ? [...history, { candidate, generation, prompt: description, ratio: settings.ratio }]
+        : history;
     updateCreation({
       description: normalizedDescription,
       generation: generation + 1,
       hasUnappliedChanges: false,
+      history: nextHistory,
       savedTarget: undefined,
       stage: nextPackageStage,
     });
@@ -298,7 +313,8 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
       const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches
         ? "auto"
         : "smooth";
-      mainRef.current?.scrollTo({ behavior, top: 0 });
+      const content = mainRef.current;
+      content?.scrollTo({ behavior, top: content.scrollHeight });
     });
   };
 
@@ -315,6 +331,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
       description: item.prompt,
       generation: existing?.generation ?? 0,
       hasUnappliedChanges: false,
+      history: existing?.history ?? [],
       ...(projectId ? { projectId } : {}),
       settings: {
         ...settings,
@@ -325,11 +342,48 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
       },
       stage: existing?.stage ?? "draft",
     });
-    const next = new URLSearchParams(searchParams);
-    next.set("itemId", item.id);
-    next.delete("assetId");
-    next.delete("shotId");
-    setSearchParams(next, { replace: true });
+    if (workspaceKey) {
+      saveMockDraft(
+        workspaceKey,
+        { activeItemId: item.id },
+        {
+          ...(requestedLessonId ? { lessonId: requestedLessonId } : {}),
+          ...(projectId ? { projectId } : {}),
+        },
+      );
+    }
+  };
+
+  const generateAllPackageItems = () => {
+    if (!packageStatePrefix || !queueKey || packageItems.length === 0) return;
+    let nextQueue = packageQueue;
+    for (const item of packageItems) {
+      nextQueue = enqueueCreationTask(nextQueue, item.id);
+      const itemKey = `${packageStatePrefix}:item:${item.id}`;
+      const existing = runtime.drafts[itemKey]?.value as Partial<SavedCreation> | undefined;
+      saveMockDraft(itemKey, {
+        ...existing,
+        advancedSettings: existing?.advancedSettings ?? advancedSettings,
+        candidate: existing?.candidate ?? 0,
+        description: existing?.description ?? item.prompt,
+        generation: existing?.generation ?? 1,
+        hasUnappliedChanges: false,
+        history: existing?.history ?? [],
+        ...(projectId ? { projectId } : {}),
+        settings: {
+          ...settings,
+          duration: item.duration ?? settings.duration,
+          ratio: item.ratio,
+          referenceName: item.referenceNames?.join("、") ?? "",
+          style: item.style,
+        },
+        stage: nextQueue[item.id]?.status === "running" ? "running" : "queued",
+      });
+    }
+    saveMockDraft(queueKey, nextQueue, {
+      ...(requestedLessonId ? { lessonId: requestedLessonId } : {}),
+      ...(projectId ? { projectId } : {}),
+    });
   };
 
   const cancelPackageTask = (itemId: string) => {
@@ -533,6 +587,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
                   candidateCount={Math.max(1, Number.parseInt(settings.candidateCount, 10) || 3)}
                   generation={generation}
                   hasUnappliedChanges={hasUnappliedChanges}
+                  history={history}
                   onAdvance={advance}
                   onCandidateChange={changeCandidate}
                   onDownload={() => {
@@ -550,6 +605,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
                         }
                       : undefined
                   }
+                  prompt={description}
                   ratio={settings.ratio}
                   saveTriggerRef={saveTriggerRef}
                   savedTarget={savedTarget}
@@ -607,6 +663,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
               items={packageItems}
               lessonTitle={lesson.title}
               onCancel={cancelPackageTask}
+              onGenerateAll={generateAllPackageItems}
               onImport={importPackageItem}
               onOpenChange={setAssetDrawerOpen}
               onRetry={retryPackageTask}

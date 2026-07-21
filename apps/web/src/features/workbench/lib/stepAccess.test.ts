@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { demoLessonId, demoProjectId } from "@/shared/data/mockData";
+import { projectSteps } from "@/shared/data/mockData";
 import { createDefaultMockRuntimeState, createMockRuntimeStore } from "@/shared/api/mocks/runtime";
 import {
   getPreviousWorkbenchStepKey,
@@ -119,7 +120,18 @@ describe("workbench step access", () => {
   it("returns to the real dependency within PPT and video branches", () => {
     expect(getPreviousWorkbenchStepKey("materials")).toBeNull();
     expect(getPreviousWorkbenchStepKey("ppt-pages")).toBe("ppt-cover");
+    expect(getPreviousWorkbenchStepKey("ppt-cover")).toBe("ppt-design");
+    expect(getPreviousWorkbenchStepKey("ppt-design")).toBe("ppt-outline");
     expect(getPreviousWorkbenchStepKey("master-script")).toBe("intro-options");
     expect(getPreviousWorkbenchStepKey("rough-storyboard")).toBe("master-script");
+    expect(getPreviousWorkbenchStepKey("video-assets")).toBe("video-asset-plan");
+  });
+
+  it("exposes PPT design and video asset planning as explicit workflow nodes", () => {
+    const keys = projectSteps.flatMap((group) => group.items.map((item) => item.key));
+    expect(keys.indexOf("ppt-design")).toBe(keys.indexOf("ppt-outline") + 1);
+    expect(keys.indexOf("ppt-cover")).toBe(keys.indexOf("ppt-design") + 1);
+    expect(keys.indexOf("video-asset-plan")).toBe(keys.indexOf("video-style") + 1);
+    expect(keys.indexOf("video-assets")).toBe(keys.indexOf("video-asset-plan") + 1);
   });
 });

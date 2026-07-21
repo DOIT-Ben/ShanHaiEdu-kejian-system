@@ -30,6 +30,7 @@ const items: ProjectCreationPackageItem[] = [
 describe("ProjectAssetDrawer", () => {
   it("从右侧按钮打开项目资产并切换待制作素材", () => {
     const onSelect = vi.fn();
+    const onOpenChange = vi.fn();
     render(
       <TooltipProvider>
         <ProjectAssetDrawer
@@ -38,6 +39,7 @@ describe("ProjectAssetDrawer", () => {
           lessonTitle="第 1 课时 · 百分数的意义"
           onCancel={() => undefined}
           onImport={onSelect}
+          onOpenChange={onOpenChange}
           onRetry={() => undefined}
           projectTitle="认识百分数"
           savedSlotKeys={new Set<string>()}
@@ -47,9 +49,11 @@ describe("ProjectAssetDrawer", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "打开项目资产" }));
-    expect(screen.getByRole("dialog", { name: "项目资产" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "任务队列与项目资产" })).toBeInTheDocument();
     expect(screen.getByText(/认识百分数/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "导入场景：果汁标签观察桌" }));
     expect(onSelect).toHaveBeenCalledWith("scene");
+    expect(onOpenChange).toHaveBeenLastCalledWith(true);
+    expect(screen.getByRole("dialog", { name: "任务队列与项目资产" })).toBeInTheDocument();
   });
 });

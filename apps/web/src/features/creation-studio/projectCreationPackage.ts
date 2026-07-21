@@ -16,6 +16,7 @@ export type ProjectCreationPackageItem = {
   prompt: string;
   ratio: "16:9";
   referenceNames?: string[];
+  scope?: "common" | "shot";
   slotKey: string;
   slotLabel: string;
   style: "clay" | "illustration" | "paper";
@@ -55,7 +56,7 @@ export function createProjectVideoShotPackage(
       `挂靠${shot.id}的已确认关键帧作为首帧参考，保持人物、场景和教具一致。`,
       "画面清楚、节奏克制，不出现水印、Logo、乱码或无关文字。",
     ].join("\n"),
-    ratio: "16:9",
+    ratio: "16:9" as const,
     referenceNames: [`${shot.id}关键帧参考`],
     slotKey: `video.shot.${lessonId}.${String(index + 1)}`,
     slotLabel: `${shot.id}（课堂导入视频分镜）`,
@@ -75,21 +76,45 @@ export function createProjectVideoAssetPackage(
   const assets =
     createAssetsFromApprovedStory(runtime, projectId, lessonId) ??
     createTopicVideoAssets(project.knowledge_point);
+  const shots =
+    createShotsFromApprovedStory(runtime, projectId, lessonId) ??
+    createTopicVideoShots(project.knowledge_point);
   const style = resolveStyle(runtime, projectId, lessonId);
 
-  return assets.map((asset) => ({
-    id: asset.id,
+  const commonItems = assets
+    .filter((asset) => asset.id !== "keyframe")
+    .map((asset) => ({
+      id: asset.id,
+      prompt: [
+        `为小学数学“${project.knowledge_point}”课堂导入视频制作${asset.type}素材：${asset.title}。`,
+        `采用${style.label}，画面清晰、克制、适合课堂投屏。`,
+        "构图服务于教师讲解，主体明确，保留镜头衔接空间。",
+        "不要水印、Logo、乱码；涉及文字或数字时必须准确。",
+      ].join("\n"),
+      ratio: "16:9" as const,
+      scope: "common" as const,
+      slotKey: `video.asset.${lessonId}.${asset.id}`,
+      slotLabel: `${asset.title}（视频画面素材）`,
+      style: style.value,
+      title: asset.title,
+      type: asset.type,
+    }));
+  const shotItems = shots.map((shot, index) => ({
+    id: `frame-${String(index + 1)}`,
     prompt: [
-      `为小学数学“${project.knowledge_point}”课堂导入视频制作${asset.type}素材：${asset.title}。`,
-      `采用${style.label}，画面清晰、克制、适合课堂投屏。`,
-      "构图服务于教师讲解，主体明确，保留镜头衔接空间。",
-      "不要水印、Logo、乱码；涉及文字或数字时必须准确。",
+      `为小学数学“${project.knowledge_point}”课堂导入制作${shot.id}的内部场景图：${shot.beat}。`,
+      `采用${style.label}，构图对应“${shot.movement}”的起始关键帧。`,
+      "继承通用人物、场景和道具资产，保留动作发展与镜头衔接空间。",
+      "不要水印、Logo、乱码或无关文字。",
     ].join("\n"),
-    ratio: "16:9",
-    slotKey: `video.asset.${lessonId}.${asset.id}`,
-    slotLabel: `${asset.title}（视频画面素材）`,
+    ratio: "16:9" as const,
+    referenceNames: commonItems.map((item) => item.title).slice(0, 3),
+    scope: "shot" as const,
+    slotKey: `video.asset.${lessonId}.frame-${String(index + 1)}`,
+    slotLabel: `${shot.id}内部场景图`,
     style: style.value,
-    title: asset.title,
-    type: asset.type,
+    title: `${shot.id} · ${shot.beat}`,
+    type: "分镜内部图",
   }));
+  return [...commonItems, ...shotItems];
 }

@@ -67,14 +67,22 @@ export function ProjectStepNavigation({
     const itemRect = activeStep.getBoundingClientRect();
     const containerRect = scrollContainer.getBoundingClientRect();
     if (containerRect.height <= 0) return;
-    const itemCenter = itemRect.top + itemRect.height / 2;
-    const containerCenter = containerRect.top + containerRect.height / 2;
+    const safeInset = Math.min(48, containerRect.height / 4);
+    const safeTop = containerRect.top + safeInset;
+    const safeBottom = containerRect.bottom - safeInset;
+    let nextTop: number | null = null;
+    if (itemRect.top < safeTop) {
+      nextTop = scrollContainer.scrollTop + itemRect.top - safeTop;
+    } else if (itemRect.bottom > safeBottom) {
+      nextTop = scrollContainer.scrollTop + itemRect.bottom - safeBottom;
+    }
+    if (nextTop === null) return;
     const reducedMotion =
       typeof window.matchMedia === "function" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     scrollContainer.scrollTo({
       behavior: reducedMotion ? "auto" : "smooth",
-      top: Math.max(0, scrollContainer.scrollTop + itemCenter - containerCenter),
+      top: Math.max(0, nextTop),
     });
   }, [activeStepKey, currentPath]);
 

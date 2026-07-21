@@ -7,6 +7,7 @@ import {
   FolderOpen,
   ImagePlus,
   LoaderCircle,
+  Play,
   RotateCcw,
   X,
 } from "lucide-react";
@@ -23,6 +24,7 @@ type ProjectAssetDrawerProps = {
   lessonTitle: string;
   onCancel: (id: string) => void;
   onImport: (id: string) => void;
+  onGenerateAll?: () => void;
   onOpenChange?: (open: boolean) => void;
   onRetry: (id: string) => void;
   projectTitle: string;
@@ -46,6 +48,7 @@ export function ProjectAssetDrawer({
   lessonTitle,
   onCancel,
   onImport,
+  onGenerateAll,
   onOpenChange,
   onRetry,
   projectTitle,
@@ -55,6 +58,7 @@ export function ProjectAssetDrawer({
   const [open, setOpen] = useState(false);
   const reduceMotion = useReducedMotion();
   const completed = items.filter((item) => savedSlotKeys.has(item.slotKey)).length;
+  const pending = items.length - completed;
   const changeOpen = (nextOpen: boolean) => {
     setOpen(nextOpen);
     onOpenChange?.(nextOpen);
@@ -70,7 +74,7 @@ export function ProjectAssetDrawer({
           variant="secondary"
         >
           <FolderOpen aria-hidden="true" />
-          <span className="hidden xl:inline">项目资产</span>
+          <span className="hidden xl:inline">任务与资产</span>
           <span className="text-xs text-[var(--sh-ink-muted)]">
             {completed}/{items.length}
           </span>
@@ -91,20 +95,29 @@ export function ProjectAssetDrawer({
                 <div className="flex items-start justify-between gap-3 border-b border-[var(--sh-line-subtle)] px-4 py-3">
                   <div className="min-w-0">
                     <Dialog.Title className="font-semibold text-[var(--sh-ink-strong)]">
-                      项目资产
+                      任务队列与项目资产
                     </Dialog.Title>
                     <Dialog.Description
                       className="mt-0.5 truncate text-xs text-[var(--sh-ink-muted)]"
                       id="project-assets-description"
                     >
-                      {projectTitle} · {lessonTitle}
+                      {projectTitle} · {lessonTitle} · {String(completed)}/{String(items.length)}{" "}
+                      已完成
                     </Dialog.Description>
                   </div>
-                  <Dialog.Close asChild>
-                    <IconButton className="size-9" label="关闭项目资产">
-                      <X aria-hidden="true" />
-                    </IconButton>
-                  </Dialog.Close>
+                  <div className="flex items-center gap-1.5">
+                    {onGenerateAll && pending > 0 ? (
+                      <Button onClick={onGenerateAll} size="sm">
+                        <Play aria-hidden="true" />
+                        全部加入队列
+                      </Button>
+                    ) : null}
+                    <Dialog.Close asChild>
+                      <IconButton className="size-9" label="关闭项目资产">
+                        <X aria-hidden="true" />
+                      </IconButton>
+                    </Dialog.Close>
+                  </div>
                 </div>
                 <div className="min-h-0 flex-1 overflow-y-auto p-3">
                   <div className="grid gap-2">
@@ -139,7 +152,8 @@ export function ProjectAssetDrawer({
                           </span>
                           <span className="min-w-0 flex-1">
                             <span className="block text-xs font-medium text-[var(--sh-ink-muted)]">
-                              {item.type} · {item.ratio}
+                              {item.scope === "shot" ? "分镜资产" : "通用资产"} · {item.type} ·{" "}
+                              {item.ratio}
                             </span>
                             <span className="mt-0.5 block font-semibold text-[var(--sh-ink-strong)]">
                               {item.title}
@@ -169,7 +183,6 @@ export function ProjectAssetDrawer({
                                 disabled={busy}
                                 onClick={() => {
                                   onImport(item.id);
-                                  changeOpen(false);
                                 }}
                                 size="sm"
                                 variant={active ? "primary" : "secondary"}

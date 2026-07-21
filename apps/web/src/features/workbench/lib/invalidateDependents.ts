@@ -6,6 +6,7 @@ export type DependentNode = readonly [nodeKey: string, title: string];
 
 const lessonPlanDependents = [
   ["ppt-outline", "安排 PPT 页面"],
+  ["ppt-design", "确认逐页设计稿"],
   ["ppt-cover", "选择课件封面"],
   ["ppt-pages", "制作 PPT 正文"],
   ["ppt-export", "检查并导出 PPT"],
@@ -13,13 +14,16 @@ const lessonPlanDependents = [
 
 const pptOutlineDependents = lessonPlanDependents.slice(1);
 
+const pptDesignDependents = pptOutlineDependents.slice(1);
+
 const pptCoverDependents = [["ppt-pages", "制作 PPT 正文"]] as const;
 
 const videoPipelineDependents = [
   ["rough-storyboard", "安排故事镜头"],
   ["video-style", "确定画面风格"],
+  ["video-asset-plan", "规划图片资产"],
   ["video-assets", "制作镜头图片"],
-  ["fine-storyboard", "选择关键帧参考"],
+  ["fine-storyboard", "设计分镜提示词"],
   ["final-video", "生成课堂导入视频"],
 ] as const;
 
@@ -122,6 +126,22 @@ export function markPptCoverDependentsStale(
   );
 }
 
+export function markPptDesignDependentsStale(
+  runtime: MockRuntimeState,
+  projectId: string,
+  lessonId: string,
+  store: MockRuntimeStore = mockRuntime,
+) {
+  markDependentsStale(
+    runtime,
+    projectId,
+    lessonId,
+    pptDesignDependents,
+    "PPT 逐页设计稿已批准新版本，请更新封面和正文",
+    store,
+  );
+}
+
 function markVideoDependentsStaleFrom(
   runtime: MockRuntimeState,
   projectId: string,
@@ -188,7 +208,7 @@ export function markVideoStyleDependentsStale(
   );
 }
 
-export function markVideoAssetsDependentsStale(
+export function markVideoAssetPlanDependentsStale(
   runtime: MockRuntimeState,
   projectId: string,
   lessonId: string,
@@ -199,6 +219,22 @@ export function markVideoAssetsDependentsStale(
     projectId,
     lessonId,
     3,
+    "图片资产规划已批准新版本，请重新制作镜头图片",
+    store,
+  );
+}
+
+export function markVideoAssetsDependentsStale(
+  runtime: MockRuntimeState,
+  projectId: string,
+  lessonId: string,
+  store: MockRuntimeStore = mockRuntime,
+) {
+  markVideoDependentsStaleFrom(
+    runtime,
+    projectId,
+    lessonId,
+    4,
     "镜头图片已批准新版本，请更新关键帧参考并重新生成视频",
     store,
   );
@@ -214,7 +250,7 @@ export function markFineStoryboardDependentsStale(
     runtime,
     projectId,
     lessonId,
-    4,
+    5,
     "关键帧参考已批准新版本，请重新生成课堂导入视频",
     store,
   );

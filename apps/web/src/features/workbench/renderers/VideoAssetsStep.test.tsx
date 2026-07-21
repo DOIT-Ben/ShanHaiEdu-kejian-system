@@ -7,7 +7,7 @@ import { createMockProject, resetMockRuntime } from "@/shared/api/mocks/runtime"
 describe("VideoAssetsStep visual truth", () => {
   beforeEach(() => resetMockRuntime());
 
-  it("新课题使用真实课堂图片替代图标占位，同时明确它只是示例构图", () => {
+  it("新课题以紧凑资产状态列表呈现，不再用大面积占位图", () => {
     const project = createMockProject({
       knowledge_point: "圆的面积",
       title: "圆的面积课堂",
@@ -24,12 +24,9 @@ describe("VideoAssetsStep visual truth", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getAllByRole("img")).toHaveLength(4);
-    expect(screen.getAllByText("示例构图 · 等待当前课题素材")).toHaveLength(4);
-    expect(
-      screen.getAllByRole("img", {
-        name: /果汁标签课堂示例.*不是当前课题生成结果/,
-      }),
-    ).toHaveLength(4);
+    expect(screen.queryAllByRole("img")).toHaveLength(0);
+    expect(screen.getByRole("region", { name: "图片资产制作状态" })).toBeInTheDocument();
+    expect(screen.getAllByText("等待制作").length).toBeGreaterThan(0);
+    expect(screen.queryByText("示例构图 · 等待当前课题素材")).not.toBeInTheDocument();
   });
 });

@@ -112,16 +112,16 @@ export function VideoStyleStep() {
         title={`${videoTitle} · 视觉母图`}
       />
       {stale ? <StaleContentNotice reason={nodeState.stale_reason?.summary} /> : null}
-      <div className="mt-3 space-y-3">
+      <div
+        className="mt-3 grid items-start gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.65fr)]"
+        data-layout="split-preview"
+      >
         <section className="flex min-h-0 items-center justify-center rounded-[var(--sh-radius-md)] bg-[var(--sh-surface-stage)] p-3 md:p-4">
-          <div
-            className="w-full max-w-[min(960px,max(280px,calc((100dvh-450px)*1.7778)))]"
-            data-testid="video-style-preview"
-          >
+          <div className="w-full max-w-[720px]" data-testid="video-style-preview">
             <StyleVisual style={selected} />
           </div>
         </section>
-        <aside className="mx-auto w-full max-w-[720px]">
+        <aside className="flex w-full min-w-0 flex-col">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <div>
               <p className="text-sm font-semibold text-[var(--sh-ink-strong)]">选择画面风格</p>
@@ -155,7 +155,7 @@ export function VideoStyleStep() {
               );
             })}
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap gap-2 border-t border-[var(--sh-line-subtle)] pt-3">
             <Button onClick={() => setRedesignOpen(true)} size="sm" variant="secondary">
               重新设计画面
             </Button>

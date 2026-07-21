@@ -1,45 +1,41 @@
-import { ArrowRight, CheckCircle2, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { ArrowRight, CheckCircle2, Clock3, ImagePlus } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
-import { getDemoVideoSceneSource } from "@/features/home/components/VideoScenePreview";
 import { StaleContentNotice } from "@/features/workbench/components/StaleContentNotice";
 import { WorkbenchPageFrame } from "@/features/workbench/components/WorkbenchPageFrame";
 import {
   createTopicVideoAssets,
-  demoVideoAssets,
-  demoVideoTitle,
+  createTopicVideoShots,
 } from "@/features/workbench/lib/videoContent";
 import {
   createAssetsFromApprovedStory,
-  getApprovedVideoStyle,
+  createShotsFromApprovedStory,
 } from "@/features/workbench/lib/videoWorkflow";
-import { saveMockDraft, useMockRuntime } from "@/shared/api/mocks/runtime";
-import { Button, buttonVariants } from "@/shared/ui/Button";
+import { useMockRuntime } from "@/shared/api/mocks/runtime";
+import { listMockSavedResults } from "@/shared/api/mocks/savedResults";
+import { buttonVariants } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
-import { demoProjectId } from "@/shared/data/mockData";
 
 export function VideoAssetsStep() {
   const { lessonId = "", projectId = "" } = useParams();
   const runtime = useMockRuntime();
   const project = runtime.projects.find((item) => item.id === projectId);
-  const demo = projectId === demoProjectId || !project;
   const topic = project?.knowledge_point ?? "本课知识点";
-  const approvedStoryAssets = createAssetsFromApprovedStory(runtime, projectId, lessonId);
-  const approvedStyleId = getApprovedVideoStyle(runtime, projectId, lessonId)?.selectedId;
-  const approvedStyleLabel =
-    approvedStyleId === "clay" ? "柔和定格" : approvedStyleId === "clean" ? "清透插画" : "纸艺课堂";
-  const assets = demo ? demoVideoAssets : (approvedStoryAssets ?? createTopicVideoAssets(topic));
+  const commonAssets =
+    createAssetsFromApprovedStory(runtime, projectId, lessonId) ?? createTopicVideoAssets(topic);
+  const shots =
+    createShotsFromApprovedStory(runtime, projectId, lessonId) ?? createTopicVideoShots(topic);
   const nodeState = runtime.nodeStates[`${projectId}:${lessonId}:video-assets`];
   const approved = nodeState?.status === "approved";
   const stale = nodeState?.status === "stale";
-  const readyCount = approved
-    ? assets.length
-    : assets.filter((asset) => asset.status === "ready").length;
-  const pendingCount = assets.length - readyCount;
-  const [message, setMessage] = useState("");
+  const savedResults = listMockSavedResults(runtime, projectId).filter((item) =>
+    item.slotKey.startsWith(`video.asset.${lessonId}.`),
+  );
+  const total = commonAssets.filter((item) => item.id !== "keyframe").length + shots.length;
+  const completed = approved ? total : Math.min(savedResults.length, total);
+
   return (
-    <WorkbenchPageFrame>
+    <WorkbenchPageFrame width="workspace">
       <FocusPageHeader
         action={
           approved ? (
@@ -47,20 +43,19 @@ export function VideoAssetsStep() {
               className={buttonVariants({ size: "md" })}
               to={`/app/projects/${projectId}/lessons/${lessonId}/work/fine-storyboard`}
             >
-              选择关键帧参考
+              设计视频分镜提示词
               <ArrowRight aria-hidden="true" />
             </Link>
           ) : (
             <Link
-              className={buttonVariants({ size: "lg" })}
-              to={`/app/creation/images?projectId=${encodeURIComponent(projectId)}&lessonId=${encodeURIComponent(lessonId)}&package=video-assets&assetId=${encodeURIComponent(assets[0]?.id ?? "character")}`}
+              className={buttonVariants({ size: "md" })}
+              to={`/app/creation/images?projectId=${encodeURIComponent(projectId)}&lessonId=${encodeURIComponent(lessonId)}&package=video-assets`}
             >
-              开始制作镜头图片
-              <ArrowRight aria-hidden="true" />
+              <ImagePlus aria-hidden="true" />
+              进入图片创作台
             </Link>
           )
         }
-        eyebrow="当前要做：准备视频所需图片"
         hideEyebrow
         status={
           <StatusBadge
@@ -69,84 +64,56 @@ export function VideoAssetsStep() {
                 ? "stale"
                 : approved
                   ? "approved"
-                  : pendingCount === 0
-                    ? "ready"
-                    : "review_required"
+                  : completed > 0
+                    ? "partially_completed"
+                    : "ready"
             }
           />
         }
-        title={`${demo ? demoVideoTitle : topic} · ${String(assets.length)} 类图片资产`}
+        title={`镜头图片制作 · ${String(completed)}/${String(total)}`}
       />
       {stale ? <StaleContentNotice reason={nodeState.stale_reason?.summary} /> : null}
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {assets.map((asset, index) => (
-          <article
-            className="overflow-hidden rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-3"
-            key={asset.id}
-          >
-            <div className="relative aspect-video overflow-hidden rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-soft)]">
-              <img
-                alt={
-                  demo
-                    ? `${asset.title}参考画面`
-                    : `果汁标签课堂示例，作为“${asset.title}”的构图参考，不是当前课题生成结果`
-                }
-                className="size-full object-cover"
-                decoding="async"
-                loading="lazy"
-                src={getDemoVideoSceneSource(index)}
-              />
-              {!demo ? (
-                <span className="absolute bottom-2 left-2 rounded-full bg-[var(--sh-surface-elevated)]/92 px-2 py-1 text-[10px] font-semibold text-[var(--sh-brand-700)] shadow-[var(--sh-shadow-card)] backdrop-blur-sm">
-                  示例构图 · 等待当前课题素材
-                </span>
-              ) : null}
-              {approved || asset.status === "ready" ? (
-                <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-[var(--sh-surface-elevated)]/92 px-2 py-1 text-xs font-semibold text-[var(--sh-success)] shadow-[var(--sh-shadow-card)] backdrop-blur-sm">
+      <section
+        aria-label="图片资产制作状态"
+        className="mt-4 overflow-hidden border-y border-[var(--sh-line-subtle)]"
+      >
+        {[
+          ...commonAssets.filter((item) => item.id !== "keyframe"),
+          ...shots.map((shot, index) => ({
+            id: `shot-${String(index + 1)}`,
+            status: "needs_generation" as const,
+            title: `${shot.id} · ${shot.beat}`,
+            type: "分镜内部图",
+          })),
+        ].map((item, index) => {
+          const ready = approved || index < completed;
+          return (
+            <article
+              className="grid min-h-14 items-center gap-2 border-b border-[var(--sh-line-subtle)] px-2 py-2 last:border-b-0 sm:grid-cols-[32px_minmax(0,1fr)_120px]"
+              key={item.id}
+            >
+              <span
+                className={`grid size-8 place-items-center rounded-[var(--sh-radius-sm)] ${ready ? "bg-[var(--sh-success-soft)] text-[var(--sh-success-strong)]" : "bg-[var(--sh-surface-soft)] text-[var(--sh-ink-muted)]"}`}
+              >
+                {ready ? (
                   <CheckCircle2 aria-hidden="true" className="size-4" />
-                  {demo ? "已准备" : "清单已准备"}
-                </span>
-              ) : (
-                <span className="absolute right-2 top-2">
-                  <StatusBadge status="not_ready" />
-                </span>
-              )}
-            </div>
-            <p className="mt-3 text-xs font-semibold text-[var(--sh-brand-600)]">{asset.type}</p>
-            <h2 className="mt-1 font-semibold text-[var(--sh-ink-strong)]">{asset.title}</h2>
-            <p className="mt-2 text-sm text-[var(--sh-ink-muted)]">
-              来源：故事节拍 {Math.min(index + 1, 5)} · {approvedStyleLabel}
-            </p>
-          </article>
-        ))}
-      </div>
-      <div className="mt-6 flex flex-wrap gap-3">
-        <Button
-          onClick={() => {
-            saveMockDraft(
-              `project:${projectId}:lesson:${lessonId}:video-assets-check`,
-              {
-                checkedAt: new Date().toISOString(),
-                ready: readyCount,
-                required: assets.length,
-              },
-              { lessonId, nodeKey: "video-assets", projectId },
-            );
-            setMessage(
-              `资产清单已重新检查：${String(readyCount)} 类已准备，${String(pendingCount)} 类等待生成。`,
-            );
-          }}
-          variant="secondary"
-        >
-          <RefreshCw aria-hidden="true" />
-          重新检查资产清单
-        </Button>
-      </div>
-      {message ? (
-        <p className="mt-3 text-sm font-medium text-[var(--sh-success)]" role="status">
-          {message}
-        </p>
-      ) : null}
+                ) : (
+                  <Clock3 aria-hidden="true" className="size-4" />
+                )}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate font-medium text-[var(--sh-ink-strong)]">{item.title}</p>
+                <p className="text-xs text-[var(--sh-ink-muted)]">{item.type}</p>
+              </div>
+              <span
+                className={`text-xs font-semibold sm:text-right ${ready ? "text-[var(--sh-success-strong)]" : "text-[var(--sh-ink-muted)]"}`}
+              >
+                {ready ? "已保存到项目" : "等待制作"}
+              </span>
+            </article>
+          );
+        })}
+      </section>
     </WorkbenchPageFrame>
   );
 }
