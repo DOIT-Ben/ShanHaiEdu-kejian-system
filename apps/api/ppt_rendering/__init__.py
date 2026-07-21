@@ -1,0 +1,56 @@
+"""Provider-neutral deterministic PPT rendering core."""
+
+from apps.api.ppt_rendering.errors import PptRenderingError
+from apps.api.ppt_rendering.models import (
+    IMPLEMENTATION_VERSION,
+    MAX_BACKGROUND_BYTES,
+    MAX_ELEMENTS_PER_PAGE,
+    MAX_PAGES,
+    MAX_TOTAL_INPUT_BYTES,
+    PPTX_MEDIA_TYPE,
+    SLIDE_HEIGHT_EMU,
+    SLIDE_WIDTH_EMU,
+    SUPPORTED_BACKGROUND_MEDIA_TYPES,
+    AssemblyManifest,
+    AssemblyRequest,
+    BackgroundImage,
+    Box,
+    CanvasSpec,
+    FontStyle,
+    ManifestElement,
+    ManifestPage,
+    PageSpec,
+    PptxFileFact,
+    ShapeElement,
+    TextElement,
+)
+from apps.api.ppt_rendering.ports import PptRenderingPort
+from apps.api.ppt_rendering.service import assemble_pages, export_pptx
+
+__all__ = [
+    "IMPLEMENTATION_VERSION",
+    "MAX_BACKGROUND_BYTES",
+    "MAX_ELEMENTS_PER_PAGE",
+    "MAX_PAGES",
+    "MAX_TOTAL_INPUT_BYTES",
+    "PPTX_MEDIA_TYPE",
+    "SLIDE_HEIGHT_EMU",
+    "SLIDE_WIDTH_EMU",
+    "SUPPORTED_BACKGROUND_MEDIA_TYPES",
+    "AssemblyManifest",
+    "AssemblyRequest",
+    "BackgroundImage",
+    "Box",
+    "CanvasSpec",
+    "FontStyle",
+    "ManifestElement",
+    "ManifestPage",
+    "PageSpec",
+    "PptRenderingError",
+    "PptRenderingPort",
+    "PptxFileFact",
+    "ShapeElement",
+    "TextElement",
+    "assemble_pages",
+    "export_pptx",
+]
