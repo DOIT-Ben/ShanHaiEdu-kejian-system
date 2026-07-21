@@ -78,7 +78,7 @@ test("新项目可以只通过页面操作走到真实视频生成门槛", async
   await page.goto(`${workUrl}/video-style`);
   await page.getByRole("button", { name: "采用这个画面风格" }).click();
   await page.goto(`${workUrl}/video-assets`);
-  await page.getByRole("link", { name: "去图片创作台" }).click();
+  await page.getByRole("link", { name: "开始制作镜头图片" }).click();
 
   const assetCards = page.locator("aside").first().getByRole("button");
   await expect(assetCards).toHaveCount(4);
@@ -299,7 +299,10 @@ test("粗分镜排序、文字和确认刷新后仍保留", async ({ page }) => 
   await expect(page.getByRole("textbox", { name: "三瓶果汁进入画面主要事件" })).toHaveValue(
     "三瓶果汁依次进入画面，学生先观察标签差异。",
   );
-  await expect(page.getByRole("button", { name: "故事镜头已确认" })).toBeDisabled();
+  await expect(
+    page.getByTestId("workbench-content").getByRole("link", { name: "确定画面风格" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "增加故事节拍" })).toHaveCount(0);
   await expect(page.locator("article").first().getByRole("heading")).toHaveText("发现不同标签");
 });
 
@@ -310,7 +313,7 @@ test("保存到项目的候选会出现在素材与成果并保留版本历史",
   await page.getByRole("button", { name: "就用这张" }).click();
   await page.getByRole("button", { name: "保存到项目" }).click();
   await page.getByRole("button", { name: "保存到这个位置" }).click();
-  await expect(page.getByText(/已放进“.*”/, { exact: false })).toBeVisible();
+  await expect(page.getByText(/已挂载到“.*”/, { exact: false })).toBeVisible();
   await page.goto(`/app/projects/${projectId}/results`);
   await expect(page.getByText("三瓶果汁主视觉", { exact: true })).toHaveCount(1);
   await expect(page.getByText("图片创作台 · 作品 1")).toBeVisible();

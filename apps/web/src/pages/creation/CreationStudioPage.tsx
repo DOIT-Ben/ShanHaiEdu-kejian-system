@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { CreationAdvancedPanel } from "@/features/creation-studio/CreationAdvancedPanel";
 import type { CreationAdvancedSettings } from "@/features/creation-studio/CreationAdvancedPanel";
 import { CreationComposer } from "@/features/creation-studio/CreationComposer";
+import { ImageEditDialog } from "@/features/creation-studio/ImageEditDialog";
 import { CreationResultsPanel } from "@/features/creation-studio/CreationResultsPanel";
 import { CreationSetupPanel } from "@/features/creation-studio/CreationSetupPanel";
 import { downloadCreationResult } from "@/features/creation-studio/downloadCreationResult";
@@ -75,7 +76,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
       candidateCount,
       duration: stored?.settings?.duration ?? "10",
       model: stored?.settings?.model ?? "balanced",
-      ratio: stored?.settings?.ratio ?? (type === "image" ? "1:1" : "16:9"),
+      ratio: stored?.settings?.ratio ?? (type === "image" ? "auto" : "16:9"),
       referenceName: stored?.settings?.referenceName ?? "",
       style: stored?.settings?.style ?? "paper",
     }),
@@ -95,6 +96,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
   );
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [promptOpen, setPromptOpen] = useState(false);
+  const [imageEditOpen, setImageEditOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   const saveTriggerRef = useRef<HTMLButtonElement>(null);
   const mainRef = useRef<HTMLElement>(null);
@@ -297,6 +299,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
           updateCreation({ description: nextDescription, ...changedOutputPatch })
         }
         onGenerate={() => generate()}
+        onImageEdit={type === "image" ? () => setImageEditOpen(true) : undefined}
         onPromptReview={() => setPromptOpen(true)}
         onSettingsChange={(patch) => {
           const nextSettings = { ...settings, ...patch };
@@ -320,6 +323,14 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
         }
         open={promptOpen}
       />
+      {type === "image" ? (
+        <ImageEditDialog
+          description={description}
+          onApply={generate}
+          onOpenChange={setImageEditOpen}
+          open={imageEditOpen}
+        />
+      ) : null}
       <SaveToProjectDialog
         onOpenChange={setSaveOpen}
         onSaved={(savedResult) => {

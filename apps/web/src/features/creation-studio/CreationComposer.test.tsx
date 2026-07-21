@@ -16,8 +16,17 @@ const settings: CreationSettings = {
   style: "paper",
 };
 
-function ComposerHarness({ onGenerate }: { onGenerate: () => void }) {
+function ComposerHarness({
+  onGenerate,
+  onImageEdit,
+  stage = "draft",
+}: {
+  onGenerate: () => void;
+  onImageEdit?: () => void;
+  stage?: "draft" | "ready";
+}) {
   const [description, setDescription] = useState("");
+  const [currentSettings, setCurrentSettings] = useState(settings);
 
   return (
     <TooltipProvider>
@@ -30,10 +39,11 @@ function ComposerHarness({ onGenerate }: { onGenerate: () => void }) {
         onAdvancedOpenChange={() => undefined}
         onDescriptionChange={setDescription}
         onGenerate={onGenerate}
+        onImageEdit={onImageEdit}
         onPromptReview={() => undefined}
-        onSettingsChange={() => undefined}
-        settings={settings}
-        stage="draft"
+        onSettingsChange={(patch) => setCurrentSettings((current) => ({ ...current, ...patch }))}
+        settings={currentSettings}
+        stage={stage}
         type="image"
       />
     </TooltipProvider>
@@ -45,7 +55,8 @@ describe("CreationComposer", () => {
     const user = userEvent.setup();
     render(<ComposerHarness onGenerate={() => undefined} />);
 
-    expect(screen.getByRole("button", { name: "添加参考图" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "上传参考图" })).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "图片比例" })).toBeVisible();
     expect(screen.getByRole("button", { name: "创作设置" })).toBeVisible();
     expect(screen.queryByRole("combobox", { name: "创作模型" })).not.toBeInTheDocument();
     expect(screen.queryByText("留出板书区")).not.toBeInTheDocument();
@@ -54,10 +65,21 @@ describe("CreationComposer", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("combobox", { name: "创作模型" })).toBeVisible();
-      expect(screen.getByRole("combobox", { name: "比例" })).toBeVisible();
+      expect(screen.queryByRole("combobox", { name: "比例" })).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "画面细节" })).toBeVisible();
       expect(screen.getByRole("button", { name: "完整要求" })).toBeVisible();
     });
+  });
+
+  it("图片生成后直接提供编辑入口", async () => {
+    const onImageEdit = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ComposerHarness onGenerate={() => undefined} onImageEdit={onImageEdit} stage="ready" />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "编辑图片" }));
+    expect(onImageEdit).toHaveBeenCalledTimes(1);
   });
 
   it("输入内容后使用箭头按钮或 Enter 发送", async () => {

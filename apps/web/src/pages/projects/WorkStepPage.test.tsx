@@ -121,7 +121,7 @@ describe("WorkStepPage route isolation", () => {
     );
 
     expect(screen.getByRole("button", { name: "重新编辑教案" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "编辑" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "编辑" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "重新编辑教案" }));
     expect(screen.getByRole("button", { name: "编辑" })).not.toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "编辑" }));

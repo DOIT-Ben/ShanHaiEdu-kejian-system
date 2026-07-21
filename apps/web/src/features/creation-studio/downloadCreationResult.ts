@@ -51,7 +51,8 @@ function extensionFor(source: string | Blob) {
   return "webp";
 }
 
-function targetDimensions(ratio: string) {
+function targetDimensions(ratio: string, sourceWidth: number, sourceHeight: number) {
+  if (ratio === "auto") return { height: sourceHeight, width: sourceWidth };
   if (ratio === "16:9") return { height: 900, width: 1600 };
   if (ratio === "4:3") return { height: 900, width: 1200 };
   return { height: 1024, width: 1024 };
@@ -111,10 +112,10 @@ async function cropImageToBlob(
   ratio: string,
   position: { x: number; y: number },
 ) {
-  const { height, width } = targetDimensions(ratio);
   const sourceWidth = image.naturalWidth;
   const sourceHeight = image.naturalHeight;
   if (!sourceWidth || !sourceHeight || typeof document === "undefined") return undefined;
+  const { height, width } = targetDimensions(ratio, sourceWidth, sourceHeight);
 
   const canvas = document.createElement("canvas");
   canvas.width = width;

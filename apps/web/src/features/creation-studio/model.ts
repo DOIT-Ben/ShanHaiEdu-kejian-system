@@ -35,11 +35,15 @@ const styleSummaryLabels: Record<string, string> = {
   paper: "纸艺微缩",
 };
 
+export function getCreationRatioLabel(ratio: string) {
+  return ratio === "auto" ? "自动比例" : ratio;
+}
+
 export function getCreationSettingsSummary(type: StudioType, settings: CreationSettings) {
   const itemLabel = type === "image" ? "张" : type === "video" ? "段" : "套";
   const parts = [
     modelSummaryLabels[type][settings.model] ?? settings.model,
-    settings.ratio,
+    getCreationRatioLabel(settings.ratio),
     styleSummaryLabels[settings.style] ?? settings.style,
     `${settings.candidateCount} ${itemLabel}`,
   ];

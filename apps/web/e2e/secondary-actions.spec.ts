@@ -38,7 +38,7 @@ test("创作设置、参考图和创作要求刷新后保留", async ({ page }) 
   );
   await page.getByRole("button", { name: "创作设置" }).click();
   await expect(page.getByRole("combobox", { name: "画面风格" })).toContainText("清透插画");
-  await expect(page.getByTestId("creation-parameter-bar")).toContainText("果汁参考图.png");
+  await expect(page.getByRole("button", { name: "上传参考图" })).toContainText("果汁参考图.png");
   await page.getByRole("button", { name: "画面细节" }).click();
   await expect(page.getByLabel("画面安排")).toHaveValue("主体居中，前景保留一块课堂提问空间。");
   await page.getByRole("button", { name: "关闭画面细节" }).click();

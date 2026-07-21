@@ -49,6 +49,7 @@ describe("工作台连续稿件格式", () => {
 
     expect(markdown).toContain("## 场次 1｜标签上的谜题（0:00—0:18）");
     expect(markdown).toContain("三张标签并排出现，等待学生判断。");
+    expect(markdown).not.toContain("视频导入母版剧本");
     expect(parsed.scenes).toHaveLength(1);
     expect(parsed.scenes[0]).toMatchObject({
       action: "果汁依次落桌。",

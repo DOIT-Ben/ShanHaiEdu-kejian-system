@@ -1,6 +1,6 @@
-import { Check, Clock3, GripVertical, Image, Plus } from "lucide-react";
+import { ArrowRight, Check, Clock3, GripVertical, Image, PencilLine, Plus } from "lucide-react";
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { StaleContentNotice } from "@/features/workbench/components/StaleContentNotice";
 import { WorkbenchPageFrame } from "@/features/workbench/components/WorkbenchPageFrame";
 import {
@@ -89,10 +89,25 @@ export function RoughStoryboardStep() {
     <WorkbenchPageFrame width="wide">
       <FocusPageHeader
         action={
-          <Button disabled={confirmed} onClick={() => persist(items, true)} size="lg">
-            <Check aria-hidden="true" />
-            {confirmed ? "故事镜头已确认" : stale ? "重新确认故事镜头" : "确认故事镜头"}
-          </Button>
+          confirmed ? (
+            <>
+              <Button onClick={() => persist(items, false)} size="md" variant="secondary">
+                <PencilLine aria-hidden="true" />
+                重新安排镜头
+              </Button>
+              <Button asChild size="md">
+                <Link to={`/app/projects/${projectId}/lessons/${lessonId}/work/video-style`}>
+                  确定画面风格
+                  <ArrowRight aria-hidden="true" />
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <Button onClick={() => persist(items, true)} size="lg">
+              <Check aria-hidden="true" />
+              {stale ? "重新确认故事镜头" : "确认故事镜头"}
+            </Button>
+          )
         }
         eyebrow="当前要做：安排故事镜头"
         hideEyebrow
@@ -120,6 +135,7 @@ export function RoughStoryboardStep() {
               <button
                 aria-label={`拖动${beat.title}；也可使用左右方向键移动`}
                 className="ml-auto grid size-9 place-items-center rounded-md text-[var(--sh-ink-muted)] hover:bg-[var(--sh-surface-soft)] hover:text-[var(--sh-ink-strong)]"
+                disabled={confirmed}
                 draggable
                 onDragStart={() => setDragIndex(index)}
                 onKeyDown={(event) => {
@@ -144,6 +160,7 @@ export function RoughStoryboardStep() {
               <textarea
                 aria-label={`${beat.title}主要事件`}
                 className="mt-3 min-h-20 flex-1 resize-none rounded-[var(--sh-radius-sm)] border border-transparent bg-[var(--sh-surface-soft)] p-2 text-sm leading-5 outline-none focus:border-[var(--sh-brand-500)] focus:bg-[var(--sh-surface-elevated)]"
+                disabled={confirmed}
                 onChange={(event) =>
                   persist(
                     items.map((item, itemIndex) =>
@@ -165,27 +182,29 @@ export function RoughStoryboardStep() {
       <p aria-live="polite" className="sr-only">
         {reorderMessage}
       </p>
-      <button
-        className="inline-flex min-h-11 items-center gap-2 rounded-[var(--sh-radius-sm)] border border-dashed border-[var(--sh-line-strong)] px-4 text-sm font-semibold text-[var(--sh-brand-600)] hover:bg-[var(--sh-brand-50)]"
-        onClick={() =>
-          persist(
-            [
-              ...items,
-              {
-                time: "待安排",
-                title: `新增故事节拍 ${String(items.length + 1)}`,
-                event: `补充这个节拍中与${demo ? demoVideoTitle : topic}有关的主要事件。`,
-                assets: "待补充资产",
-              },
-            ],
-            false,
-          )
-        }
-        type="button"
-      >
-        <Plus aria-hidden="true" className="size-4" />
-        增加故事节拍
-      </button>
+      {!confirmed ? (
+        <button
+          className="inline-flex min-h-11 items-center gap-2 rounded-[var(--sh-radius-sm)] border border-dashed border-[var(--sh-line-strong)] px-4 text-sm font-semibold text-[var(--sh-brand-600)] hover:bg-[var(--sh-brand-50)]"
+          onClick={() =>
+            persist(
+              [
+                ...items,
+                {
+                  time: "待安排",
+                  title: `新增故事节拍 ${String(items.length + 1)}`,
+                  event: `补充这个节拍中与${demo ? demoVideoTitle : topic}有关的主要事件。`,
+                  assets: "待补充资产",
+                },
+              ],
+              false,
+            )
+          }
+          type="button"
+        >
+          <Plus aria-hidden="true" className="size-4" />
+          增加故事节拍
+        </button>
+      ) : null}
     </WorkbenchPageFrame>
   );
 }

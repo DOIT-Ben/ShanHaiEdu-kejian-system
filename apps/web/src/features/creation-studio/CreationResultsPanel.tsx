@@ -14,7 +14,11 @@ import {
 import { useEffect, useRef, useState, type Ref } from "react";
 import { CreationResultCanvas } from "@/features/creation-studio/CreationResultCanvas";
 import { CreativeResultVisual } from "@/features/creation-studio/CreativeResultVisual";
-import type { CreationStage, StudioType } from "@/features/creation-studio/model";
+import {
+  getCreationRatioLabel,
+  type CreationStage,
+  type StudioType,
+} from "@/features/creation-studio/model";
 import { Button } from "@/shared/ui/Button";
 import { IconButton } from "@/shared/ui/IconButton";
 
@@ -68,7 +72,7 @@ function EnlargedPreview({
                 放大查看
               </Dialog.Title>
               <Dialog.Description className="text-xs text-[var(--sh-ink-muted)]">
-                当前作品 {candidate + 1} · {ratio}
+                当前作品 {candidate + 1} · {getCreationRatioLabel(ratio)}
               </Dialog.Description>
             </div>
             <Dialog.Close asChild>
@@ -299,7 +303,9 @@ export function CreationResultsPanel({
             >
               <ChevronRight aria-hidden="true" />
             </IconButton>
-            <span className="px-2 text-xs font-medium text-[var(--sh-ink-muted)]">{ratio}</span>
+            <span className="px-2 text-xs font-medium text-[var(--sh-ink-muted)]">
+              {getCreationRatioLabel(ratio)}
+            </span>
             <IconButton
               className="size-9"
               disabled={running}

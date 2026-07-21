@@ -116,12 +116,19 @@ test("图片、视频和 PPT 共用上下式创作布局", async ({ page }) => {
     expect(composerBox).not.toBeNull();
     expect(composerBox?.y ?? 0).toBeGreaterThan(outputBox?.y ?? 0);
     await expect(page.getByRole("textbox", { name: studio.input })).toBeInViewport();
-    await expect(page.getByRole("button", { name: "添加参考图" })).toBeInViewport();
+    await expect(page.getByRole("button", { name: "上传参考图" })).toBeInViewport();
     await expect(page.getByRole("button", { name: "创作设置" })).toBeInViewport();
     await expect(page.getByRole("combobox", { name: "创作模型" })).toHaveCount(0);
+    if (studio.path === "/app/creation/images") {
+      await expect(page.getByRole("combobox", { name: "图片比例" })).toBeInViewport();
+    }
     await page.getByRole("button", { name: "创作设置" }).click();
     await expect(page.getByLabel("创作模型")).toBeInViewport();
-    await expect(page.getByLabel("比例")).toBeInViewport();
+    if (studio.path === "/app/creation/images") {
+      await expect(page.getByLabel("比例", { exact: true })).toHaveCount(0);
+    } else {
+      await expect(page.getByLabel("比例", { exact: true })).toBeInViewport();
+    }
     await page.getByRole("button", { name: "创作设置" }).click();
   }
 });
@@ -175,6 +182,25 @@ test("图片结果可修改创作要求并经过稳定运行态重新创作", as
   );
 });
 
+test("图片结果可直接打开编辑图片并生成修改版", async ({ page }) => {
+  await openReadyImageStudio(page);
+
+  await page.getByRole("button", { name: "编辑图片" }).click();
+  const dialog = page.getByRole("dialog", { name: "编辑这张图片" });
+  await expect(dialog).toBeVisible();
+
+  const editRequest = "保留三瓶果汁，把背景改得更干净，并拉开瓶子之间的距离。";
+  await page.getByRole("textbox", { name: "图片修改要求" }).fill(editRequest);
+  await page.getByRole("button", { name: "生成修改版" }).click();
+
+  const workspace = page.getByRole("region", { name: "创作结果" });
+  await expect(dialog).toBeHidden();
+  await expect(workspace).toHaveAttribute("aria-busy", "true");
+  await expect(page.getByRole("button", { name: "就用这张" })).toBeEnabled();
+  await expect(page.getByRole("textbox", { name: "创作要求" })).toHaveValue(editRequest);
+  await expect(workspace).toHaveAttribute("data-generation", "2");
+});
+
 test("1440×900 使用上方展示区和底部悬浮输入台", async ({ page }) => {
   await page.setViewportSize({ height: 900, width: 1440 });
   await openReadyImageStudio(page);
@@ -197,9 +223,9 @@ test("1440×900 使用上方展示区和底部悬浮输入台", async ({ page })
   expect(previewBox?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(760);
   expect(visualBox?.width ?? 0).toBeGreaterThanOrEqual(480);
   expect(visualBox?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(720);
-  expect(visualBox?.height ?? 0).toBeGreaterThanOrEqual(480);
-  expect(visualBox?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(720);
-  expect((visualBox?.width ?? 0) / (visualBox?.height ?? 1)).toBeCloseTo(1, 2);
+  expect(visualBox?.height ?? 0).toBeGreaterThanOrEqual(384);
+  expect(visualBox?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(576);
+  expect((visualBox?.width ?? 0) / (visualBox?.height ?? 1)).toBeCloseTo(4 / 3, 2);
   expect(workspaceBox?.y ?? 0).toBeLessThan(composerBox?.y ?? 0);
   expect((workspaceBox?.y ?? 0) + (workspaceBox?.height ?? 0)).toBeLessThanOrEqual(
     (composerBox?.y ?? 0) + 1,
@@ -208,7 +234,9 @@ test("1440×900 使用上方展示区和底部悬浮输入台", async ({ page })
 
   for (const control of [
     prompt,
-    page.getByRole("button", { name: "添加参考图" }),
+    page.getByRole("button", { name: "上传参考图" }),
+    page.getByRole("combobox", { name: "图片比例" }),
+    page.getByRole("button", { name: "编辑图片" }),
     page.getByRole("button", { name: "创作设置" }),
     page.getByRole("button", { name: "按新要求再画一组" }),
     page.getByRole("button", { name: "就用这张" }),
@@ -220,7 +248,7 @@ test("1440×900 使用上方展示区和底部悬浮输入台", async ({ page })
   await expect(page.getByRole("combobox", { name: "创作模型" })).toHaveCount(0);
   await page.getByRole("button", { name: "创作设置" }).click();
   await expect(page.getByLabel("创作模型")).toBeInViewport();
-  await expect(page.getByLabel("比例")).toBeInViewport();
+  await expect(page.getByLabel("比例", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "创作设置" }).click();
   await workspace.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
   await expect(page.getByRole("button", { name: "备选作品 1" })).toBeInViewport();
@@ -233,7 +261,9 @@ test("1280×800 首屏可查看结果并直接在底部调整", async ({ page })
 
   for (const control of [
     page.getByRole("textbox", { name: "创作要求" }),
-    page.getByRole("button", { name: "添加参考图" }),
+    page.getByRole("button", { name: "上传参考图" }),
+    page.getByRole("combobox", { name: "图片比例" }),
+    page.getByRole("button", { name: "编辑图片" }),
     page.getByRole("button", { name: "创作设置" }),
     page.getByRole("button", { name: "按新要求再画一组" }),
   ]) {
@@ -288,10 +318,9 @@ test("390px 下输入台固定可用并能按需展开画面细节", async ({ pa
   }));
   expect(promptHeight.scrollHeight).toBeLessThanOrEqual(promptHeight.clientHeight);
   const settingsTrigger = page.getByRole("button", { name: "创作设置" });
-  await expect(settingsTrigger).toContainText("课堂插画");
-  await expect(settingsTrigger).toContainText("1:1");
-  await expect(settingsTrigger).toContainText("纸艺微缩");
-  await expect(settingsTrigger).toContainText("3 张");
+  await expect(page.getByTestId("creation-composer-panel")).toContainText(
+    "课堂插画 · 自动比例 · 纸艺微缩 · 3 张",
+  );
   await settingsTrigger.click();
   await page.getByRole("button", { name: "画面细节" }).click();
   await expect(page.getByRole("complementary", { name: "画面细节调整" })).toBeVisible();
@@ -305,7 +334,7 @@ test("390px 下输入台固定可用并能按需展开画面细节", async ({ pa
 test("图片比例同步应用到预览并下载当前真实素材", async ({ page }) => {
   await loginAsTeacher(page);
   await page.goto("/app/creation/images");
-  await chooseSelect(page, "比例", "16:9");
+  await chooseSelect(page, "图片比例", "16:9");
   await page.getByRole("button", { name: "开始创作图片" }).click();
   await expect(page.getByRole("button", { name: "就用这张" })).toBeVisible();
 

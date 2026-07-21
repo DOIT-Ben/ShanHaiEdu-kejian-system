@@ -44,9 +44,24 @@ export function CreativeResultVisual({
     );
   }
   const asset = getCreationImageAsset(variant);
+  const ratioClass =
+    ratio === "auto"
+      ? ""
+      : ratio === "16:9"
+        ? "aspect-video"
+        : ratio === "4:3"
+          ? "aspect-[4/3]"
+          : "aspect-square";
   return (
     <div
-      className={`group relative overflow-hidden rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-soft)] ${ratio === "16:9" ? "aspect-video" : ratio === "4:3" ? "aspect-[4/3]" : "aspect-square"}`}
+      className={`group relative overflow-hidden rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-soft)] ${ratioClass}`}
+      style={
+        ratio === "auto"
+          ? {
+              aspectRatio: `${String(asset.naturalWidth)}/${String(asset.naturalHeight)}`,
+            }
+          : undefined
+      }
     >
       <img
         alt={asset.alt}

@@ -273,7 +273,7 @@ test("390 封面与视频备选保持紧凑且可横向选择", async ({ page })
   await page.goto(`/app/projects/${projectId}/lessons/${lessonId}/work/ppt-cover`);
   const coverCandidate = page.getByRole("button", { name: "选择百格光窗" });
   await expect(coverCandidate).toBeVisible();
-  await expect(page.getByText("3 张备选封面")).toBeVisible();
+  await expect(page.getByText("3 张备选", { exact: true })).toBeVisible();
   expect(
     (await coverCandidate.boundingBox())?.width ?? Number.POSITIVE_INFINITY,
   ).toBeLessThanOrEqual(160);
@@ -340,7 +340,7 @@ test("390 核心页面优先展示下一步与可操作内容", async ({ page })
       .evaluateAll((controls) =>
         controls.slice(0, 4).map((control) => control.getAttribute("aria-label")),
       ),
-  ).toEqual(["创作模型", "比例", "画面风格", "一次生成数量"]);
+  ).toEqual(["创作模型", "画面风格", "一次生成数量"]);
   const settingsDimensions = await parameterBar.evaluate((element) => ({
     clientWidth: element.clientWidth,
     scrollWidth: element.scrollWidth,

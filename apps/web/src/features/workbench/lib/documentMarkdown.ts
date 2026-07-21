@@ -139,8 +139,6 @@ export function serializeMasterScript(
 ) {
   return [
     `# ${title}`,
-    `> 视频导入母版剧本 · ${String(scenes.length)} 个场次 · 先让学生发现问题，再把问题带回课堂`,
-    "",
     "## 故事梗概",
     summary,
     "",

@@ -220,8 +220,9 @@ for (const viewport of viewports) {
     if (viewport.width < 768) {
       expect(visual.width).toBeLessThanOrEqual(Math.min(360, viewport.width - 24) + 1);
       expect(visual.width).toBeGreaterThan(0);
-      await expect(page.getByRole("button", { name: "创作设置" })).toContainText("课堂插画");
-      await expect(page.getByRole("button", { name: "创作设置" })).toContainText("1:1");
+      await expect(page.getByTestId("creation-composer-panel")).toContainText(
+        "课堂插画 · 自动比例 · 纸艺微缩 · 3 张",
+      );
     } else {
       expect(visual.width).toBeGreaterThanOrEqual(480);
       expect(visual.width).toBeLessThanOrEqual(720);
@@ -267,7 +268,7 @@ test("创作台选中并保存状态具备可追踪反馈", async ({ page }, tes
   const dialog = page.getByRole("dialog", { name: "保存到项目" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "保存到这个位置" }).click();
-  await expect(page.getByText(/已放进“/)).toBeVisible();
+  await expect(page.getByText(/已挂载到“/)).toBeVisible();
   await captureVisual(page, testInfo, "creation-1280-saved");
 });
 

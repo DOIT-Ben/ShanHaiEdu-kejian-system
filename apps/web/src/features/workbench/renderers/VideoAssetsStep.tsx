@@ -55,7 +55,7 @@ export function VideoAssetsStep() {
               className={buttonVariants({ size: "lg" })}
               to={`/app/creation/batches/video-assets-${projectId}--lesson--${lessonId}?sourceProjectId=${encodeURIComponent(projectId)}&lessonId=${encodeURIComponent(lessonId)}`}
             >
-              去图片创作台
+              开始制作镜头图片
               <ArrowRight aria-hidden="true" />
             </Link>
           )

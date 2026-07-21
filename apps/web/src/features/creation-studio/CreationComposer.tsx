@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowUp, ImagePlus, LoaderCircle, Settings2, X } from "lucide-react";
+import { ArrowUp, ImagePlus, LoaderCircle, PencilLine, Settings2, X } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { CreationParameterBar } from "@/features/creation-studio/CreationParameterBar";
 import type {
@@ -11,6 +11,7 @@ import type {
 import { getCreationSettingsSummary } from "@/features/creation-studio/model";
 import { Button } from "@/shared/ui/Button";
 import { IconButton } from "@/shared/ui/IconButton";
+import { Select } from "@/shared/ui/Select";
 
 function generationLabel(type: StudioType, stage: CreationStage, primaryLabel: string) {
   if (stage === "draft") return primaryLabel;
@@ -27,6 +28,7 @@ export function CreationComposer({
   onAdvancedOpenChange,
   onDescriptionChange,
   onGenerate,
+  onImageEdit,
   onPromptReview,
   onSettingsChange,
   settings,
@@ -41,6 +43,7 @@ export function CreationComposer({
   onAdvancedOpenChange: (open: boolean) => void;
   onDescriptionChange: (description: string) => void;
   onGenerate: () => void;
+  onImageEdit?: () => void;
   onPromptReview: () => void;
   onSettingsChange: (settings: Partial<CreationSettings>) => void;
   settings: CreationSettings;
@@ -60,7 +63,7 @@ export function CreationComposer({
 
   const referenceButton = (className?: string) => (
     <Button
-      aria-label="添加参考图"
+      aria-label="上传参考图"
       className={className ?? "min-w-0 max-w-[min(48vw,220px)]"}
       disabled={running}
       onClick={() => referenceInputRef.current?.click()}
@@ -68,7 +71,7 @@ export function CreationComposer({
       variant="secondary"
     >
       <ImagePlus aria-hidden="true" />
-      <span className="truncate">{settings.referenceName || "参考图"}</span>
+      <span className="truncate">{settings.referenceName || "上传参考图"}</span>
     </Button>
   );
 
@@ -165,7 +168,6 @@ export function CreationComposer({
                 if (open) openAdvanced();
               }}
               onPromptReview={openPromptReview}
-              referenceAction={referenceButton("max-w-full")}
               onSettingsChange={onSettingsChange}
               settings={settings}
               type={type}
@@ -198,41 +200,67 @@ export function CreationComposer({
           />
         </label>
 
-        <div className="mt-2 flex min-w-0 items-center gap-2">
-          <input
-            accept="image/*"
-            aria-hidden="true"
-            className="sr-only"
-            data-testid="reference-image-input"
-            disabled={running}
-            onChange={(event) =>
-              onSettingsChange({ referenceName: event.target.files?.[0]?.name ?? "" })
-            }
-            ref={referenceInputRef}
-            tabIndex={-1}
-            type="file"
-          />
-          <div className="hidden sm:block">{referenceButton()}</div>
-          <Button
-            aria-controls="creation-settings-panel"
-            aria-expanded={settingsOpen}
-            aria-label="创作设置"
-            className="min-w-0 flex-1 justify-start sm:flex-none sm:justify-center"
-            disabled={running}
-            onClick={toggleSettings}
-            ref={settingsTriggerRef}
-            size="sm"
-            title={settingsSummary}
-            variant="secondary"
-          >
-            <Settings2 aria-hidden="true" />
-            <span className="hidden sm:inline">创作设置</span>
-            <span className="min-w-0 truncate sm:hidden">{settingsSummary}</span>
-          </Button>
+        <div className="mt-2 grid min-w-0 grid-cols-[minmax(0,1fr)_44px] items-end gap-2 sm:grid-cols-[minmax(0,1fr)_40px]">
+          <p className="col-span-2 truncate px-1 text-xs font-medium text-[var(--sh-ink-muted)] sm:hidden">
+            {settingsSummary}
+          </p>
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <input
+              accept="image/*"
+              aria-hidden="true"
+              className="sr-only"
+              data-testid="reference-image-input"
+              disabled={running}
+              onChange={(event) =>
+                onSettingsChange({ referenceName: event.target.files?.[0]?.name ?? "" })
+              }
+              ref={referenceInputRef}
+              tabIndex={-1}
+              type="file"
+            />
+            {referenceButton("min-w-0 max-w-[min(46vw,190px)]")}
+            {type === "image" ? (
+              <Select
+                ariaLabel="图片比例"
+                className="w-[108px] shrink-0"
+                disabled={running}
+                onValueChange={(ratio) => onSettingsChange({ ratio })}
+                options={[
+                  { label: "自动比例", value: "auto" },
+                  { label: "1:1", value: "1:1" },
+                  { label: "4:3", value: "4:3" },
+                  { label: "16:9", value: "16:9" },
+                ]}
+                size="sm"
+                value={settings.ratio}
+              />
+            ) : null}
+            {type === "image" && stage !== "draft" && onImageEdit ? (
+              <Button disabled={running} onClick={onImageEdit} size="sm" variant="secondary">
+                <PencilLine aria-hidden="true" />
+                编辑图片
+              </Button>
+            ) : null}
+            <Button
+              aria-controls="creation-settings-panel"
+              aria-expanded={settingsOpen}
+              aria-label="创作设置"
+              className="w-10 shrink-0 justify-center px-0 sm:w-auto sm:px-3"
+              disabled={running}
+              onClick={toggleSettings}
+              ref={settingsTriggerRef}
+              size="sm"
+              title={settingsSummary}
+              variant="secondary"
+            >
+              <Settings2 aria-hidden="true" />
+              <span className="hidden sm:inline">创作设置</span>
+            </Button>
+          </div>
 
           <IconButton
             aria-keyshortcuts="Enter"
-            className="ml-auto size-11 rounded-full sm:size-10 [&_svg]:size-4"
+            className="size-11 rounded-full sm:size-10 [&_svg]:size-4"
             disabled={!canGenerate}
             label={generateLabel}
             onClick={generate}

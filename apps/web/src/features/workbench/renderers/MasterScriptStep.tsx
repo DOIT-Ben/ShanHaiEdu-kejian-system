@@ -33,6 +33,10 @@ import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { demoProjectId } from "@/shared/data/mockData";
 
+function withoutLegacyScriptPrelude(markdown: string) {
+  return markdown.replace(/^>\s*视频导入母版剧本.*(?:\r?\n){1,2}/, "");
+}
+
 export function MasterScriptStep() {
   const { lessonId = "", projectId = "" } = useParams();
   const runtime = useMockRuntime();
@@ -77,9 +81,11 @@ export function MasterScriptStep() {
   const [items, setItems] = useState(initialItems);
   const [title, setTitle] = useState(initialTitle);
   const [summary, setSummary] = useState(initialSummary);
-  const [markdown, setMarkdown] = useState(
-    saved?.markdown ??
-      serializeMasterScript(initialTitle, initialSummary, initialItems, adoptedOption.handoff),
+  const [markdown, setMarkdown] = useState(() =>
+    withoutLegacyScriptPrelude(
+      saved?.markdown ??
+        serializeMasterScript(initialTitle, initialSummary, initialItems, adoptedOption.handoff),
+    ),
   );
   const [mode, setMode] = useState<DocumentMode>("preview");
   const [dirty, setDirty] = useState(false);

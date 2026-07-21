@@ -114,18 +114,20 @@ export function CreationParameterBar({
           options={modelOptions[type]}
           value={settings.model}
         />
-        <ParameterField
-          ariaLabel="比例"
-          disabled={disabled}
-          label="比例"
-          onChange={(ratio) => onSettingsChange({ ratio })}
-          options={[
-            { label: "16:9", value: "16:9" },
-            { label: "1:1", value: "1:1" },
-            { label: "4:3", value: "4:3" },
-          ]}
-          value={settings.ratio}
-        />
+        {type !== "image" ? (
+          <ParameterField
+            ariaLabel="比例"
+            disabled={disabled}
+            label="比例"
+            onChange={(ratio) => onSettingsChange({ ratio })}
+            options={[
+              { label: "16:9", value: "16:9" },
+              { label: "1:1", value: "1:1" },
+              { label: "4:3", value: "4:3" },
+            ]}
+            value={settings.ratio}
+          />
+        ) : null}
         <ParameterField
           ariaLabel="画面风格"
           disabled={disabled}
