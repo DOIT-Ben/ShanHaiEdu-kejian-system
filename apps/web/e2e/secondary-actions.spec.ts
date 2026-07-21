@@ -62,9 +62,10 @@ test("母版剧本增加场次并刷新后保留", async ({ page }) => {
   await page.reload();
   await expect(page.getByTestId("markdown-preview")).toContainText("场次 4｜回到课堂");
   await page.getByRole("button", { name: "确认母版剧本" }).click();
-  await expect(page.getByRole("button", { name: "编辑", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "编辑", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "重新编辑剧本" }).click();
   await expect(page.getByRole("button", { name: "增加场次" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "编辑", exact: true })).toBeEnabled();
 });
 
 test("封面重新生成和下载预览均有结果", async ({ page }, testInfo) => {

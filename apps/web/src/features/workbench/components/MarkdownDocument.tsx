@@ -43,31 +43,32 @@ export function MarkdownDocument({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {extraActions}
-          <div
-            aria-label="稿件视图"
-            className="inline-flex rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-soft)] p-1"
-            role="group"
-          >
-            <button
-              aria-pressed={mode === "preview"}
-              className={`inline-flex min-h-8 items-center gap-1.5 rounded-[var(--sh-radius-sm)] px-3 text-sm font-medium ${mode === "preview" ? "bg-[var(--sh-surface-elevated)] text-[var(--sh-ink-strong)] shadow-[var(--sh-shadow-card)]" : "text-[var(--sh-ink-muted)]"}`}
-              onClick={() => onModeChange("preview")}
-              type="button"
+          {!readOnly ? (
+            <div
+              aria-label="稿件视图"
+              className="inline-flex rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-soft)] p-1"
+              role="group"
             >
-              <Eye aria-hidden="true" className="size-4" />
-              预览
-            </button>
-            <button
-              aria-pressed={mode === "edit"}
-              className={`inline-flex min-h-8 items-center gap-1.5 rounded-[var(--sh-radius-sm)] px-3 text-sm font-medium ${mode === "edit" ? "bg-[var(--sh-surface-elevated)] text-[var(--sh-ink-strong)] shadow-[var(--sh-shadow-card)]" : "text-[var(--sh-ink-muted)]"}`}
-              disabled={readOnly}
-              onClick={() => onModeChange("edit")}
-              type="button"
-            >
-              <PencilLine aria-hidden="true" className="size-4" />
-              编辑
-            </button>
-          </div>
+              <button
+                aria-pressed={mode === "preview"}
+                className={`inline-flex min-h-8 items-center gap-1.5 rounded-[var(--sh-radius-sm)] px-3 text-sm font-medium ${mode === "preview" ? "bg-[var(--sh-surface-elevated)] text-[var(--sh-ink-strong)] shadow-[var(--sh-shadow-card)]" : "text-[var(--sh-ink-muted)]"}`}
+                onClick={() => onModeChange("preview")}
+                type="button"
+              >
+                <Eye aria-hidden="true" className="size-4" />
+                预览
+              </button>
+              <button
+                aria-pressed={mode === "edit"}
+                className={`inline-flex min-h-8 items-center gap-1.5 rounded-[var(--sh-radius-sm)] px-3 text-sm font-medium ${mode === "edit" ? "bg-[var(--sh-surface-elevated)] text-[var(--sh-ink-strong)] shadow-[var(--sh-shadow-card)]" : "text-[var(--sh-ink-muted)]"}`}
+                onClick={() => onModeChange("edit")}
+                type="button"
+              >
+                <PencilLine aria-hidden="true" className="size-4" />
+                编辑
+              </button>
+            </div>
+          ) : null}
           {dirty ? (
             <Button onClick={onSave} size="sm">
               <Save aria-hidden="true" />
@@ -81,7 +82,7 @@ export function MarkdownDocument({
           )}
         </div>
       </div>
-      {mode === "edit" ? (
+      {mode === "edit" && !readOnly ? (
         <label className="block" htmlFor={editorId}>
           <span className="sr-only">{ariaLabel}</span>
           <textarea

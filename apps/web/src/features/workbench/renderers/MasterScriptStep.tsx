@@ -225,7 +225,7 @@ export function MasterScriptStep() {
                 variant="secondary"
               >
                 <PencilLine aria-hidden="true" />
-                重新编辑
+                重新编辑剧本
               </Button>
               <Button asChild size="md">
                 <Link to={`/app/projects/${projectId}/lessons/${lessonId}/work/rough-storyboard`}>
