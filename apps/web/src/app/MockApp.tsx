@@ -193,6 +193,10 @@ export function MockApp() {
                   path="creation/presentations"
                 />
                 <Route element={<CreationBatchPage />} path="creation/batches/:batchId" />
+                <Route
+                  element={<CreationBatchPage />}
+                  path="projects/:projectId/lessons/:lessonId/creation-batches/:batchId"
+                />
                 <Route element={<TasksPage />} path="tasks" />
               </Route>
             </Route>

@@ -21,6 +21,7 @@ import {
   updateMockNodeState,
   useMockRuntime,
 } from "@/shared/api/mocks/runtime";
+import { saveMockResult, type MockSavedResult } from "@/shared/api/mocks/savedResults";
 import { Button } from "@/shared/ui/Button";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { requiredItem } from "@/shared/lib/requiredItem";
@@ -75,14 +76,19 @@ type SavedBatchState = {
 };
 
 export function CreationBatchPage() {
-  const { batchId = "mock-batch" } = useParams();
+  const {
+    batchId = "mock-batch",
+    lessonId: routeLessonId,
+    projectId: routeProjectId,
+  } = useParams();
   const [searchParams] = useSearchParams();
   const runtime = useMockRuntime();
   const sourcePayload = batchId.startsWith("video-assets-")
     ? batchId.slice("video-assets-".length)
     : undefined;
   const [sourceProjectFromBatch, sourceLessonFromBatch] = sourcePayload?.split("--lesson--") ?? [];
-  const requestedSourceProjectId = searchParams.get("sourceProjectId") ?? undefined;
+  const requestedSourceProjectId =
+    routeProjectId ?? searchParams.get("sourceProjectId") ?? undefined;
   const sourceProjectMismatch = Boolean(
     sourceProjectFromBatch &&
     requestedSourceProjectId &&
@@ -90,7 +96,7 @@ export function CreationBatchPage() {
   );
   const sourceProjectCandidateId = sourceProjectFromBatch ?? requestedSourceProjectId;
   const sourceProject = runtime.projects.find((project) => project.id === sourceProjectCandidateId);
-  const requestedSourceLessonId = searchParams.get("lessonId") ?? undefined;
+  const requestedSourceLessonId = routeLessonId ?? searchParams.get("lessonId") ?? undefined;
   const sourceLessonMismatch = Boolean(
     sourceLessonFromBatch &&
     requestedSourceLessonId &&
@@ -184,8 +190,12 @@ export function CreationBatchPage() {
       : !adopted
         ? "先比较下面三张作品，选中最合适的一张，再点击“就用这张”。"
         : !saved
-          ? "这张已经选好了。下一步点击右上角“保存到项目”。"
-          : "这张已经放进项目，可以继续查看左侧的其他画面。";
+          ? sourceProjectId && sourceLessonId
+            ? "选好后点击“就用这张”，系统会自动保存到当前项目。"
+            : "这张已经选好了。下一步点击右上角“保存到项目”。"
+          : sourceProjectId && sourceLessonId
+            ? "这张已经自动保存到当前项目，可以继续处理左侧的其他画面。"
+            : "这张已经放进项目，可以继续查看左侧的其他画面。";
   const preserveApprovedAssetsBaseline = () => {
     if (
       !approvedAssetsKey ||
@@ -228,13 +238,85 @@ export function CreationBatchPage() {
       });
     }
   };
+  const handleSavedResult = (savedResult: MockSavedResult) => {
+    const projectTitle = runtime.projects.find(
+      (project) => project.id === savedResult.projectId,
+    )?.title;
+    const countsForSource = hasSourceContext
+      ? savedResult.projectId === sourceProjectId &&
+        savedResult.slotKey === `video.asset.${batchId}.${String(selected)}`
+      : true;
+    const nextStatuses = statuses.map((status, index) =>
+      countsForSource && index === selected ? "approved" : status,
+    );
+    const nextSavedItems = countsForSource ? [...new Set([...savedItems, selected])] : savedItems;
+    const nextResultIds = countsForSource
+      ? { ...resultIds, [String(selected)]: savedResult.resultId }
+      : resultIds;
+    const allAssetsApproved = nextStatuses.every((status) => status === "approved");
+    updateBatch({
+      message:
+        sourceProjectId && sourceLessonId
+          ? "作品已自动保存到当前项目。"
+          : "作品已经保存，可在目标项目的素材与成果中查看。",
+      adopted: countsForSource,
+      saved: true,
+      savedItems: nextSavedItems,
+      resultIds: nextResultIds,
+      savedTarget: `${projectTitle ?? "目标项目"} · ${savedResult.slotLabel}`,
+      statuses: nextStatuses,
+    });
+    if (countsForSource && sourceProjectId && sourceLessonId) {
+      const currentApprovedAssetsKey = `project:${sourceProjectId}:lesson:${sourceLessonId}:video-assets:approved`;
+      const previousApproved = runtime.drafts[currentApprovedAssetsKey]?.value as
+        { resultIds?: Record<string, string> } | undefined;
+      if (
+        allAssetsApproved &&
+        JSON.stringify(previousApproved?.resultIds ?? {}) !== JSON.stringify(nextResultIds)
+      ) {
+        markVideoAssetsDependentsStale(runtime, sourceProjectId, sourceLessonId);
+      }
+      if (allAssetsApproved) {
+        saveMockDraft(
+          currentApprovedAssetsKey,
+          { resultIds: nextResultIds },
+          { lessonId: sourceLessonId, nodeKey: "video-assets", projectId: sourceProjectId },
+        );
+      }
+      updateMockNodeState(sourceProjectId, sourceLessonId, "video-assets", {
+        stale_reason: null,
+        status: allAssetsApproved ? "approved" : "review_required",
+        title: "制作镜头图片",
+      });
+    }
+  };
+  const saveSelectedToSourceProject = () => {
+    if (!sourceProjectId || !sourceLessonId) return;
+    handleSavedResult(
+      saveMockResult({
+        lessonLabel: "当前课时",
+        preview: { candidate: selectedCandidate, generation: 0, ratio: "1:1" },
+        projectId: sourceProjectId,
+        replaceMode: "replace",
+        resultId: `batch-${batchId}-item-${String(selected)}-candidate-${String(selectedCandidate + 1)}`,
+        slotKey: `video.asset.${batchId}.${String(selected)}`,
+        slotLabel: `${item.title}（视频画面素材）`,
+        title: `${item.title} · 作品 ${String(selectedCandidate + 1)}`,
+        type: "image",
+      }),
+    );
+  };
   return (
     <div className="flex min-h-[calc(100dvh-var(--sh-topbar-height))] flex-col bg-[var(--sh-surface-canvas)]">
       <header className="flex min-h-14 items-center gap-3 border-b border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] px-4">
         <Link
-          aria-label="返回创作中心"
+          aria-label={sourceProjectId && sourceLessonId ? "返回项目工作台" : "返回创作中心"}
           className="inline-grid size-10 shrink-0 place-items-center rounded-[var(--sh-radius-sm)] text-[var(--sh-ink-muted)] hover:bg-[var(--sh-surface-soft)]"
-          to="/app/creation"
+          to={
+            sourceProjectId && sourceLessonId
+              ? `/app/projects/${sourceProjectId}/lessons/${sourceLessonId}/work/video-assets`
+              : "/app/creation"
+          }
         >
           <ChevronLeft aria-hidden="true" className="size-5" />
         </Link>
@@ -245,13 +327,21 @@ export function CreationBatchPage() {
         <span className="ml-auto hidden text-xs text-[var(--sh-ink-muted)] sm:block">
           来源：{sourceProject?.title ?? "独立创作"} · {sourceLessonId ? "当前课时" : "待保存"}
         </span>
-        <Button
-          disabled={!adopted || saved || sourceContextInvalid}
-          onClick={() => setSaveOpen(true)}
-          ref={saveTriggerRef}
-        >
-          {saved ? "已保存到项目" : "保存到项目"}
-        </Button>
+        {sourceProjectId && sourceLessonId ? (
+          saved ? (
+            <Button asChild>
+              <Link to={`/app/projects/${sourceProjectId}/results`}>查看项目资产</Link>
+            </Button>
+          ) : null
+        ) : (
+          <Button
+            disabled={!adopted || saved || sourceContextInvalid}
+            onClick={() => setSaveOpen(true)}
+            ref={saveTriggerRef}
+          >
+            {saved ? "已保存到项目" : "保存到项目"}
+          </Button>
+        )}
       </header>
       {sourceContextInvalid ? (
         <div
@@ -277,7 +367,7 @@ export function CreationBatchPage() {
                 key={batchItem.title}
                 onClick={() => {
                   updateBatch({
-                    adopted: (statuses[index] ?? batchItem.status) === "approved",
+                    adopted: savedItems.includes(index),
                     message: "",
                     saved: savedItems.includes(index),
                     savedTarget: savedItems.includes(index) ? "已保存的项目位置" : undefined,
@@ -384,6 +474,10 @@ export function CreationBatchPage() {
                     className="w-full"
                     disabled={item.status === "failed" || adopted}
                     onClick={() => {
+                      if (sourceProjectId && sourceLessonId) {
+                        saveSelectedToSourceProject();
+                        return;
+                      }
                       updateBatch({
                         adopted: true,
                         message: `已选好作品 ${String(selectedCandidate + 1)}`,
@@ -467,89 +561,42 @@ export function CreationBatchPage() {
             ) : null}
             {saved ? (
               <p className="mt-5 rounded-[var(--sh-radius-sm)] bg-[var(--sh-success-soft)] p-4 text-sm font-semibold text-[var(--sh-ink-strong)]">
-                已保存到“{savedTarget ?? sourceProject?.title ?? "目标项目"}
+                {sourceProjectId && sourceLessonId ? "已自动保存到" : "已保存到"}“
+                {savedTarget ?? sourceProject?.title ?? "目标项目"}
                 ”，其他没有选中的作品不会放进项目。
               </p>
             ) : null}
           </div>
         </div>
       </div>
-      <SaveToProjectDialog
-        customSlots={
-          sourceProjectId && sourceLessonId
-            ? [
-                {
-                  accepts: ["image"],
-                  key: `video.asset.${batchId}.${String(selected)}`,
-                  label: `${item.title}（视频画面素材）`,
-                },
-              ]
-            : undefined
-        }
-        lockSourceProject={Boolean(sourceProjectId)}
-        onOpenChange={setSaveOpen}
-        onSaved={(savedResult) => {
-          const projectTitle = runtime.projects.find(
-            (project) => project.id === savedResult.projectId,
-          )?.title;
-          const countsForSource = hasSourceContext
-            ? savedResult.projectId === sourceProjectId &&
-              savedResult.slotKey === `video.asset.${batchId}.${String(selected)}`
-            : true;
-          const nextStatuses = statuses.map((status, index) =>
-            countsForSource && index === selected ? "approved" : status,
-          );
-          const nextSavedItems = countsForSource
-            ? [...new Set([...savedItems, selected])]
-            : savedItems;
-          const nextResultIds = countsForSource
-            ? { ...resultIds, [String(selected)]: savedResult.resultId }
-            : resultIds;
-          const allAssetsApproved = nextStatuses.every((status) => status === "approved");
-          updateBatch({
-            message: "作品已经保存，可在目标项目的素材与成果中查看。",
-            adopted: countsForSource,
-            saved: true,
-            savedItems: nextSavedItems,
-            resultIds: nextResultIds,
-            savedTarget: `${projectTitle ?? "目标项目"} · ${savedResult.slotLabel}`,
-            statuses: nextStatuses,
-          });
-          if (countsForSource && sourceProjectId && sourceLessonId) {
-            const currentApprovedAssetsKey = `project:${sourceProjectId}:lesson:${sourceLessonId}:video-assets:approved`;
-            const previousApproved = runtime.drafts[currentApprovedAssetsKey]?.value as
-              { resultIds?: Record<string, string> } | undefined;
-            if (
-              allAssetsApproved &&
-              JSON.stringify(previousApproved?.resultIds ?? {}) !== JSON.stringify(nextResultIds)
-            ) {
-              markVideoAssetsDependentsStale(runtime, sourceProjectId, sourceLessonId);
-            }
-            if (allAssetsApproved) {
-              saveMockDraft(
-                currentApprovedAssetsKey,
-                { resultIds: nextResultIds },
-                { lessonId: sourceLessonId, nodeKey: "video-assets", projectId: sourceProjectId },
-              );
-            }
-            updateMockNodeState(sourceProjectId, sourceLessonId, "video-assets", {
-              stale_reason: null,
-              status: allAssetsApproved ? "approved" : "review_required",
-              title: "制作镜头图片",
-            });
+      {!sourceProjectId ? (
+        <SaveToProjectDialog
+          customSlots={
+            sourceProjectId && sourceLessonId
+              ? [
+                  {
+                    accepts: ["image"],
+                    key: `video.asset.${batchId}.${String(selected)}`,
+                    label: `${item.title}（视频画面素材）`,
+                  },
+                ]
+              : undefined
           }
-        }}
-        open={saveOpen}
-        result={{
-          id: `batch-${batchId}-item-${String(selected)}-candidate-${String(selectedCandidate + 1)}`,
-          preview: { candidate: selectedCandidate, generation: 0, ratio: "1:1" },
-          title: `${item.title} · 作品 ${String(selectedCandidate + 1)}`,
-          type: "image",
-          lessonLabel: sourceLessonId ? "当前课时" : "多张作品",
-        }}
-        returnFocusRef={saveTriggerRef}
-        sourceProjectId={sourceProjectId}
-      />
+          lockSourceProject={Boolean(sourceProjectId)}
+          onOpenChange={setSaveOpen}
+          onSaved={handleSavedResult}
+          open={saveOpen}
+          result={{
+            id: `batch-${batchId}-item-${String(selected)}-candidate-${String(selectedCandidate + 1)}`,
+            preview: { candidate: selectedCandidate, generation: 0, ratio: "1:1" },
+            title: `${item.title} · 作品 ${String(selectedCandidate + 1)}`,
+            type: "image",
+            lessonLabel: sourceLessonId ? "当前课时" : "多张作品",
+          }}
+          returnFocusRef={saveTriggerRef}
+          sourceProjectId={sourceProjectId}
+        />
+      ) : null}
     </div>
   );
 }

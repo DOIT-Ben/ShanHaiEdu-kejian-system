@@ -79,6 +79,18 @@ test("新项目可以只通过页面操作走到真实视频生成门槛", async
   await page.getByRole("button", { name: "采用这个画面风格" }).click();
   await page.goto(`${workUrl}/video-assets`);
   await page.getByRole("link", { name: "开始制作镜头图片" }).click();
+  await expect(page).toHaveURL(
+    new RegExp(`/app/projects/${projectId}/lessons/${lessonId}/creation-batches/`),
+  );
+  await expect(page.getByRole("link", { name: "项目", exact: true })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await expect(page.getByRole("link", { name: "创作中心", exact: true })).not.toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await expect(page.getByRole("link", { name: "返回项目工作台" })).toBeVisible();
 
   const assetCards = page.locator("aside").first().getByRole("button");
   await expect(assetCards).toHaveCount(4);
@@ -88,12 +100,8 @@ test("新项目可以只通过页面操作走到真实视频生成门槛", async
     if (await retry.isVisible()) await retry.click();
     const adoptAsset = page.getByRole("button", { name: "就用这张" });
     if (await adoptAsset.isVisible()) await adoptAsset.click();
-    await page.getByRole("button", { name: "保存到项目" }).click();
-    await page
-      .getByRole("dialog", { name: "保存到项目" })
-      .getByRole("button", { name: "保存到这个位置" })
-      .click();
-    await expect(page.getByText("已保存到项目", { exact: true })).toBeVisible();
+    await expect(page.getByText(/已自动保存到“/)).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "保存到项目" })).toHaveCount(0);
   }
 
   await page.goto(`${workUrl}/video-assets`);
