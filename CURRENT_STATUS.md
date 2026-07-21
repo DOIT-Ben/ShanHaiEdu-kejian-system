@@ -38,7 +38,7 @@
 - [Issue #146](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/146)与[PR #148](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/148)已经关闭并合并，P0安全与发布固定性缺口已经收口。
 - [Issue #89](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/89)、[Decision #153](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/153)与[PR #147](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/147)已经关闭并合并：通用节点执行器、两阶段事务、确定性Fake、完整血缘、幂等/取消/恢复/回滚/并发、私有恢复事实保留期和CreationPackage固定条件已经进入主线。
 - [Issue #133](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/133)与[PR #164](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/164)已经关闭并合并：Artifact与FileAsset质量源可形成不可变ArtifactQualityReport，并与validate NodeRun终态和事件原子提交。
-- [Issue #134](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/134)已经在当前树实现：所有Artifact批准入口从项目固定发布合同解析exact质量要求，只接受当前submitted版本的passing报告，用户与系统身份不能伪造或绕过服务端证据。
+- [Issue #134](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/134)与[PR #174](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/174)已经在当前树实现：所有Artifact批准入口从项目固定发布合同解析exact质量要求，只接受当前submitted版本的passing报告，用户与系统身份不能伪造或绕过服务端证据。
 - [Issue #90](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/90)已经完成GenerationAttempt租约、心跳、过期恢复、并发安全序号、未知提交与取消协调；失去租约的Worker不能覆盖终态，历史未知提交不会自动重提或重复写入用量。
 - [Issue #85](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/85)与[PR #98](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/98)已经把37个运行时操作与5个规划操作分层，生成客户端只保留真实可调用接口，CI会拒绝静态合同与FastAPI运行时双向漂移。
 - [Issue #44](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/44)的实现已经提供TemplateDraft到结构化内容包的确定性编译入口、CompilationProfile、CLI和合同测试。
