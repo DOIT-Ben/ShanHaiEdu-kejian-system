@@ -5,6 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock
+from uuid import uuid4
 
 import pytest
 
@@ -61,6 +62,18 @@ async def test_video_smoke_configuration_failure_excludes_prompt(capsys) -> None
     assert summary["conclusion"] == "failed"
     assert "prompt" not in summary
     assert "must-not-appear" not in json.dumps(summary)
+
+
+async def test_video_smoke_rejects_an_unpaired_private_media_selector(capsys) -> None:
+    exit_code = await run_video_smoke(
+        prompt="a short test video",
+        duration_seconds=6,
+        file_version_id=uuid4(),
+    )
+
+    summary = json.loads(capsys.readouterr().out)
+    assert exit_code == 1
+    assert summary["error_code"] == GatewayErrorCode.INVALID_RESPONSE.value
 
 
 async def test_video_smoke_success_uses_the_minimal_auditable_summary(

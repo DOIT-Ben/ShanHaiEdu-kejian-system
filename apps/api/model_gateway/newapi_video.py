@@ -25,8 +25,8 @@ from apps.api.model_gateway.contracts import (
     VideoPollRequest,
     VideoProviderResult,
 )
-from apps.api.model_gateway.openai_compatible import map_provider_error
 from apps.api.model_gateway.newapi_video_submission import build_newapi_video_submission_payload
+from apps.api.model_gateway.openai_compatible import map_provider_error
 from apps.api.model_gateway.provider_media import ProviderMediaReferenceResolver
 from apps.api.model_gateway.video_store import StoredVideoFile, VideoResultStore
 

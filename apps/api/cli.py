@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import asyncio
 import json
 import tempfile
@@ -10,6 +9,7 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from uuid import UUID
 
 from apps.api.content_runtime.package_source import load_builtin_courseware_release
 from apps.api.content_runtime.publication_service import ContentReleasePublisher
@@ -31,8 +31,12 @@ from apps.api.model_gateway.contracts import (
 from apps.api.model_gateway.factory import build_real_text_gateway, build_real_video_gateway
 from apps.api.model_gateway.fake import DeterministicFakeTextProvider
 from apps.api.model_gateway.gateway import ModelGateway
-from apps.api.model_gateway.video_store import LocalVideoSmokeStore
 from apps.api.model_gateway.video_smoke import VideoProbeError, VideoProbeResult, probe_mp4
+from apps.api.model_gateway.video_smoke_media import (
+    VideoSmokeMediaContext,
+    open_video_smoke_media_context,
+)
+from apps.api.model_gateway.video_store import LocalVideoSmokeStore
 from apps.api.model_registry import register_models
 from apps.api.settings import Settings, get_settings
 
@@ -160,6 +164,8 @@ async def run_video_smoke(
     prompt: str,
     duration_seconds: int,
     output_dir: Path | None = None,
+    organization_id: UUID | None = None,
+    file_version_id: UUID | None = None,
 ) -> int:
     settings = get_settings()
     configure_logging(
@@ -178,13 +184,19 @@ async def run_video_smoke(
     request_id = f"req_video_smoke_{new_uuid7()}"
     started_at = time.perf_counter()
     try:
-        outcome = await _execute_video_smoke(
-            settings=settings,
-            storage=storage,
-            request_id=request_id,
-            prompt=prompt,
-            duration_seconds=duration_seconds,
-        )
+        with open_video_smoke_media_context(
+            settings,
+            organization_id=organization_id,
+            file_version_id=file_version_id,
+        ) as media_context:
+            outcome = await _execute_video_smoke(
+                settings=settings,
+                storage=storage,
+                request_id=request_id,
+                prompt=prompt,
+                duration_seconds=duration_seconds,
+                media_context=media_context,
+            )
     except ModelGatewayError as error:
         return _video_smoke_failure(settings, error, request_id=request_id)
     except VideoProbeError:
@@ -213,8 +225,13 @@ async def _execute_video_smoke(
     request_id: str,
     prompt: str,
     duration_seconds: int,
+    media_context: VideoSmokeMediaContext | None = None,
 ) -> _VideoSmokeOutcome:
-    gateway, provider = build_real_video_gateway(settings, store=storage)
+    gateway, provider = build_real_video_gateway(
+        settings,
+        store=storage,
+        media_reference_resolver=(media_context.resolver if media_context is not None else None),
+    )
     try:
         submitted = await gateway.submit_video(
             VideoModelRequest(
@@ -222,7 +239,11 @@ async def _execute_video_smoke(
                 request_id=request_id,
                 prompt=prompt,
                 duration_seconds=duration_seconds,
-            )
+                references=[media_context.reference] if media_context is not None else [],
+            ),
+            media_organization_id=(
+                media_context.organization_id if media_context is not None else None
+            ),
         )
         result = await wait_for_video_completion(gateway, settings, submitted)
         if result.status != VideoOperationStatus.SUCCEEDED or len(result.files) != 1:
@@ -336,48 +357,9 @@ def _error_summary(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="ShanHaiEdu administrative commands")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-    smoke = subparsers.add_parser("model-smoke", help="run an explicit text model smoke")
-    smoke.add_argument(
-        "--capability",
-        choices=[capability.value for capability in TEXT_SMOKE_CAPABILITIES],
-        required=True,
-    )
-    smoke.add_argument("--real", action="store_true")
-    video_smoke = subparsers.add_parser(
-        "video-smoke",
-        help="run an explicit billable video Provider smoke",
-    )
-    video_smoke.add_argument("--prompt", required=True)
-    video_smoke.add_argument("--duration-seconds", type=int, default=6)
-    video_smoke.add_argument("--output-dir", type=Path)
-    video_smoke.add_argument("--real", action="store_true")
-    subparsers.add_parser(
-        "publish-golden-content",
-        help="publish the validated built-in content package and activate it for new projects",
-    )
-    args = parser.parse_args()
-    if args.command == "model-smoke":
-        return asyncio.run(
-            run_model_smoke(
-                capability=ModelCapability(args.capability),
-                real=bool(args.real),
-            )
-        )
-    if args.command == "video-smoke":
-        if not args.real:
-            parser.error("video-smoke requires --real")
-        return asyncio.run(
-            run_video_smoke(
-                prompt=args.prompt,
-                duration_seconds=args.duration_seconds,
-                output_dir=args.output_dir,
-            )
-        )
-    if args.command == "publish-golden-content":
-        return run_publish_golden_content()
-    return 2
+    from apps.api.cli_main import main as command_main
+
+    return command_main()
 
 
 if __name__ == "__main__":
