@@ -50,13 +50,22 @@ This service exposes one short-lived, signed PNG/JPEG/WebP GET path to an extern
 
    ```bash
    systemctl daemon-reload
-   systemctl enable --now shanhai-provider-media-relay.service
+   systemctl enable shanhai-provider-media-relay.service
+   systemctl restart shanhai-provider-media-relay.service
    systemctl enable --now provider-media-cleanup.timer
    systemctl is-active --quiet shanhai-provider-media-relay.service
    systemctl is-active --quiet provider-media-cleanup.timer
+   test "$(systemctl show shanhai-provider-media-relay.service -p User --value)" = "shanhai-relay"
+   systemctl show shanhai-provider-media-relay.service -p ExecStart --value | grep -Fq '/opt/shanhaiedu/provider-media-relay/provider_media_relay.py'
+   relay_pid="$(systemctl show shanhai-provider-media-relay.service -p MainPID --value)"
+   test "$(stat -c '%U' "/proc/${relay_pid}")" = "shanhai-relay"
+   if sudo -u shanhai-dev -- cat "/proc/${relay_pid}/environ" >/dev/null 2>&1; then exit 1; fi
+   unset relay_pid
    nginx -t
    systemctl reload nginx
    ```
+
+   The explicit restart is mandatory for an existing active deployment: `enable --now` alone does not replace the old process identity, code path, environment, or signing secret.
 
 ## HTTPS Smoke
 

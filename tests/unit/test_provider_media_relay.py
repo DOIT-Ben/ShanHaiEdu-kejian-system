@@ -158,6 +158,7 @@ def test_expired_media_cleanup_is_scheduled_independently() -> None:
     cleanup_env = (
         root / "infra/provider-media-relay/provider-media-cleanup.env.example"
     ).read_text(encoding="utf-8")
+    runbook = (root / "infra/provider-media-relay/README.md").read_text(encoding="utf-8")
 
     assert "User=shanhai-relay" in relay_service
     assert "User=shanhai-dev" not in relay_service
@@ -169,3 +170,5 @@ def test_expired_media_cleanup_is_scheduled_independently() -> None:
     assert "ReadWritePaths=/srv/shanhaiedu/runtime/provider-media" in service
     assert "OnUnitActiveSec=60s" in timer
     assert "Persistent=true" in timer
+    assert "systemctl restart shanhai-provider-media-relay.service" in runbook
+    assert "/proc/${relay_pid}/environ" in runbook
