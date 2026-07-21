@@ -9,7 +9,10 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from apps.api.identity.context import ActorContext
+from apps.api.model_gateway.attempt_success import complete_attempt_success
 from apps.api.model_gateway.audit_models import GenerationAttempt, UsageRecord
+from apps.api.model_gateway.contracts import ModelAuditContext
+from apps.api.model_gateway.pending import PendingTextGeneration
 
 
 class AttemptExecutionPortError(ValueError):
@@ -142,3 +145,48 @@ class SqlAlchemyAttemptExecutionPort:
             usage_id=usage.id,
             attempt_no=attempt.attempt_no,
         )
+
+    def checkpoint_text_success(
+        self,
+        pending: PendingTextGeneration,
+        *,
+        context: ModelAuditContext,
+    ) -> AttemptEvidence:
+        """Finalize Attempt and Usage in the caller's recovery-fact transaction."""
+
+        if pending.lease is None or pending.audit_context != context:
+            raise AttemptExecutionPortError(
+                "NODE_EXECUTION_ATTEMPT_CONTEXT_MISMATCH",
+                "the pending model result is not bound to this execution",
+            )
+        outcome, usage_id = complete_attempt_success(
+            self._session,
+            pending.lease,
+            context,
+            pending.success_audit,
+            latency_ms=pending.result.latency_ms,
+        )
+        if outcome.value != "succeeded":
+            raise AttemptExecutionPortError(
+                "NODE_EXECUTION_CANCEL_REQUESTED",
+                "the model attempt was cancelled before checkpoint",
+            )
+        return AttemptEvidence(
+            attempt_id=pending.lease.attempt_id,
+            usage_id=usage_id,
+            attempt_no=self._attempt_no(pending.lease.attempt_id),
+        )
+
+    def _attempt_no(self, attempt_id: UUID) -> int:
+        value = self._session.scalar(
+            select(GenerationAttempt.attempt_no).where(
+                GenerationAttempt.id == attempt_id,
+                GenerationAttempt.organization_id == self._actor.organization_id,
+            )
+        )
+        if value is None:
+            raise AttemptExecutionPortError(
+                "NODE_EXECUTION_ATTEMPT_NOT_FOUND",
+                "the model attempt is not visible",
+            )
+        return int(value)

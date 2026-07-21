@@ -36,7 +36,6 @@ def validate_execution_boundary(
             "NODE_EXECUTION_KIND_UNSUPPORTED",
             "the generic executor only accepts published model-generation nodes",
         )
-
     binding = definition.node_binding
     if not _binding_matches_execution(binding, definition, execution):
         raise NodeExecutionBoundaryError(
@@ -58,6 +57,24 @@ def validate_execution_boundary(
             "NODE_EXECUTION_CONTENT_DEFINITION_MISMATCH",
             "the output content definition is not fixed to the project release",
         )
+
+
+def same_fixed_execution(
+    current: WorkflowExecutionContext,
+    frozen: WorkflowExecutionContext,
+) -> bool:
+    return (
+        current.organization_id == frozen.organization_id
+        and current.project_id == frozen.project_id
+        and current.workflow_run_id == frozen.workflow_run_id
+        and current.node_run_id == frozen.node_run_id
+        and current.content_release_id == frozen.content_release_id
+        and current.workflow_definition_version_id == frozen.workflow_definition_version_id
+        and current.node_key == frozen.node_key
+        and current.branch_key == frozen.branch_key
+        and current.lesson_key == frozen.lesson_key
+        and current.lesson_unit_id == frozen.lesson_unit_id
+    )
 
 
 def _binding_matches_execution(

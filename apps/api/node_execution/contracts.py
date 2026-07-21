@@ -8,10 +8,12 @@ from typing import Any, Protocol
 from uuid import UUID
 
 from apps.api.model_gateway.contracts import (
+    GatewayErrorCode,
     ModelAuditContext,
-    TextGatewayResult,
     TextModelRequest,
 )
+from apps.api.model_gateway.pending import PendingTextGeneration
+from apps.api.model_gateway.ports import CancellationToken
 from apps.api.runtime_boundary.ports import (
     ArtifactContextVersion,
     FrozenSnapshotRefs,
@@ -50,6 +52,7 @@ class PreparedNodeExecution:
     pre_model_error_message: str | None = None
     commit_context: NodeExecutionCommitContext | None = None
     committed_result: CommittedNodeExecution | None = None
+    recovery_available: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,12 +67,14 @@ class CommittedNodeExecution:
 class NodeExecutionTransaction(Protocol):
     def prepare(self, node_run_id: UUID, request_id: str) -> PreparedNodeExecution: ...
 
-    def commit(
+    def checkpoint(
         self,
         execution: PreparedNodeExecution,
         output: dict[str, Any],
-        result: TextGatewayResult,
-    ) -> CommittedNodeExecution: ...
+        pending: PendingTextGeneration,
+    ) -> None: ...
+
+    def commit(self, execution: PreparedNodeExecution) -> CommittedNodeExecution: ...
 
     def terminalize_failure(
         self,
@@ -82,3 +87,20 @@ class NodeExecutionTransaction(Protocol):
 
 class NodeExecutionTransactionFactory(Protocol):
     def begin(self) -> AbstractContextManager[NodeExecutionTransaction]: ...
+
+
+class NodeExecutionModelPort(Protocol):
+    async def generate_text_pending(
+        self,
+        request: TextModelRequest,
+        *,
+        cancellation: CancellationToken | None = None,
+        audit_context: ModelAuditContext | None = None,
+    ) -> PendingTextGeneration: ...
+
+    def fail_text_pending(
+        self,
+        pending: PendingTextGeneration,
+        *,
+        code: GatewayErrorCode = GatewayErrorCode.INVALID_RESPONSE,
+    ) -> None: ...

@@ -14,6 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.artifacts.domain import canonical_content_hash
+from apps.api.artifacts.execution_port import ArtifactExecutionPortError, SqlAlchemyArtifactPort
 from apps.api.artifacts.models import Artifact, ArtifactRelation, ArtifactVersion
 from apps.api.artifacts.relation_service import ArtifactRelationService
 from apps.api.assets.models import FileAsset, FileAssetVersion, MaterialParseVersion
@@ -31,13 +32,17 @@ from apps.api.model_gateway.audit_models import GenerationAttempt, UsageRecord
 from apps.api.model_gateway.contracts import ModelCapability, TextModelRequest, TextProviderResult
 from apps.api.model_gateway.fake import DeterministicFakeTextProvider, FakeScenario
 from apps.api.model_gateway.gateway import ModelGateway
-from apps.api.node_execution.contracts import NodeExecutionError
+from apps.api.node_execution.contracts import NodeExecutionError, PreparedNodeExecution
 from apps.api.node_execution.fake import DeterministicNodeOutputProvider
+from apps.api.node_execution.materials import collect_upstream_artifacts
+from apps.api.node_execution.models import NodeExecutionRecoveryFact
 from apps.api.node_execution.service import NodeExecutionService
 from apps.api.node_execution.sqlalchemy import SqlAlchemyNodeExecutionTransactionFactory
+from apps.api.node_execution.structured_output import validate_structured_output
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.prompt_runtime.models import ContextSnapshot, PromptSnapshot
+from apps.api.runtime_boundary.ports import WorkflowExecutionContext
 from apps.api.uploads.models import SourceMaterial
 from apps.api.workflows.execution_port import WorkflowExecutionPortError
 from apps.api.workflows.models import (
@@ -235,6 +240,11 @@ async def test_cancel_requested_after_model_success_rolls_back_t2(
         assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 0
         assert _count(session, GenerationAttempt, "node_run_id", seeded.node_run_id) == 1
         assert _count(session, UsageRecord, "node_run_id", seeded.node_run_id) == 1
+        attempt = session.scalar(
+            select(GenerationAttempt).where(GenerationAttempt.node_run_id == seeded.node_run_id)
+        )
+        assert attempt is not None and attempt.status == "cancelled"
+        assert session.scalar(select(func.count()).select_from(NodeExecutionRecoveryFact)) == 0
 
 
 @pytest.mark.parametrize("fault_stage", ["after_artifact", "after_package", "before_transition"])
@@ -349,7 +359,7 @@ async def test_worker_recovery_after_t1_does_not_repeat_provider_call(
         assert _count(session, UsageRecord, "node_run_id", seeded.node_run_id) == 1
 
 
-async def test_successful_attempt_before_t2_fails_closed_without_second_attempt(
+async def test_successful_attempt_before_t2_recovers_from_isolated_fact_without_second_attempt(
     migrated_database_url: str,
 ) -> None:
     factory = build_session_factory(build_engine(migrated_database_url))
@@ -366,10 +376,13 @@ async def test_successful_attempt_before_t2_fails_closed_without_second_attempt(
         },
         audit_sink=SqlAlchemyAttemptAuditSink(factory),
     )
-    await gateway.generate_text(
+    pending = await gateway.generate_text_pending(
         prepared.request,
         audit_context=prepared.audit_context,
     )
+    output = validate_structured_output(pending.result.text, prepared.output_schema)
+    with transactions.begin() as transaction:
+        transaction.checkpoint(prepared, output, pending)
     with factory() as session, session.begin():
         lease = session.get(NodeExecutionLease, seeded.node_run_id)
         assert lease is not None
@@ -383,15 +396,319 @@ async def test_successful_attempt_before_t2_fails_closed_without_second_attempt(
             audit_sink=SqlAlchemyAttemptAuditSink(factory),
         ),
     )
-    with pytest.raises(NodeExecutionError) as caught:
-        await service.execute(seeded.node_run_id, request_id="issue-89-lost-t2")
+    result = await service.execute(seeded.node_run_id, request_id="issue-89-lost-t2")
 
-    assert caught.value.code == "NODE_EXECUTION_RESULT_UNAVAILABLE"
+    assert result.attempt_id is not None
     assert provider.calls == 0
     with factory() as session:
-        assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 0
+        assert session.scalar(select(func.count()).select_from(NodeExecutionRecoveryFact)) == 0
+        assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 1
         assert _count(session, GenerationAttempt, "node_run_id", seeded.node_run_id) == 1
         assert _count(session, UsageRecord, "node_run_id", seeded.node_run_id) == 1
+
+
+async def test_t2_rollback_keeps_isolated_recovery_fact_for_retry(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_runtime(factory)
+    calls = {"count": 0}
+
+    def fault(stage: str) -> None:
+        if stage == "after_artifact":
+            raise RuntimeError("test T2 rollback")
+
+    first_service = NodeExecutionService(
+        SqlAlchemyNodeExecutionTransactionFactory(factory, seeded.actor, fault_injector=fault),
+        ModelGateway(
+            {
+                ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: DeterministicNodeOutputProvider(
+                    seeded.output
+                )
+            },
+            audit_sink=SqlAlchemyAttemptAuditSink(factory),
+        ),
+    )
+    with pytest.raises(NodeExecutionError):
+        await first_service.execute(seeded.node_run_id, request_id="issue-89-recovery-rollback")
+
+    with factory() as session:
+        assert session.scalar(select(func.count()).select_from(NodeExecutionRecoveryFact)) == 1
+
+    class CountingProvider(DeterministicNodeOutputProvider):
+        async def complete(self, request):
+            calls["count"] += 1
+            return await super().complete(request)
+
+    retry_service = NodeExecutionService(
+        SqlAlchemyNodeExecutionTransactionFactory(factory, seeded.actor),
+        ModelGateway(
+            {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: CountingProvider(seeded.output)},
+            audit_sink=SqlAlchemyAttemptAuditSink(factory),
+        ),
+    )
+    result = await retry_service.execute(
+        seeded.node_run_id, request_id="issue-89-recovery-rollback"
+    )
+    assert result.attempt_id is not None
+    assert calls["count"] == 0
+
+
+async def test_checkpoint_failure_rolls_back_attempt_usage_and_recovery_fact(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_runtime(factory)
+
+    def fault(stage: str) -> None:
+        if stage == "after_recovery_fact":
+            raise RuntimeError("test checkpoint rollback")
+
+    transactions = SqlAlchemyNodeExecutionTransactionFactory(
+        factory,
+        seeded.actor,
+        fault_injector=fault,
+    )
+    with transactions.begin() as transaction:
+        prepared = transaction.prepare(seeded.node_run_id, "issue-89-checkpoint-rollback")
+    gateway = ModelGateway(
+        {
+            ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: DeterministicNodeOutputProvider(
+                seeded.output
+            )
+        },
+        audit_sink=SqlAlchemyAttemptAuditSink(factory),
+    )
+    pending = await gateway.generate_text_pending(
+        prepared.request,
+        audit_context=prepared.audit_context,
+    )
+    output = validate_structured_output(pending.result.text, prepared.output_schema)
+
+    with pytest.raises(RuntimeError, match="checkpoint rollback"):
+        with transactions.begin() as transaction:
+            transaction.checkpoint(prepared, output, pending)
+
+    with factory() as session:
+        attempt = session.scalar(
+            select(GenerationAttempt).where(GenerationAttempt.node_run_id == seeded.node_run_id)
+        )
+        assert attempt is not None and attempt.status == "running"
+        assert _count(session, UsageRecord, "node_run_id", seeded.node_run_id) == 0
+        assert session.scalar(select(func.count()).select_from(NodeExecutionRecoveryFact)) == 0
+
+
+async def test_tampered_recovery_fact_is_rejected_without_provider_replay(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_runtime(factory)
+    transactions = SqlAlchemyNodeExecutionTransactionFactory(factory, seeded.actor)
+    with transactions.begin() as transaction:
+        prepared = transaction.prepare(seeded.node_run_id, "issue-89-tampered-recovery")
+    gateway = ModelGateway(
+        {
+            ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: DeterministicNodeOutputProvider(
+                seeded.output
+            )
+        },
+        audit_sink=SqlAlchemyAttemptAuditSink(factory),
+    )
+    pending = await gateway.generate_text_pending(
+        prepared.request,
+        audit_context=prepared.audit_context,
+    )
+    output = validate_structured_output(pending.result.text, prepared.output_schema)
+    with transactions.begin() as transaction:
+        transaction.checkpoint(prepared, output, pending)
+    with factory() as session, session.begin():
+        fact = session.scalar(select(NodeExecutionRecoveryFact).with_for_update())
+        lease = session.get(NodeExecutionLease, seeded.node_run_id)
+        assert fact is not None and lease is not None
+        fact.output_hash = "0" * 64
+        lease.lease_expires_at = utc_now() - timedelta(seconds=1)
+
+    provider = DeterministicNodeOutputProvider(seeded.output)
+    service = NodeExecutionService(
+        transactions,
+        ModelGateway(
+            {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: provider},
+            audit_sink=SqlAlchemyAttemptAuditSink(factory),
+        ),
+    )
+    with pytest.raises(NodeExecutionError) as caught:
+        await service.execute(seeded.node_run_id, request_id="issue-89-tampered-recovery")
+    assert caught.value.code == "NODE_EXECUTION_RECOVERY_MISMATCH"
+    assert provider.calls == 0
+
+
+async def test_expired_recovery_fact_fails_closed_without_provider_replay(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_runtime(factory)
+    transactions, _ = await _checkpoint_recovery_fact(
+        factory,
+        seeded,
+        "issue-89-expired-recovery",
+    )
+    with factory() as session, session.begin():
+        fact = session.scalar(select(NodeExecutionRecoveryFact).with_for_update())
+        lease = session.get(NodeExecutionLease, seeded.node_run_id)
+        assert fact is not None and lease is not None
+        fact.expires_at = utc_now() - timedelta(seconds=1)
+        lease.lease_expires_at = utc_now() - timedelta(seconds=1)
+
+    provider = DeterministicNodeOutputProvider(seeded.output)
+    service = NodeExecutionService(
+        transactions,
+        ModelGateway(
+            {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: provider},
+            audit_sink=SqlAlchemyAttemptAuditSink(factory),
+        ),
+    )
+    with pytest.raises(NodeExecutionError) as caught:
+        await service.execute(seeded.node_run_id, request_id="issue-89-expired-recovery")
+    assert caught.value.code == "NODE_EXECUTION_RECOVERY_EXPIRED"
+    assert provider.calls == 0
+    with factory() as session:
+        node = session.get(NodeRun, seeded.node_run_id)
+        assert node is not None and node.status == NodeStatus.FAILED.value
+        assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 0
+
+
+async def test_frozen_upstream_change_blocks_recovery_t2(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_runtime(factory)
+    transactions, prepared = await _checkpoint_recovery_fact(
+        factory,
+        seeded,
+        "issue-89-upstream-stale-before-t2",
+    )
+    with factory() as session, session.begin():
+        source = session.get(ArtifactVersion, seeded.upstream_version_id)
+        assert source is not None
+        replacement = ArtifactVersion(
+            id=new_uuid7(),
+            organization_id=seeded.actor.organization_id,
+            artifact_id=source.artifact_id,
+            version_no=2,
+            content_json={"replacement": True},
+            content_hash=canonical_content_hash({"replacement": True}),
+            render_summary_json={},
+            source_kind="manual",
+            source_node_run_id=None,
+            context_snapshot_id=None,
+            prompt_snapshot_id=None,
+            validation_report_json={"valid": True},
+            created_by=seeded.actor.principal_id,
+        )
+        session.add(replacement)
+        session.flush()
+        artifact = session.get(Artifact, source.artifact_id)
+        assert artifact is not None
+        artifact.current_approved_version_id = replacement.id
+    with pytest.raises(ArtifactExecutionPortError) as caught:
+        with transactions.begin() as transaction:
+            transaction.commit(prepared)
+    assert caught.value.code == "NODE_EXECUTION_UPSTREAM_STALE"
+    with factory() as session:
+        assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 0
+
+
+async def test_lesson_scoped_context_and_relations_stay_with_current_lesson(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_runtime(factory)
+    with factory() as session, session.begin():
+        run = session.get(WorkflowRun, seeded.workflow_run_id)
+        assert run is not None
+        definition_id = session.scalar(select(ContentDefinitionVersion.id).limit(1))
+        assert definition_id is not None
+        lessons = []
+        for index in (1, 2):
+            lesson = LessonUnit(
+                id=new_uuid7(),
+                organization_id=seeded.actor.organization_id,
+                project_id=seeded.project_id,
+                lesson_key=f"LESSON-{index:03d}",
+                position=index,
+                title=f"Lesson {index}",
+                scope_summary="scope",
+                objective_summary="objective",
+                estimated_minutes=40,
+                source_division_version_id=seeded.upstream_version_id,
+                status="active",
+                created_by=seeded.actor.principal_id,
+                updated_by=seeded.actor.principal_id,
+            )
+            session.add(lesson)
+            session.flush()
+            _seed_approved_artifact(
+                session,
+                seeded.actor,
+                seeded.project_id,
+                definition_id,
+                artifact_key=f"lesson-plan:{index}",
+                artifact_type="lesson_plan",
+                branch_key="lesson_plan",
+                lesson_unit_id=lesson.id,
+                content={"lesson_key": lesson.lesson_key},
+            )
+            lessons.append(lesson)
+
+        _seed_approved_artifact(
+            session,
+            seeded.actor,
+            seeded.project_id,
+            definition_id,
+            artifact_key="lesson-plan:wrong-branch",
+            artifact_type="lesson_plan",
+            branch_key="ppt",
+            lesson_unit_id=lessons[0].id,
+        )
+        project_division = _seed_approved_artifact(
+            session,
+            seeded.actor,
+            seeded.project_id,
+            definition_id,
+            artifact_key="lesson-division:project",
+            artifact_type="lesson_division",
+            branch_key="project",
+            lesson_unit_id=None,
+        )
+
+        base = dict(
+            organization_id=seeded.actor.organization_id,
+            project_id=seeded.project_id,
+            workflow_run_id=seeded.workflow_run_id,
+            node_run_id=seeded.node_run_id,
+            content_release_id=run.content_release_id,
+            workflow_definition_version_id=run.workflow_definition_version_id,
+            node_key="ppt.outline.generate",
+            branch_key="ppt",
+            lesson_key=lessons[0].lesson_key,
+            status=NodeStatus.READY.value,
+        )
+        context = WorkflowExecutionContext(lesson_unit_id=lessons[0].id, **base)
+        port = SqlAlchemyArtifactPort(session, seeded.actor)
+        values = port.list_context_versions(context, "lesson_plan.approved_version")
+        upstream = collect_upstream_artifacts(
+            port, context, {"input_contract_refs": ["approval:lesson_plan"]}
+        )
+        assert [value.lesson_unit_id for value in values] == [lessons[0].id]
+        assert upstream["approval:lesson_plan"].lesson_unit_id == lessons[0].id
+        project_values = port.list_context_versions(
+            context,
+            "lesson_division.approved_version",
+        )
+        assert [value.artifact_version_id for value in project_values] == [project_division.id]
+        with pytest.raises(ArtifactExecutionPortError) as caught:
+            port.list_context_versions(context, "approval:undeclared")
+        assert caught.value.code == "NODE_EXECUTION_CONTEXT_SOURCE_UNKNOWN"
 
 
 async def test_prepare_claims_one_worker_before_attempt_start(
@@ -736,6 +1053,32 @@ def _seed_runtime(factory: sessionmaker[Session]) -> RuntimeSeed:
         upstream_version_id=upstream.id,
         output=output,
     )
+
+
+async def _checkpoint_recovery_fact(
+    factory: sessionmaker[Session],
+    seeded: RuntimeSeed,
+    request_id: str,
+) -> tuple[SqlAlchemyNodeExecutionTransactionFactory, PreparedNodeExecution]:
+    transactions = SqlAlchemyNodeExecutionTransactionFactory(factory, seeded.actor)
+    with transactions.begin() as transaction:
+        prepared = transaction.prepare(seeded.node_run_id, request_id)
+    gateway = ModelGateway(
+        {
+            ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: DeterministicNodeOutputProvider(
+                seeded.output
+            )
+        },
+        audit_sink=SqlAlchemyAttemptAuditSink(factory),
+    )
+    pending = await gateway.generate_text_pending(
+        prepared.request,
+        audit_context=prepared.audit_context,
+    )
+    output = validate_structured_output(pending.result.text, prepared.output_schema)
+    with transactions.begin() as transaction:
+        transaction.checkpoint(prepared, output, pending)
+    return transactions, prepared
 
 
 def _seed_material_context(

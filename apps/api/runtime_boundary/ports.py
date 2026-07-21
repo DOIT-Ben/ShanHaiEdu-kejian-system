@@ -296,8 +296,14 @@ class WorkflowExecutionPort(Protocol):
 
 class ArtifactPort(Protocol):
     def list_context_versions(
-        self, project_id: UUID, source: str
+        self, execution: WorkflowExecutionContext, source: str
     ) -> tuple[ArtifactContextVersion, ...]: ...
+
+    def verify_frozen_versions(
+        self,
+        execution: WorkflowExecutionContext,
+        upstream: dict[str, ArtifactContextVersion],
+    ) -> None: ...
 
     def persist_generated(self, write: GeneratedArtifactWrite) -> ArtifactWriteResult: ...
 
@@ -320,6 +326,8 @@ class PromptSnapshotPort(Protocol):
         context: AssembledContext,
         prompt: CompiledPrompt,
     ) -> FrozenSnapshotRefs: ...
+
+    def verify(self, refs: FrozenSnapshotRefs) -> None: ...
 
 
 class ModelInvocationPort(Protocol):

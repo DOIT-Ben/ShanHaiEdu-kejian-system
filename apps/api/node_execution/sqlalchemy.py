@@ -14,8 +14,12 @@ from apps.api.assets.execution_port import SqlAlchemyAssetPort
 from apps.api.content_runtime.runtime_port import SqlAlchemyRuntimeDefinitionReader
 from apps.api.creation.execution_port import SqlAlchemyCreationPackagePort
 from apps.api.identity.context import ActorContext
-from apps.api.model_gateway.contracts import TextGatewayResult
-from apps.api.model_gateway.execution_port import AttemptEvidence, SqlAlchemyAttemptExecutionPort
+from apps.api.model_gateway.execution_port import (
+    AttemptEvidence,
+    SqlAlchemyAttemptExecutionPort,
+)
+from apps.api.model_gateway.pending import PendingTextGeneration
+from apps.api.node_execution.boundaries import same_fixed_execution
 from apps.api.node_execution.contracts import (
     CommittedNodeExecution,
     NodeExecutionCommitContext,
@@ -31,7 +35,9 @@ from apps.api.node_execution.materials import (
     execution_snapshot,
     placeholder_request,
 )
+from apps.api.node_execution.preparation import build_prepared_execution
 from apps.api.node_execution.prompt_plan import compile_node_prompt
+from apps.api.node_execution.recovery import SqlAlchemyRecoveryFactStore
 from apps.api.prompt_runtime.execution_port import SqlAlchemyPromptSnapshotPort
 from apps.api.runtime_boundary.output_projection import compile_output_projection
 from apps.api.runtime_boundary.ports import PromptSnapshotPort, WorkflowExecutionContext
@@ -86,6 +92,12 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
         )
         self._attempts = SqlAlchemyAttemptExecutionPort(session, actor)
         self._fault_injector = fault_injector
+        self._recovery = SqlAlchemyRecoveryFactStore(
+            session,
+            actor,
+            self._attempts,
+            fault_injector,
+        )
 
     def prepare(self, node_run_id: UUID, request_id: str) -> PreparedNodeExecution:
         execution = self._workflow.require_context(node_run_id, for_update=True)
@@ -156,28 +168,25 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
                 "another worker already owns the frozen node execution",
             )
         owner_token = self._claim_owner(node_run_id)
+        model_request_id = compiled.request.request_id
+        recovery_state = self._recovery.state(execution, succeeded, model_request_id)
+        if recovery_state == "available":
+            assert succeeded is not None
+            self._recovery.rebind_owner(execution, succeeded, model_request_id, owner_token)
         self._workflow.start(node_run_id)
-        return PreparedNodeExecution(
+        return build_prepared_execution(
             node_run_id=node_run_id,
-            request=compiled.request,
-            audit_context=compiled.audit_context,
-            output_schema=materials.output_schema,
-            execution_owner_token=owner_token,
-            pre_model_error_code=(
-                "NODE_EXECUTION_RESULT_UNAVAILABLE" if succeeded is not None else None
-            ),
-            pre_model_error_message=(
-                "the successful model result was lost before T2" if succeeded is not None else None
-            ),
-            commit_context=NodeExecutionCommitContext(
-                definition=materials.definition,
-                execution=execution,
-                snapshots=snapshots,
-                upstream_artifacts=upstream,
-                runtime_values=runtime_values,
-                target_slot_authorization=target_auth,
-                reference_asset_authorization=reference_auth,
-            ),
+            execution=execution,
+            materials=materials,
+            compiled=compiled,
+            snapshots=snapshots,
+            upstream=upstream,
+            runtime_values=runtime_values,
+            target_authorization=target_auth,
+            reference_authorization=reference_auth,
+            succeeded=succeeded,
+            recovery_state=recovery_state,
+            owner_token=owner_token,
         )
 
     def _claim_owner(self, node_run_id: UUID) -> str:
@@ -236,18 +245,59 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
             frozen_reference_assets,
         )
 
-    def commit(
+    def checkpoint(
         self,
         execution: PreparedNodeExecution,
         output: dict[str, Any],
-        result: TextGatewayResult,
-    ) -> CommittedNodeExecution:
+        pending: PendingTextGeneration,
+    ) -> None:
         context = execution.commit_context
         if context is None:
             raise NodeExecutionError(
                 "NODE_EXECUTION_CONTEXT_MISSING",
                 "the prepared execution has no commit context",
             )
+        owner_token, current = self._require_owned_running(execution)
+        self._recovery.checkpoint(execution, current, context, owner_token, output, pending)
+
+    def commit(self, execution: PreparedNodeExecution) -> CommittedNodeExecution:
+        context = execution.commit_context
+        if context is None:
+            raise NodeExecutionError(
+                "NODE_EXECUTION_CONTEXT_MISSING",
+                "the prepared execution has no commit context",
+            )
+        owner_token, current = self._require_owned_running(execution)
+        fact = self._recovery.require(execution, current, context, owner_token)
+        self._definitions.resolve(execution.node_run_id)
+        self._snapshots.verify(context.snapshots)
+        self._artifacts.verify_frozen_versions(current, context.upstream_artifacts)
+        evidence = self._attempts.require_succeeded(
+            node_run_id=current.node_run_id,
+            project_id=current.project_id,
+            request_id=execution.request.request_id,
+        )
+        if evidence.attempt_id != fact.attempt_id:
+            raise NodeExecutionError(
+                "NODE_EXECUTION_RECOVERY_MISMATCH",
+                "the recovery fact is not bound to the successful attempt",
+            )
+        result = self._persist_outputs(
+            execution,
+            current,
+            context,
+            fact.output_json,
+            evidence,
+            owner_token,
+        )
+        self._session.delete(fact)
+        self._session.flush()
+        return result
+
+    def _require_owned_running(
+        self,
+        execution: PreparedNodeExecution,
+    ) -> tuple[str, WorkflowExecutionContext]:
         owner_token = execution.execution_owner_token
         if owner_token is None or not self._workflow.owns_execution_owner(
             execution.node_run_id, owner_token
@@ -267,13 +317,18 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
                 "NODE_EXECUTION_STATE_CONFLICT",
                 "the node run is not running at T2",
             )
-        self._definitions.resolve(execution.node_run_id)
-        evidence = self._attempts.require_succeeded(
-            node_run_id=current.node_run_id,
-            project_id=current.project_id,
-            request_id=execution.request.request_id,
-        )
-        return self._persist_outputs(execution, current, context, output, evidence, owner_token)
+        commit_context = execution.commit_context
+        if commit_context is None:
+            raise NodeExecutionError(
+                "NODE_EXECUTION_CONTEXT_MISSING",
+                "the prepared execution has no commit context",
+            )
+        if not same_fixed_execution(current, commit_context.execution):
+            raise NodeExecutionError(
+                "NODE_EXECUTION_CONTEXT_CHANGED",
+                "the fixed workflow execution context changed before commit",
+            )
+        return owner_token, current
 
     def _persist_outputs(
         self,
@@ -329,6 +384,8 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
             if not self._workflow.owns_execution_owner(execution.node_run_id, owner_token):
                 return
             self._workflow.release_execution_owner(execution.node_run_id, owner_token)
+        if cancelled:
+            self._recovery.discard(execution.node_run_id)
         self._workflow.terminalize(
             execution.node_run_id,
             code=code,

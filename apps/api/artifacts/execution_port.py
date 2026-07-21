@@ -8,7 +8,10 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from apps.api.artifacts.context_source_registry import artifact_types_for_context_source
+from apps.api.artifacts.context_source_registry import (
+    is_known_context_source,
+    resolve_artifact_source,
+)
 from apps.api.artifacts.domain import canonical_content_hash
 from apps.api.artifacts.models import Approval, Artifact, ArtifactVersion
 from apps.api.artifacts.relation_service import ArtifactRelationService
@@ -21,6 +24,7 @@ from apps.api.runtime_boundary.ports import (
     ArtifactContextVersion,
     ArtifactWriteResult,
     GeneratedArtifactWrite,
+    WorkflowExecutionContext,
 )
 
 
@@ -37,43 +41,46 @@ class SqlAlchemyArtifactPort:
 
     def list_context_versions(
         self,
-        project_id: UUID,
+        execution: WorkflowExecutionContext,
         source: str,
     ) -> tuple[ArtifactContextVersion, ...]:
         ProjectAccessService(self._session, self._actor).require(
-            project_id,
+            execution.project_id,
             ProjectAction.GENERATE,
         )
-        prefix = next(
-            (
-                candidate
-                for candidate in ("artifact:", "approval:", "content:", "prompt:")
-                if source.startswith(candidate)
-            ),
-            None,
-        )
-        artifact_types = artifact_types_for_context_source(source)
-        if prefix is None and artifact_types is None:
+        if not is_known_context_source(source):
+            raise ArtifactExecutionPortError(
+                "NODE_EXECUTION_CONTEXT_SOURCE_UNKNOWN",
+                "the published context source is not registered",
+            )
+        definition = resolve_artifact_source(source)
+        if definition is None:
             return ()
-        if artifact_types is None:
-            assert prefix is not None
-            artifact_types = (source.removeprefix(prefix),)
+        if definition.scope == "lesson" and execution.lesson_unit_id is None:
+            return ()
+        assert definition.branch_key is not None
         rows = self._session.execute(
             select(ArtifactVersion, Artifact)
             .join(Artifact, Artifact.id == ArtifactVersion.artifact_id)
             .where(
                 Artifact.organization_id == self._actor.organization_id,
-                Artifact.project_id == project_id,
+                Artifact.project_id == execution.project_id,
                 Artifact.deleted_at.is_(None),
-                Artifact.artifact_type.in_(artifact_types),
+                Artifact.artifact_type.in_(definition.artifact_types),
+                Artifact.branch_key == definition.branch_key,
                 Artifact.current_approved_version_id == ArtifactVersion.id,
                 ArtifactVersion.organization_id == self._actor.organization_id,
+            )
+            .where(
+                Artifact.lesson_unit_id.is_(None)
+                if definition.scope == "project"
+                else Artifact.lesson_unit_id == execution.lesson_unit_id
             )
             .order_by(ArtifactVersion.created_at, ArtifactVersion.id)
         ).all()
         return tuple(
             ArtifactContextVersion(
-                project_id=project_id,
+                project_id=execution.project_id,
                 lesson_unit_id=artifact.lesson_unit_id,
                 artifact_version_id=version.id,
                 contract_ref=source,
@@ -83,6 +90,40 @@ class SqlAlchemyArtifactPort:
             )
             for version, artifact in rows
         )
+
+    def verify_frozen_versions(
+        self,
+        execution: WorkflowExecutionContext,
+        upstream: dict[str, ArtifactContextVersion],
+    ) -> None:
+        for value in upstream.values():
+            definition = resolve_artifact_source(value.contract_ref)
+            if definition is None:
+                raise ArtifactExecutionPortError(
+                    "NODE_EXECUTION_CONTEXT_SOURCE_UNKNOWN",
+                    "the frozen artifact source is not registered",
+                )
+            row = self._session.execute(
+                select(ArtifactVersion, Artifact)
+                .join(Artifact, Artifact.id == ArtifactVersion.artifact_id)
+                .where(
+                    ArtifactVersion.id == value.artifact_version_id,
+                    ArtifactVersion.organization_id == self._actor.organization_id,
+                    Artifact.organization_id == self._actor.organization_id,
+                    Artifact.project_id == execution.project_id,
+                    Artifact.current_approved_version_id == ArtifactVersion.id,
+                    Artifact.status != "stale",
+                    Artifact.lesson_unit_id == value.lesson_unit_id,
+                    Artifact.branch_key == definition.branch_key,
+                    Artifact.artifact_type.in_(definition.artifact_types),
+                    ArtifactVersion.content_hash == value.content_hash,
+                )
+            ).one_or_none()
+            if row is None:
+                raise ArtifactExecutionPortError(
+                    "NODE_EXECUTION_UPSTREAM_STALE",
+                    "a frozen upstream artifact is no longer the current approved version",
+                )
 
     def persist_generated(self, write: GeneratedArtifactWrite) -> ArtifactWriteResult:
         ProjectAccessService(self._session, self._actor).require(

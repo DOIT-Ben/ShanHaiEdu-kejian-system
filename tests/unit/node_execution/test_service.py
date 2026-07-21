@@ -9,6 +9,7 @@ from uuid import UUID
 
 import pytest
 
+from apps.api.model_gateway.audit_contracts import AttemptLease, AttemptSuccessAudit
 from apps.api.model_gateway.contracts import (
     GatewayErrorCode,
     ModelAuditContext,
@@ -19,6 +20,7 @@ from apps.api.model_gateway.contracts import (
     TextGatewayResult,
     TextModelRequest,
 )
+from apps.api.model_gateway.pending import PendingTextGeneration
 from apps.api.model_gateway.ports import CancellationToken
 from apps.api.node_execution.contracts import (
     CommittedNodeExecution,
@@ -94,17 +96,20 @@ class FakeTransaction:
         assert request_id == "request-89"
         return prepared()
 
-    def commit(
+    def checkpoint(
         self,
         execution: PreparedNodeExecution,
         output: dict[str, Any],
-        result: TextGatewayResult,
-    ) -> CommittedNodeExecution:
+        pending: PendingTextGeneration,
+    ) -> None:
+        self.events.append("checkpoint")
+        assert output == {"title": "Lesson 1"}
+        assert pending.result.request_id == execution.request.request_id
+
+    def commit(self, execution: PreparedNodeExecution) -> CommittedNodeExecution:
         self.events.append("commit")
         if self.commit_error is not None:
             raise self.commit_error
-        assert output == {"title": "Lesson 1"}
-        assert result.request_id == execution.request.request_id
         return CommittedNodeExecution(
             node_run_id=execution.node_run_id,
             artifact_version_id=ARTIFACT_VERSION_ID,
@@ -174,18 +179,41 @@ class FakeModel:
         self.error = error
         self.calls = 0
 
-    async def generate_text(
+    async def generate_text_pending(
         self,
         request: TextModelRequest,
         *,
         cancellation: CancellationToken | None = None,
         audit_context: ModelAuditContext | None = None,
-    ) -> TextGatewayResult:
+    ) -> PendingTextGeneration:
         self.calls += 1
         self.events.append("model")
         if self.error is not None:
             raise self.error
-        return self.result
+        context = audit_context or prepared().audit_context
+        return PendingTextGeneration(
+            result=self.result,
+            lease=AttemptLease(
+                attempt_id=UUID("10000000-0000-4000-8000-000000000006"),
+                lease_owner="unit-owner",
+            ),
+            audit_context=context,
+            success_audit=AttemptSuccessAudit(
+                provider_request_id=self.result.provider_request_id,
+                provider_task_id=None,
+                actual_model=self.result.actual_model,
+                finish_reason=self.result.finish_reason,
+                usage=self.result.usage,
+            ),
+        )
+
+    def fail_text_pending(
+        self,
+        pending: PendingTextGeneration,
+        *,
+        code: GatewayErrorCode = GatewayErrorCode.INVALID_RESPONSE,
+    ) -> None:
+        self.events.append("model_fail")
 
 
 async def test_runs_model_only_between_t1_and_t2() -> None:
@@ -201,8 +229,11 @@ async def test_runs_model_only_between_t1_and_t2() -> None:
         "tx1:commit",
         "model",
         "tx2:open",
-        "commit",
+        "checkpoint",
         "tx2:commit",
+        "tx3:open",
+        "commit",
+        "tx3:commit",
     ]
 
 
@@ -269,11 +300,11 @@ async def test_validation_or_t2_failure_never_leaves_a_partial_success(
         await service.execute(NODE_RUN_ID, request_id="request-89")
 
     assert caught.value.code == code
-    terminal_tx = 3 if commit_error is not None else 2
+    terminal_tx = 4 if commit_error is not None else 2
     assert events[-3:] == [
         f"tx{terminal_tx}:open",
         f"terminal:{code}:False",
         f"tx{terminal_tx}:commit",
     ]
     if commit_error is not None:
-        assert "tx2:rollback" in events
+        assert "tx3:rollback" in events

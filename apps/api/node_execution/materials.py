@@ -55,7 +55,7 @@ def collect_context_items(
                 source_version_id=str(value.artifact_version_id),
                 content=cast(Mapping[str, Any], plain_json_value(value.content)),
             )
-            for value in artifacts.list_context_versions(execution.project_id, source)
+            for value in artifacts.list_context_versions(execution, source)
         )
         items.extend(
             _asset_context_item(source, value)
@@ -79,7 +79,7 @@ def collect_upstream_artifacts(
     for raw in cast(Sequence[object], refs):
         if type(raw) is not str:
             continue
-        values = artifacts.list_context_versions(execution.project_id, raw)
+        values = artifacts.list_context_versions(execution, raw)
         if len(values) == 1:
             upstream[raw] = values[0]
     return upstream

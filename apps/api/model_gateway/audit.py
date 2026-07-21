@@ -21,6 +21,7 @@ from apps.api.jobs.service import (
     GenerationJobBinding,
     GenerationJobCancellationReader,
 )
+from apps.api.model_gateway.attempt_success import complete_attempt_success
 from apps.api.model_gateway.audit_contracts import (
     AttemptCompletion,
     AttemptHeartbeat,
@@ -178,40 +179,12 @@ class SqlAlchemyAttemptAuditSink:
         latency_ms: int,
     ) -> AttemptCompletion:
         with self._session_factory() as session, session.begin():
-            attempt = self._require_owned_running(session, lease, context)
-            now = database_wall_clock(session)
-            outcome = (
-                AttemptCompletion.CANCELLED
-                if attempt.cancel_requested_at is not None
-                or self._job_cancel_requested(session, attempt)
-                else AttemptCompletion.SUCCEEDED
-            )
-            if outcome == AttemptCompletion.CANCELLED:
-                attempt.cancel_requested_at = attempt.cancel_requested_at or now
-            attempt.status = outcome.value
-            attempt.provider_request_id = _bounded(result.provider_request_id, 255)
-            attempt.provider_task_id = _bounded(result.provider_task_id, 255)
-            attempt.finished_at = now
-            attempt.latency_ms = latency_ms
-            attempt.lease_owner = None
-            attempt.lease_expires_at = None
-            if outcome == AttemptCompletion.CANCELLED:
-                attempt.error_code = GatewayErrorCode.CANCELLED.value
-                attempt.error_details_json = {
-                    "retryable": False,
-                    "retry_after_seconds": None,
-                }
-            session.add(
-                self._usage_record(
-                    attempt,
-                    context,
-                    input_units=_input_units(result.usage),
-                    output_units=_output_units(result.usage),
-                    actual_cost=result.usage.cost,
-                    currency=result.usage.currency,
-                    latency_ms=latency_ms,
-                    provider_model=_bounded(result.actual_model, 160),
-                )
+            outcome, _ = complete_attempt_success(
+                session,
+                lease,
+                context,
+                result,
+                latency_ms=latency_ms,
             )
             return outcome
 

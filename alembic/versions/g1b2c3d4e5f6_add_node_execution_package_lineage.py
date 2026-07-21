@@ -61,9 +61,62 @@ def upgrade() -> None:
         "creation_packages",
         ["organization_id", "source_artifact_version_id"],
     )
+    op.create_table(
+        "node_execution_recovery_facts",
+        sa.Column("id", sa.Uuid(), nullable=False),
+        sa.Column("organization_id", sa.Uuid(), nullable=False),
+        sa.Column("project_id", sa.Uuid(), nullable=False),
+        sa.Column("workflow_run_id", sa.Uuid(), nullable=False),
+        sa.Column("node_run_id", sa.Uuid(), nullable=False),
+        sa.Column("attempt_id", sa.Uuid(), nullable=False),
+        sa.Column("request_id", sa.String(length=160), nullable=False),
+        sa.Column("owner_token", sa.String(length=64), nullable=False),
+        sa.Column("output_json", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column("output_hash", sa.String(length=64), nullable=False),
+        sa.Column("output_schema_digest", sa.String(length=64), nullable=False),
+        sa.Column("prompt_snapshot_id", sa.Uuid(), nullable=False),
+        sa.Column("prompt_snapshot_hash", sa.String(length=64), nullable=False),
+        sa.Column("context_snapshot_id", sa.Uuid(), nullable=False),
+        sa.Column("context_snapshot_hash", sa.String(length=64), nullable=False),
+        sa.Column("max_json_bytes", sa.Integer(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["project_id"], ["projects.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["workflow_run_id"], ["workflow_runs.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["node_run_id"], ["node_runs.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["attempt_id"], ["generation_attempts.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(
+            ["prompt_snapshot_id"], ["prompt_snapshots.id"], ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["context_snapshot_id"], ["context_snapshots.id"], ondelete="RESTRICT"
+        ),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        "uq_node_execution_recovery_fact_attempt",
+        "node_execution_recovery_facts",
+        ["organization_id", "node_run_id", "attempt_id"],
+        unique=True,
+    )
+    op.create_index(
+        "ix_node_execution_recovery_fact_expiry",
+        "node_execution_recovery_facts",
+        ["organization_id", "expires_at"],
+    )
 
 
 def downgrade() -> None:
+    op.drop_index(
+        "ix_node_execution_recovery_fact_expiry",
+        table_name="node_execution_recovery_facts",
+    )
+    op.drop_index(
+        "uq_node_execution_recovery_fact_attempt",
+        table_name="node_execution_recovery_facts",
+    )
+    op.drop_table("node_execution_recovery_facts")
     op.drop_index(
         "ix_creation_packages_source_artifact_version",
         table_name="creation_packages",
