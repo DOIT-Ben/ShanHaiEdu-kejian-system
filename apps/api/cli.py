@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import json
 import tempfile
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -37,15 +38,16 @@ from apps.api.settings import Settings, get_settings
 
 TEXT_SMOKE_CAPABILITIES = (ModelCapability.TEXT_SMOKE,)
 VIDEO_SMOKE_CAPABILITY = ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S
+VIDEO_SMOKE_DURATION_TOLERANCE_SECONDS = 1.0
 ROOT = Path(__file__).resolve().parents[2]
 
 
 @dataclass(frozen=True, slots=True)
 class _VideoSmokeOutcome:
+    request_id: str
     result: VideoGatewayResult
     file: GeneratedFileFact
     probe: VideoProbeResult
-    output_path: Path
 
 
 def run_publish_golden_content(*, database_url: str | None = None, root: Path = ROOT) -> int:
@@ -174,6 +176,7 @@ async def run_video_smoke(
         output_dir or Path(tempfile.gettempdir()) / "shanhaiedu-video-smoke"
     )
     request_id = f"req_video_smoke_{new_uuid7()}"
+    started_at = time.perf_counter()
     try:
         outcome = await _execute_video_smoke(
             settings=settings,
@@ -190,13 +193,16 @@ async def run_video_smoke(
             ModelGatewayError(GatewayErrorCode.INVALID_RESPONSE, retryable=False),
             request_id=request_id,
         )
-    if not 6 <= outcome.probe.duration_seconds <= 30:
+    if not _matches_requested_duration(outcome.probe.duration_seconds, duration_seconds):
         return _video_smoke_failure(
             settings,
             ModelGatewayError(GatewayErrorCode.INVALID_RESPONSE, retryable=False),
             request_id=request_id,
         )
-    _print_video_smoke_success(outcome)
+    _print_video_smoke_success(
+        outcome,
+        elapsed_ms=int((time.perf_counter() - started_at) * 1_000),
+    )
     return 0
 
 
@@ -225,10 +231,10 @@ async def _execute_video_smoke(
         output_path = storage.path_for(file.storage_key)
         probe = _probe_stored_video(output_path)
         return _VideoSmokeOutcome(
+            request_id=request_id,
             result=result,
             file=file,
             probe=probe,
-            output_path=output_path,
         )
     finally:
         await provider.aclose()
@@ -283,30 +289,23 @@ def _video_smoke_failure(
     return 1
 
 
-def _print_video_smoke_success(outcome: _VideoSmokeOutcome) -> None:
+def _matches_requested_duration(actual_seconds: float, requested_seconds: int) -> bool:
+    return abs(actual_seconds - requested_seconds) <= VIDEO_SMOKE_DURATION_TOLERANCE_SECONDS
+
+
+def _print_video_smoke_success(outcome: _VideoSmokeOutcome, *, elapsed_ms: int) -> None:
     result = outcome.result
     file = outcome.file
-    probe = outcome.probe
     print(
         json.dumps(
             {
                 "conclusion": "passed",
                 "utc": datetime.now(UTC).isoformat(),
-                "capability": VIDEO_SMOKE_CAPABILITY.value,
+                "elapsed_ms": elapsed_ms,
                 "provider": result.route.provider,
-                "configured_model": result.route.model,
-                "actual_model": result.actual_model,
-                "request_id": result.request_id,
-                "provider_request_id": result.provider_request_id,
-                "provider_task_id": result.provider_task_id,
-                "storage_key": file.storage_key,
-                "output_path": str(outcome.output_path),
+                "model": result.actual_model,
+                "request_id": outcome.request_id,
                 "sha256": file.sha256,
-                "size_bytes": file.size_bytes,
-                "mime_type": file.mime_type,
-                "duration_seconds": probe.duration_seconds,
-                "width": probe.width,
-                "height": probe.height,
             },
             ensure_ascii=True,
         )
