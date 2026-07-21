@@ -229,3 +229,31 @@ def test_expired_media_cleanup_is_scheduled_independently() -> None:
     assert "sha256sum apps/api/provider_media_relay.py" in runbook
     assert "sha256sum /opt/shanhaiedu/provider-media-relay/provider_media_relay.py" in runbook
     assert "date -u +%Y-%m-%dT%H:%M:%SZ" in runbook
+
+
+def test_relay_deploy_provenance_fails_closed_before_mutation() -> None:
+    root = Path(__file__).resolve().parents[2]
+    runbook = (root / "infra/provider-media-relay/README.md").read_text(encoding="utf-8")
+    stale_checkout_check = 'test "$(git rev-parse HEAD)" = "${deployment_origin_main_sha}"'
+    dirty_source_check = (
+        'git show "${deployment_origin_main_sha}:apps/api/provider_media_relay.py" '
+        "| cmp --silent - apps/api/provider_media_relay.py"
+    )
+    installed_blob_check = (
+        'git show "${deployment_origin_main_sha}:apps/api/provider_media_relay.py" '
+        "| cmp --silent - /opt/shanhaiedu/provider-media-relay/provider_media_relay.py"
+    )
+    relay_install = (
+        "install -m 0555 -o root -g root apps/api/provider_media_relay.py "
+        "/opt/shanhaiedu/provider-media-relay/provider_media_relay.py"
+    )
+    first_mutation = runbook.index("id -u shanhai-relay")
+    first_install = runbook.index("install -d -m 0755")
+    restart = runbook.index("systemctl restart shanhai-provider-media-relay.service")
+
+    assert runbook.index("set -euo pipefail") < runbook.index(stale_checkout_check)
+    assert runbook.index(stale_checkout_check) < first_mutation < first_install
+    assert runbook.index(dirty_source_check) < first_mutation
+    assert runbook.index(relay_install) < runbook.index(installed_blob_check) < restart
+    assert 'test "${relay_source_sha256}" = "${relay_blob_sha256}"' in runbook
+    assert 'test "${relay_installed_sha256}" = "${relay_blob_sha256}"' in runbook
