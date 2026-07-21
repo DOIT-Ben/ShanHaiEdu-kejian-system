@@ -21,16 +21,19 @@ from apps.api.artifact_quality.registry import InMemoryQualityValidatorRegistry
 from apps.api.artifact_quality.service import ArtifactQualityService
 from apps.api.artifact_quality.sqlalchemy import SqlAlchemyArtifactQualityTransactionFactory
 from apps.api.artifacts.domain import ApprovalAction, canonical_content_hash
-from apps.api.artifacts.models import Approval, Artifact, ArtifactVersion
+from apps.api.artifacts.models import Approval, Artifact, ArtifactDraft, ArtifactVersion
+from apps.api.artifacts.relation_service import ArtifactRelationService
 from apps.api.artifacts.service import ArtifactService
-from apps.api.database import build_engine, build_session_factory
+from apps.api.database import build_engine, build_session_factory, utc_now
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, system_actor
 from apps.api.ids import new_uuid7
 from apps.api.reliability.events import EventWriter
+from apps.api.reliability.models import EventStreamEntry, OutboxEvent
 from apps.api.workflows.models import NodeRun
 from apps.api.workflows.service import WorkflowRuntimeService
 from tests.integration.test_node_execution_runtime import (
+    _seed_approved_artifact,  # pyright: ignore[reportPrivateUsage]
     _seed_runtime,  # pyright: ignore[reportPrivateUsage]
 )
 from workflow.node_state import NodeStatus
@@ -45,6 +48,7 @@ class ApprovalSeed:
     actor: ActorContext
     project_id: UUID
     artifact_id: UUID
+    prior_approved_version_id: UUID
     version_id: UUID
     validate_node_id: UUID
 
@@ -83,7 +87,7 @@ def test_quality_gated_approval_rejects_missing_report_without_partial_writes(
         assert artifact is not None
         assert artifact.status == "in_review"
         assert artifact.current_submitted_version_id == seeded.version_id
-        assert artifact.current_approved_version_id is None
+        assert artifact.current_approved_version_id == seeded.prior_approved_version_id
         assert _approval_count(session, seeded.version_id, "approve") == 0
 
 
@@ -260,6 +264,34 @@ def test_event_failure_rolls_back_quality_bound_approval(
     factory = build_session_factory(build_engine(migrated_database_url))
     seeded = _seed_submitted_quality_artifact(factory)
     _execute_report(factory, seeded, passed=True)
+    with factory() as session, session.begin():
+        source = session.get(ArtifactVersion, seeded.version_id)
+        source_artifact = session.get(
+            Artifact,
+            source.artifact_id if source is not None else None,
+        )
+        assert source is not None and source_artifact is not None
+        downstream = _seed_approved_artifact(
+            session,
+            seeded.actor,
+            seeded.project_id,
+            source_artifact.content_definition_version_id,
+            artifact_key="quality-rollback-downstream",
+            artifact_type="lesson_division",
+            branch_key="project",
+            lesson_unit_id=None,
+            content=dict(source.content_json),
+        )
+        ArtifactRelationService(session, seeded.actor).add(
+            from_version_id=seeded.prior_approved_version_id,
+            to_version_id=downstream.id,
+            relation_type="derives_from",
+            binding_key="quality-rollback",
+            impact_scope={"mode": "all"},
+        )
+        downstream_artifact_id = downstream.artifact_id
+        baseline_events = _count(session, EventStreamEntry)
+        baseline_outbox = _count(session, OutboxEvent)
 
     def fail_event(*_args: object, **_kwargs: object) -> None:
         raise RuntimeError("simulated event failure")
@@ -279,8 +311,14 @@ def test_event_failure_rolls_back_quality_bound_approval(
         assert artifact is not None
         assert artifact.status == "in_review"
         assert artifact.current_submitted_version_id == seeded.version_id
-        assert artifact.current_approved_version_id is None
+        assert artifact.current_approved_version_id == seeded.prior_approved_version_id
         assert _approval_count(session, seeded.version_id, "approve") == 0
+        downstream_artifact = session.get(Artifact, downstream_artifact_id)
+        assert downstream_artifact is not None
+        assert downstream_artifact.status == "approved"
+        assert downstream_artifact.stale_reason_json is None
+        assert _count(session, EventStreamEntry) == baseline_events
+        assert _count(session, OutboxEvent) == baseline_outbox
 
 
 def _seed_submitted_quality_artifact(
@@ -310,11 +348,30 @@ def _seed_submitted_quality_artifact(
         )
         session.add(artifact)
         session.flush()
-        version = ArtifactVersion(
+        prior_content = dict(runtime.output)
+        prior_content["scope_summary"] = f"{prior_content['scope_summary']} (previous draft)"
+        prior = ArtifactVersion(
             id=new_uuid7(),
             organization_id=runtime.actor.organization_id,
             artifact_id=artifact.id,
             version_no=1,
+            content_json=prior_content,
+            content_hash=canonical_content_hash(prior_content),
+            render_summary_json={},
+            source_kind="manual",
+            source_node_run_id=None,
+            context_snapshot_id=None,
+            prompt_snapshot_id=None,
+            validation_report_json={"valid": True},
+            created_by=runtime.actor.principal_id,
+        )
+        session.add(prior)
+        session.flush()
+        version = ArtifactVersion(
+            id=new_uuid7(),
+            organization_id=runtime.actor.organization_id,
+            artifact_id=artifact.id,
+            version_no=2,
             content_json=dict(runtime.output),
             content_hash=canonical_content_hash(runtime.output),
             render_summary_json={},
@@ -327,21 +384,52 @@ def _seed_submitted_quality_artifact(
         )
         session.add(version)
         session.flush()
+        draft = ArtifactDraft(
+            id=new_uuid7(),
+            organization_id=runtime.actor.organization_id,
+            artifact_id=artifact.id,
+            draft_branch="main",
+            content_json=dict(version.content_json),
+            validation_report_json={"valid": True},
+            based_on_version_id=version.id,
+            autosaved_at=utc_now(),
+            created_by=runtime.actor.principal_id,
+            updated_by=runtime.actor.principal_id,
+        )
+        session.add(draft)
+        session.flush()
+        artifact.current_draft_id = draft.id
+        artifact.current_approved_version_id = prior.id
         artifact.current_submitted_version_id = version.id
-        session.add(
-            Approval(
-                id=new_uuid7(),
-                organization_id=runtime.actor.organization_id,
-                artifact_version_id=version.id,
-                node_run_id=None,
-                action=ApprovalAction.SUBMIT.value,
-                actor_type="user",
-                actor_user_id=runtime.actor.user_id,
-                comment=None,
-                quality_evidence_json={},
-                policy_snapshot_json={},
-                created_by=runtime.actor.principal_id,
-            )
+        session.add_all(
+            [
+                Approval(
+                    id=new_uuid7(),
+                    organization_id=runtime.actor.organization_id,
+                    artifact_version_id=prior.id,
+                    node_run_id=None,
+                    action=ApprovalAction.APPROVE.value,
+                    actor_type="user",
+                    actor_user_id=runtime.actor.user_id,
+                    comment="Historical fixture approval",
+                    quality_evidence_json={"fixture": "pre-guard"},
+                    policy_snapshot_json={},
+                    created_by=runtime.actor.principal_id,
+                ),
+                Approval(
+                    id=new_uuid7(),
+                    organization_id=runtime.actor.organization_id,
+                    artifact_version_id=version.id,
+                    node_run_id=None,
+                    action=ApprovalAction.SUBMIT.value,
+                    actor_type="user",
+                    actor_user_id=runtime.actor.user_id,
+                    comment=None,
+                    quality_evidence_json={},
+                    policy_snapshot_json={},
+                    created_by=runtime.actor.principal_id,
+                ),
+            ]
         )
         workflow = WorkflowRuntimeService(session, runtime.actor)
         node = workflow.create_project_node_run(
@@ -362,6 +450,7 @@ def _seed_submitted_quality_artifact(
         actor=runtime.actor,
         project_id=runtime.project_id,
         artifact_id=artifact.id,
+        prior_approved_version_id=prior.id,
         version_id=version.id,
         validate_node_id=node.id,
     )
@@ -398,3 +487,7 @@ def _approval_count(session: Session, version_id: UUID, action: str) -> int:
         )
         or 0
     )
+
+
+def _count(session: Session, model: type[object]) -> int:
+    return int(session.scalar(select(func.count()).select_from(model)) or 0)

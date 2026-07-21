@@ -35,6 +35,15 @@ def test_explicit_none_gate_preserves_approval_semantics() -> None:
     assert resolve_declared_quality_gate(registered, "ppt.outline.generate.output") is None
 
 
+def test_current_workflow_missing_output_declaration_fails_closed() -> None:
+    registered = BUILTIN_WORKFLOW_REGISTRY.load(json.loads(CATALOG.read_text(encoding="utf-8")))
+
+    with pytest.raises(ArtifactQualityGateError) as captured:
+        resolve_declared_quality_gate(registered, "missing.output.definition")
+
+    assert captured.value.code == "ARTIFACT_QUALITY_GATE_UNDECLARED"
+
+
 def test_legacy_workflow_without_versioned_quality_declaration_fails_closed() -> None:
     registered = BUILTIN_WORKFLOW_REGISTRY.load(
         {

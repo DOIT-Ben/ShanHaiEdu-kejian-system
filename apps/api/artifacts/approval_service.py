@@ -133,6 +133,7 @@ class ArtifactApprovalService:
         artifact.current_approved_version_id = version.id
         artifact.status = "approved"
         artifact.stale_reason_json = None
+        self._session.flush()
         stale_ids, stale_node_ids = self._relations.propagate_stale(previous_version_id, version.id)
         CreationPackageStalenessService(
             self._session, self._actor.organization_id

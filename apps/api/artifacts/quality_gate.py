@@ -56,7 +56,10 @@ def resolve_declared_quality_gate(
         )
     output = registered.output_definition_index.get(content_definition_key)
     if output is None:
-        return None
+        raise ArtifactQualityGateError(
+            "ARTIFACT_QUALITY_GATE_UNDECLARED",
+            "the artifact output has no versioned quality declaration",
+        )
     if output.quality_requirement_mode == "none":
         return None
     if (

@@ -16,7 +16,7 @@
 - 正式发布的`shanhai.primary_math.courseware@1.0.0`继续固定原内容、v1工作流和既有项目绑定；主线已经包含#130合并的`1.1.0`/v2前向候选，#146加固与PostgreSQL前向发布复验已经完成，但该候选尚未显式发布或激活为新项目默认。“1～5的认识”黄金Fixture可以分别启动教案、PPT和视频合同测试，但不代表真实模型或媒体生产完成。
 - 已审核的Markdown TemplateDraft可以通过显式CompilationProfile确定性编译为同一套结构化内容包合同；该能力不替代内容发布服务或模型节点执行运行时。
 - 当前可以通过自动化测试和API/CLI验证后端链路，但尚未完成浏览器到真实API的阶段1纵向演示，不得描述为阶段1产品完成。
-- 生产前端仍由[Issue #4](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)独立负责；先前的PR #33已经关闭且未合并，当前没有可供#11联调的开放前端PR，任何本地前端分支或交付ZIP都不能替代远端源码交接。
+- 生产前端仍由[Issue #4](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)独立负责；先前的PR #33已经关闭且未合并，当前开放的Draft [PR #111](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/111)尚未达到Ready或合并，#11仍等待可联调的生产前端源码，任何本地前端分支或交付ZIP都不能替代远端源码交接。
 
 ## 已完成
 
