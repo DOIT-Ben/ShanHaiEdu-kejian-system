@@ -92,6 +92,30 @@ def indexed_png_bytes(
     )
 
 
+def insert_png_chunks(
+    content: bytes,
+    *,
+    before_kind: bytes,
+    chunks: tuple[tuple[bytes, bytes], ...],
+) -> bytes:
+    """Insert CRC-correct chunks before a named chunk in a PNG fixture."""
+
+    offset = 8
+    while offset < len(content):
+        length = struct.unpack_from(">I", content, offset)[0]
+        kind = content[offset + 4 : offset + 8]
+        if kind == before_kind:
+            inserted = b"".join(_png_chunk(chunk_kind, payload) for chunk_kind, payload in chunks)
+            return content[:offset] + inserted + content[offset:]
+        offset += 12 + length
+    raise AssertionError(f"PNG chunk not found: {before_kind!r}")
+
+
+def _png_chunk(kind: bytes, payload: bytes) -> bytes:
+    body = kind + payload
+    return struct.pack(">I", len(payload)) + body + struct.pack(">I", zlib.crc32(body))
+
+
 def make_page(*, page_key: str = "page-1", position: int = 1) -> PageSpec:
     return PageSpec(
         page_key=page_key,

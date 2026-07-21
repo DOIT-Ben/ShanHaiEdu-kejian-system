@@ -18,6 +18,7 @@ from apps.api.ppt_rendering import (
 )
 from tests.unit.ppt_rendering.helpers import (
     indexed_png_bytes,
+    insert_png_chunks,
     jpeg_bytes,
     make_page,
     make_request,
@@ -156,6 +157,85 @@ def test_png_crc_corruption_is_rejected() -> None:
 
     with pytest.raises(PptRenderingError, match="PPT_BACKGROUND_IMAGE_INVALID"):
         assemble_pages(make_request(pages=(page,)))
+
+
+@pytest.mark.parametrize("chunk_kind", [b"a1aa", b"abca"])
+def test_png_chunk_type_and_reserved_bit_are_validated(chunk_kind: bytes) -> None:
+    content = insert_png_chunks(png_bytes(), before_kind=b"IDAT", chunks=((chunk_kind, b""),))
+    background = BackgroundImage(content=content, media_type="image/png")
+    page = make_page().model_copy(update={"backgrounds": (background,)})
+
+    with pytest.raises(PptRenderingError, match="PPT_BACKGROUND_IMAGE_INVALID"):
+        assemble_pages(make_request(pages=(page,)))
+
+
+def test_png_rejects_duplicate_transparency_singleton() -> None:
+    content = insert_png_chunks(
+        indexed_png_bytes(),
+        before_kind=b"IDAT",
+        chunks=((b"tRNS", b"\xff"), (b"tRNS", b"\xff")),
+    )
+    background = BackgroundImage(content=content, media_type="image/png")
+    page = make_page().model_copy(update={"backgrounds": (background,)})
+
+    with pytest.raises(PptRenderingError, match="PPT_BACKGROUND_IMAGE_INVALID"):
+        assemble_pages(make_request(pages=(page,)))
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        insert_png_chunks(
+            indexed_png_bytes(),
+            before_kind=b"IDAT",
+            chunks=((b"PLTE", bytes((0, 0, 0))),),
+        ),
+        insert_png_chunks(indexed_png_bytes(), before_kind=b"PLTE", chunks=((b"tRNS", b"\xff"),)),
+        insert_png_chunks(
+            indexed_png_bytes(),
+            before_kind=b"IEND",
+            chunks=((b"PLTE", bytes((0, 0, 0))),),
+        ),
+        insert_png_chunks(indexed_png_bytes(), before_kind=b"IEND", chunks=((b"tRNS", b"\xff"),)),
+        insert_png_chunks(indexed_png_bytes(), before_kind=b"IEND", chunks=((b"IEND", b""),)),
+        insert_png_chunks(
+            png_bytes(),
+            before_kind=b"IDAT",
+            chunks=(
+                (b"tRNS", b"\x00\xf5\x00\xf8\x00\xff"),
+                (b"PLTE", bytes((0, 0, 0))),
+            ),
+        ),
+    ],
+)
+def test_png_rejects_duplicate_singletons_and_illegal_chunk_order(content: bytes) -> None:
+    background = BackgroundImage(content=content, media_type="image/png")
+    page = make_page().model_copy(update={"backgrounds": (background,)})
+
+    with pytest.raises(PptRenderingError, match="PPT_BACKGROUND_IMAGE_INVALID"):
+        assemble_pages(make_request(pages=(page,)))
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        insert_png_chunks(
+            indexed_png_bytes(), before_kind=b"IDAT", chunks=((b"tRNS", b"\xff\x80"),)
+        ),
+        insert_png_chunks(
+            png_bytes(),
+            before_kind=b"IDAT",
+            chunks=((b"tRNS", b"\x00\xf5\x00\xf8\x00\xff"),),
+        ),
+    ],
+)
+def test_png_accepts_valid_transparency_chunks(content: bytes) -> None:
+    background = BackgroundImage(content=content, media_type="image/png")
+    page = make_page().model_copy(update={"backgrounds": (background,)})
+
+    manifest = assemble_pages(make_request(pages=(page,)))
+
+    assert manifest.pages[0].background_width == 160
 
 
 def test_valid_indexed_color_png_is_accepted() -> None:

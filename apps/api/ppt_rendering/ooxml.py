@@ -43,7 +43,12 @@ def render_pptx(request: AssemblyRequest) -> bytes:
         for name in sorted(files):
             info = ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
             info.compress_type = ZIP_DEFLATED
-            info.external_attr = 0o600 << 16
+            info.create_system = 3
+            info.external_attr = 0o100600 << 16
+            info.internal_attr = 0
+            info.create_version = 20
+            info.extract_version = 20
+            info.flag_bits = 0
             package.writestr(info, files[name])
     return output.getvalue()
 

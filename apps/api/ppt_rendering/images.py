@@ -29,6 +29,8 @@ class _PngState:
     compressed: bytearray = field(default_factory=bytearray)
     seen_idat: bool = False
     idat_ended: bool = False
+    seen_trns: bool = False
+    seen_iend: bool = False
 
 
 def inspect_background(background: BackgroundImage) -> ImageInfo:
@@ -73,6 +75,7 @@ def _inspect_png(data: bytes) -> ImageInfo:
         state.info is None
         or not state.compressed
         or kind != b"IEND"
+        or not state.seen_iend
         or (state.color_type == 3 and not state.palette_entries)
     ):
         raise _invalid_image()
@@ -85,6 +88,10 @@ def _read_png_chunk(data: bytes, offset: int) -> tuple[bytes, bytes, int]:
         raise _invalid_image()
     length = struct.unpack_from(">I", data, offset)[0]
     kind = data[offset + 4 : offset + 8]
+    if len(kind) != 4 or not all(65 <= value <= 90 or 97 <= value <= 122 for value in kind):
+        raise _invalid_image()
+    if not 65 <= kind[2] <= 90:
+        raise _invalid_image()
     payload_start = offset + 8
     payload_end = payload_start + length
     chunk_end = payload_end + 4
@@ -105,13 +112,11 @@ def _apply_png_chunk(state: _PngState, kind: bytes, payload: bytes) -> bool:
     elif kind == b"IDAT":
         _apply_png_data(state, payload)
     elif kind == b"tRNS":
-        if state.seen_idat or state.color_type != 3 or not state.palette_entries:
-            raise _invalid_image()
-        if len(payload) > state.palette_entries:
-            raise _invalid_image()
+        _apply_png_transparency(state, payload)
     elif kind == b"IEND":
-        if payload:
+        if payload or state.seen_iend:
             raise _invalid_image()
+        state.seen_iend = True
         return True
     elif kind and kind[0] & 0x20 == 0:
         raise _invalid_image()
@@ -135,7 +140,13 @@ def _apply_png_header(state: _PngState, payload: bytes) -> None:
 
 
 def _apply_png_palette(state: _PngState, payload: bytes) -> None:
-    if state.info is None or state.seen_idat or state.palette_entries:
+    if (
+        state.info is None
+        or state.seen_idat
+        or state.palette_entries
+        or state.seen_trns
+        or state.color_type == 6
+    ):
         raise _invalid_image()
     if len(payload) < 3 or len(payload) % 3:
         raise _invalid_image()
@@ -144,6 +155,22 @@ def _apply_png_palette(state: _PngState, payload: bytes) -> None:
         state.color_type == 3 and state.palette_entries > 2**state.bit_depth
     ):
         raise _invalid_image()
+
+
+def _apply_png_transparency(state: _PngState, payload: bytes) -> None:
+    if state.info is None or state.seen_idat or state.seen_trns:
+        raise _invalid_image()
+    if state.color_type == 3:
+        if not state.palette_entries or not 1 <= len(payload) <= state.palette_entries:
+            raise _invalid_image()
+    elif state.color_type == 2:
+        if len(payload) != 6:
+            raise _invalid_image()
+        if any(value > 2**state.bit_depth - 1 for value in struct.unpack(">HHH", payload)):
+            raise _invalid_image()
+    else:
+        raise _invalid_image()
+    state.seen_trns = True
 
 
 def _apply_png_data(state: _PngState, payload: bytes) -> None:

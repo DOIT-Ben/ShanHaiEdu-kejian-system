@@ -7,7 +7,7 @@ from zipfile import ZipFile
 
 import pytest
 
-from apps.api.ppt_rendering import FontStyle, ShapeElement, assemble_pages, export_pptx
+from apps.api.ppt_rendering import FontStyle, ShapeElement, assemble_pages, export_pptx, ooxml
 from tests.unit.ppt_rendering.helpers import make_page, make_request
 
 NS = {
@@ -37,6 +37,39 @@ def test_canonical_replay_is_deterministic() -> None:
     assert first_export.media_type == (
         "application/vnd.openxmlformats-officedocument.presentationml.presentation"
     )
+
+
+def test_zip_metadata_is_cross_platform_deterministic(monkeypatch: pytest.MonkeyPatch) -> None:
+    real_zip_info = ooxml.ZipInfo
+
+    def export_with_platform_default(create_system: int) -> tuple[bytes, str]:
+        def platform_zip_info(*args: object, **kwargs: object) -> object:
+            info = real_zip_info(*args, **kwargs)  # type: ignore[arg-type]
+            info.create_system = create_system
+            info.external_attr = (0o100666 if create_system == 0 else 0o100644) << 16
+            info.internal_attr = create_system
+            info.create_version = 63
+            info.extract_version = 10
+            info.flag_bits = 0x800
+            return info
+
+        monkeypatch.setattr(ooxml, "ZipInfo", platform_zip_info)
+        result = export_pptx(make_request())
+        return result.content, result.sha256
+
+    windows_content, windows_hash = export_with_platform_default(0)
+    unix_content, unix_hash = export_with_platform_default(3)
+
+    assert windows_content == unix_content
+    assert windows_hash == unix_hash
+    with ZipFile(BytesIO(unix_content)) as package:
+        for entry in package.infolist():
+            assert entry.create_system == 3
+            assert entry.external_attr == 0o100600 << 16
+            assert entry.internal_attr == 0
+            assert entry.create_version == 20
+            assert entry.extract_version == 20
+            assert entry.flag_bits == 0
 
 
 def test_export_contains_one_full_slide_background_and_editable_native_objects() -> None:
