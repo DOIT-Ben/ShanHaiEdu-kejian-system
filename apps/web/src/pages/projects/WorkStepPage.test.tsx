@@ -132,6 +132,54 @@ describe("WorkStepPage route isolation", () => {
     expect(getMockRuntimeState().nodeStates["project-a:lesson-a:ppt-pages"]?.status).toBe("stale");
   });
 
+  it("批准后的母版剧本直接暴露预览和编辑，修改后回到待确认", () => {
+    const option = introOptions[0];
+    expect(option).toBeDefined();
+    if (!option) return;
+    saveMockDraft(
+      "project:project-a:lesson:lesson-a:intro-options",
+      {
+        adoptedKey: option.key,
+        adoptedRevision: 0,
+        previewKey: option.key,
+        previewRevision: 0,
+        revisions: { [option.key]: 0 },
+      },
+      { lessonId: "lesson-a", nodeKey: "intro-options", projectId: "project-a" },
+    );
+    updateMockNodeState("project-a", "lesson-a", "intro-options", {
+      status: "approved",
+      title: "选择课堂导入",
+    });
+    updateMockNodeState("project-a", "lesson-a", "master-script", {
+      status: "approved",
+      title: "编写母版剧本",
+    });
+
+    render(
+      <TooltipProvider>
+        <MemoryRouter initialEntries={["/projects/project-a/lessons/lesson-a/work/master-script"]}>
+          <Routes>
+            <Route
+              element={<WorkStepPage />}
+              path="/projects/:projectId/lessons/:lessonId/work/:stepKey"
+            />
+          </Routes>
+        </MemoryRouter>
+      </TooltipProvider>,
+    );
+
+    expect(screen.queryByRole("button", { name: "重新编辑剧本" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "预览" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "编辑" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "母版剧本正文" }), {
+      target: { value: "# 修改后的完整故事" },
+    });
+    expect(getMockRuntimeState().nodeStates["project-a:lesson-a:master-script"]?.status).toBe(
+      "review_required",
+    );
+  });
+
   it("批准后的 PPT 页面安排锁定，重新编辑后才允许调整", () => {
     updateMockNodeState("project-a", null, "lesson-division", {
       status: "approved",

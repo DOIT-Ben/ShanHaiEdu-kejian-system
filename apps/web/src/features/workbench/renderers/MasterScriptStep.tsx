@@ -1,12 +1,4 @@
-import {
-  AlertTriangle,
-  ArrowRight,
-  BookOpen,
-  Check,
-  PencilLine,
-  Plus,
-  RefreshCw,
-} from "lucide-react";
+import { AlertTriangle, ArrowRight, BookOpen, Check, Plus, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { createTopicIntroOptions, introOptions } from "@/features/intro-options/data";
@@ -193,6 +185,29 @@ export function MasterScriptStep() {
     setDirty(true);
   };
 
+  const beginApprovedRevision = () => {
+    if (!approved) return;
+    if (!runtime.drafts[approvedKey]) {
+      saveMockDraft(
+        approvedKey,
+        {
+          markdown,
+          scenes: items,
+          sourceIntroKey: introDraft.adoptedKey,
+          sourceIntroRevision: introDraft.adoptedRevision,
+          summary,
+          title,
+        },
+        { lessonId, nodeKey: "master-script", projectId },
+      );
+    }
+    updateMockNodeState(projectId, lessonId, "master-script", {
+      stale_reason: null,
+      status: "review_required",
+      title: "编写母版剧本",
+    });
+  };
+
   return (
     <WorkbenchPageFrame width="document">
       <FocusPageHeader
@@ -203,43 +218,12 @@ export function MasterScriptStep() {
               根据新方案更新剧本
             </Button>
           ) : approved ? (
-            <>
-              <Button
-                aria-label="重新编辑剧本"
-                onClick={() => {
-                  if (!runtime.drafts[approvedKey]) {
-                    saveMockDraft(
-                      approvedKey,
-                      {
-                        markdown,
-                        scenes: items,
-                        sourceIntroKey: introDraft.adoptedKey,
-                        sourceIntroRevision: introDraft.adoptedRevision,
-                        summary,
-                        title,
-                      },
-                      { lessonId, nodeKey: "master-script", projectId },
-                    );
-                  }
-                  updateMockNodeState(projectId, lessonId, "master-script", {
-                    stale_reason: null,
-                    status: "review_required",
-                    title: "编写母版剧本",
-                  });
-                }}
-                size="md"
-                variant="secondary"
-              >
-                <PencilLine aria-hidden="true" />
-                重新编辑剧本
-              </Button>
-              <Button asChild size="md">
-                <Link to={`/app/projects/${projectId}/lessons/${lessonId}/work/rough-storyboard`}>
-                  安排故事镜头
-                  <ArrowRight aria-hidden="true" />
-                </Link>
-              </Button>
-            </>
+            <Button asChild size="md">
+              <Link to={`/app/projects/${projectId}/lessons/${lessonId}/work/rough-storyboard`}>
+                安排故事镜头
+                <ArrowRight aria-hidden="true" />
+              </Link>
+            </Button>
           ) : (
             <Button onClick={approveScript} size="md">
               <Check aria-hidden="true" />
@@ -284,6 +268,7 @@ export function MasterScriptStep() {
         markdown={markdown}
         mode={mode}
         onChange={(nextMarkdown) => {
+          beginApprovedRevision();
           const parsed = parseMasterScript(nextMarkdown, { scenes: items, summary, title });
           setMarkdown(nextMarkdown);
           setItems(parsed.scenes);
@@ -293,7 +278,7 @@ export function MasterScriptStep() {
         }}
         onModeChange={setMode}
         onSave={persistScript}
-        readOnly={approved || stale}
+        readOnly={stale}
         title="完整故事稿"
       />
     </WorkbenchPageFrame>

@@ -2,6 +2,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   Check,
+  ArrowLeft,
   ChevronLeft,
   CirclePause,
   Menu,
@@ -16,6 +17,7 @@ import { Link, Outlet, useParams } from "react-router-dom";
 import { ContextDrawer } from "@/features/workbench/components/ContextDrawer";
 import { ProjectStepNavigation } from "@/features/workbench/components/ProjectStepNavigation";
 import { TaskStatusBar } from "@/features/workbench/components/TaskStatusBar";
+import { getPreviousWorkbenchStepKey } from "@/features/workbench/lib/stepAccess";
 import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
 import { useWorkbenchUi } from "@/features/workbench/model/workbenchUi";
 import { saveMockDraft, updateMockProject, useMockRuntime } from "@/shared/api/mocks/runtime";
@@ -46,6 +48,9 @@ export function ProjectWorkbenchLayout() {
     "当前步骤";
   const automationMode = project?.automation_mode ?? "assisted";
   const base = `/app/projects/${projectId}/lessons/${lessonId}/work`;
+  const workflowSteps = projectSteps.flatMap((group) => group.items);
+  const previousStepKey = getPreviousWorkbenchStepKey(stepKey);
+  const previousStep = workflowSteps.find((item) => item.key === previousStepKey);
   useProjectEvents(projectId);
 
   useEffect(() => {
@@ -88,6 +93,21 @@ export function ProjectWorkbenchLayout() {
             {lesson?.title ?? "当前课时"} · {currentStepLabel}
           </span>
         </div>
+
+        {previousStep ? (
+          <Button
+            aria-label={`上一步：${previousStep.label}`}
+            asChild
+            className="size-9 px-0 sm:size-auto sm:px-3"
+            size="sm"
+            variant="quiet"
+          >
+            <Link to={`${base}/${previousStep.key}`}>
+              <ArrowLeft aria-hidden="true" />
+              <span className="hidden sm:inline">上一步</span>
+            </Link>
+          </Button>
+        ) : null}
 
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>

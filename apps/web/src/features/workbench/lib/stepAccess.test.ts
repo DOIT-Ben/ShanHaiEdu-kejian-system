@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { demoLessonId, demoProjectId } from "@/shared/data/mockData";
 import { createDefaultMockRuntimeState, createMockRuntimeStore } from "@/shared/api/mocks/runtime";
 import {
+  getPreviousWorkbenchStepKey,
   getWorkbenchStepBlocker,
   getWorkbenchStepStatus,
 } from "@/features/workbench/lib/stepAccess";
@@ -113,5 +114,12 @@ describe("workbench step access", () => {
     expect(
       getWorkbenchStepBlocker(store.getState(), demoProjectId, demoLessonId, "master-script"),
     ).toBeNull();
+  });
+
+  it("returns to the real dependency within PPT and video branches", () => {
+    expect(getPreviousWorkbenchStepKey("materials")).toBeNull();
+    expect(getPreviousWorkbenchStepKey("ppt-pages")).toBe("ppt-cover");
+    expect(getPreviousWorkbenchStepKey("master-script")).toBe("intro-options");
+    expect(getPreviousWorkbenchStepKey("rough-storyboard")).toBe("master-script");
   });
 });

@@ -170,6 +170,10 @@ export function getWorkbenchStepBlocker(
   return requirement;
 }
 
+export function getPreviousWorkbenchStepKey(stepKey: string) {
+  return stepRequirements[stepKey]?.toStep ?? null;
+}
+
 export function getWorkbenchStepStatus(
   runtime: MockRuntimeState,
   projectId: string,
