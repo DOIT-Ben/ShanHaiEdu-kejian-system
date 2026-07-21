@@ -14,6 +14,7 @@ from apps.api.artifact_quality.contracts import (
     ValidatorOutcome,
     ValidatorRef,
 )
+from apps.api.artifact_quality.registry import QualityValidatorRegistryError
 from apps.api.artifact_quality.service import ArtifactQualityError, ArtifactQualityService
 
 NODE_RUN_ID = UUID("10000000-0000-4000-8000-000000000133")
@@ -177,6 +178,35 @@ def test_validator_exception_marks_node_failed_without_fabricating_report() -> N
         "resolve",
         "validate",
         "technical:QUALITY_VALIDATION_TECHNICAL_FAILURE",
+        "tx:commit",
+    ]
+
+
+def test_unavailable_validator_is_classified_as_non_retryable_configuration_failure() -> None:
+    events: list[str] = []
+
+    class UnavailableRegistry:
+        def resolve(self, refs: tuple[ValidatorRef, ...]) -> tuple[FakeValidator, ...]:
+            events.append("resolve")
+            raise QualityValidatorRegistryError(
+                "QUALITY_VALIDATOR_UNAVAILABLE",
+                "fixture validator is not registered",
+            )
+
+    service = ArtifactQualityService(
+        FakeTransactionFactory(events),
+        UnavailableRegistry(),
+    )
+
+    with pytest.raises(ArtifactQualityError) as captured:
+        service.execute(NODE_RUN_ID)
+
+    assert captured.value.code == "QUALITY_VALIDATOR_UNAVAILABLE"
+    assert events == [
+        "tx:open",
+        "prepare",
+        "resolve",
+        "technical:QUALITY_VALIDATOR_UNAVAILABLE",
         "tx:commit",
     ]
 

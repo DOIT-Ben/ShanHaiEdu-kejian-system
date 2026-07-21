@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from typing import cast
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from apps.api.database import utc_now
@@ -138,7 +139,7 @@ class WorkflowRuntimeService:
         )
         self._session.add(record)
         self._session.flush()
-        self._queue_quality_validation_if_ready(node, run, input_key)
+        self._queue_quality_validation_if_ready(node, run, input_key=input_key)
         return record
 
     def transition_node(self, node_run_id: UUID, target: NodeStatus) -> NodeRun:
@@ -175,6 +176,8 @@ class WorkflowRuntimeService:
         if target in {NodeStatus.CANCELLED, NodeStatus.SKIPPED}:
             node.finished_at = now
         self._session.flush()
+        if target is NodeStatus.READY:
+            self._queue_quality_validation_if_ready(node, run, input_key=None)
         return node
 
     def _require_run(self, run_id: UUID) -> WorkflowRun:
@@ -199,8 +202,11 @@ class WorkflowRuntimeService:
         self,
         node: NodeRun,
         run: WorkflowRun,
-        input_key: str,
+        *,
+        input_key: str | None,
     ) -> None:
+        if NodeStatus(node.status) is not NodeStatus.READY:
+            return
         registered = self._load_registered_workflow(run.workflow_definition_version_id)
         definition = registered.node_by_key.get(node.node_key)
         persistence = (
@@ -209,7 +215,18 @@ class WorkflowRuntimeService:
         if not isinstance(persistence, Mapping):
             return
         values = cast(Mapping[str, object], persistence)
-        if values.get("source_input_ref") != input_key:
+        source_input_ref = values.get("source_input_ref")
+        if type(source_input_ref) is not str:
+            return
+        if input_key is not None and source_input_ref != input_key:
+            return
+        snapshot_exists = self._session.scalar(
+            select(NodeInputSnapshot.id).where(
+                NodeInputSnapshot.node_run_id == node.id,
+                NodeInputSnapshot.input_key == source_input_ref,
+            )
+        )
+        if snapshot_exists is None:
             return
         EventWriter(self._session, self._actor.organization_id).append(
             project_id=run.project_id,

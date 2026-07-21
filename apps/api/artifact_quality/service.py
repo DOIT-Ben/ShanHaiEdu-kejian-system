@@ -13,6 +13,7 @@ from apps.api.artifact_quality.contracts import (
     QualityValidatorRegistry,
     ValidatorOutcome,
 )
+from apps.api.artifact_quality.registry import QualityValidatorRegistryError
 
 _TECHNICAL_FAILURE = "QUALITY_VALIDATION_TECHNICAL_FAILURE"
 _COMMIT_FAILURE = "QUALITY_REPORT_COMMIT_FAILED"
@@ -44,9 +45,14 @@ class ArtifactQualityService:
                 validators = self._validators.resolve(context.validator_refs)
                 outcomes = tuple(validator.validate(context) for validator in validators)
             except Exception as exc:
-                transaction.fail_technical(context, code=_TECHNICAL_FAILURE)
+                failure_code = (
+                    exc.code
+                    if isinstance(exc, QualityValidatorRegistryError)
+                    else _TECHNICAL_FAILURE
+                )
+                transaction.fail_technical(context, code=failure_code)
                 technical_error = ArtifactQualityError(
-                    _TECHNICAL_FAILURE,
+                    failure_code,
                     "artifact quality validation failed technically",
                 )
                 technical_error.__cause__ = exc

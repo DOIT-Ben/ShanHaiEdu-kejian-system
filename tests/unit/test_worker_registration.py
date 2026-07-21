@@ -34,5 +34,16 @@ def test_artifact_quality_actor_uses_dramatiq_message_contract() -> None:
         assert process_artifact_quality_node.actor_name == "process_artifact_quality_node"
         assert message.actor_name == process_artifact_quality_node.actor_name
         assert message.args == ("01900000-0000-7000-8000-000000000133",)
+        retry_when = process_artifact_quality_node.options["retry_when"]
+        assert not retry_when(
+            0,
+            type("Unavailable", (RuntimeError,), {"code": "QUALITY_VALIDATOR_UNAVAILABLE"})(),
+        )
+        assert not retry_when(
+            0,
+            type("InvalidBinding", (RuntimeError,), {"code": "QUALITY_REPORT_BINDING_INVALID"})(),
+        )
+        assert retry_when(0, RuntimeError("transient database failure"))
+        assert not retry_when(5, RuntimeError("retry budget exhausted"))
     finally:
         dramatiq.set_broker(original)

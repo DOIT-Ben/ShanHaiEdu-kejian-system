@@ -148,6 +148,7 @@ def upgrade() -> None:
         DECLARE
           source_version_organization uuid;
           source_artifact_organization uuid;
+          source_artifact_id uuid;
           source_project uuid;
           source_lesson uuid;
           source_hash text;
@@ -157,14 +158,19 @@ def upgrade() -> None:
           node_lesson uuid;
           node_release uuid;
           node_workflow uuid;
+          source_binding_matches boolean;
+          declared_validator_set jsonb;
+          declared_validator_payload text;
         BEGIN
           SELECT artifact_versions.organization_id,
                  artifacts.organization_id,
+                 artifacts.id,
                  artifacts.project_id,
                  artifacts.lesson_unit_id,
                  artifact_versions.content_hash
           INTO source_version_organization,
                source_artifact_organization,
+               source_artifact_id,
                source_project,
                source_lesson,
                source_hash
@@ -189,8 +195,71 @@ def upgrade() -> None:
           LEFT JOIN branch_runs ON branch_runs.id = node_runs.branch_run_id
           WHERE node_runs.id = NEW.validate_node_run_id;
 
+          SELECT node_input_snapshots.id IS NOT NULL,
+                 (
+                   SELECT jsonb_agg(
+                            validator_ref.value
+                            ORDER BY validator_ref.value->>'key',
+                                     validator_ref.value->>'semantic_version',
+                                     validator_ref.value->>'implementation_digest'
+                          )
+                   FROM jsonb_array_elements(
+                     node_definition.value
+                       ->'quality_report_persistence'
+                       ->'validator_refs'
+                   ) AS validator_ref(value)
+                 ),
+                 (
+                   SELECT '[' || string_agg(
+                            '{{"implementation_digest":' ||
+                            to_jsonb(validator_ref.value->>'implementation_digest')::text ||
+                            ',"key":' || to_jsonb(validator_ref.value->>'key')::text ||
+                            ',"semantic_version":' ||
+                            to_jsonb(validator_ref.value->>'semantic_version')::text || '}}',
+                            ','
+                            ORDER BY validator_ref.value->>'key',
+                                     validator_ref.value->>'semantic_version',
+                                     validator_ref.value->>'implementation_digest'
+                          ) || ']'
+                   FROM jsonb_array_elements(
+                     node_definition.value
+                       ->'quality_report_persistence'
+                       ->'validator_refs'
+                   ) AS validator_ref(value)
+                 )
+          INTO source_binding_matches,
+               declared_validator_set,
+               declared_validator_payload
+          FROM node_runs
+          JOIN workflow_runs ON workflow_runs.id = node_runs.workflow_run_id
+          JOIN workflow_definition_versions
+            ON workflow_definition_versions.id = workflow_runs.workflow_definition_version_id
+          CROSS JOIN LATERAL jsonb_array_elements(
+            workflow_definition_versions.graph_json->'nodes'
+          ) AS node_definition(value)
+          LEFT JOIN node_input_snapshots
+            ON node_input_snapshots.node_run_id = node_runs.id
+           AND node_input_snapshots.input_key = (
+             node_definition.value
+               ->'quality_report_persistence'
+               ->>'source_input_ref'
+           )
+           AND node_input_snapshots.source_type = 'artifact'
+           AND node_input_snapshots.source_id = source_artifact_id
+           AND node_input_snapshots.source_version_id = NEW.source_artifact_version_id
+           AND node_input_snapshots.content_hash = NEW.source_content_hash
+          WHERE node_runs.id = NEW.validate_node_run_id
+            AND node_definition.value->>'node_key' = node_runs.node_key
+          LIMIT 1;
+
           IF source_version_organization IS NULL
              OR node_organization IS NULL
+             OR source_binding_matches IS DISTINCT FROM TRUE
+             OR NEW.validator_set_json IS DISTINCT FROM declared_validator_set
+             OR NEW.validator_set_hash IS DISTINCT FROM encode(
+               sha256(convert_to(declared_validator_payload, 'UTF8')),
+               'hex'
+             )
              OR NEW.organization_id IS DISTINCT FROM source_version_organization
              OR NEW.organization_id IS DISTINCT FROM source_artifact_organization
              OR NEW.organization_id IS DISTINCT FROM node_organization

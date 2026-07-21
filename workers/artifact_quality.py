@@ -18,6 +18,14 @@ from apps.api.identity.context import system_actor
 from apps.api.settings import get_settings
 from apps.api.workflows.quality_port import QualityNodeRoutingReader
 
+_NON_RETRYABLE_QUALITY_CODES = frozenset(
+    {
+        "QUALITY_REPORT_BINDING_INVALID",
+        "QUALITY_VALIDATOR_UNAVAILABLE",
+    }
+)
+_MAX_RETRIES = 5
+
 
 def execute_artifact_quality_node(
     database_url: str,
@@ -51,6 +59,18 @@ def run_artifact_quality_node(node_run_id: UUID) -> ArtifactQualityReportResult 
     )
 
 
-@dramatiq.actor(max_retries=5, min_backoff=1_000, max_backoff=30_000)
+def _retry_artifact_quality_failure(retries: int, exception: BaseException) -> bool:
+    return (
+        retries < _MAX_RETRIES
+        and getattr(exception, "code", None) not in _NON_RETRYABLE_QUALITY_CODES
+    )
+
+
+@dramatiq.actor(
+    max_retries=_MAX_RETRIES,
+    min_backoff=1_000,
+    max_backoff=30_000,
+    retry_when=_retry_artifact_quality_failure,
+)
 def process_artifact_quality_node(node_run_id: str) -> None:
     run_artifact_quality_node(UUID(node_run_id))

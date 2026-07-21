@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from threading import Barrier
 from uuid import UUID
@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.artifact_quality.binding import QualityReportBinding, resolve_quality_report_binding
 from apps.api.artifact_quality.contracts import (
+    QualityConclusion,
     QualityValidationContext,
     ValidatorOutcome,
     ValidatorRef,
@@ -29,7 +30,6 @@ from apps.api.artifact_quality.sqlalchemy import (
 from apps.api.artifacts.models import Artifact, ArtifactVersion
 from apps.api.database import build_engine, build_session_factory
 from apps.api.identity.context import ActorContext, system_actor
-from apps.api.ids import new_uuid7
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.reliability.models import EventStreamEntry, OutboxEvent
@@ -172,6 +172,42 @@ def test_worker_composition_executes_the_queued_quality_node(
         assert session.scalar(select(func.count()).select_from(ArtifactQualityReport)) == 1
 
 
+def test_not_ready_quality_node_queues_once_when_it_becomes_ready(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_quality_node(factory, status=NodeStatus.NOT_READY)
+
+    with factory() as session:
+        assert _event_count(session, "artifact.quality_validation.queued") == 0
+        assert _outbox_count(session, "artifact.quality_validation.queued") == 0
+
+    with factory() as session, session.begin():
+        WorkflowRuntimeService(session, seeded.actor).transition_node(
+            seeded.node_run_id,
+            NodeStatus.READY,
+        )
+
+    with factory() as session:
+        assert _event_count(session, "artifact.quality_validation.queued") == 1
+        assert _outbox_count(session, "artifact.quality_validation.queued") == 1
+
+    binding = _binding()
+    registry = InMemoryQualityValidatorRegistry(
+        {ref: FixtureValidator(ref) for ref in binding.validator_refs}
+    )
+    result = execute_artifact_quality_node(
+        migrated_database_url,
+        seeded.node_run_id,
+        registry,
+    )
+
+    assert result is not None and result.conclusion == "passed"
+    with factory() as session:
+        node = session.get(NodeRun, seeded.node_run_id)
+        assert node is not None and node.status == NodeStatus.APPROVED.value
+
+
 def test_validator_technical_failure_fails_node_without_quality_report(
     migrated_database_url: str,
 ) -> None:
@@ -226,7 +262,7 @@ def test_same_identity_from_another_node_with_different_payload_is_a_stable_conf
         assert _event_count(session, "artifact.quality_report.passed") == 1
 
 
-def test_concurrent_nodes_for_one_identity_return_one_report_and_one_stable_conflict(
+def test_concurrent_payloads_for_one_identity_return_one_report_and_one_stable_conflict(
     migrated_database_url: str,
 ) -> None:
     factory = build_session_factory(build_engine(migrated_database_url))
@@ -234,28 +270,44 @@ def test_concurrent_nodes_for_one_identity_return_one_report_and_one_stable_conf
     worker_actor = system_actor(seeded.actor.organization_id)
     transactions = SqlAlchemyArtifactQualityTransactionFactory(factory, worker_actor)
     with transactions.begin() as transaction:
-        first_context = transaction.prepare(seeded.node_run_id)
-    second_node_id = _seed_concurrent_running_node(factory, seeded)
-    second_context = replace(first_context, node_run_id=second_node_id, existing_result=None)
-    outcomes = tuple(
-        FixtureValidator(ref).validate(first_context) for ref in first_context.validator_refs
+        context = transaction.prepare(seeded.node_run_id)
+    passed_outcomes = tuple(
+        FixtureValidator(ref).validate(context) for ref in context.validator_refs
+    )
+    failed_outcomes = tuple(
+        FixtureValidator(ref, passed=False).validate(context) for ref in context.validator_refs
     )
     barrier = Barrier(2)
 
-    def complete(context: QualityValidationContext):
+    def complete(
+        task: tuple[
+            QualityValidationContext,
+            QualityConclusion,
+            tuple[ValidatorOutcome, ...],
+        ],
+    ):
+        task_context, conclusion, outcomes = task
         try:
             barrier.wait(timeout=10)
             with transactions.begin() as transaction:
                 return transaction.complete(
-                    context,
-                    conclusion="passed",
+                    task_context,
+                    conclusion=conclusion,
                     outcomes=outcomes,
                 )
         except Exception as exc:
             return exc
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        results = list(executor.map(complete, (first_context, second_context)))
+        results = list(
+            executor.map(
+                complete,
+                (
+                    (context, "passed", passed_outcomes),
+                    (context, "failed", failed_outcomes),
+                ),
+            )
+        )
 
     reports = [item for item in results if not isinstance(item, Exception)]
     errors = [item for item in results if isinstance(item, ArtifactQualityTransactionError)]
@@ -341,7 +393,11 @@ def test_any_quality_commit_fault_rolls_back_report_node_and_events(
         assert _outbox_count(session, "artifact.quality_report.passed") == 0
 
 
-def _seed_quality_node(factory: sessionmaker[Session]) -> QualitySeed:
+def _seed_quality_node(
+    factory: sessionmaker[Session],
+    *,
+    status: NodeStatus = NodeStatus.READY,
+) -> QualitySeed:
     runtime = _seed_runtime(factory)
     with factory() as session, session.begin():
         upstream_artifact = session.get(
@@ -363,7 +419,7 @@ def _seed_quality_node(factory: sessionmaker[Session]) -> QualitySeed:
         node = workflow.create_project_node_run(
             runtime.workflow_run_id,
             node_key="lesson.division.validate",
-            status=NodeStatus.READY,
+            status=status,
         )
         workflow.add_input_snapshot(
             node.id,
@@ -423,31 +479,6 @@ def _create_replay_node(factory: sessionmaker[Session], seeded: QualitySeed) -> 
             content_hash=source.content_hash,
             snapshot=dict(source.content_json),
         )
-    return node.id
-
-
-def _seed_concurrent_running_node(
-    factory: sessionmaker[Session],
-    seeded: QualitySeed,
-) -> UUID:
-    with factory() as session, session.begin():
-        first = session.get(NodeRun, seeded.node_run_id)
-        assert first is not None
-        node = NodeRun(
-            id=new_uuid7(),
-            organization_id=first.organization_id,
-            workflow_run_id=first.workflow_run_id,
-            branch_run_id=first.branch_run_id,
-            node_key="quality.concurrent.fixture",
-            run_no=1,
-            status=NodeStatus.RUNNING.value,
-            trigger_type="system",
-            automation_policy_snapshot_json=first.automation_policy_snapshot_json,
-            created_by=seeded.actor.principal_id,
-            updated_by=seeded.actor.principal_id,
-        )
-        session.add(node)
-        session.flush()
     return node.id
 
 
