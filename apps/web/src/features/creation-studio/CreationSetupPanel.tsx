@@ -11,8 +11,8 @@ export function CreationSetupPanel({
   const visualWidth =
     type === "image"
       ? "w-[min(100%,360px)] md:w-[clamp(420px,46vw,560px)]"
-      : "w-full max-w-[720px]";
-  const workspaceWidth = type === "image" ? "max-w-[760px]" : "max-w-[1040px]";
+      : "w-full max-w-[620px]";
+  const workspaceWidth = type === "image" ? "max-w-[760px]" : "max-w-[900px]";
 
   return (
     <section

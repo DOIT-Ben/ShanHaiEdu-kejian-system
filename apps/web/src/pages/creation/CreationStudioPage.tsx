@@ -1,6 +1,6 @@
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, FolderOpen } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { CreationAdvancedPanel } from "@/features/creation-studio/CreationAdvancedPanel";
 import type { CreationAdvancedSettings } from "@/features/creation-studio/CreationAdvancedPanel";
 import { CreationComposer } from "@/features/creation-studio/CreationComposer";
@@ -21,6 +21,7 @@ import {
   type SaveResultDescriptor,
 } from "@/features/save-to-project/SaveToProjectDialog";
 import { saveMockDraft, useMockRuntime } from "@/shared/api/mocks/runtime";
+import { saveMockResult } from "@/shared/api/mocks/savedResults";
 
 const creationStages: CreationStage[] = ["draft", "running", "ready", "adopted", "saved"];
 
@@ -30,6 +31,7 @@ type SavedCreation = {
   description: string;
   generation: number;
   hasUnappliedChanges: boolean;
+  projectId?: string;
   savedTarget?: string;
   settings: CreationSettings;
   stage: CreationStage;
@@ -48,6 +50,8 @@ function getCreationDescription(type: StudioType) {
 export function CreationStudioPage({ type }: { type: StudioType }) {
   const config = studioRegistry[type];
   const runtime = useMockRuntime();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const stateKey = `creation:${type}:state`;
   const stored = runtime.drafts[stateKey]?.value as Partial<SavedCreation> | undefined;
   const fallbackDescription = getCreationDescription(type);
@@ -64,6 +68,8 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
   const description =
     typeof stored?.description === "string" ? stored.description : fallbackDescription;
   const savedTarget = typeof stored?.savedTarget === "string" ? stored.savedTarget : undefined;
+  const projectId = searchParams.get("projectId") ?? stored?.projectId;
+  const project = runtime.projects.find((item) => item.id === projectId);
   const settings = useMemo<CreationSettings>(
     () => ({
       candidateCount,
@@ -102,6 +108,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
       description,
       generation,
       hasUnappliedChanges,
+      ...(projectId ? { projectId } : {}),
       settings,
       stage,
       ...patch,
@@ -126,12 +133,13 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
         description,
         generation,
         hasUnappliedChanges: false,
+        ...(projectId ? { projectId } : {}),
         settings,
         stage: "ready",
       });
     }, 1450);
     return () => window.clearTimeout(timer);
-  }, [advancedSettings, candidate, description, generation, settings, stage, stateKey]);
+  }, [advancedSettings, candidate, description, generation, projectId, settings, stage, stateKey]);
 
   const generate = (nextDescription = description) => {
     const normalizedDescription = nextDescription.trim();
@@ -153,11 +161,43 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
     });
   };
 
+  const result: SaveResultDescriptor = {
+    id: buildCreationResultId(type, generation, candidate),
+    preview: { candidate, generation, ratio: settings.ratio },
+    title: `${config.title} · 作品 ${String(candidate + 1)}`,
+    type: type === "presentation" ? "ppt_page" : type,
+  };
+  const sharedSlot =
+    type === "image"
+      ? { key: "project.shared-images", label: "项目通用教学图片" }
+      : type === "video"
+        ? { key: "project.shared-videos", label: "项目通用视频素材" }
+        : { key: "project.shared-presentations", label: "项目通用课件" };
+  const saveToKnownProject = (targetProjectId: string) => {
+    const savedResult = saveMockResult({
+      lessonLabel: "独立创作",
+      projectId: targetProjectId,
+      ...(result.preview ? { preview: result.preview } : {}),
+      replaceMode: "append",
+      resultId: result.id,
+      slotKey: `${sharedSlot.key}:${result.id}`,
+      slotLabel: sharedSlot.label,
+      title: result.title,
+      type: result.type,
+    });
+    const projectTitle = runtime.projects.find((item) => item.id === savedResult.projectId)?.title;
+    updateCreation({
+      projectId: savedResult.projectId,
+      savedTarget: `${projectTitle ?? "目标项目"} · ${savedResult.slotLabel}`,
+      stage: "saved",
+    });
+  };
   const advance = () => {
     if (stage === "ready") {
       updateCreation({ stage: "adopted" });
     } else if (stage === "adopted") {
-      setSaveOpen(true);
+      if (projectId) saveToKnownProject(projectId);
+      else setSaveOpen(true);
     }
   };
 
@@ -169,12 +209,6 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
     });
   };
 
-  const result: SaveResultDescriptor = {
-    id: buildCreationResultId(type, generation, candidate),
-    preview: { candidate, generation, ratio: settings.ratio },
-    title: `${config.title} · 作品 ${String(candidate + 1)}`,
-    type: type === "presentation" ? "ppt_page" : type,
-  };
   return (
     <div
       className="sh-creation-studio flex h-[calc(100dvh-var(--sh-topbar-height))] flex-col overflow-hidden bg-[var(--sh-surface-canvas)]"
@@ -189,6 +223,17 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
           <ChevronLeft aria-hidden="true" className="size-5" />
         </Link>
         <h1 className="truncate font-semibold text-[var(--sh-ink-strong)]">{config.title}</h1>
+        {project ? (
+          <Link
+            aria-label={`查看${project.title}的项目资产`}
+            className="ml-auto inline-flex min-w-0 items-center gap-1.5 rounded-[var(--sh-radius-sm)] px-2 py-1 text-sm font-medium text-[var(--sh-brand-700)] hover:bg-[var(--sh-brand-50)]"
+            to={`/app/projects/${project.id}/results`}
+          >
+            <FolderOpen aria-hidden="true" className="size-4 shrink-0" />
+            <span className="max-w-44 truncate">{project.title}</span>
+            <span className="hidden sm:inline">· 项目资产</span>
+          </Link>
+        ) : null}
       </header>
 
       <section
@@ -214,6 +259,13 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
                 type,
               });
             }}
+            onViewProjectAssets={
+              projectId
+                ? () => {
+                    void navigate(`/app/projects/${projectId}/results`);
+                  }
+                : undefined
+            }
             ratio={settings.ratio}
             saveTriggerRef={saveTriggerRef}
             savedTarget={savedTarget}
@@ -275,6 +327,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
             (project) => project.id === savedResult.projectId,
           )?.title;
           updateCreation({
+            projectId: savedResult.projectId,
             savedTarget: `${projectTitle ?? "目标项目"} · ${savedResult.slotLabel}`,
             stage: "saved",
           });

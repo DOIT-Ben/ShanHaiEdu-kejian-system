@@ -256,6 +256,21 @@ test("1280×800 首屏可查看结果并直接在底部调整", async ({ page })
   await expect(page.getByRole("button", { name: "备选作品 1" })).toBeInViewport();
 });
 
+test("等效 110% 缩放时视频创作台保持紧凑", async ({ page }) => {
+  await page.setViewportSize({ height: 818, width: 1164 });
+  await loginAsTeacher(page);
+  await page.goto("/app/creation/videos");
+  await page.getByRole("button", { name: "开始创作视频" }).click();
+  await expect(page.getByRole("button", { name: "就用这张" })).toBeVisible();
+
+  const visual = await page.getByTestId("creation-main-visual").boundingBox();
+  const preview = await page.getByTestId("creation-preview-panel").boundingBox();
+  expect(visual?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(720);
+  expect(preview?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(900);
+  await expect(page.getByRole("textbox", { name: "创作要求" })).toBeInViewport();
+  await expect(page.getByRole("button", { name: "按新要求再做一组" })).toBeInViewport();
+});
+
 test("390px 下输入台固定可用并能按需展开画面细节", async ({ page }) => {
   await page.setViewportSize({ height: 844, width: 390 });
   await openReadyImageStudio(page);
@@ -342,6 +357,29 @@ test("全屏预览退出后再打开保存对话框", async ({ page }) => {
   await page.getByRole("button", { name: "保存到项目" }).click();
   await expect.poll(() => page.evaluate(() => document.fullscreenElement === null)).toBe(true);
   await expect(page.getByRole("dialog", { name: "保存到项目" })).toBeInViewport();
+});
+
+test("独立创作首次选定项目后自动挂载后续作品并可查看项目资产", async ({ page }) => {
+  await openReadyImageStudio(page);
+  await page.getByRole("button", { name: "就用这张" }).click();
+  await page.getByRole("button", { name: "保存到项目" }).click();
+  const dialog = page.getByRole("dialog", { name: "保存到项目" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "保存到这个位置" }).click();
+  await expect(page.getByText(/已挂载到“/)).toBeVisible();
+  await page.getByRole("button", { name: "查看项目资产" }).click();
+  await expect(page).toHaveURL(/\/app\/projects\/.*\/results$/);
+  await expect(page.getByRole("heading", { name: "素材与成果" })).toBeVisible();
+
+  await page.goBack();
+  const prompt = page.getByRole("textbox", { name: "创作要求" });
+  await prompt.fill("让三个标签之间留出更清晰的对比空间。");
+  await page.getByRole("button", { name: "按新要求再画一组" }).click();
+  await expect(page.getByRole("button", { name: "就用这张" })).toBeVisible();
+  await page.getByRole("button", { name: "就用这张" }).click();
+  await page.getByRole("button", { name: "保存到项目" }).click();
+  await expect(page.getByRole("dialog", { name: "保存到项目" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "查看项目资产" })).toBeVisible();
 });
 
 test("PPT 候选会同步切换当前课件预览", async ({ page }) => {

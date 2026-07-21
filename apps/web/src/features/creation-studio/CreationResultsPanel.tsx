@@ -30,6 +30,7 @@ type CreationResultsPanelProps = {
   onAdvance: () => void;
   onCandidateChange: (candidate: number) => void;
   onDownload: () => void;
+  onViewProjectAssets?: () => void;
   saveTriggerRef?: Ref<HTMLButtonElement>;
 };
 type PreviewContext = Pick<
@@ -160,6 +161,7 @@ export function CreationResultsPanel({
   onAdvance,
   onCandidateChange,
   onDownload,
+  onViewProjectAssets,
   ratio,
   saveTriggerRef,
   savedTarget,
@@ -181,8 +183,8 @@ export function CreationResultsPanel({
       : "w-[min(92vw,1280px)]"
     : type === "image"
       ? "w-[min(100%,360px)] md:w-[clamp(480px,45vw,576px)]"
-      : "w-full max-w-[960px]";
-  const workspaceWidth = type === "image" ? "max-w-[760px]" : "max-w-[1120px]";
+      : "w-full max-w-[720px]";
+  const workspaceWidth = type === "image" ? "max-w-[760px]" : "max-w-[900px]";
   const downloadLabel =
     type === "image" ? "下载这张图片" : type === "video" ? "下载关键帧说明" : "下载课件预览";
   const itemLabel = type === "image" ? "张" : type === "video" ? "张关键帧" : "套";
@@ -373,9 +375,16 @@ export function CreationResultsPanel({
         </div>
       </div>
       {stage === "saved" ? (
-        <p className="mt-2 rounded-[var(--sh-radius-sm)] bg-[var(--sh-success-soft)] px-3 py-1.5 text-sm font-semibold text-[var(--sh-ink-strong)]">
-          已放进“{savedTarget ?? "目标项目"}”，可在项目的素材与成果中查看。
-        </p>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-[var(--sh-radius-sm)] bg-[var(--sh-success-soft)] px-3 py-1.5">
+          <p className="text-sm font-semibold text-[var(--sh-ink-strong)]">
+            已挂载到“{savedTarget ?? "目标项目"}”。
+          </p>
+          {onViewProjectAssets ? (
+            <Button onClick={onViewProjectAssets} size="sm" variant="quiet">
+              查看项目资产
+            </Button>
+          ) : null}
+        </div>
       ) : null}
       <EnlargedPreview
         candidate={candidate}
