@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+from decimal import Decimal
+from typing import Any, cast
+
 import pytest
 
 from apps.api.video_preproduction.fake import ScriptedDeterministicTextFake
 from apps.api.video_preproduction.models import (
     IntroSelectionSnapshot,
     MasterScript,
+    PricingSnapshot,
     SceneAssetRequirement,
+    VideoPreproductionRequest,
 )
 from apps.api.video_preproduction.service import (
     VideoPreproductionError,
@@ -32,6 +37,82 @@ class StaticGenerator:
 
     def generate_master_script(self, snapshot: IntroSelectionSnapshot) -> MasterScript:
         return self.master
+
+
+def test_invalid_request_fails_before_the_text_generation_port() -> None:
+    fake = ScriptedDeterministicTextFake()
+    service = VideoPreproductionService(fake, clock=lambda: NOW)
+    valid = request()
+    assert valid.pricing_snapshot is not None
+    invalid_pricing = valid.pricing_snapshot.model_copy(
+        update={
+            "version": "",
+            "currency": "usd",
+            "image_candidate_unit_price": Decimal("0"),
+        }
+    )
+    for payload in (
+        valid.model_copy(update={"pricing_snapshot": None}),
+        valid.model_copy(update={"pricing_snapshot": invalid_pricing}),
+        *(
+            valid.model_copy(
+                update={
+                    "pricing_snapshot": PricingSnapshot.model_construct(
+                        version="video-pricing-constructed",
+                        currency="CNY",
+                        image_candidate_unit_price=Decimal("0.80"),
+                        candidates_per_asset=count,
+                    )
+                }
+            )
+            for count in (0, 9)
+        ),
+    ):
+        with pytest.raises(VideoPreproductionError) as caught:
+            service.generate_master_script(payload)
+        assert caught.value.code == "PRICING_SNAPSHOT_REQUIRED"
+    snapshot_data = valid.intro_selection_snapshot.model_dump(mode="python")
+    snapshot_data["must_not_preteach"] = ()
+    invalid_snapshot = cast(Any, IntroSelectionSnapshot.model_construct)(**snapshot_data)
+    invalid_request = VideoPreproductionRequest.model_construct(
+        intro_selection_snapshot=invalid_snapshot,
+        pricing_snapshot=valid.pricing_snapshot,
+        aspect_ratio=valid.aspect_ratio,
+        language=valid.language,
+        cost_preference=valid.cost_preference,
+    )
+    with pytest.raises(VideoPreproductionError) as caught:
+        service.generate_master_script(invalid_request)
+    assert caught.value.code == "VIDEO_PREPRODUCTION_REQUEST_INVALID"
+    assert fake.calls == 0
+
+    for value in ("", "   "):
+        invalid_snapshot = valid.intro_selection_snapshot.model_copy(
+            update={"must_not_preteach": (value,)}
+        )
+        invalid_request = valid.model_copy(update={"intro_selection_snapshot": invalid_snapshot})
+        with pytest.raises(VideoPreproductionError) as caught:
+            service.generate_master_script(invalid_request)
+        assert caught.value.code == "VIDEO_PREPRODUCTION_REQUEST_INVALID"
+        assert fake.calls == 0
+
+    for field in (
+        "snapshot_id",
+        "version",
+        "option_key",
+        "title",
+        "creative_concept",
+        "hook",
+        "course_anchor",
+        "classroom_first_question",
+        "handoff_moment",
+    ):
+        blank_snapshot = valid.intro_selection_snapshot.model_copy(update={field: "   "})
+        invalid_request = valid.model_copy(update={"intro_selection_snapshot": blank_snapshot})
+        with pytest.raises(VideoPreproductionError) as caught:
+            service.generate_master_script(invalid_request)
+        assert caught.value.code == "VIDEO_PREPRODUCTION_REQUEST_INVALID"
+        assert fake.calls == 0
 
 
 def test_canonical_serialization_bytes_are_stable_and_detect_tampering() -> None:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from decimal import Decimal
-from typing import Any, cast, get_type_hints
+from typing import get_type_hints
 
 import pytest
 
@@ -12,7 +12,6 @@ from apps.api.video_preproduction.models import (
     IntroSelectionSnapshot,
     MasterScript,
     PricingSnapshot,
-    VideoPreproductionRequest,
 )
 from apps.api.video_preproduction.ports import VideoPreproductionTextGenerator
 from apps.api.video_preproduction.service import (
@@ -68,65 +67,6 @@ def test_master_generation_accepts_a_provider_neutral_text_generator() -> None:
     assert stage.master_script.selected_intro_snapshot_id == stage.source_snapshot.snapshot_id
     hints = get_type_hints(VideoPreproductionService.__init__)
     assert hints["text_generator"] is VideoPreproductionTextGenerator
-
-
-def test_master_generation_rejects_missing_or_invalid_pricing_before_fake_call() -> None:
-    fake = ScriptedDeterministicTextFake()
-    service = VideoPreproductionService(fake, clock=lambda: NOW)
-    valid = request()
-    assert valid.pricing_snapshot is not None
-    invalid_pricing = valid.pricing_snapshot.model_copy(
-        update={
-            "version": "",
-            "currency": "usd",
-            "image_candidate_unit_price": Decimal("0"),
-        }
-    )
-    for payload in (
-        valid.model_copy(update={"pricing_snapshot": None}),
-        valid.model_copy(update={"pricing_snapshot": invalid_pricing}),
-        *(
-            valid.model_copy(
-                update={
-                    "pricing_snapshot": PricingSnapshot.model_construct(
-                        version="video-pricing-constructed",
-                        currency="CNY",
-                        image_candidate_unit_price=Decimal("0.80"),
-                        candidates_per_asset=count,
-                    )
-                }
-            )
-            for count in (0, 9)
-        ),
-    ):
-        with pytest.raises(VideoPreproductionError) as caught:
-            service.generate_master_script(payload)
-        assert caught.value.code == "PRICING_SNAPSHOT_REQUIRED"
-    snapshot = valid.intro_selection_snapshot
-    snapshot_data = snapshot.model_dump(mode="python")
-    snapshot_data["must_not_preteach"] = ()
-    invalid_snapshot = cast(Any, IntroSelectionSnapshot.model_construct)(**snapshot_data)
-    invalid_request = VideoPreproductionRequest.model_construct(
-        intro_selection_snapshot=invalid_snapshot,
-        pricing_snapshot=valid.pricing_snapshot,
-        aspect_ratio=valid.aspect_ratio,
-        language=valid.language,
-        cost_preference=valid.cost_preference,
-    )
-    with pytest.raises(VideoPreproductionError) as caught:
-        service.generate_master_script(invalid_request)
-    assert caught.value.code == "VIDEO_PREPRODUCTION_REQUEST_INVALID"
-    assert fake.calls == 0
-
-    for value in ("", "   "):
-        empty_constraint = valid.intro_selection_snapshot.model_copy(
-            update={"must_not_preteach": (value,)}
-        )
-        invalid_request = valid.model_copy(update={"intro_selection_snapshot": empty_constraint})
-        with pytest.raises(VideoPreproductionError) as caught:
-            service.generate_master_script(invalid_request)
-        assert caught.value.code == "VIDEO_PREPRODUCTION_REQUEST_INVALID"
-        assert fake.calls == 0
 
 
 def test_rough_storyboard_requires_confirmation_and_master_approval() -> None:

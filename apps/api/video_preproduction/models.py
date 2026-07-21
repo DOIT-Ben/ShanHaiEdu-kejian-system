@@ -14,6 +14,26 @@ NonEmptyText = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=10_000),
 ]
+ShortText = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=160),
+]
+VersionText = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=80),
+]
+TitleText = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=500),
+]
+MediumText = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=5_000),
+]
+Currency = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, pattern=r"^[A-Z]{3}$"),
+]
 
 
 class _FrozenModel(BaseModel):
@@ -21,21 +41,21 @@ class _FrozenModel(BaseModel):
 
 
 class IntroSelectionSnapshot(_FrozenModel):
-    snapshot_id: str = Field(min_length=1, max_length=160)
-    version: str = Field(min_length=1, max_length=80)
-    option_key: str = Field(min_length=1, max_length=160)
-    title: str = Field(min_length=1, max_length=500)
-    creative_concept: str = Field(min_length=1, max_length=10_000)
-    hook: str = Field(min_length=1, max_length=5_000)
-    course_anchor: str = Field(min_length=1, max_length=5_000)
-    classroom_first_question: str = Field(min_length=1, max_length=5_000)
-    handoff_moment: str = Field(min_length=1, max_length=5_000)
+    snapshot_id: ShortText
+    version: VersionText
+    option_key: ShortText
+    title: TitleText
+    creative_concept: NonEmptyText
+    hook: MediumText
+    course_anchor: MediumText
+    classroom_first_question: MediumText
+    handoff_moment: MediumText
     must_not_preteach: tuple[NonEmptyText, ...] = Field(min_length=1, max_length=50)
 
 
 class PricingSnapshot(_FrozenModel):
-    version: str = Field(min_length=1, max_length=160)
-    currency: str = Field(pattern=r"^[A-Z]{3}$")
+    version: ShortText
+    currency: Currency
     image_candidate_unit_price: Decimal = Field(gt=0)
     candidates_per_asset: int = Field(ge=1, le=8)
 
@@ -59,15 +79,15 @@ class StoryComplexity(_FrozenModel):
 class DurationRecommendation(_FrozenModel):
     recommended_duration_seconds: int = Field(ge=60, le=180)
     estimated_cost: Decimal = Field(ge=0)
-    pricing_version: str
-    currency: str = Field(pattern=r"^[A-Z]{3}$")
+    pricing_version: ShortText
+    currency: Currency
     story_complexity: StoryComplexity
-    rationale: tuple[str, ...]
+    rationale: tuple[NonEmptyText, ...]
 
 
 class TeacherConfirmation(_FrozenModel):
-    pricing_version: str = Field(min_length=1, max_length=160)
-    currency: str = Field(pattern=r"^[A-Z]{3}$")
+    pricing_version: ShortText
+    currency: Currency
     confirmed_duration_seconds: int = Field(ge=60, le=180)
     confirmed_estimated_cost: Decimal = Field(ge=0)
     confirmed_at: AwareDatetime
@@ -75,23 +95,23 @@ class TeacherConfirmation(_FrozenModel):
 
 class ApprovalFact(_FrozenModel):
     subject_kind: ApprovalKind
-    subject_key: str = Field(min_length=1, max_length=160)
+    subject_key: ShortText
     subject_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     confirmation_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
-    approved_by: str = Field(min_length=1, max_length=160)
+    approved_by: ShortText
     approved_at: AwareDatetime
 
 
 class SceneAssetRequirement(_FrozenModel):
-    asset_key: str = Field(min_length=1, max_length=160)
+    asset_key: ShortText
     asset_type: AssetType
-    identity_key: str = Field(min_length=1, max_length=160)
-    purpose: str = Field(min_length=1, max_length=5_000)
-    visual_description: str = Field(min_length=1, max_length=10_000)
+    identity_key: ShortText
+    purpose: MediumText
+    visual_description: NonEmptyText
 
 
 class MasterScene(_FrozenModel):
-    scene_key: NonEmptyText
+    scene_key: ShortText
     position: int = Field(ge=1)
     purpose: NonEmptyText
     location: NonEmptyText
@@ -108,15 +128,15 @@ class MasterScene(_FrozenModel):
 
 
 class MasterScript(_FrozenModel):
-    master_script_key: str
-    selected_intro_snapshot_id: str
-    selected_intro_snapshot_version: str
-    selected_intro_option_key: str
-    title: str
-    creative_concept: str
-    course_anchor: str
-    narrative_purpose: str
-    complete_story: str
+    master_script_key: ShortText
+    selected_intro_snapshot_id: ShortText
+    selected_intro_snapshot_version: VersionText
+    selected_intro_option_key: ShortText
+    title: TitleText
+    creative_concept: NonEmptyText
+    course_anchor: MediumText
+    narrative_purpose: NonEmptyText
+    complete_story: NonEmptyText
     scenes: tuple[MasterScene, ...] = Field(min_length=1)
     ends_at_handoff: bool
 
@@ -127,20 +147,20 @@ class ReviewableMasterScriptStage(_FrozenModel):
 
 
 class RoughBeat(_FrozenModel):
-    beat_key: str
-    scene_key: str
+    beat_key: ShortText
+    scene_key: ShortText
     scene_beat_position: int = Field(ge=1, le=4)
     position: int = Field(ge=1)
     main_event: NonEmptyText
     start_state: NonEmptyText
     end_state: NonEmptyText
     duration_seconds: int = Field(gt=0)
-    asset_keys: tuple[str, ...] = Field(min_length=1)
+    asset_keys: tuple[ShortText, ...] = Field(min_length=1)
 
 
 class RoughStoryboard(_FrozenModel):
-    rough_storyboard_key: str
-    source_master_script_key: str
+    rough_storyboard_key: ShortText
+    source_master_script_key: ShortText
     beats: tuple[RoughBeat, ...] = Field(min_length=1)
     total_duration_seconds: int = Field(ge=60, le=180)
     generated_at: AwareDatetime
@@ -155,12 +175,12 @@ class ReviewableRoughStoryboardStage(_FrozenModel):
 
 
 class VideoAsset(_FrozenModel):
-    asset_key: str
+    asset_key: ShortText
     asset_type: AssetType
-    identity_key: str
+    identity_key: ShortText
     purpose: NonEmptyText
     visual_description: NonEmptyText
-    source_beat_keys: tuple[str, ...] = Field(min_length=1)
+    source_beat_keys: tuple[ShortText, ...] = Field(min_length=1)
 
 
 class AssetInventory(_FrozenModel):
@@ -173,14 +193,14 @@ class AssetInventory(_FrozenModel):
 class VisualPlan(_FrozenModel):
     aspect_ratio: AspectRatio
     language: Literal["zh-CN"]
-    consistency_principles: tuple[str, ...] = Field(min_length=1)
-    negative_constraints: tuple[str, ...] = Field(min_length=1)
+    consistency_principles: tuple[NonEmptyText, ...] = Field(min_length=1)
+    negative_constraints: tuple[ShortText, ...] = Field(min_length=1)
 
 
 class ImagePrompt(_FrozenModel):
-    asset_key: str
+    asset_key: ShortText
     prompt: NonEmptyText
-    negative_constraints: tuple[str, ...] = Field(min_length=1)
+    negative_constraints: tuple[ShortText, ...] = Field(min_length=1)
     aspect_ratio: AspectRatio
 
 
