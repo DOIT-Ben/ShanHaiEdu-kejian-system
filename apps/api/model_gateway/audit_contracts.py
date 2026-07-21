@@ -46,6 +46,7 @@ class AttemptSuccessAudit:
     finish_reason: str | None
     usage: ModelUsage
     provider_task_id: str | None = None
+    recovery_text: str | None = None
 
 
 class AttemptAuditSink(Protocol):

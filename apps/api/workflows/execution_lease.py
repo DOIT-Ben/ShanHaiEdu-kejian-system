@@ -8,7 +8,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from apps.api.database import utc_now
+from apps.api.database import database_wall_clock
 from apps.api.workflows.models import NodeExecutionLease
 from apps.api.workflows.repository import WorkflowRuntimeRepository
 
@@ -29,7 +29,7 @@ class SqlAlchemyNodeExecutionLeasePort:
     def claim(self, node_run_id: UUID, owner_token: str) -> None:
         if self._repository.get_node(node_run_id, for_update=True) is None:
             raise NodeExecutionLeaseError("NODE_EXECUTION_NOT_FOUND", "node run not found")
-        now = utc_now()
+        now = database_wall_clock(self._session)
         lease = self._locked(node_run_id)
         if lease is not None and lease.lease_expires_at > now:
             raise NodeExecutionLeaseError(

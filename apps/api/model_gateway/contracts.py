@@ -20,6 +20,7 @@ class ModelAuditContext:
     project_id: UUID
     node_run_id: UUID
     generation_job_id: UUID | None
+    persist_result_for_recovery: bool = False
 
 
 class GatewayErrorCode(StrEnum):

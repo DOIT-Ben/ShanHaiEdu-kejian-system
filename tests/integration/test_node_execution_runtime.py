@@ -327,6 +327,10 @@ async def test_worker_recovery_after_t1_does_not_repeat_provider_call(
     with transactions.begin() as transaction:
         prepared = transaction.prepare(seeded.node_run_id, "issue-89-recover")
         assert prepared.committed_result is None
+    with factory() as session, session.begin():
+        lease = session.get(NodeExecutionLease, seeded.node_run_id)
+        assert lease is not None
+        lease.lease_expires_at = utc_now() - timedelta(seconds=1)
 
     provider = DeterministicNodeOutputProvider(seeded.output)
     service = NodeExecutionService(
@@ -345,7 +349,7 @@ async def test_worker_recovery_after_t1_does_not_repeat_provider_call(
         assert _count(session, UsageRecord, "node_run_id", seeded.node_run_id) == 1
 
 
-async def test_successful_attempt_before_t2_fails_closed_without_second_attempt(
+async def test_successful_attempt_before_t2_recovers_without_second_attempt(
     migrated_database_url: str,
 ) -> None:
     factory = build_session_factory(build_engine(migrated_database_url))
@@ -379,12 +383,17 @@ async def test_successful_attempt_before_t2_fails_closed_without_second_attempt(
             audit_sink=SqlAlchemyAttemptAuditSink(factory),
         ),
     )
-    with pytest.raises(NodeExecutionError) as caught:
-        await service.execute(seeded.node_run_id, request_id="issue-89-lost-t2")
+    result = await service.execute(seeded.node_run_id, request_id="issue-89-lost-t2")
 
-    assert caught.value.code == "NODE_EXECUTION_RESULT_UNAVAILABLE"
+    assert result.attempt_id is not None
     assert provider.calls == 0
     with factory() as session:
+        attempt = session.scalar(
+            select(GenerationAttempt).where(GenerationAttempt.node_run_id == seeded.node_run_id)
+        )
+        assert attempt is not None
+        assert attempt.error_details_json.get("recovery_text")
+        assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 1
         assert _count(session, GenerationAttempt, "node_run_id", seeded.node_run_id) == 1
         assert _count(session, UsageRecord, "node_run_id", seeded.node_run_id) == 1
 
@@ -573,7 +582,7 @@ async def test_creation_package_publish_is_bound_to_fixed_source_and_target(
             branch_run_id=branch.id,
             node_key="ppt.body_asset_prompts.generate",
             run_no=1,
-            status=NodeStatus.RUNNING.value,
+            status=NodeStatus.READY.value,
             trigger_type="manual",
             automation_policy_snapshot_json=run.automation_policy_snapshot_json,
             created_by=seeded.actor.principal_id,
@@ -642,7 +651,7 @@ async def test_creation_package_publish_is_bound_to_fixed_source_and_target(
     service = NodeExecutionService(
         SqlAlchemyNodeExecutionTransactionFactory(factory, seeded.actor),
         ModelGateway(
-            {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: provider},
+            {ModelCapability.TEXT_STRUCTURED_IMAGE_PROMPT: provider},
             audit_sink=SqlAlchemyAttemptAuditSink(factory),
         ),
     )

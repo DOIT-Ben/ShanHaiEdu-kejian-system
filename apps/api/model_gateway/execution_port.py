@@ -29,6 +29,7 @@ class AttemptEvidence:
 class SucceededAttempt:
     request_id: str
     evidence: AttemptEvidence
+    recovery_text: str | None
 
 
 class SqlAlchemyAttemptExecutionPort:
@@ -99,6 +100,7 @@ class SqlAlchemyAttemptExecutionPort:
                 usage_id=usage.id,
                 attempt_no=attempt.attempt_no,
             ),
+            recovery_text=_recovery_text(attempt.error_details_json),
         )
 
     def require_succeeded(
@@ -142,3 +144,8 @@ class SqlAlchemyAttemptExecutionPort:
             usage_id=usage.id,
             attempt_no=attempt.attempt_no,
         )
+
+
+def _recovery_text(details: dict[str, object]) -> str | None:
+    value = details.get("recovery_text")
+    return value if type(value) is str and value else None

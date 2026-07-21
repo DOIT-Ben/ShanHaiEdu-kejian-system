@@ -8,6 +8,8 @@ from uuid import UUID
 from apps.api.model_gateway.contracts import (
     GatewayErrorCode,
     ModelGatewayError,
+    ModelUsage,
+    RouteDecision,
     TextGatewayResult,
 )
 from apps.api.model_gateway.ports import CancellationToken
@@ -45,6 +47,20 @@ class NodeExecutionService:
             message = prepared.pre_model_error_message or "node execution cannot invoke the model"
             self._terminalize(prepared, prepared.pre_model_error_code, cancelled=False)
             raise NodeExecutionError(prepared.pre_model_error_code, message)
+        if prepared.recovered_result_text is not None:
+            return self._validate_and_commit(
+                prepared,
+                TextGatewayResult(
+                    request_id=prepared.request.request_id,
+                    text=prepared.recovered_result_text,
+                    route=_recovery_route(prepared),
+                    provider_request_id=None,
+                    actual_model="recovered-attempt",
+                    finish_reason=None,
+                    usage=ModelUsage(),
+                    latency_ms=0,
+                ),
+            )
         try:
             result = await self._model.generate_text(
                 prepared.request,
@@ -98,3 +114,12 @@ class NodeExecutionService:
     ) -> None:
         with self._transactions.begin() as transaction:
             transaction.terminalize_failure(prepared, code=code, cancelled=cancelled)
+
+
+def _recovery_route(prepared: PreparedNodeExecution) -> RouteDecision:
+    return RouteDecision(
+        capability=prepared.request.capability,
+        provider="recovered-attempt",
+        model="recovered-attempt",
+        reason="persisted_attempt_result",
+    )

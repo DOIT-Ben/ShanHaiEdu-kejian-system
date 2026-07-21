@@ -99,6 +99,7 @@ def compile_node_prompt(
         project_id=execution.project_id,
         node_run_id=execution.node_run_id,
         generation_job_id=None,
+        persist_result_for_recovery=True,
     )
     return CompiledNodePrompt(context=context, prompt=prompt, request=request, audit_context=audit)
 

@@ -113,6 +113,7 @@ def audit_context(execution: WorkflowExecutionContext, user_id: UUID | None) -> 
         project_id=execution.project_id,
         node_run_id=execution.node_run_id,
         generation_job_id=None,
+        persist_result_for_recovery=True,
     )
 
 

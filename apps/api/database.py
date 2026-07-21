@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, Integer, MetaData, Uuid, create_engine
+from sqlalchemy import DateTime, ForeignKey, Integer, MetaData, Uuid, create_engine, func, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
@@ -20,6 +20,15 @@ NAMING_CONVENTION = {
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+def database_wall_clock(session: Session) -> datetime:
+    """Return PostgreSQL wall time for cross-worker lease decisions."""
+
+    current_time = session.scalar(select(func.clock_timestamp()))
+    if current_time is None:
+        raise RuntimeError("database wall clock is unavailable")
+    return current_time
 
 
 class Base(DeclarativeBase):

@@ -8,6 +8,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from apps.api.artifacts.context_source_registry import artifact_types_for_context_source
 from apps.api.artifacts.domain import canonical_content_hash
 from apps.api.artifacts.models import Approval, Artifact, ArtifactVersion
 from apps.api.artifacts.relation_service import ArtifactRelationService
@@ -21,21 +22,6 @@ from apps.api.runtime_boundary.ports import (
     ArtifactWriteResult,
     GeneratedArtifactWrite,
 )
-
-_CONTEXT_SOURCE_ARTIFACT_TYPES: dict[str, tuple[str, ...]] = {
-    "intro_selection.snapshot": ("intro_selection",),
-    "lesson_division.approved_version": ("lesson_division",),
-    "lesson_plan.approved_version": ("lesson_plan",),
-    "ppt_outline.approved_version": ("ppt_outline",),
-    "ppt_page_spec.current_version": ("ppt_page_specs", "ppt_page_spec_set"),
-    "ppt_style.approved_version": ("ppt_style",),
-    "video.asset_inventory.current_version": ("video_asset_inventory",),
-    "video.assets.approved_versions": ("video_asset_generation_batch",),
-    "video.clips.approved_versions": ("video_shot_generation",),
-    "video.master_script.approved_version": ("video_master_script",),
-    "video.rough_storyboard.approved_version": ("video_rough_storyboard",),
-    "video.style.approved_version": ("video_style_master_image_candidates",),
-}
 
 
 class ArtifactExecutionPortError(ValueError):
@@ -66,7 +52,7 @@ class SqlAlchemyArtifactPort:
             ),
             None,
         )
-        artifact_types = _CONTEXT_SOURCE_ARTIFACT_TYPES.get(source)
+        artifact_types = artifact_types_for_context_source(source)
         if prefix is None and artifact_types is None:
             return ()
         if artifact_types is None:

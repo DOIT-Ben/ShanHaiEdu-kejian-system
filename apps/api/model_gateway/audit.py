@@ -4,16 +4,17 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timedelta
+from datetime import timedelta
 from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
+from apps.api.database import database_wall_clock
 from apps.api.ids import new_uuid7
 from apps.api.jobs.service import (
     GenerationJobAttemptBindingReader,
@@ -40,14 +41,6 @@ from apps.api.model_gateway.contracts import (
     ModelUsage,
 )
 from apps.api.workflows.models import NodeRun, WorkflowRun
-
-
-def database_wall_clock(session: Session) -> datetime:
-    """Return PostgreSQL wall time instead of the transaction-start timestamp."""
-    current_time = session.scalar(select(func.clock_timestamp()))
-    if current_time is None:
-        raise RuntimeError("database wall clock is unavailable")
-    return current_time
 
 
 class SqlAlchemyAttemptAuditSink:
@@ -208,6 +201,8 @@ class SqlAlchemyAttemptAuditSink:
                     "retryable": False,
                     "retry_after_seconds": None,
                 }
+            elif result.recovery_text is not None:
+                attempt.error_details_json = {"recovery_text": result.recovery_text}
             session.add(
                 self._usage_record(
                     attempt,
