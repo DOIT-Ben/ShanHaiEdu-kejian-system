@@ -11,7 +11,7 @@ WorkingDirectory=/srv/shanhaiedu/repository
 EnvironmentFile=/etc/shanhaiedu/provider-media-relay.env
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/srv/shanhaiedu/repository/.venv/bin/python -m apps.api.provider_media_relay --host 127.0.0.1 --port 8201
+ExecStart=/srv/shanhaiedu/repository/.venv/bin/python -m apps.api.provider_media_relay --port 8201
 Restart=on-failure
 RestartSec=2
 

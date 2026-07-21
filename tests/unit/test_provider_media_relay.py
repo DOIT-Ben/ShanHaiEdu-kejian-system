@@ -116,7 +116,7 @@ def test_http_relay_serves_valid_image_without_caching(tmp_path: Path) -> None:
     image = tmp_path / "frame.png"
     image.write_bytes(PNG_BYTES)
     config = relay_config(tmp_path)
-    server = ProviderMediaRelayServer(("127.0.0.1", 0), config)
+    server = ProviderMediaRelayServer(0, config)
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     path = sign_media_path(
@@ -126,6 +126,7 @@ def test_http_relay_serves_valid_image_without_caching(tmp_path: Path) -> None:
     )
     host = str(server.server_address[0])
     port = int(server.server_address[1])
+    assert host == "127.0.0.1"
 
     try:
         with urlopen(f"http://{host}:{port}{path}") as response:

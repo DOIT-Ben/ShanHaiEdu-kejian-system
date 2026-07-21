@@ -28,6 +28,7 @@ _ALLOWED_MEDIA_TYPES = {
 }
 _FILENAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,254}", re.ASCII)
 _MAX_EXPIRY_DIGITS = 20
+_LOOPBACK_HOST = "127.0.0.1"
 
 
 class ProviderMediaRequestError(ValueError):
@@ -110,8 +111,8 @@ class ProviderMediaRelayServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
 
-    def __init__(self, address: tuple[str, int], config: ProviderMediaRelayConfig) -> None:
-        super().__init__(address, ProviderMediaRequestHandler)
+    def __init__(self, port: int, config: ProviderMediaRelayConfig) -> None:
+        super().__init__((_LOOPBACK_HOST, port), ProviderMediaRequestHandler)
         self.config = config
 
 
@@ -176,13 +177,12 @@ def build_relay_config(environ: Mapping[str, str] | None = None) -> ProviderMedi
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="serve short-lived provider media references")
-    parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8201)
     args = parser.parse_args()
     if not 1 <= args.port <= 65_535:
         parser.error("--port must be between 1 and 65535")
-    server = ProviderMediaRelayServer((args.host, args.port), build_relay_config())
-    logger.info("provider_media_relay_started", extra={"host": args.host, "port": args.port})
+    server = ProviderMediaRelayServer(args.port, build_relay_config())
+    logger.info("provider_media_relay_started", extra={"host": _LOOPBACK_HOST, "port": args.port})
     try:
         server.serve_forever()
     except KeyboardInterrupt:
