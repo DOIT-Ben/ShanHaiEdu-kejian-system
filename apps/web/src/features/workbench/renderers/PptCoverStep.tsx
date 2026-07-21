@@ -149,28 +149,56 @@ export function PptCoverStep() {
           </div>
         </section>
         <aside className="mx-auto w-full max-w-[720px]">
-          <p className="text-sm font-semibold text-[var(--sh-ink-strong)]">3 张备选封面</p>
-          <div className="mt-2 grid grid-cols-3 gap-2 md:gap-3">
-            {availableCandidates.map((candidate) => (
-              <button
-                aria-label={`选择${candidate.label}`}
-                aria-pressed={selectedId === candidate.id}
-                className={`min-w-0 rounded-[var(--sh-radius-sm)] border bg-[var(--sh-surface-elevated)] p-1.5 text-left md:p-2 ${selectedId === candidate.id ? "border-[var(--sh-brand-500)] shadow-[var(--sh-shadow-card)]" : "border-[var(--sh-line-subtle)]"}`}
-                disabled={approved}
-                key={candidate.id}
-                onClick={() => {
-                  selectCover(candidate.id);
-                  setMessage(`已切换到备选封面“${candidate.label}”`);
-                }}
-                type="button"
-              >
-                <CoverVisual candidate={candidate} demo={demo} topic={topic} />
-                <span className="mt-1.5 block truncate px-1 text-xs font-semibold text-[var(--sh-ink-strong)]">
-                  {candidate.label}
-                </span>
-              </button>
-            ))}
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <div>
+              <p className="text-sm font-semibold text-[var(--sh-ink-strong)]">选择封面</p>
+              <p className="mt-0.5 text-xs text-[var(--sh-ink-muted)]">
+                {approved
+                  ? `已采用：${selected.label}`
+                  : `点击候选查看大图 · 当前预览：${selected.label}`}
+              </p>
+            </div>
+            <span className="text-xs font-medium text-[var(--sh-ink-muted)]">3 张备选</span>
           </div>
+          <div className="mt-2 grid grid-cols-3 gap-2 md:gap-3">
+            {availableCandidates.map((candidate) => {
+              const previewing = selectedId === candidate.id;
+              return (
+                <button
+                  aria-label={`选择${candidate.label}`}
+                  aria-pressed={previewing}
+                  className={`group relative min-w-0 rounded-[var(--sh-radius-sm)] border bg-[var(--sh-surface-elevated)] p-1.5 text-left transition-[border-color,box-shadow,transform] motion-reduce:transition-none md:p-2 ${previewing ? "border-[var(--sh-brand-600)] bg-[var(--sh-brand-50)] shadow-[var(--sh-shadow-card)] ring-1 ring-[var(--sh-brand-200)]" : "border-[var(--sh-line-subtle)] hover:-translate-y-0.5 hover:border-[var(--sh-brand-300)] hover:shadow-[var(--sh-shadow-card)]"} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sh-brand-500)] focus-visible:ring-offset-2 disabled:cursor-default disabled:opacity-85`}
+                  disabled={approved}
+                  key={candidate.id}
+                  onClick={() => {
+                    selectCover(candidate.id);
+                    setMessage(`正在预览“${candidate.label}”，确认后将作为 PPT 封面`);
+                  }}
+                  type="button"
+                >
+                  <CoverVisual candidate={candidate} demo={demo} topic={topic} />
+                  {previewing ? (
+                    <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-[var(--sh-radius-sm)] bg-[var(--sh-brand-700)] px-1.5 py-1 text-[10px] font-semibold text-white shadow-[var(--sh-shadow-card)]">
+                      <Check aria-hidden="true" className="size-3" />
+                      当前预览
+                    </span>
+                  ) : (
+                    <span className="pointer-events-none absolute inset-x-2 bottom-7 grid min-h-8 place-items-center rounded-[var(--sh-radius-sm)] bg-[var(--sh-overlay-scrim)] px-2 text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100 motion-reduce:transition-none">
+                      预览这张
+                    </span>
+                  )}
+                  <span
+                    className={`mt-1.5 block truncate px-1 text-xs font-semibold ${previewing ? "text-[var(--sh-brand-700)]" : "text-[var(--sh-ink-strong)]"}`}
+                  >
+                    {candidate.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p aria-live="polite" className="sr-only" role="status">
+            {message}
+          </p>
         </aside>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -203,11 +231,6 @@ export function PptCoverStep() {
           下载预览
         </Button>
       </div>
-      {message ? (
-        <p className="mt-3 text-sm font-medium text-[var(--sh-success)]" role="status">
-          {message}
-        </p>
-      ) : null}
     </WorkbenchPageFrame>
   );
 }
