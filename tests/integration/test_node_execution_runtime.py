@@ -4,7 +4,7 @@ import asyncio
 import json
 from collections.abc import Callable
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import timedelta
 from pathlib import Path
 from uuid import UUID
@@ -43,6 +43,7 @@ from apps.api.node_execution.structured_output import validate_structured_output
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.prompt_runtime.models import ContextSnapshot, PromptSnapshot
+from apps.api.runtime_boundary.output_projection import compile_output_projection
 from apps.api.runtime_boundary.ports import WorkflowExecutionContext
 from apps.api.uploads.models import SourceMaterial
 from apps.api.workflows.execution_port import WorkflowExecutionPortError
@@ -71,6 +72,57 @@ class RuntimeSeed:
     node_run_id: UUID
     upstream_version_id: UUID
     output: dict[str, object]
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "node_run_id",
+        "context_snapshot_id",
+        "prompt_snapshot_id",
+        "content_definition_version_id",
+        "request_id",
+        "artifact_key",
+        "artifact_type",
+        "branch_key",
+    ],
+)
+def test_generated_artifact_capability_rejects_forged_execution_provenance(
+    migrated_database_url: str,
+    field: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_runtime(factory)
+    transactions = SqlAlchemyNodeExecutionTransactionFactory(factory, seeded.actor)
+    with transactions.begin() as transaction:
+        prepared = transaction.prepare(seeded.node_run_id, f"issue-131-{field}")
+    context = prepared.commit_context
+    assert context is not None
+    plan = compile_output_projection(
+        definition=context.definition,
+        execution=context.execution,
+        snapshots=context.snapshots,
+        validated_output=seeded.output,
+        upstream_artifacts=context.upstream_artifacts,
+        request_id=prepared.request.request_id,
+        runtime_values=context.runtime_values,
+        target_slot_authorization=context.target_slot_authorization,
+        reference_asset_authorization=context.reference_asset_authorization,
+    )
+    uuid_fields = {
+        "node_run_id",
+        "context_snapshot_id",
+        "prompt_snapshot_id",
+        "content_definition_version_id",
+    }
+    forged_value = new_uuid7() if field in uuid_fields else f"forged-{field}"
+    forged = replace(plan.artifact_write, **{field: forged_value})
+
+    with factory() as session, session.begin():
+        with pytest.raises(ArtifactExecutionPortError) as caught:
+            SqlAlchemyArtifactPort(session, seeded.actor).persist_generated(forged)
+        assert caught.value.code == "NODE_EXECUTION_ARTIFACT_PROVENANCE_INVALID"
+        assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 0
 
 
 async def test_published_golden_text_node_commits_complete_lineage_once(

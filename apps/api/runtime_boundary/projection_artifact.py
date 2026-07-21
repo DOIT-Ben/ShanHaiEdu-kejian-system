@@ -39,8 +39,12 @@ def compile_artifact_write(
     request_id: str,
     runtime_values: Mapping[str, Any] | None,
 ) -> GeneratedArtifactWrite:
-    validate_artifact_declaration(binding, artifact)
-    _validate_content_definition_ref(definition, artifact)
+    artifact_key, artifact_type, branch_key = compile_artifact_identity(
+        definition=definition,
+        execution=execution,
+        binding=binding,
+        artifact=artifact,
+    )
     runtime = runtime_document(execution, runtime_values)
     content = require_json_mapping(
         resolve_projection(artifact.get("content"), output=output, item=None, runtime=runtime),
@@ -57,20 +61,38 @@ def compile_artifact_write(
             "OUTPUT_PROJECTION_INPUT_CONTRACTS_INVALID",
         ),
     )
-    identity = require_mapping(artifact.get("identity"), "OUTPUT_PROJECTION_IDENTITY_INVALID")
     return GeneratedArtifactWrite(
         project_id=execution.project_id,
         lesson_unit_id=execution.lesson_unit_id,
         node_run_id=execution.node_run_id,
         context_snapshot_id=snapshots.context_snapshot_id,
         prompt_snapshot_id=snapshots.prompt_snapshot_id,
-        artifact_key=_compile_artifact_key(identity, execution),
-        artifact_type=require_text(artifact.get("artifact_type"), "artifact_type", 80),
-        branch_key=require_text(artifact.get("branch_key"), "branch_key", 80),
+        artifact_key=artifact_key,
+        artifact_type=artifact_type,
+        branch_key=branch_key,
         content_definition_version_id=definition.content_definition_version_id,
         content=content,
         request_id=request_id,
         relations=relations,
+    )
+
+
+def compile_artifact_identity(
+    *,
+    definition: RuntimeNodeDefinition,
+    execution: WorkflowExecutionContext,
+    binding: Mapping[str, Any],
+    artifact: Mapping[str, Any],
+) -> tuple[str, str, str]:
+    """Resolve the immutable artifact identity without evaluating generated content."""
+
+    validate_artifact_declaration(binding, artifact)
+    _validate_content_definition_ref(definition, artifact)
+    identity = require_mapping(artifact.get("identity"), "OUTPUT_PROJECTION_IDENTITY_INVALID")
+    return (
+        _compile_artifact_key(identity, execution),
+        require_text(artifact.get("artifact_type"), "artifact_type", 80),
+        require_text(artifact.get("branch_key"), "branch_key", 80),
     )
 
 
