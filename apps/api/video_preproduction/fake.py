@@ -72,7 +72,9 @@ def _scene(
         estimated_shot_count=len(visible_beats),
         narration=narration,
         dialogue=(
-            snapshot.classroom_first_question if position == scene_count else "角色确认当前变化。"
+            "画面在交接点停止, 等待教师接回课堂。"
+            if position == scene_count
+            else "角色确认当前变化。"
         ),
         sound_intent=f"第{position}场用清晰节奏提示可见状态变化。",
         start_state=start_state,

@@ -217,30 +217,33 @@ def _validate_master_structure(
         errors.append("master script must end at the selected handoff moment")
     if snapshot.course_anchor not in master.complete_story:
         errors.append("master story must contain the selected course anchor")
+    scene_texts = tuple(
+        text
+        for scene in master.scenes
+        for text in (
+            scene.purpose,
+            scene.location,
+            scene.action,
+            scene.visible_change,
+            *scene.visible_beats,
+            scene.narration,
+            scene.dialogue,
+            scene.sound_intent,
+            scene.start_state,
+            scene.end_state,
+            *(item.purpose for item in scene.asset_requirements),
+            *(item.visual_description for item in scene.asset_requirements),
+        )
+    )
+    master_texts = (master.narrative_purpose, master.complete_story, *scene_texts)
     _validate_no_preteach(
         snapshot,
-        (
-            text
-            for scene in master.scenes
-            for text in (
-                scene.purpose,
-                scene.location,
-                scene.action,
-                scene.visible_change,
-                *scene.visible_beats,
-                scene.narration,
-                scene.dialogue,
-                scene.sound_intent,
-                scene.start_state,
-                scene.end_state,
-                *(item.purpose for item in scene.asset_requirements),
-                *(item.visual_description for item in scene.asset_requirements),
-            )
-        ),
+        master_texts,
         "master script",
         errors,
-        additional=(master.narrative_purpose, master.complete_story),
     )
+    if any(snapshot.classroom_first_question in text for text in master_texts):
+        errors.append("master script must reserve the classroom first question for after handoff")
     _validate_scene_asset_requirements(master, errors)
 
 
@@ -304,6 +307,7 @@ def _validate_no_preteach(
 
 def _validate_scene_asset_requirements(master: MasterScript, errors: list[str]) -> None:
     facts: dict[str, tuple[str, str, str, str]] = {}
+    identity_to_key: dict[str, str] = {}
     for scene in master.scenes:
         keys = tuple(item.asset_key for item in scene.asset_requirements)
         if len(keys) != len(set(keys)):
@@ -313,6 +317,11 @@ def _validate_scene_asset_requirements(master: MasterScript, errors: list[str]) 
             previous = facts.setdefault(item.asset_key, fact)
             if previous != fact:
                 errors.append("reused scene assets must keep identical semantics")
+            previous_key = identity_to_key.setdefault(item.identity_key, item.asset_key)
+            if previous_key != item.asset_key:
+                errors.append("one asset identity must use exactly one asset key")
     types = {fact[0] for fact in facts.values()}
     if not {"character", "scene", "prop"} <= types:
         errors.append("master script must declare character, scene and prop asset classes")
+    if not 5 <= len(identity_to_key) <= 8:
+        errors.append("master script must declare between five and eight unique assets")

@@ -216,6 +216,9 @@ def _story_complexity(
     scenes = master_stage.master_script.scenes
     visible_beats = sum(len(scene.visible_beats) for scene in scenes)
     estimated_shots = sum(scene.estimated_shot_count for scene in scenes)
+    estimated_assets = len(
+        {requirement.identity_key for scene in scenes for requirement in scene.asset_requirements}
+    )
     handoff_chars = len(master_stage.master_script.scenes[-1].end_state.strip())
     handoff_complexity = min(3, max(1, (handoff_chars + 39) // 40))
     return StoryComplexity(
@@ -223,7 +226,7 @@ def _story_complexity(
         visible_beat_count=visible_beats,
         estimated_shot_count=estimated_shots,
         handoff_complexity=handoff_complexity,
-        estimated_asset_count=len(scenes) + 2,
+        estimated_asset_count=estimated_assets,
     )
 
 

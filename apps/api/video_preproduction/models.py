@@ -5,12 +5,15 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints
 
 ApprovalKind = Literal["master_script", "rough_storyboard"]
 AssetType = Literal["character", "scene", "prop", "creature"]
 AspectRatio = Literal["16:9", "9:16"]
-NonEmptyText = Annotated[str, Field(min_length=1, max_length=10_000)]
+NonEmptyText = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=10_000),
+]
 
 
 class _FrozenModel(BaseModel):
