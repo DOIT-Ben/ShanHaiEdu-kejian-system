@@ -1,7 +1,8 @@
 import type { LucideIcon } from "lucide-react";
 
 export type StudioType = "image" | "video" | "presentation";
-export type CreationStage = "draft" | "running" | "ready" | "adopted" | "saved";
+export type CreationStage =
+  "adopted" | "cancelled" | "draft" | "failed" | "queued" | "ready" | "running" | "saved";
 
 export function buildCreationResultId(type: StudioType, generation: number, candidate: number) {
   return `creation-${type}-generation-${String(generation)}-candidate-${String(candidate + 1)}`;

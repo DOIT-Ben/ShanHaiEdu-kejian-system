@@ -57,13 +57,7 @@ export function ProjectWorkbenchLayout() {
     const content = workbenchContentRef.current;
     if (!content) return;
     const frame = window.requestAnimationFrame(() => {
-      const reducedMotion =
-        typeof window.matchMedia === "function" &&
-        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      content.scrollTo({
-        behavior: reducedMotion ? "auto" : "smooth",
-        top: 0,
-      });
+      content.scrollTo({ top: 0 });
       content.focus({ preventScroll: true });
     });
     return () => window.cancelAnimationFrame(frame);

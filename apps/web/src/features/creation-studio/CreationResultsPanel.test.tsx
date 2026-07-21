@@ -25,13 +25,17 @@ function renderResults(overrides: Partial<ComponentProps<typeof CreationResultsP
 }
 
 describe("CreationResultsPanel", () => {
-  it("在桌面与移动端使用可检查的主预览尺寸，并支持前后切换", () => {
+  it("在对话消息中使用适度预览尺寸，并支持前后切换", () => {
     const onCandidateChange = vi.fn();
     renderResults({ onCandidateChange });
 
     expect(screen.getByTestId("creation-main-visual")).toHaveClass(
-      "w-[min(100%,360px)]",
-      "md:w-[clamp(480px,45vw,576px)]",
+      "w-[min(100%,320px)]",
+      "md:w-[clamp(320px,32vw,440px)]",
+    );
+    expect(screen.getByTestId("creation-output-region")).toHaveAttribute(
+      "data-layout",
+      "conversation",
     );
     expect(screen.getByRole("button", { name: "上一张作品" })).toBeDisabled();
 

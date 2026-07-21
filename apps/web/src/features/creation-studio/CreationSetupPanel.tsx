@@ -10,8 +10,10 @@ export function CreationSetupPanel({
 }) {
   const visualWidth =
     type === "image"
-      ? "w-[min(100%,360px)] md:w-[clamp(420px,46vw,560px)]"
-      : "w-full max-w-[620px]";
+      ? "w-[min(100%,280px)] md:w-[clamp(300px,28vw,380px)]"
+      : type === "video"
+        ? "w-full max-w-[520px]"
+        : "w-full max-w-[620px]";
   const workspaceWidth = type === "image" ? "max-w-[760px]" : "max-w-[900px]";
 
   return (

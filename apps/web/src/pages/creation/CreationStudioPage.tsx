@@ -1,10 +1,19 @@
-import { ChevronLeft, FolderOpen } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { CreationAdvancedPanel } from "@/features/creation-studio/CreationAdvancedPanel";
 import type { CreationAdvancedSettings } from "@/features/creation-studio/CreationAdvancedPanel";
 import { CreationComposer } from "@/features/creation-studio/CreationComposer";
+import {
+  cancelCreationTask,
+  completeCreationTask,
+  enqueueCreationTask,
+  retryCreationTask,
+  type CreationQueueState,
+  type CreationQueueStatus,
+} from "@/features/creation-studio/creationQueue";
 import { ImageEditDialog } from "@/features/creation-studio/ImageEditDialog";
+import { ProjectAssetDrawer } from "@/features/creation-studio/ProjectAssetDrawer";
 import { CreationResultsPanel } from "@/features/creation-studio/CreationResultsPanel";
 import { CreationSetupPanel } from "@/features/creation-studio/CreationSetupPanel";
 import { downloadCreationResult } from "@/features/creation-studio/downloadCreationResult";
@@ -16,8 +25,10 @@ import {
   type StudioType,
 } from "@/features/creation-studio/model";
 import { PromptReviewDialog } from "@/features/creation-studio/PromptReviewDialog";
-import { ProjectCreationPackageBar } from "@/features/creation-studio/ProjectCreationPackageBar";
-import { createProjectVideoAssetPackage } from "@/features/creation-studio/projectCreationPackage";
+import {
+  createProjectVideoAssetPackage,
+  createProjectVideoShotPackage,
+} from "@/features/creation-studio/projectCreationPackage";
 import { studioRegistry } from "@/features/creation-studio/registry";
 import {
   SaveToProjectDialog,
@@ -32,8 +43,18 @@ import {
 import { listMockSavedResults, saveMockResult } from "@/shared/api/mocks/savedResults";
 import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
 import { markVideoAssetsDependentsStale } from "@/features/workbench/lib/invalidateDependents";
+import { ProjectStepNavigation } from "@/features/workbench/components/ProjectStepNavigation";
 
-const creationStages: CreationStage[] = ["draft", "running", "ready", "adopted", "saved"];
+const creationStages: CreationStage[] = [
+  "adopted",
+  "cancelled",
+  "draft",
+  "failed",
+  "queued",
+  "ready",
+  "running",
+  "saved",
+];
 
 type SavedCreation = {
   advancedSettings: CreationAdvancedSettings;
@@ -64,20 +85,37 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedProjectId = searchParams.get("projectId") ?? undefined;
   const requestedLessonId = searchParams.get("lessonId") ?? undefined;
-  const packageMode = type === "image" && searchParams.get("package") === "video-assets";
-  const packageItems = useMemo(
-    () =>
-      packageMode && requestedProjectId && requestedLessonId
-        ? createProjectVideoAssetPackage(runtime, requestedProjectId, requestedLessonId)
-        : [],
-    [packageMode, requestedLessonId, requestedProjectId, runtime],
-  );
-  const requestedAssetId = searchParams.get("assetId") ?? packageItems[0]?.id;
-  const packageItem = packageItems.find((item) => item.id === requestedAssetId);
+  const requestedPackage = searchParams.get("package");
+  const packageMode =
+    (type === "image" && requestedPackage === "video-assets") ||
+    (type === "video" && requestedPackage === "video-shots");
+  const packageItems = useMemo(() => {
+    if (!packageMode || !requestedProjectId || !requestedLessonId) return [];
+    return type === "video"
+      ? createProjectVideoShotPackage(runtime, requestedProjectId, requestedLessonId)
+      : createProjectVideoAssetPackage(runtime, requestedProjectId, requestedLessonId);
+  }, [packageMode, requestedLessonId, requestedProjectId, runtime, type]);
+  const requestedItemId =
+    searchParams.get("itemId") ??
+    searchParams.get("assetId") ??
+    searchParams.get("shotId") ??
+    packageItems[0]?.id;
+  const packageItem = packageItems.find((item) => item.id === requestedItemId);
+  const packageKind = requestedPackage ?? "standalone";
+  const packageStatePrefix =
+    requestedProjectId && requestedLessonId
+      ? `creation:${type}:project:${requestedProjectId}:lesson:${requestedLessonId}:package:${packageKind}`
+      : undefined;
+  const packageItemStateKey = (itemId: string) =>
+    packageStatePrefix ? `${packageStatePrefix}:item:${itemId}` : `creation:${type}:state`;
   const stateKey =
-    packageItem && requestedProjectId && requestedLessonId
-      ? `creation:${type}:project:${requestedProjectId}:lesson:${requestedLessonId}:package:video-assets:item:${packageItem.id}`
+    packageItem && packageStatePrefix
+      ? packageItemStateKey(packageItem.id)
       : `creation:${type}:state`;
+  const queueKey = packageStatePrefix ? `${packageStatePrefix}:queue` : undefined;
+  const queueState = (queueKey ? runtime.drafts[queueKey]?.value : undefined) as
+    CreationQueueState | undefined;
+  const packageQueue = queueState ?? {};
   const stored = runtime.drafts[stateKey]?.value as Partial<SavedCreation> | undefined;
   const fallbackDescription = packageItem?.prompt ?? getCreationDescription(type);
   const stage = creationStages.includes(stored?.stage as CreationStage)
@@ -102,10 +140,11 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
   const settings = useMemo<CreationSettings>(
     () => ({
       candidateCount,
-      duration: stored?.settings?.duration ?? "10",
+      duration: stored?.settings?.duration ?? packageItem?.duration ?? "10",
       model: stored?.settings?.model ?? "balanced",
       ratio: stored?.settings?.ratio ?? packageItem?.ratio ?? (type === "image" ? "auto" : "16:9"),
-      referenceName: stored?.settings?.referenceName ?? "",
+      referenceName:
+        stored?.settings?.referenceName ?? packageItem?.referenceNames?.join("、") ?? "",
       style: stored?.settings?.style ?? packageItem?.style ?? "paper",
     }),
     [candidateCount, packageItem, stored?.settings, type],
@@ -125,6 +164,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [promptOpen, setPromptOpen] = useState(false);
   const [imageEditOpen, setImageEditOpen] = useState(false);
+  const [assetDrawerOpen, setAssetDrawerOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   const saveTriggerRef = useRef<HTMLButtonElement>(null);
   const mainRef = useRef<HTMLElement>(null);
@@ -140,7 +180,6 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
 
   useEffect(() => {
     if (!packageItem) return;
-    mainRef.current?.scrollTo({ top: 0 });
     mainRef.current?.focus({ preventScroll: true });
   }, [packageItem]);
 
@@ -159,7 +198,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
   };
 
   const changedOutputPatch =
-    stage === "draft"
+    stage === "draft" || stage === "cancelled" || stage === "failed"
       ? {}
       : {
           hasUnappliedChanges: true,
@@ -168,7 +207,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
         };
 
   useEffect(() => {
-    if (stage !== "running") return;
+    if (packageMode || stage !== "running") return;
     const timer = window.setTimeout(() => {
       saveMockDraft(stateKey, {
         advancedSettings,
@@ -182,25 +221,150 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
       });
     }, 1450);
     return () => window.clearTimeout(timer);
-  }, [advancedSettings, candidate, description, generation, projectId, settings, stage, stateKey]);
+  }, [
+    advancedSettings,
+    candidate,
+    description,
+    generation,
+    packageMode,
+    projectId,
+    settings,
+    stage,
+    stateKey,
+  ]);
+
+  const runningPackageItemId = Object.keys(packageQueue).find(
+    (itemId) => packageQueue[itemId]?.status === "running",
+  );
+
+  useEffect(() => {
+    if (!packageStatePrefix || !queueKey || !runningPackageItemId) return;
+    const timer = window.setTimeout(() => {
+      const latestRuntime = getMockRuntimeState();
+      const runningStateKey = `${packageStatePrefix}:item:${runningPackageItemId}`;
+      const runningStored = latestRuntime.drafts[runningStateKey]?.value as
+        Partial<SavedCreation> | undefined;
+      const latestQueue =
+        (latestRuntime.drafts[queueKey]?.value as CreationQueueState | undefined) ?? {};
+      const nextQueue = completeCreationTask(latestQueue, runningPackageItemId);
+      saveMockDraft(runningStateKey, {
+        ...runningStored,
+        candidate: 0,
+        hasUnappliedChanges: false,
+        stage: "ready",
+      });
+      const nextRunningId = Object.keys(nextQueue).find(
+        (itemId) => nextQueue[itemId]?.status === "running",
+      );
+      if (nextRunningId) {
+        const nextStateKey = `${packageStatePrefix}:item:${nextRunningId}`;
+        const nextStored = latestRuntime.drafts[nextStateKey]?.value as
+          Partial<SavedCreation> | undefined;
+        saveMockDraft(nextStateKey, { ...nextStored, stage: "running" });
+      }
+      saveMockDraft(queueKey, nextQueue, {
+        ...(requestedLessonId ? { lessonId: requestedLessonId } : {}),
+        ...(projectId ? { projectId } : {}),
+      });
+    }, 1450);
+    return () => window.clearTimeout(timer);
+  }, [packageStatePrefix, projectId, queueKey, requestedLessonId, runningPackageItemId]);
 
   const generate = (nextDescription = description) => {
     const normalizedDescription = nextDescription.trim();
     if (!normalizedDescription) return;
     setAdvancedOpen(false);
     setPromptOpen(false);
+    const nextQueue = packageItem ? enqueueCreationTask(packageQueue, packageItem.id) : undefined;
+    const nextPackageStage = packageItem
+      ? nextQueue?.[packageItem.id]?.status === "running"
+        ? "running"
+        : "queued"
+      : "running";
     updateCreation({
       description: normalizedDescription,
       generation: generation + 1,
       hasUnappliedChanges: false,
       savedTarget: undefined,
-      stage: "running",
+      stage: nextPackageStage,
     });
+    if (queueKey && nextQueue) {
+      saveMockDraft(queueKey, nextQueue, {
+        ...(requestedLessonId ? { lessonId: requestedLessonId } : {}),
+        ...(projectId ? { projectId } : {}),
+      });
+    }
     window.requestAnimationFrame(() => {
       const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches
         ? "auto"
         : "smooth";
       mainRef.current?.scrollTo({ behavior, top: 0 });
+    });
+  };
+
+  const importPackageItem = (itemId: string) => {
+    if (!packageStatePrefix) return;
+    const item = packageItems.find((candidateItem) => candidateItem.id === itemId);
+    if (!item) return;
+    const targetKey = `${packageStatePrefix}:item:${item.id}`;
+    const existing = runtime.drafts[targetKey]?.value as Partial<SavedCreation> | undefined;
+    saveMockDraft(targetKey, {
+      ...existing,
+      advancedSettings: existing?.advancedSettings ?? advancedSettings,
+      candidate: existing?.candidate ?? 0,
+      description: item.prompt,
+      generation: existing?.generation ?? 0,
+      hasUnappliedChanges: false,
+      ...(projectId ? { projectId } : {}),
+      settings: {
+        ...settings,
+        duration: item.duration ?? settings.duration,
+        ratio: item.ratio,
+        referenceName: item.referenceNames?.join("、") ?? "",
+        style: item.style,
+      },
+      stage: existing?.stage ?? "draft",
+    });
+    const next = new URLSearchParams(searchParams);
+    next.set("itemId", item.id);
+    next.delete("assetId");
+    next.delete("shotId");
+    setSearchParams(next, { replace: true });
+  };
+
+  const cancelPackageTask = (itemId: string) => {
+    if (!packageStatePrefix || !queueKey) return;
+    const nextQueue = cancelCreationTask(packageQueue, itemId);
+    const itemKey = `${packageStatePrefix}:item:${itemId}`;
+    const itemStored = runtime.drafts[itemKey]?.value as Partial<SavedCreation> | undefined;
+    saveMockDraft(itemKey, { ...itemStored, stage: "cancelled" });
+    const nextRunningId = Object.keys(nextQueue).find(
+      (candidateId) => nextQueue[candidateId]?.status === "running",
+    );
+    if (nextRunningId) {
+      const nextKey = `${packageStatePrefix}:item:${nextRunningId}`;
+      const nextStored = runtime.drafts[nextKey]?.value as Partial<SavedCreation> | undefined;
+      saveMockDraft(nextKey, { ...nextStored, stage: "running" });
+    }
+    saveMockDraft(queueKey, nextQueue, {
+      ...(requestedLessonId ? { lessonId: requestedLessonId } : {}),
+      ...(projectId ? { projectId } : {}),
+    });
+  };
+
+  const retryPackageTask = (itemId: string) => {
+    if (!packageStatePrefix || !queueKey) return;
+    const nextQueue = retryCreationTask(packageQueue, itemId);
+    const itemKey = `${packageStatePrefix}:item:${itemId}`;
+    const itemStored = runtime.drafts[itemKey]?.value as Partial<SavedCreation> | undefined;
+    saveMockDraft(itemKey, {
+      ...itemStored,
+      generation: (itemStored?.generation ?? 0) + 1,
+      stage: nextQueue[itemId]?.status === "running" ? "running" : "queued",
+    });
+    saveMockDraft(queueKey, nextQueue, {
+      ...(requestedLessonId ? { lessonId: requestedLessonId } : {}),
+      ...(projectId ? { projectId } : {}),
     });
   };
 
@@ -249,25 +413,38 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
             item.resultId,
           ]),
       );
-      const allAssetsApproved = packageItems.every((item) => item.id in packageResultIds);
-      const approvedKey = `project:${targetProjectId}:lesson:${requestedLessonId}:video-assets:approved`;
-      const previous = latestRuntime.drafts[approvedKey]?.value as
-        { resultIds?: Record<string, string> } | undefined;
-      if (allAssetsApproved) {
-        if (JSON.stringify(previous?.resultIds ?? {}) !== JSON.stringify(packageResultIds)) {
-          markVideoAssetsDependentsStale(latestRuntime, targetProjectId, requestedLessonId);
+      const allPackageItemsSaved = packageItems.every((item) => item.id in packageResultIds);
+      if (packageKind === "video-assets") {
+        const approvedKey = `project:${targetProjectId}:lesson:${requestedLessonId}:video-assets:approved`;
+        const previous = latestRuntime.drafts[approvedKey]?.value as
+          { resultIds?: Record<string, string> } | undefined;
+        if (allPackageItemsSaved) {
+          if (JSON.stringify(previous?.resultIds ?? {}) !== JSON.stringify(packageResultIds)) {
+            markVideoAssetsDependentsStale(latestRuntime, targetProjectId, requestedLessonId);
+          }
+          saveMockDraft(
+            approvedKey,
+            { resultIds: packageResultIds },
+            { lessonId: requestedLessonId, nodeKey: "video-assets", projectId: targetProjectId },
+          );
         }
+        updateMockNodeState(targetProjectId, requestedLessonId, "video-assets", {
+          stale_reason: null,
+          status: allPackageItemsSaved ? "approved" : "review_required",
+          title: "制作镜头图片",
+        });
+      } else if (packageKind === "video-shots") {
         saveMockDraft(
-          approvedKey,
+          `project:${targetProjectId}:lesson:${requestedLessonId}:final-video:shots`,
           { resultIds: packageResultIds },
-          { lessonId: requestedLessonId, nodeKey: "video-assets", projectId: targetProjectId },
+          { lessonId: requestedLessonId, nodeKey: "final-video", projectId: targetProjectId },
         );
+        updateMockNodeState(targetProjectId, requestedLessonId, "final-video", {
+          stale_reason: null,
+          status: allPackageItemsSaved ? "review_required" : "partially_completed",
+          title: "生成课堂导入视频",
+        });
       }
-      updateMockNodeState(targetProjectId, requestedLessonId, "video-assets", {
-        stale_reason: null,
-        status: allAssetsApproved ? "approved" : "review_required",
-        title: "制作镜头图片",
-      });
     }
   };
   const advance = () => {
@@ -287,6 +464,14 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
       stage: stage === "adopted" || stage === "saved" ? "ready" : stage,
     });
   };
+  const sourceStep = type === "video" ? "fine-storyboard" : "video-assets";
+  const workbenchBase =
+    projectId && requestedLessonId
+      ? `/app/projects/${projectId}/lessons/${requestedLessonId}/work`
+      : undefined;
+  const taskStatuses: Record<string, CreationQueueStatus> = Object.fromEntries(
+    packageItems.map((item) => [item.id, packageQueue[item.id]?.status ?? "idle"]),
+  );
 
   return (
     <div
@@ -299,7 +484,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
           className="grid size-9 place-items-center rounded-[var(--sh-radius-sm)] text-[var(--sh-ink-muted)] hover:bg-[var(--sh-surface-soft)]"
           to={
             packageItem && projectId && requestedLessonId
-              ? `/app/projects/${projectId}/lessons/${requestedLessonId}/work/video-assets`
+              ? `/app/projects/${projectId}/lessons/${requestedLessonId}/work/${sourceStep}`
               : "/app/creation"
           }
         >
@@ -307,108 +492,131 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
         </Link>
         <h1 className="truncate font-semibold text-[var(--sh-ink-strong)]">{config.title}</h1>
         {project ? (
-          <Link
-            aria-label={`查看${project.title}的项目资产`}
-            className="ml-auto inline-flex min-w-0 items-center gap-1.5 rounded-[var(--sh-radius-sm)] px-2 py-1 text-sm font-medium text-[var(--sh-brand-700)] hover:bg-[var(--sh-brand-50)]"
-            to={`/app/projects/${project.id}/results`}
-          >
-            <FolderOpen aria-hidden="true" className="size-4 shrink-0" />
-            <span className="max-w-44 truncate">{project.title}</span>
-            <span className="hidden sm:inline">· 项目资产</span>
-          </Link>
+          <span className="ml-auto max-w-[min(48vw,360px)] truncate text-sm font-medium text-[var(--sh-ink-muted)]">
+            {project.title}
+            {lesson ? ` · ${lesson.title}` : ""}
+          </span>
         ) : null}
       </header>
 
-      <section
-        aria-label="创作工作区"
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-2.5 md:px-6"
-        ref={mainRef}
-        tabIndex={-1}
-      >
-        {packageItem ? (
-          <ProjectCreationPackageBar
-            activeId={packageItem.id}
-            items={packageItems}
-            onSelect={(assetId) => {
-              const next = new URLSearchParams(searchParams);
-              next.set("assetId", assetId);
-              setSearchParams(next, { replace: true });
-            }}
-            savedSlotKeys={savedSlotKeys}
-          />
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {packageItem && workbenchBase && projectId && requestedLessonId ? (
+          <aside
+            className="hidden h-full w-[var(--sh-project-sidebar-width)] shrink-0 overflow-y-auto border-r border-[var(--sh-line-default)] bg-[var(--sh-brand-50)] md:block"
+            data-step-scroll-container
+          >
+            <div className="flex h-12 items-center px-5 text-xs font-semibold text-[var(--sh-ink-muted)]">
+              课时制作流程
+            </div>
+            <ProjectStepNavigation
+              activeStepKey={sourceStep}
+              base={workbenchBase}
+              lessonId={requestedLessonId}
+              projectId={projectId}
+            />
+          </aside>
         ) : null}
-        <div className="min-h-0 flex-1">
-          {stage === "draft" ? (
-            <CreationSetupPanel settings={settings} type={type} />
-          ) : (
-            <CreationResultsPanel
-              candidate={candidate}
-              candidateCount={Math.max(1, Number.parseInt(settings.candidateCount, 10) || 3)}
-              generation={generation}
-              hasUnappliedChanges={hasUnappliedChanges}
-              onAdvance={advance}
-              onCandidateChange={changeCandidate}
-              onDownload={() => {
-                void downloadCreationResult({
-                  candidate,
-                  ratio: settings.ratio,
-                  title: config.title,
-                  type,
+
+        <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+          <section
+            aria-label="创作工作区"
+            className={`flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-2.5 transition-[padding] duration-[var(--sh-duration-normal)] md:px-6 ${assetDrawerOpen ? "lg:pr-[420px]" : "lg:pr-20"}`}
+            ref={mainRef}
+            tabIndex={-1}
+          >
+            <div className="min-h-0 flex-1">
+              {stage === "draft" || stage === "cancelled" || stage === "failed" ? (
+                <CreationSetupPanel settings={settings} type={type} />
+              ) : (
+                <CreationResultsPanel
+                  candidate={candidate}
+                  candidateCount={Math.max(1, Number.parseInt(settings.candidateCount, 10) || 3)}
+                  generation={generation}
+                  hasUnappliedChanges={hasUnappliedChanges}
+                  onAdvance={advance}
+                  onCandidateChange={changeCandidate}
+                  onDownload={() => {
+                    void downloadCreationResult({
+                      candidate,
+                      ratio: settings.ratio,
+                      title: config.title,
+                      type,
+                    });
+                  }}
+                  onViewProjectAssets={
+                    projectId
+                      ? () => {
+                          void navigate(`/app/projects/${projectId}/results`);
+                        }
+                      : undefined
+                  }
+                  ratio={settings.ratio}
+                  saveTriggerRef={saveTriggerRef}
+                  savedTarget={savedTarget}
+                  stage={stage}
+                  type={type}
+                />
+              )}
+            </div>
+          </section>
+
+          <div
+            className={`transition-[padding] duration-[var(--sh-duration-normal)] ${assetDrawerOpen ? "lg:pr-[396px]" : ""}`}
+          >
+            <CreationComposer
+              advancedOpen={advancedOpen}
+              advancedPanel={
+                <CreationAdvancedPanel
+                  embedded
+                  onChange={(patch) =>
+                    updateCreation({
+                      advancedSettings: { ...advancedSettings, ...patch },
+                      ...changedOutputPatch,
+                    })
+                  }
+                  settings={advancedSettings}
+                />
+              }
+              config={config}
+              description={description}
+              descriptionLabel={descriptionLabel}
+              onAdvancedOpenChange={setAdvancedOpen}
+              onDescriptionChange={(nextDescription) =>
+                updateCreation({ description: nextDescription, ...changedOutputPatch })
+              }
+              onGenerate={() => generate()}
+              onImageEdit={type === "image" ? () => setImageEditOpen(true) : undefined}
+              onPromptReview={() => setPromptOpen(true)}
+              onSettingsChange={(patch) => {
+                const nextSettings = { ...settings, ...patch };
+                updateCreation({
+                  candidate: clampCreationCandidate(candidate, nextSettings.candidateCount),
+                  settings: nextSettings,
+                  ...changedOutputPatch,
                 });
               }}
-              onViewProjectAssets={
-                projectId
-                  ? () => {
-                      void navigate(`/app/projects/${projectId}/results`);
-                    }
-                  : undefined
-              }
-              ratio={settings.ratio}
-              saveTriggerRef={saveTriggerRef}
-              savedTarget={savedTarget}
+              settings={settings}
               stage={stage}
               type={type}
             />
-          )}
-        </div>
-      </section>
+          </div>
 
-      <CreationComposer
-        advancedOpen={advancedOpen}
-        advancedPanel={
-          <CreationAdvancedPanel
-            embedded
-            onChange={(patch) =>
-              updateCreation({
-                advancedSettings: { ...advancedSettings, ...patch },
-                ...changedOutputPatch,
-              })
-            }
-            settings={advancedSettings}
-          />
-        }
-        config={config}
-        description={description}
-        descriptionLabel={descriptionLabel}
-        onAdvancedOpenChange={setAdvancedOpen}
-        onDescriptionChange={(nextDescription) =>
-          updateCreation({ description: nextDescription, ...changedOutputPatch })
-        }
-        onGenerate={() => generate()}
-        onImageEdit={type === "image" ? () => setImageEditOpen(true) : undefined}
-        onPromptReview={() => setPromptOpen(true)}
-        onSettingsChange={(patch) => {
-          const nextSettings = { ...settings, ...patch };
-          updateCreation({
-            candidate: clampCreationCandidate(candidate, nextSettings.candidateCount),
-            settings: nextSettings,
-            ...changedOutputPatch,
-          });
-        }}
-        settings={settings}
-        stage={stage}
-        type={type}
-      />
+          {packageItem && project && lesson ? (
+            <ProjectAssetDrawer
+              activeId={packageItem.id}
+              items={packageItems}
+              lessonTitle={lesson.title}
+              onCancel={cancelPackageTask}
+              onImport={importPackageItem}
+              onOpenChange={setAssetDrawerOpen}
+              onRetry={retryPackageTask}
+              projectTitle={project.title}
+              savedSlotKeys={savedSlotKeys}
+              taskStatuses={taskStatuses}
+            />
+          ) : null}
+        </div>
+      </div>
 
       <PromptReviewDialog
         description={description}

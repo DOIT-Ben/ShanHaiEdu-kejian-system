@@ -176,7 +176,8 @@ export function CreationResultsPanel({
   const [enlargedOpen, setEnlargedOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
-  const running = stage === "running";
+  const queued = stage === "queued";
+  const running = queued || stage === "running";
   const renderedGeneration = running ? Math.max(0, generation - 1) : generation;
   const candidates = Array.from({ length: candidateCount }, (_, index) => index);
   const compareStart = Math.min(Math.max(candidate - 1, 0), Math.max(candidateCount - 3, 0));
@@ -186,9 +187,11 @@ export function CreationResultsPanel({
       ? "w-[min(88vmin,960px)]"
       : "w-[min(92vw,1280px)]"
     : type === "image"
-      ? "w-[min(100%,360px)] md:w-[clamp(480px,45vw,576px)]"
-      : "w-full max-w-[720px]";
-  const workspaceWidth = type === "image" ? "max-w-[760px]" : "max-w-[900px]";
+      ? "w-[min(100%,320px)] md:w-[clamp(320px,32vw,440px)]"
+      : type === "video"
+        ? "w-full max-w-[520px]"
+        : "w-full max-w-[720px]";
+  const workspaceWidth = type === "image" ? "max-w-[920px]" : "max-w-[900px]";
   const downloadLabel =
     type === "image" ? "下载这张图片" : type === "video" ? "下载关键帧说明" : "下载课件预览";
   const itemLabel = type === "image" ? "张" : type === "video" ? "张关键帧" : "套";
@@ -247,6 +250,7 @@ export function CreationResultsPanel({
       aria-busy={running}
       aria-label="创作结果"
       className={`mx-auto flex w-full ${workspaceWidth} flex-col justify-start`}
+      data-layout="conversation"
       data-generation={generation}
       data-testid="creation-output-region"
     >
@@ -254,7 +258,7 @@ export function CreationResultsPanel({
         className={
           fullscreen
             ? "flex h-screen w-screen flex-col justify-center overflow-auto bg-[var(--sh-surface-elevated)] p-6"
-            : "rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-soft)] p-2 shadow-[var(--sh-shadow-card)]"
+            : "max-w-[820px] rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-2.5 shadow-[var(--sh-shadow-card)]"
         }
         data-testid="creation-preview-panel"
         ref={previewRef}
@@ -275,12 +279,16 @@ export function CreationResultsPanel({
             </span>
             <span className="truncate">
               {running
-                ? "正在创作新作品"
+                ? queued
+                  ? "作品已进入队列"
+                  : "正在创作新作品"
                 : `${currentLabel} ${String(candidate + 1)} / ${String(candidateCount)}`}
             </span>
             <span className="shrink-0 text-xs font-medium text-[var(--sh-ink-muted)]">
               {running
-                ? `生成 ${String(candidateCount)} ${itemLabel}`
+                ? queued
+                  ? "等待前一项完成"
+                  : `生成 ${String(candidateCount)} ${itemLabel}`
                 : type === "video"
                   ? `${String(candidateCount)} 张关键帧`
                   : `${String(candidateCount)} 个作品`}
@@ -334,45 +342,51 @@ export function CreationResultsPanel({
             {primaryAction}
           </div>
         </div>
-        <div
-          className={`mx-auto ${visualWidth}`}
-          data-creation-type={type}
-          data-render-generation={renderedGeneration}
-          data-testid="creation-main-visual"
-        >
-          <CreationResultCanvas
-            candidate={candidate}
-            generation={renderedGeneration}
-            ratio={ratio}
-            running={running}
-            type={type}
-          />
+        <div className="grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_88px]">
+          <div
+            className={`mx-auto ${visualWidth}`}
+            data-creation-type={type}
+            data-render-generation={renderedGeneration}
+            data-testid="creation-main-visual"
+          >
+            <CreationResultCanvas
+              candidate={candidate}
+              generation={renderedGeneration}
+              ratio={ratio}
+              running={running}
+              type={type}
+            />
+          </div>
+          <div
+            aria-label={candidateAriaLabel}
+            className="flex min-w-0 gap-2 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0"
+          >
+            {candidates.map((item) => (
+              <button
+                aria-label={`${candidateAriaLabel} ${String(item + 1)}`}
+                aria-pressed={candidate === item}
+                className={`w-[76px] shrink-0 rounded-[var(--sh-radius-sm)] border bg-[var(--sh-surface-elevated)] p-1 text-left transition-[border-color,box-shadow] disabled:cursor-wait disabled:opacity-55 md:w-[88px] ${candidate === item ? "border-[var(--sh-brand-500)] ring-2 ring-[var(--sh-brand-100)]" : "border-[var(--sh-line-default)]"}`}
+                disabled={running}
+                key={item}
+                onClick={() => changeCandidate(item)}
+                type="button"
+              >
+                <CreativeResultVisual
+                  loading="lazy"
+                  ratio={ratio}
+                  type={type}
+                  variant={(item + renderedGeneration) % 3}
+                />
+                <span className="mt-1 block text-center text-[11px] font-semibold text-[var(--sh-ink-strong)]">
+                  {candidateDisplayLabel} {item + 1}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <div aria-label={candidateAriaLabel} className="flex min-w-0 gap-2 overflow-x-auto pb-1">
-          {candidates.map((item) => (
-            <button
-              aria-label={`${candidateAriaLabel} ${String(item + 1)}`}
-              aria-pressed={candidate === item}
-              className={`w-[76px] shrink-0 rounded-[var(--sh-radius-sm)] border bg-[var(--sh-surface-elevated)] p-1 text-left transition-[border-color,box-shadow] disabled:cursor-wait disabled:opacity-55 ${candidate === item ? "border-[var(--sh-brand-500)] ring-2 ring-[var(--sh-brand-100)]" : "border-[var(--sh-line-default)]"}`}
-              disabled={running}
-              key={item}
-              onClick={() => changeCandidate(item)}
-              type="button"
-            >
-              <CreativeResultVisual
-                loading="lazy"
-                ratio={ratio}
-                type={type}
-                variant={(item + renderedGeneration) % 3}
-              />
-              <span className="mt-1 block text-center text-[11px] font-semibold text-[var(--sh-ink-strong)]">
-                {candidateDisplayLabel} {item + 1}
-              </span>
-            </button>
-          ))}
-        </div>
+        <span />
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           <Button disabled={running} onClick={onDownload} variant="quiet">
             <Download aria-hidden="true" />

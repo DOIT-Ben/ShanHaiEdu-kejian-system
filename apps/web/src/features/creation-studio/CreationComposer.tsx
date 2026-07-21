@@ -15,6 +15,7 @@ import { Select } from "@/shared/ui/Select";
 
 function generationLabel(type: StudioType, stage: CreationStage, primaryLabel: string) {
   if (stage === "draft") return primaryLabel;
+  if (stage === "queued") return "等待创作";
   if (stage === "running") return "正在创作";
   return type === "image" ? "按新要求再画一组" : "按新要求再做一组";
 }
@@ -68,7 +69,7 @@ export function CreationComposer({
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
   const settingsPanelRef = useRef<HTMLDivElement>(null);
   const settingsTriggerRef = useRef<HTMLButtonElement>(null);
-  const running = stage === "running";
+  const running = stage === "queued" || stage === "running";
   const inputLabel = stage === "draft" ? descriptionLabel : "创作要求";
   const generateLabel = generationLabel(type, stage, config.primaryLabel);
   const canGenerate = !running && description.trim().length > 0;
@@ -200,7 +201,7 @@ export function CreationComposer({
       </AnimatePresence>
 
       <div
-        className="relative mx-auto w-full max-w-[1200px] rounded-[var(--sh-radius-md)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)]/96 p-2.5 shadow-[var(--sh-shadow-modal)] backdrop-blur-xl transition-[border-color,box-shadow] focus-within:border-[var(--sh-brand-300)] focus-within:shadow-[var(--sh-shadow-focus)]"
+        className="relative mx-auto w-full max-w-[980px] rounded-[var(--sh-radius-md)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)]/96 p-2.5 shadow-[var(--sh-shadow-modal)] backdrop-blur-xl transition-[border-color,box-shadow] focus-within:border-[var(--sh-brand-300)] focus-within:shadow-[var(--sh-shadow-focus)]"
         data-testid="creation-composer-panel"
       >
         <label className="block min-w-0">

@@ -74,6 +74,7 @@ export function FineStoryboardStep() {
   const canAdopt = ["approved", "ready", "review_required"].includes(effectiveShotStatus);
   const selectedCandidate = saved?.candidateByShot?.[shot.id] ?? 1;
   const [message, setMessage] = useState("");
+  const videoStudioUrl = `/app/creation/videos?projectId=${encodeURIComponent(projectId)}&lessonId=${encodeURIComponent(lessonId)}&package=video-shots&itemId=shot-1`;
   const updateStoryboard = (
     patch: Partial<NonNullable<typeof saved>>,
     reevaluateApproval = true,
@@ -120,7 +121,7 @@ export function FineStoryboardStep() {
   };
   const confirmCurrentAndContinue = () => {
     if (approved) {
-      void navigate(`/app/projects/${projectId}/lessons/${lessonId}/work/final-video`);
+      void navigate(videoStudioUrl);
       return;
     }
     const nextAdopted = [...new Set([...(saved?.adoptedShots ?? []), shot.id])];
@@ -146,11 +147,11 @@ export function FineStoryboardStep() {
                   status: "approved",
                   title: "选择关键帧参考",
                 });
-                void navigate(`/app/projects/${projectId}/lessons/${lessonId}/work/final-video`);
+                void navigate(videoStudioUrl);
               }}
               size="md"
             >
-              查看视频生成状态
+              打开视频创作台
               <ArrowRight aria-hidden="true" />
             </Button>
           ) : adopted && !approved ? (
@@ -160,7 +161,7 @@ export function FineStoryboardStep() {
             </Button>
           ) : (
             <Button disabled={!canAdopt} onClick={confirmCurrentAndContinue} size="md">
-              {approved ? "查看视频生成状态" : canAdopt ? "确认当前关键帧" : "关键帧尚未准备好"}
+              {approved ? "打开视频创作台" : canAdopt ? "确认当前关键帧" : "关键帧尚未准备好"}
               {approved ? <ArrowRight aria-hidden="true" /> : <Check aria-hidden="true" />}
             </Button>
           )

@@ -7,9 +7,12 @@ import { projectSteps } from "@/shared/data/mockData";
 import { cn } from "@/shared/lib/cn";
 
 type ProjectStepNavigationProps = {
+  activeStepKey?: string;
   base: string;
   collapsed?: boolean;
+  lessonId?: string;
   onNavigate?: () => void;
+  projectId?: string;
 };
 
 function statusLabel(status: WorkflowStatus) {
@@ -25,11 +28,16 @@ function statusLabel(status: WorkflowStatus) {
 }
 
 export function ProjectStepNavigation({
+  activeStepKey,
   base,
   collapsed = false,
+  lessonId: lessonIdProp,
   onNavigate,
+  projectId: projectIdProp,
 }: ProjectStepNavigationProps) {
-  const { lessonId = "", projectId = "" } = useParams();
+  const { lessonId: routeLessonId = "", projectId: routeProjectId = "" } = useParams();
+  const lessonId = lessonIdProp ?? routeLessonId;
+  const projectId = projectIdProp ?? routeProjectId;
   const location = useLocation();
   const activeStepRef = useRef<HTMLAnchorElement>(null);
   const runtime = useMockRuntime();
@@ -51,7 +59,7 @@ export function ProjectStepNavigation({
       behavior: reducedMotion ? "auto" : "smooth",
       top: Math.max(0, scrollContainer.scrollTop + itemCenter - containerCenter),
     });
-  }, [currentPath]);
+  }, [activeStepKey, currentPath]);
 
   return (
     <nav
@@ -68,19 +76,22 @@ export function ProjectStepNavigation({
           {group.items.map((item) => {
             const status = getWorkbenchStepStatus(runtime, projectId, lessonId, item.key);
             const stepPath = `${base}/${item.key}`;
+            const externallyActive = activeStepKey === item.key;
             return (
               <NavLink
-                className={({ isActive }) =>
-                  cn(
-                    "relative mb-0.5 flex min-h-11 items-center gap-2 rounded-[var(--sh-radius-sm)] px-3 text-sm text-[var(--sh-ink-muted)] transition-colors duration-[var(--sh-duration-fast)] hover:bg-[var(--sh-surface-soft)] hover:text-[var(--sh-ink-strong)]",
-                    isActive &&
-                      "bg-[var(--sh-surface-soft)] font-semibold text-[var(--sh-brand-700)] before:absolute before:bottom-2 before:left-0 before:top-2 before:w-[3px] before:rounded-r-full before:bg-[var(--sh-brand-500)]",
+                className={({ isActive }) => {
+                  const active = externallyActive || isActive;
+                  return cn(
+                    "relative mb-0.5 flex min-h-11 items-center gap-2 rounded-[var(--sh-radius-sm)] px-3 text-sm text-[var(--sh-ink-muted)] transition-[background-color,color,transform] duration-[var(--sh-duration-normal)] hover:bg-[var(--sh-surface-soft)] hover:text-[var(--sh-ink-strong)]",
+                    active &&
+                      "translate-x-0.5 bg-[var(--sh-surface-soft)] font-semibold text-[var(--sh-brand-700)] before:absolute before:bottom-2 before:left-0 before:top-2 before:w-[3px] before:rounded-r-full before:bg-[var(--sh-brand-500)]",
                     collapsed && "justify-center px-2",
-                  )
-                }
+                  );
+                }}
+                data-current={externallyActive ? "true" : undefined}
                 key={item.key}
                 onClick={onNavigate}
-                ref={currentPath === stepPath ? activeStepRef : undefined}
+                ref={externallyActive || currentPath === stepPath ? activeStepRef : undefined}
                 title={collapsed ? item.label : undefined}
                 to={stepPath}
               >
@@ -103,7 +114,7 @@ export function ProjectStepNavigation({
                       <>
                         <span className="min-w-0 flex-1 truncate">{item.label}</span>
                         <span className="shrink-0 text-[11px] font-medium text-[var(--sh-ink-muted)]">
-                          {isActive ? "当前" : statusLabel(status)}
+                          {externallyActive || isActive ? "当前" : statusLabel(status)}
                         </span>
                       </>
                     ) : null}

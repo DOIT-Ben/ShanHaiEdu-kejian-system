@@ -57,4 +57,23 @@ describe("ProjectStepNavigation active step visibility", () => {
     expect(elementScroll).toHaveBeenCalledWith({ behavior: "smooth", top: 208 });
     expect(windowScroll).not.toHaveBeenCalled();
   });
+
+  it("从项目创作台进入时仍高亮来源节点并使用项目上下文", () => {
+    const base = `/app/projects/${demoProjectId}/lessons/${demoLessonId}/work`;
+    render(
+      <MemoryRouter initialEntries={["/app/creation/images"]}>
+        <ProjectStepNavigation
+          activeStepKey="video-assets"
+          base={base}
+          lessonId={demoLessonId}
+          projectId={demoProjectId}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("link", { name: /制作镜头图片 当前/ })).toHaveAttribute(
+      "data-current",
+      "true",
+    );
+  });
 });
