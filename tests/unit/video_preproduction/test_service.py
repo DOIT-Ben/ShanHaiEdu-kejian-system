@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Any, cast
+from typing import Any, cast, get_type_hints
 
 import pytest
 from pydantic import BaseModel
@@ -13,10 +13,12 @@ from apps.api.video_preproduction.models import (
     ApprovalKind,
     DurationRecommendation,
     IntroSelectionSnapshot,
+    MasterScript,
     PricingSnapshot,
     TeacherConfirmation,
     VideoPreproductionRequest,
 )
+from apps.api.video_preproduction.ports import VideoPreproductionTextGenerator
 from apps.api.video_preproduction.service import (
     VideoPreproductionError,
     VideoPreproductionService,
@@ -138,6 +140,27 @@ def test_master_precedes_story_based_recommendation_and_teacher_confirmation() -
     )
     assert recommendation.story_complexity.handoff_complexity > 0
     assert 60 <= recommendation.recommended_duration_seconds <= 180
+
+
+def test_master_generation_accepts_a_provider_neutral_text_generator() -> None:
+    class DelegatingTextGenerator:
+        def __init__(self) -> None:
+            self.calls = 0
+            self._fake = ScriptedDeterministicTextFake()
+
+        def generate_master_script(self, snapshot: IntroSelectionSnapshot) -> MasterScript:
+            self.calls += 1
+            return self._fake.generate_master_script(snapshot)
+
+    generator = DelegatingTextGenerator()
+    service = VideoPreproductionService(generator)
+
+    stage = service.generate_master_script(request())
+
+    assert generator.calls == 1
+    assert stage.master_script.selected_intro_snapshot_id == stage.source_snapshot.snapshot_id
+    hints = get_type_hints(VideoPreproductionService.__init__)
+    assert hints["text_generator"] is VideoPreproductionTextGenerator
 
 
 def test_master_generation_rejects_missing_or_invalid_pricing_before_fake_call() -> None:

@@ -6,7 +6,6 @@ from decimal import Decimal
 
 from pydantic import ValidationError
 
-from apps.api.video_preproduction.fake import ScriptedDeterministicTextFake
 from apps.api.video_preproduction.models import (
     ApprovalFact,
     AssetInventory,
@@ -27,6 +26,7 @@ from apps.api.video_preproduction.models import (
     VideoPreproductionRequest,
     VisualPlan,
 )
+from apps.api.video_preproduction.ports import VideoPreproductionTextGenerator
 from apps.api.video_preproduction.validator import (
     canonical_package_hash,
     inventory_assets,
@@ -44,8 +44,8 @@ class VideoPreproductionError(ValueError):
 
 
 class VideoPreproductionService:
-    def __init__(self, text_fake: ScriptedDeterministicTextFake) -> None:
-        self._text_fake = text_fake
+    def __init__(self, text_generator: VideoPreproductionTextGenerator) -> None:
+        self._text_generator = text_generator
 
     def generate_master_script(
         self,
@@ -53,7 +53,7 @@ class VideoPreproductionService:
     ) -> ReviewableMasterScriptStage:
         validated = _require_valid_request(request)
         _require_pricing(validated)
-        script = self._text_fake.generate_master_script(validated.intro_selection_snapshot)
+        script = self._text_generator.generate_master_script(validated.intro_selection_snapshot)
         if validate_master_script(validated.intro_selection_snapshot, script):
             raise VideoPreproductionError("VIDEO_MASTER_SCRIPT_INVALID")
         return ReviewableMasterScriptStage(
