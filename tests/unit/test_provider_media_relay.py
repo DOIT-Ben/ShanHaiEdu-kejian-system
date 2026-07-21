@@ -41,6 +41,7 @@ def test_valid_signed_image_resolves_to_a_private_file(tmp_path: Path) -> None:
     assert asset.path == image
     assert asset.media_type == "image/png"
     assert asset.size_bytes == len(PNG_BYTES)
+    assert asset.content == PNG_BYTES
 
 
 @pytest.mark.parametrize(
@@ -92,6 +93,25 @@ def test_extension_must_match_detected_image_type(tmp_path: Path) -> None:
         resolve_media_request(path, config, now=1_000)
 
 
+def test_symlink_to_file_outside_relay_root_fails_closed(tmp_path: Path) -> None:
+    external_image = tmp_path.parent / "provider-media-relay-external.png"
+    external_image.write_bytes(PNG_BYTES)
+    linked_image = tmp_path / "frame.png"
+    try:
+        linked_image.symlink_to(external_image)
+    except OSError:
+        external_image.unlink()
+        pytest.skip("symbolic links require a Windows developer privilege")
+    config = relay_config(tmp_path)
+    path = sign_media_path("frame.png", expires_at=1_100, secret=config.signing_secret)
+
+    try:
+        with pytest.raises(ProviderMediaRequestError):
+            resolve_media_request(path, config, now=1_000)
+    finally:
+        external_image.unlink()
+
+
 def test_http_relay_serves_valid_image_without_caching(tmp_path: Path) -> None:
     image = tmp_path / "frame.png"
     image.write_bytes(PNG_BYTES)
@@ -104,7 +124,8 @@ def test_http_relay_serves_valid_image_without_caching(tmp_path: Path) -> None:
         expires_at=int(__import__("time").time()) + 30,
         secret=config.signing_secret,
     )
-    host, port = server.server_address
+    host = str(server.server_address[0])
+    port = int(server.server_address[1])
 
     try:
         with urlopen(f"http://{host}:{port}{path}") as response:

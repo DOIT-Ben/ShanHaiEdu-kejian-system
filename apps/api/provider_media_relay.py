@@ -8,7 +8,7 @@ import hmac
 import logging
 import os
 import re
-import shutil
+import stat
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -56,6 +56,7 @@ class ProviderMediaAsset:
     path: Path
     media_type: str
     size_bytes: int
+    content: bytes
 
 
 def sign_media_path(filename: str, *, expires_at: int, secret: str) -> str:
@@ -97,24 +98,17 @@ def resolve_media_request(
         raise ProviderMediaRequestError("media path cannot be resolved") from error
     if candidate.parent != config.root:
         raise ProviderMediaRequestError("media path escapes relay root")
-    try:
-        metadata = candidate.stat()
-    except OSError as error:
-        raise ProviderMediaRequestError("media file is unavailable") from error
-    if not candidate.is_file():
-        raise ProviderMediaRequestError("media target is not a regular file")
-    if metadata.st_size > config.max_file_bytes:
-        raise ProviderMediaRequestError("media file exceeds configured size")
-
     expected_media_type = _ALLOWED_MEDIA_TYPES.get(candidate.suffix.lower())
     if expected_media_type is None:
         raise ProviderMediaRequestError("media type is not allowed")
-    if _detect_media_type(candidate) != expected_media_type:
+    content = _read_media_content(candidate, config.max_file_bytes)
+    if _detect_media_type(content) != expected_media_type:
         raise ProviderMediaRequestError("media bytes do not match the declared type")
     return ProviderMediaAsset(
         path=candidate,
         media_type=expected_media_type,
-        size_bytes=metadata.st_size,
+        size_bytes=len(content),
+        content=content,
     )
 
 
@@ -135,22 +129,20 @@ class ProviderMediaRequestHandler(BaseHTTPRequestHandler):
         try:
             relay_server = cast(ProviderMediaRelayServer, self.server)
             asset = resolve_media_request(self.path, relay_server.config)
-            stream = asset.path.open("rb")
-        except (OSError, ProviderMediaRequestError):
+        except ProviderMediaRequestError:
             self._send_not_found()
             return
-        with stream:
-            self.send_response(HTTPStatus.OK)
-            self.send_header("Content-Type", asset.media_type)
-            self.send_header("Content-Length", str(asset.size_bytes))
-            self.send_header("Cache-Control", "no-store")
-            self.send_header("X-Content-Type-Options", "nosniff")
-            self.send_header("Referrer-Policy", "no-referrer")
-            self.end_headers()
-            try:
-                shutil.copyfileobj(stream, self.wfile, length=64 * 1024)
-            except (BrokenPipeError, ConnectionResetError):
-                return
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", asset.media_type)
+        self.send_header("Content-Length", str(asset.size_bytes))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.end_headers()
+        try:
+            self.wfile.write(asset.content)
+        except (BrokenPipeError, ConnectionResetError):
+            return
 
     def do_HEAD(self) -> None:
         self._send_not_found()
@@ -243,12 +235,29 @@ def _signature_for(filename: str, expires: str, secret: str) -> str:
     return hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
 
 
-def _detect_media_type(path: Path) -> str | None:
+def _read_media_content(path: Path, max_file_bytes: int) -> bytes:
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
     try:
-        with path.open("rb") as stream:
-            header = stream.read(12)
+        descriptor = os.open(path, flags)
+    except OSError as error:
+        raise ProviderMediaRequestError("media file is unavailable") from error
+    try:
+        with os.fdopen(descriptor, "rb") as stream:
+            metadata = os.fstat(stream.fileno())
+            if not stat.S_ISREG(metadata.st_mode):
+                raise ProviderMediaRequestError("media target is not a regular file")
+            if metadata.st_size > max_file_bytes:
+                raise ProviderMediaRequestError("media file exceeds configured size")
+            content = stream.read(max_file_bytes + 1)
     except OSError as error:
         raise ProviderMediaRequestError("media file cannot be read") from error
+    if len(content) != metadata.st_size or len(content) > max_file_bytes:
+        raise ProviderMediaRequestError("media file changed while being read")
+    return content
+
+
+def _detect_media_type(content: bytes) -> str | None:
+    header = content[:12]
     if header.startswith(b"\x89PNG\r\n\x1a\n"):
         return "image/png"
     if header.startswith(b"\xff\xd8\xff"):
