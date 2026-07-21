@@ -70,14 +70,12 @@ test("新项目可以只通过页面操作走到真实视频生成门槛", async
     .getByRole("button", { name: /选择.*方案/ })
     .first()
     .click();
-  await page.getByRole("button", { name: "采用这套方案" }).click();
-  await page.goto(`${workUrl}/master-script`);
+  await page.getByRole("button", { name: "编写母版剧本", exact: true }).click();
   await page.getByRole("button", { name: "确认母版剧本" }).click();
   await page.goto(`${workUrl}/rough-storyboard`);
   await page.getByRole("button", { name: "确认故事镜头" }).click();
   await page.goto(`${workUrl}/video-style`);
-  await page.getByRole("button", { name: "采用这个画面风格" }).click();
-  await page.goto(`${workUrl}/video-assets`);
+  await page.getByRole("button", { name: "制作镜头图片" }).click();
   await page.getByRole("link", { name: "开始制作镜头图片" }).click();
   await expect(page).toHaveURL(/\/app\/creation\/images\?.*package=video-assets/);
   await expect(page.getByRole("heading", { name: "图片创作台" })).toBeVisible();
@@ -102,40 +100,28 @@ test("新项目可以只通过页面操作走到真实视频生成门槛", async
     const shotCard = shotCards.nth(index);
     await shotCard.click();
     await expect(shotCard).toHaveAttribute("aria-pressed", "true");
-    let adopt = page.getByRole("button", { name: "选择这个关键帧参考" });
-    if (!(await adopt.isVisible())) {
+    let confirm = page.getByRole("button", { name: "确认当前关键帧" });
+    if ((await confirm.count()) === 0) {
       const retry = page.getByRole("button", { name: "只重做这个关键帧" });
       if (await retry.isVisible()) {
         await retry.click();
-        await expect(page.getByRole("button", { name: "选择这个关键帧参考" })).toBeVisible();
-        adopt = page.getByRole("button", { name: "选择这个关键帧参考" });
-      }
-      const reselect = page.getByRole("button", { name: /重新选择.*关键帧/ });
-      if (!(await adopt.isVisible()) && (await reselect.isVisible())) {
-        await reselect.click();
-        await expect(page.getByRole("button", { name: "选择这个关键帧参考" })).toBeVisible();
-        adopt = page.getByRole("button", { name: "选择这个关键帧参考" });
+        confirm = page.getByRole("button", { name: "确认当前关键帧" });
       }
     }
-    if (await adopt.isVisible()) {
-      if (await adopt.isDisabled()) {
-        await page.getByRole("button", { name: "只重做这个关键帧" }).click();
-      }
-      await expect(adopt).toBeEnabled();
-      await adopt.click();
-      await expect
-        .poll(() =>
-          page.evaluate((key) => {
-            const raw = localStorage.getItem("shanhaiedu.mock-runtime.v1");
-            if (!raw) return 0;
-            const runtime = JSON.parse(raw) as {
-              drafts?: Record<string, { value?: { adoptedShots?: string[] } }>;
-            };
-            return runtime.drafts?.[key]?.value?.adoptedShots?.length ?? 0;
-          }, fineDraftKey),
-        )
-        .toBe(index + 1);
-    }
+    await expect(confirm).toBeEnabled();
+    await confirm.click();
+    await expect
+      .poll(() =>
+        page.evaluate((key) => {
+          const raw = localStorage.getItem("shanhaiedu.mock-runtime.v1");
+          if (!raw) return 0;
+          const runtime = JSON.parse(raw) as {
+            drafts?: Record<string, { value?: { adoptedShots?: string[] } }>;
+          };
+          return runtime.drafts?.[key]?.value?.adoptedShots?.length ?? 0;
+        }, fineDraftKey),
+      )
+      .toBe(index + 1);
   }
   await expect
     .poll(() =>
@@ -154,8 +140,8 @@ test("新项目可以只通过页面操作走到真实视频生成门槛", async
       }, fineDraftKey),
     )
     .toBe("3:approved");
-  await expect(page.getByRole("link", { name: "查看视频生成状态" }).last()).toBeVisible();
-  await page.getByRole("link", { name: "查看视频生成状态" }).last().click();
+  await expect(page.getByRole("button", { name: "查看视频生成状态" })).toBeVisible();
+  await page.getByRole("button", { name: "查看视频生成状态" }).click();
   await page.getByRole("button", { name: "开始生成视频" }).click();
   await expect(page.getByRole("button", { name: "视频尚未生成" })).toBeDisabled({
     timeout: 10_000,

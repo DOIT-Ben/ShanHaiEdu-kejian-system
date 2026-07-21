@@ -79,15 +79,19 @@ test("封面重新生成和下载预览均有结果", async ({ page }, testInfo)
   await page.getByRole("button", { name: "下载预览" }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/\.svg$/);
-  await page.getByRole("button", { name: "采用这张封面" }).click();
-  await expect(page.getByRole("button", { name: "选择百格光窗" })).toBeDisabled();
-  await expect(page.getByRole("link", { name: "制作 PPT 正文" })).toBeVisible();
+  await page.getByRole("button", { name: "制作 PPT 正文" }).click();
+  await page.goto(`${workUrl}/ppt-cover`);
+  await expect(page.getByRole("button", { name: "选择百格光窗" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "制作 PPT 正文" })).toBeVisible();
   await page.screenshot({
     animations: "disabled",
     path: testInfo.outputPath("ppt-cover-horizontal-candidates-1280.png"),
   });
-  await page.getByRole("button", { name: "重新选择封面" }).click();
-  await expect(page.getByRole("button", { name: "选择百格光窗" })).toBeEnabled();
+  await page.getByRole("button", { name: "选择百格光窗" }).click();
+  await expect(page.getByRole("button", { name: "选择百格光窗" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
 });
 
 test("资产检查和视频生成进入任务中心", async ({ page }) => {

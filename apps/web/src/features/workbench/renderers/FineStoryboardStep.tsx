@@ -1,6 +1,6 @@
-import { ArrowRight, Check, Clock3, Image, PencilLine, RefreshCw, Volume2 } from "lucide-react";
+import { ArrowRight, Check, Clock3, Image, RefreshCw, Volume2 } from "lucide-react";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { VideoScenePreview } from "@/features/home/components/VideoScenePreview";
 import { StaleContentNotice } from "@/features/workbench/components/StaleContentNotice";
 import { WorkbenchPageFrame } from "@/features/workbench/components/WorkbenchPageFrame";
@@ -19,6 +19,7 @@ import { saveMockDraft, updateMockNodeState, useMockRuntime } from "@/shared/api
 import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
+import { SelectableCard } from "@/shared/ui/SelectableCard";
 import { requiredItem } from "@/shared/lib/requiredItem";
 import { demoProjectId } from "@/shared/data/mockData";
 
@@ -35,6 +36,7 @@ function approvedStoryboardContent(value: {
 export function FineStoryboardStep() {
   const { lessonId = "", projectId = "" } = useParams();
   const runtime = useMockRuntime();
+  const navigate = useNavigate();
   const project = runtime.projects.find((item) => item.id === projectId);
   const demo = projectId === demoProjectId || !project;
   const topic = project?.knowledge_point ?? "本课知识点";
@@ -116,6 +118,22 @@ export function FineStoryboardStep() {
       });
     }
   };
+  const confirmCurrentAndContinue = () => {
+    if (approved) {
+      void navigate(`/app/projects/${projectId}/lessons/${lessonId}/work/final-video`);
+      return;
+    }
+    const nextAdopted = [...new Set([...(saved?.adoptedShots ?? []), shot.id])];
+    const nextShotIndex = shots.findIndex((item) => !nextAdopted.includes(item.id));
+    updateStoryboard({
+      adoptedShots: nextAdopted,
+      selectedShot: nextShotIndex >= 0 ? nextShotIndex : selected,
+    });
+  };
+  const continueToNextShot = () => {
+    const nextShotIndex = shots.findIndex((item) => !saved?.adoptedShots?.includes(item.id));
+    if (nextShotIndex >= 0) updateStoryboard({ selectedShot: nextShotIndex }, false);
+  };
   return (
     <WorkbenchPageFrame width="wide">
       <FocusPageHeader
@@ -128,58 +146,22 @@ export function FineStoryboardStep() {
                   status: "approved",
                   title: "选择关键帧参考",
                 });
+                void navigate(`/app/projects/${projectId}/lessons/${lessonId}/work/final-video`);
               }}
               size="md"
             >
-              <Check aria-hidden="true" />
-              重新确认全部关键帧
+              查看视频生成状态
+              <ArrowRight aria-hidden="true" />
             </Button>
-          ) : approved ? (
-            <>
-              <Button
-                onClick={() =>
-                  updateStoryboard({
-                    adoptedShots: (saved?.adoptedShots ?? []).filter((id) => id !== shot.id),
-                  })
-                }
-                size="md"
-                variant="secondary"
-              >
-                <PencilLine aria-hidden="true" />
-                重新选择当前关键帧
-              </Button>
-              <Button asChild size="md">
-                <Link to={`/app/projects/${projectId}/lessons/${lessonId}/work/final-video`}>
-                  查看视频生成状态
-                  <ArrowRight aria-hidden="true" />
-                </Link>
-              </Button>
-            </>
-          ) : adopted ? (
-            <Button
-              onClick={() =>
-                updateStoryboard({
-                  adoptedShots: (saved?.adoptedShots ?? []).filter((id) => id !== shot.id),
-                })
-              }
-              size="md"
-              variant="secondary"
-            >
-              <PencilLine aria-hidden="true" />
-              重新选择关键帧
+          ) : adopted && !approved ? (
+            <Button onClick={continueToNextShot} size="md">
+              选择下一个镜头
+              <ArrowRight aria-hidden="true" />
             </Button>
           ) : (
-            <Button
-              disabled={!canAdopt}
-              onClick={() =>
-                updateStoryboard({
-                  adoptedShots: [...new Set([...(saved?.adoptedShots ?? []), shot.id])],
-                })
-              }
-              size="md"
-            >
-              <Check aria-hidden="true" />
-              {canAdopt ? "选择这个关键帧参考" : "关键帧尚未准备好"}
+            <Button disabled={!canAdopt} onClick={confirmCurrentAndContinue} size="md">
+              {approved ? "查看视频生成状态" : canAdopt ? "确认当前关键帧" : "关键帧尚未准备好"}
+              {approved ? <ArrowRight aria-hidden="true" /> : <Check aria-hidden="true" />}
             </Button>
           )
         }
@@ -194,17 +176,17 @@ export function FineStoryboardStep() {
       <div className="mt-4 grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)_240px]">
         <aside className="space-y-2">
           {shots.map((item, index) => (
-            <button
-              aria-pressed={selected === index}
-              className={`w-full rounded-[var(--sh-radius-sm)] border p-3 text-left ${selected === index ? "border-[var(--sh-brand-500)] bg-[var(--sh-brand-50)]" : "border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)]"}`}
+            <SelectableCard
+              className="w-full p-3"
               key={item.id}
               onClick={() => {
                 updateStoryboard({ selectedShot: index }, false);
                 setMessage("");
               }}
-              type="button"
+              selected={selected === index}
+              selectedLabel="当前镜头"
             >
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 pr-20">
                 <strong className="text-sm text-[var(--sh-ink-strong)]">{item.id}</strong>
                 <StatusBadge
                   status={
@@ -217,7 +199,7 @@ export function FineStoryboardStep() {
                 />
               </div>
               <p className="mt-2 line-clamp-2 text-xs text-[var(--sh-ink-muted)]">{item.beat}</p>
-            </button>
+            </SelectableCard>
           ))}
         </aside>
         <section className="min-w-0">
@@ -229,10 +211,9 @@ export function FineStoryboardStep() {
           </div>
           <div className="mt-3 flex gap-2 overflow-x-auto">
             {[1, 2, 3].map((candidate) => (
-              <button
+              <SelectableCard
                 aria-label={`关键帧参考 ${String(candidate)}`}
-                aria-pressed={selectedCandidate === candidate}
-                className={`w-32 shrink-0 rounded-[var(--sh-radius-sm)] border bg-[var(--sh-surface-elevated)] p-2 text-left ${selectedCandidate === candidate ? "border-[var(--sh-brand-500)]" : "border-[var(--sh-line-subtle)]"}`}
+                className="w-32 shrink-0 p-2"
                 key={candidate}
                 onClick={() =>
                   updateStoryboard({
@@ -243,7 +224,7 @@ export function FineStoryboardStep() {
                     },
                   })
                 }
-                type="button"
+                selected={selectedCandidate === candidate}
               >
                 <VideoScenePreview
                   compact
@@ -251,7 +232,7 @@ export function FineStoryboardStep() {
                   variant={demo ? selected + candidate - 1 : previewVariant + candidate - 1}
                 />
                 <span className="mt-1 block text-xs font-semibold">关键帧参考 {candidate}</span>
-              </button>
+              </SelectableCard>
             ))}
           </div>
         </section>

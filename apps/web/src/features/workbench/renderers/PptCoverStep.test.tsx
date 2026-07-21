@@ -2,7 +2,12 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it } from "vitest";
 import { PptCoverStep } from "@/features/workbench/renderers/PptCoverStep";
-import { resetMockRuntime, saveMockDraft, updateMockNodeState } from "@/shared/api/mocks/runtime";
+import {
+  getMockRuntimeState,
+  resetMockRuntime,
+  saveMockDraft,
+  updateMockNodeState,
+} from "@/shared/api/mocks/runtime";
 import { demoLessonId, demoProjectId } from "@/shared/data/mockData";
 
 function renderStep() {
@@ -23,20 +28,18 @@ function renderStep() {
 describe("PptCoverStep", () => {
   beforeEach(() => resetMockRuntime());
 
-  it("切换候选时明确更新当前预览和无障碍反馈", () => {
+  it("点击候选后立即勾选并更新无障碍反馈", () => {
     renderStep();
 
     const candidate = screen.getByRole("button", { name: "选择果汁标签" });
     fireEvent.click(candidate);
 
     expect(candidate).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("点击候选查看大图 · 当前预览：果汁标签")).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "正在预览“果汁标签”，确认后将作为 PPT 封面",
-    );
+    expect(screen.getByText("已选中：果汁标签")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("已选择“果汁标签”，继续后将作为 PPT 封面");
   });
 
-  it("确认封面后保留下一步入口，并把候选作为缩略导航", () => {
+  it("确认后仍可直接改选，不需要重新选择按钮", () => {
     const draftKey = `project:${demoProjectId}:lesson:${demoLessonId}:ppt-cover`;
     saveMockDraft(
       draftKey,
@@ -63,12 +66,16 @@ describe("PptCoverStep", () => {
 
     renderStep();
 
-    expect(screen.getByRole("link", { name: "制作 PPT 正文" })).toHaveAttribute(
-      "href",
-      `/app/projects/${demoProjectId}/lessons/${demoLessonId}/work/ppt-pages`,
-    );
+    expect(screen.getByRole("button", { name: "制作 PPT 正文" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "重新选择封面" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "选择百格光窗" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "选择果汁标签" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "选择课堂发现" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "选择果汁标签" }));
+    expect(screen.getByRole("button", { name: "选择果汁标签" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(
+      getMockRuntimeState().nodeStates[`${demoProjectId}:${demoLessonId}:ppt-cover`]?.status,
+    ).toBe("review_required");
   });
 });

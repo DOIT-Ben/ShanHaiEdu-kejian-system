@@ -1,6 +1,6 @@
-import { ArrowRight, Check, Download, PencilLine, RefreshCw } from "lucide-react";
+import { ArrowRight, Download, RefreshCw } from "lucide-react";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { PptCoverArtwork, pptCoverOptions } from "@/features/workbench/components/PptCoverArtwork";
 import { WorkbenchPageFrame } from "@/features/workbench/components/WorkbenchPageFrame";
 import { StaleContentNotice } from "@/features/workbench/components/StaleContentNotice";
@@ -11,6 +11,7 @@ import { downloadExampleFile } from "@/shared/lib/downloadExampleFile";
 import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
+import { SelectableCard } from "@/shared/ui/SelectableCard";
 import { requiredItem } from "@/shared/lib/requiredItem";
 import { demoProjectId } from "@/shared/data/mockData";
 
@@ -37,6 +38,7 @@ function CoverVisual({
 export function PptCoverStep() {
   const { lessonId = "", projectId = "" } = useParams();
   const runtime = useMockRuntime();
+  const navigate = useNavigate();
   const project = runtime.projects.find((item) => item.id === projectId);
   const topic = project?.knowledge_point ?? "本课知识点";
   const demo = projectId === demoProjectId || !project;
@@ -68,68 +70,29 @@ export function PptCoverStep() {
   const selected =
     availableCandidates.find((candidate) => candidate.id === selectedId) ??
     requiredItem(availableCandidates, 0, "默认备选封面");
+  const confirmAndContinue = () => {
+    if (!approved) {
+      if (approvedSaved?.selectedId && approvedSaved.selectedId !== selectedId) {
+        markPptCoverDependentsStale(runtime, projectId, lessonId);
+      }
+      saveMockDraft(draftKey, { selectedId }, { lessonId, nodeKey: "ppt-cover", projectId });
+      saveMockDraft(approvedKey, { selectedId }, { lessonId, nodeKey: "ppt-cover", projectId });
+      updateMockNodeState(projectId, lessonId, "ppt-cover", {
+        stale_reason: null,
+        status: "approved",
+        title: "设计封面",
+      });
+    }
+    void navigate(`/app/projects/${projectId}/lessons/${lessonId}/work/ppt-pages`);
+  };
   return (
     <WorkbenchPageFrame width="workspace">
       <FocusPageHeader
         action={
-          approved ? (
-            <>
-              <Button
-                onClick={() => {
-                  if (!runtime.drafts[approvedKey]) {
-                    saveMockDraft(
-                      approvedKey,
-                      { selectedId },
-                      { lessonId, nodeKey: "ppt-cover", projectId },
-                    );
-                  }
-                  updateMockNodeState(projectId, lessonId, "ppt-cover", {
-                    status: "review_required",
-                    title: "设计封面",
-                  });
-                  setMessage("已进入重新选择；确认前仍保留当前封面");
-                }}
-                size="md"
-                variant="secondary"
-              >
-                <PencilLine aria-hidden="true" />
-                重新选择封面
-              </Button>
-              <Button asChild size="md">
-                <Link to={`/app/projects/${projectId}/lessons/${lessonId}/work/ppt-pages`}>
-                  制作 PPT 正文
-                  <ArrowRight aria-hidden="true" />
-                </Link>
-              </Button>
-            </>
-          ) : (
-            <Button
-              onClick={() => {
-                if (approvedSaved?.selectedId && approvedSaved.selectedId !== selectedId) {
-                  markPptCoverDependentsStale(runtime, projectId, lessonId);
-                }
-                saveMockDraft(
-                  draftKey,
-                  { selectedId },
-                  { lessonId, nodeKey: "ppt-cover", projectId },
-                );
-                saveMockDraft(
-                  approvedKey,
-                  { selectedId },
-                  { lessonId, nodeKey: "ppt-cover", projectId },
-                );
-                updateMockNodeState(projectId, lessonId, "ppt-cover", {
-                  stale_reason: null,
-                  status: "approved",
-                  title: "设计封面",
-                });
-              }}
-              size="md"
-            >
-              <Check aria-hidden="true" />
-              采用这张封面
-            </Button>
-          )
+          <Button onClick={confirmAndContinue} size="md">
+            制作 PPT 正文
+            <ArrowRight aria-hidden="true" />
+          </Button>
         }
         eyebrow="当前要做：选择一张 PPT 封面"
         hideEyebrow
@@ -153,9 +116,7 @@ export function PptCoverStep() {
             <div>
               <p className="text-sm font-semibold text-[var(--sh-ink-strong)]">选择封面</p>
               <p className="mt-0.5 text-xs text-[var(--sh-ink-muted)]">
-                {approved
-                  ? `已采用：${selected.label}`
-                  : `点击候选查看大图 · 当前预览：${selected.label}`}
+                {approved ? `当前采用：${selected.label}` : `已选中：${selected.label}`}
               </p>
             </div>
             <span className="text-xs font-medium text-[var(--sh-ink-muted)]">3 张备选</span>
@@ -164,35 +125,23 @@ export function PptCoverStep() {
             {availableCandidates.map((candidate) => {
               const previewing = selectedId === candidate.id;
               return (
-                <button
+                <SelectableCard
                   aria-label={`选择${candidate.label}`}
-                  aria-pressed={previewing}
-                  className={`group relative min-w-0 rounded-[var(--sh-radius-sm)] border bg-[var(--sh-surface-elevated)] p-1.5 text-left transition-[border-color,box-shadow,transform] motion-reduce:transition-none md:p-2 ${previewing ? "border-[var(--sh-brand-600)] bg-[var(--sh-brand-50)] shadow-[var(--sh-shadow-card)] ring-1 ring-[var(--sh-brand-200)]" : "border-[var(--sh-line-subtle)] hover:-translate-y-0.5 hover:border-[var(--sh-brand-300)] hover:shadow-[var(--sh-shadow-card)]"} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sh-brand-500)] focus-visible:ring-offset-2 disabled:cursor-default disabled:opacity-85`}
-                  disabled={approved}
+                  className="p-1.5 md:p-2"
                   key={candidate.id}
                   onClick={() => {
                     selectCover(candidate.id);
-                    setMessage(`正在预览“${candidate.label}”，确认后将作为 PPT 封面`);
+                    setMessage(`已选择“${candidate.label}”，继续后将作为 PPT 封面`);
                   }}
-                  type="button"
+                  selected={previewing}
                 >
                   <CoverVisual candidate={candidate} demo={demo} topic={topic} />
-                  {previewing ? (
-                    <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-[var(--sh-radius-sm)] bg-[var(--sh-brand-700)] px-1.5 py-1 text-[10px] font-semibold text-white shadow-[var(--sh-shadow-card)]">
-                      <Check aria-hidden="true" className="size-3" />
-                      当前预览
-                    </span>
-                  ) : (
-                    <span className="pointer-events-none absolute inset-x-2 bottom-7 grid min-h-8 place-items-center rounded-[var(--sh-radius-sm)] bg-[var(--sh-overlay-scrim)] px-2 text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100 motion-reduce:transition-none">
-                      预览这张
-                    </span>
-                  )}
                   <span
                     className={`mt-1.5 block truncate px-1 text-xs font-semibold ${previewing ? "text-[var(--sh-brand-700)]" : "text-[var(--sh-ink-strong)]"}`}
                   >
                     {candidate.label}
                   </span>
-                </button>
+                </SelectableCard>
               );
             })}
           </div>
@@ -202,11 +151,10 @@ export function PptCoverStep() {
         </aside>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button disabled={approved} onClick={() => openContextDrawer("prompt")} variant="secondary">
+        <Button onClick={() => openContextDrawer("prompt")} variant="secondary">
           提出修改
         </Button>
         <Button
-          disabled={approved}
           onClick={() => {
             const nextId = (selectedId % availableCandidates.length) + 1;
             selectCover(nextId);

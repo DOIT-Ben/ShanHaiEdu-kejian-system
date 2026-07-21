@@ -1,7 +1,7 @@
 import * as Tabs from "@radix-ui/react-tabs";
-import { ArrowRight, Check, ChevronRight, Clock3, Edit3, RotateCcw } from "lucide-react";
+import { ArrowRight, Clock3, Edit3, RotateCcw } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { createTopicIntroOptions, introOptions } from "@/features/intro-options/data";
 import type { IntroCategory, IntroOption } from "@/features/intro-options/model";
 import { markIntroDependentsStale } from "@/features/intro-options/invalidateDependents";
@@ -21,6 +21,7 @@ import { StaleContentNotice } from "@/features/workbench/components/StaleContent
 import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
+import { SelectableCard } from "@/shared/ui/SelectableCard";
 import { requiredItem } from "@/shared/lib/requiredItem";
 import { saveMockDraft, updateMockNodeState, useMockRuntime } from "@/shared/api/mocks/runtime";
 import { demoProjectId } from "@/shared/data/mockData";
@@ -46,14 +47,14 @@ function OptionCard({
   const categoryLabel =
     option.category === "science" ? "科普" : option.category === "application" ? "应用" : "故事";
   return (
-    <button
+    <SelectableCard
       aria-label={`选择${categoryLabel}方案：${option.title}`}
-      aria-pressed={active}
-      className={`w-full rounded-[var(--sh-radius-md)] border p-2.5 text-left transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 sm:p-3 ${active ? "border-[var(--sh-brand-500)] bg-[var(--sh-brand-50)] shadow-[var(--sh-shadow-card)]" : "border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] hover:border-[var(--sh-brand-300)]"}`}
+      className="w-full p-2.5 sm:p-3"
       onClick={onSelect}
-      type="button"
+      selected={active}
+      selectedLabel={adopted ? "当前采用" : "已选中"}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-center gap-2 pr-20">
         <span className="rounded-full bg-[var(--sh-surface-elevated)] px-2.5 py-1 text-xs font-semibold text-[var(--sh-brand-600)]">
           {categoryLabel}
         </span>
@@ -68,29 +69,19 @@ function OptionCard({
       <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--sh-ink-muted)] sm:text-sm lg:max-xl:hidden">
         {option.concept}
       </p>
-      <div className="mt-1.5 flex items-center justify-between text-[11px] text-[var(--sh-ink-faint)] sm:mt-2 sm:text-xs">
+      <div className="mt-1.5 flex items-center text-[11px] text-[var(--sh-ink-faint)] sm:mt-2 sm:text-xs">
         <span className="flex items-center gap-1">
           <Clock3 aria-hidden="true" className="size-3.5" />约 {option.duration} 秒
         </span>
-        {adopted ? (
-          <span className="flex items-center gap-1 font-semibold text-[var(--sh-success-strong)]">
-            <Check aria-hidden="true" className="size-3.5" />
-            当前采用
-          </span>
-        ) : (
-          <span className="flex items-center gap-1 font-semibold text-[var(--sh-brand-600)]">
-            查看详情
-            <ChevronRight aria-hidden="true" className="size-3.5" />
-          </span>
-        )}
       </div>
-    </button>
+    </SelectableCard>
   );
 }
 
 export function IntroOptionsStep() {
   const { lessonId = "", projectId = "" } = useParams();
   const runtime = useMockRuntime();
+  const navigate = useNavigate();
   const project = runtime.projects.find((item) => item.id === projectId);
   const availableOptions = useMemo(
     () =>
@@ -112,7 +103,6 @@ export function IntroOptionsStep() {
     getPreviewedIntroOptionRevision(stored),
   );
   const adoptedBase = availableOptions.find((option) => option.key === stored.adoptedKey);
-  const hasAdoptedOption = adoptedBase !== undefined;
   const previewIsAdopted = isPreviewAdopted(stored);
   const nodeState = runtime.nodeStates[`${projectId}:${lessonId}:intro-options`];
   const nodeApproved = nodeState?.status === "approved";
@@ -158,6 +148,10 @@ export function IntroOptionsStep() {
     });
     if (changed) markIntroDependentsStale(runtime, projectId, lessonId);
   };
+  const continueToMasterScript = () => {
+    if (!approved) adoptSelection();
+    void navigate(`/app/projects/${projectId}/lessons/${lessonId}/work/master-script`);
+  };
   const visible = useMemo(
     () =>
       filter === "all"
@@ -170,19 +164,10 @@ export function IntroOptionsStep() {
     <WorkbenchPageFrame width="wide">
       <FocusPageHeader
         action={
-          approved ? (
-            <Button asChild size="md">
-              <Link to={`/app/projects/${projectId}/lessons/${lessonId}/work/master-script`}>
-                编写母版剧本
-                <ArrowRight aria-hidden="true" />
-              </Link>
-            </Button>
-          ) : (
-            <Button className="hidden md:inline-flex" onClick={adoptSelection} size="md">
-              <Check aria-hidden="true" />
-              {hasAdoptedOption ? "改用这套方案" : "采用这套方案"}
-            </Button>
-          )
+          <Button onClick={continueToMasterScript} size="md">
+            编写母版剧本
+            <ArrowRight aria-hidden="true" />
+          </Button>
         }
         eyebrow="当前要做：从三类九套中选择课堂导入"
         hideEyebrow
@@ -220,7 +205,7 @@ export function IntroOptionsStep() {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-[var(--sh-brand-600)]">
-                  {previewIsAdopted ? "当前采用" : "正在预览"} · {selected.score} 分
+                  {previewIsAdopted ? "当前采用" : "已选中"} · {selected.score} 分
                 </p>
                 <h2 className="mt-1 truncate font-semibold text-[var(--sh-ink-strong)]">
                   {selected.title}
@@ -246,12 +231,6 @@ export function IntroOptionsStep() {
             <p className="mt-1 line-clamp-1 text-sm leading-5 text-[var(--sh-ink-muted)]">
               {selected.concept}
             </p>
-            {!previewIsAdopted ? (
-              <Button className="mt-2 w-full md:hidden" onClick={adoptSelection} size="sm">
-                <Check aria-hidden="true" />
-                {hasAdoptedOption ? "改用这套方案" : "采用这套方案"}
-              </Button>
-            ) : null}
           </div>
           <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
             {visible.map((option) => {
@@ -279,7 +258,7 @@ export function IntroOptionsStep() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold text-[var(--sh-brand-600)]">
-                {previewIsAdopted ? "当前采用" : "正在预览"} · 约 {selected.duration} 秒
+                {previewIsAdopted ? "当前采用" : "已选中"} · 约 {selected.duration} 秒
               </p>
               <h2 className="mt-1 text-xl font-bold text-[var(--sh-ink-strong)]">
                 {selected.title}

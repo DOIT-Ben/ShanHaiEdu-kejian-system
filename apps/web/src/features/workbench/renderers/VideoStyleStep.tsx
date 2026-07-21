@@ -1,7 +1,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowRight, Check, PencilLine, RefreshCw, X } from "lucide-react";
+import { ArrowRight, RefreshCw, X } from "lucide-react";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { StaleContentNotice } from "@/features/workbench/components/StaleContentNotice";
 import { WorkbenchPageFrame } from "@/features/workbench/components/WorkbenchPageFrame";
 import {
@@ -17,6 +17,7 @@ import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { IconButton } from "@/shared/ui/IconButton";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
+import { SelectableCard } from "@/shared/ui/SelectableCard";
 import { requiredItem } from "@/shared/lib/requiredItem";
 import { demoProjectId } from "@/shared/data/mockData";
 
@@ -43,6 +44,7 @@ function StyleVisual({
 export function VideoStyleStep() {
   const { lessonId = "", projectId = "" } = useParams();
   const runtime = useMockRuntime();
+  const navigate = useNavigate();
   const project = runtime.projects.find((item) => item.id === projectId);
   const demo = projectId === demoProjectId || !project;
   const topic = project?.knowledge_point ?? "本课知识点";
@@ -70,68 +72,37 @@ export function VideoStyleStep() {
       title: "确定画面风格",
     });
   };
+  const confirmAndContinue = () => {
+    if (!approved) {
+      if (approvedSaved?.selectedId && approvedSaved.selectedId !== selected.id) {
+        markVideoStyleDependentsStale(runtime, projectId, lessonId);
+      }
+      saveMockDraft(
+        draftKey,
+        { selectedId: selected.id },
+        { lessonId, nodeKey: "video-style", projectId },
+      );
+      saveMockDraft(
+        approvedKey,
+        { selectedId: selected.id },
+        { lessonId, nodeKey: "video-style", projectId },
+      );
+      updateMockNodeState(projectId, lessonId, "video-style", {
+        stale_reason: null,
+        status: "approved",
+        title: "确定画面风格",
+      });
+    }
+    void navigate(`/app/projects/${projectId}/lessons/${lessonId}/work/video-assets`);
+  };
   return (
     <WorkbenchPageFrame width="workspace">
       <FocusPageHeader
         action={
-          approved ? (
-            <>
-              <Button
-                onClick={() => {
-                  if (!runtime.drafts[approvedKey]) {
-                    saveMockDraft(
-                      approvedKey,
-                      { selectedId: selected.id },
-                      { lessonId, nodeKey: "video-style", projectId },
-                    );
-                  }
-                  updateMockNodeState(projectId, lessonId, "video-style", {
-                    stale_reason: null,
-                    status: "review_required",
-                    title: "确定画面风格",
-                  });
-                }}
-                size="md"
-                variant="secondary"
-              >
-                <PencilLine aria-hidden="true" />
-                重新选择风格
-              </Button>
-              <Button asChild size="md">
-                <Link to={`/app/projects/${projectId}/lessons/${lessonId}/work/video-assets`}>
-                  制作镜头图片
-                  <ArrowRight aria-hidden="true" />
-                </Link>
-              </Button>
-            </>
-          ) : (
-            <Button
-              onClick={() => {
-                if (approvedSaved?.selectedId && approvedSaved.selectedId !== selected.id) {
-                  markVideoStyleDependentsStale(runtime, projectId, lessonId);
-                }
-                saveMockDraft(
-                  draftKey,
-                  { selectedId: selected.id },
-                  { lessonId, nodeKey: "video-style", projectId },
-                );
-                saveMockDraft(
-                  approvedKey,
-                  { selectedId: selected.id },
-                  { lessonId, nodeKey: "video-style", projectId },
-                );
-                updateMockNodeState(projectId, lessonId, "video-style", {
-                  stale_reason: null,
-                  status: "approved",
-                  title: "确定画面风格",
-                });
-              }}
-              size="md"
-            >
-              <Check aria-hidden="true" />
-              采用这个画面风格
-            </Button>
-          )
+          <Button onClick={confirmAndContinue} size="md">
+            制作镜头图片
+            <ArrowRight aria-hidden="true" />
+          </Button>
         }
         eyebrow="当前要做：确定视频画面风格"
         hideEyebrow
@@ -155,9 +126,7 @@ export function VideoStyleStep() {
             <div>
               <p className="text-sm font-semibold text-[var(--sh-ink-strong)]">选择画面风格</p>
               <p className="mt-0.5 text-xs text-[var(--sh-ink-muted)]">
-                {approved
-                  ? `已采用：${selected.name}`
-                  : `点击候选查看大图 · 当前预览：${selected.name}`}
+                {approved ? `当前采用：${selected.name}` : `已选中：${selected.name}`}
               </p>
             </div>
             <span className="text-xs font-medium text-[var(--sh-ink-muted)]">3 种风格</span>
@@ -166,49 +135,31 @@ export function VideoStyleStep() {
             {styles.map((style) => {
               const previewing = selected.id === style.id;
               return (
-                <button
+                <SelectableCard
                   aria-label={`选择${style.name}`}
-                  aria-pressed={previewing}
-                  className={`group relative min-w-0 rounded-[var(--sh-radius-sm)] border bg-[var(--sh-surface-elevated)] p-1.5 text-left transition-[border-color,box-shadow,transform] motion-reduce:transition-none md:p-2 ${previewing ? "border-[var(--sh-brand-600)] bg-[var(--sh-brand-50)] shadow-[var(--sh-shadow-card)] ring-1 ring-[var(--sh-brand-200)]" : "border-[var(--sh-line-subtle)] hover:-translate-y-0.5 hover:border-[var(--sh-brand-300)] hover:shadow-[var(--sh-shadow-card)]"} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sh-brand-500)] focus-visible:ring-offset-2 disabled:cursor-default disabled:opacity-85`}
-                  disabled={approved}
+                  className="p-1.5 md:p-2"
                   key={style.id}
                   onClick={() => {
                     selectStyle(style.id);
-                    setMessage(`正在预览“${style.name}”`);
+                    setMessage(`已选择“${style.name}”`);
                   }}
-                  type="button"
+                  selected={previewing}
                 >
                   <StyleVisual loading="lazy" style={style} />
-                  {previewing ? (
-                    <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-[var(--sh-radius-sm)] bg-[var(--sh-brand-700)] px-1.5 py-1 text-[10px] font-semibold text-white shadow-[var(--sh-shadow-card)]">
-                      <Check aria-hidden="true" className="size-3" />
-                      当前预览
-                    </span>
-                  ) : (
-                    <span className="pointer-events-none absolute inset-x-2 bottom-7 grid min-h-8 place-items-center rounded-[var(--sh-radius-sm)] bg-[var(--sh-overlay-scrim)] px-2 text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100 motion-reduce:transition-none">
-                      预览这张
-                    </span>
-                  )}
                   <span
                     className={`mt-1.5 block truncate px-1 text-xs font-semibold ${previewing ? "text-[var(--sh-brand-700)]" : "text-[var(--sh-ink-strong)]"}`}
                   >
                     {style.name}
                   </span>
-                </button>
+                </SelectableCard>
               );
             })}
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button
-              disabled={approved}
-              onClick={() => setRedesignOpen(true)}
-              size="sm"
-              variant="secondary"
-            >
+            <Button onClick={() => setRedesignOpen(true)} size="sm" variant="secondary">
               重新设计画面
             </Button>
             <Button
-              disabled={approved}
               onClick={() => {
                 const index = styles.findIndex((style) => style.id === selected.id);
                 const next = requiredItem(styles, (index + 1) % styles.length, "下一种视频风格");

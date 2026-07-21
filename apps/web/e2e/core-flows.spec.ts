@@ -61,16 +61,16 @@ test("三类九套选择不阻塞教案", async ({ page }) => {
   await expect(page.getByRole("button", { name: "选择故事方案：失而复得的航海图" })).toBeVisible();
   await page.getByRole("button", { name: "选择故事方案：失而复得的航海图" }).click();
   await expect(selectedSummary).toContainText("失而复得的航海图");
-  await page.getByRole("button", { name: "采用这套方案" }).click();
+  await page.getByRole("button", { name: "编写母版剧本", exact: true }).click();
+  await page.goto(`/app/projects/${projectId}/lessons/${lessonId}/work/intro-options`);
   await expect(selectedSummary).toContainText("当前采用");
   await expect(page.getByRole("button", { name: "当前采用方案" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "编写母版剧本", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "编写母版剧本", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "选择科普方案：会变色的百格窗" }).click();
-  await expect(page.getByRole("button", { name: "改用这套方案" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "编写母版剧本", exact: true })).toBeEnabled();
   await expect(page.getByRole("button", { name: "返回当前方案" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "编写母版剧本", exact: true })).toHaveCount(0);
   await page.reload();
-  await expect(page.getByRole("button", { name: "改用这套方案" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "编写母版剧本", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "选择故事方案：失而复得的航海图" }).click();
   await expect(selectedSummary).toContainText("当前采用");
   await expect(page.getByRole("button", { name: "当前采用方案" })).toHaveCount(0);
@@ -85,7 +85,8 @@ test("改用课堂导入方案后旧母版剧本需要按新方案更新", async
   const scriptUrl = `/app/projects/${projectId}/lessons/${lessonId}/work/master-script`;
 
   await page.goto(introUrl);
-  await page.getByRole("button", { name: "采用这套方案" }).click();
+  await page.getByRole("button", { name: "编写母版剧本", exact: true }).click();
+  await page.goto(introUrl);
   const firstEditButton = page.getByRole("button", { name: "编辑方案" });
   await firstEditButton.click();
   const firstDrawer = page.getByRole("dialog", { name: "内容要求" });
@@ -96,7 +97,7 @@ test("改用课堂导入方案后旧母版剧本需要按新方案更新", async
   await expect(firstDrawer.getByRole("status")).toContainText("新方案已生成");
   await firstDrawer.getByRole("button", { name: "查看新方案" }).click();
   await expect(firstEditButton).toBeFocused();
-  await expect(page.getByRole("button", { name: "改用这套方案" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "编写母版剧本", exact: true })).toBeEnabled();
   await page.setViewportSize({ height: 844, width: 390 });
   await page.reload();
   await expect(page.getByRole("button", { name: "返回当前方案" })).toBeVisible();
@@ -139,9 +140,8 @@ test("改用课堂导入方案后旧母版剧本需要按新方案更新", async
   ).toBeVisible();
   await expect(page.getByText(/先请学生说出观察，再直接提问/).last()).toBeVisible();
   await expect(page.getByText(/先说说你观察到了什么/).last()).toBeVisible();
-  await page.getByRole("button", { name: "改用这套方案" }).click();
-
-  await page.goto(scriptUrl);
+  await page.getByRole("button", { name: "编写母版剧本", exact: true }).click();
+  await expect(page).toHaveURL(scriptUrl);
   await expect(page.getByRole("heading", { name: "果汁标签侦探" }).first()).toBeVisible();
   await expect(page.getByText(/课堂导入已经改用“会变色的百格窗”/)).toBeVisible();
   await expect(page.getByRole("button", { name: "根据新方案更新剧本" })).toBeVisible();
