@@ -13,6 +13,8 @@ from apps.api.artifacts.context_source_registry import (
     resolve_artifact_source,
 )
 from apps.api.artifacts.domain import canonical_content_hash
+from apps.api.artifacts.execution_errors import ArtifactExecutionPortError
+from apps.api.artifacts.generated_write_guard import GeneratedArtifactWriteGuard
 from apps.api.artifacts.models import Approval, Artifact, ArtifactVersion
 from apps.api.artifacts.relation_service import ArtifactRelationService
 from apps.api.database import utc_now
@@ -26,12 +28,6 @@ from apps.api.runtime_boundary.ports import (
     GeneratedArtifactWrite,
     WorkflowExecutionContext,
 )
-
-
-class ArtifactExecutionPortError(ValueError):
-    def __init__(self, code: str, message: str) -> None:
-        super().__init__(message)
-        self.code = code
 
 
 class SqlAlchemyArtifactPort:
@@ -173,6 +169,7 @@ class SqlAlchemyArtifactPort:
         return values
 
     def persist_generated(self, write: GeneratedArtifactWrite) -> ArtifactWriteResult:
+        GeneratedArtifactWriteGuard(self._session, self._actor).require(write)
         ProjectAccessService(self._session, self._actor).require(
             write.project_id,
             ProjectAction.GENERATE,

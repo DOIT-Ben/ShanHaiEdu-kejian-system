@@ -8,12 +8,12 @@ from sqlalchemy import func, select
 from apps.api.artifacts.models import Approval, Artifact
 from apps.api.artifacts.repository import ArtifactRepository
 from apps.api.artifacts.service import ArtifactService
-from apps.api.content_runtime.registry import BUILTIN_CONTENT_DEFINITION_VERSION_ID
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import ApiError
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.reliability.models import EventStreamEntry, OutboxEvent
+from tests.fakes.content_runtime import ensure_test_authoring_definition
 from tests.fakes.identity import seed_test_actor
 
 
@@ -27,13 +27,14 @@ def test_approval_pointer_event_and_outbox_commit_or_rollback_together(
             project = ProjectRepository(session, actor).create(
                 CreateProjectRequest(title="Fractions", knowledge_point="One half")
             )
+            definition_id = ensure_test_authoring_definition(session, project.id)
             service = ArtifactService(session, actor)
             artifact = service.create(
                 project.id,
                 artifact_key="lesson-plan:lesson-01",
                 artifact_type="lesson_plan",
                 branch_key="lesson_plan",
-                content_definition_version_id=BUILTIN_CONTENT_DEFINITION_VERSION_ID,
+                content_definition_version_id=definition_id,
                 draft_branch="main",
                 initial_content={"title": "Review me"},
                 request_id="req-create",
@@ -111,13 +112,14 @@ def test_concurrent_double_approval_returns_one_deterministic_record(
         project = ProjectRepository(session, actor).create(
             CreateProjectRequest(title="Fractions", knowledge_point="One half")
         )
+        definition_id = ensure_test_authoring_definition(session, project.id)
         service = ArtifactService(session, actor)
         artifact = service.create(
             project.id,
             artifact_key="lesson-plan:concurrent",
             artifact_type="lesson_plan",
             branch_key="lesson_plan",
-            content_definition_version_id=BUILTIN_CONTENT_DEFINITION_VERSION_ID,
+            content_definition_version_id=definition_id,
             draft_branch="main",
             initial_content={"title": "Concurrent review"},
             request_id="req-concurrent-create",
@@ -170,13 +172,14 @@ def test_approved_version_is_no_longer_a_returnable_submission(
             project = ProjectRepository(session, actor).create(
                 CreateProjectRequest(title="Fractions", knowledge_point="One half")
             )
+            definition_id = ensure_test_authoring_definition(session, project.id)
             service = ArtifactService(session, actor)
             artifact = service.create(
                 project.id,
                 artifact_key="lesson-plan:terminal-approval",
                 artifact_type="lesson_plan",
                 branch_key="lesson_plan",
-                content_definition_version_id=BUILTIN_CONTENT_DEFINITION_VERSION_ID,
+                content_definition_version_id=definition_id,
                 draft_branch="main",
                 initial_content={"title": "Approve once"},
                 request_id="req-terminal-create",

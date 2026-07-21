@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -48,25 +49,73 @@ class AuthoringPolicy:
     fields: tuple[FieldPolicy, ...]
 
     def validate_create(self, content: Mapping[str, Any]) -> None:
-        if not isinstance(content, Mapping):
-            raise AuthoringViolation((), "artifact content must be an object")
         for field in self.fields:
-            self._validate_create_field(field, cast(Mapping[str, Any], content), ())
+            self._validate_create_field(field, content, ())
 
     def validate_update(
         self,
         baseline: Mapping[str, Any],
         candidate: Mapping[str, Any],
     ) -> None:
-        if not isinstance(baseline, Mapping) or not isinstance(candidate, Mapping):
-            raise AuthoringViolation((), "artifact content must be an object")
         for field in self.fields:
             self._validate_update_field(
                 field,
-                cast(Mapping[str, Any], baseline),
-                cast(Mapping[str, Any], candidate),
+                baseline,
+                candidate,
                 (),
             )
+
+    def provision_repeatable_item(
+        self,
+        baseline: Mapping[str, Any],
+        candidate: Mapping[str, Any],
+        *,
+        field_path: tuple[str, ...],
+        item: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Append one server-owned item after validating all existing user changes."""
+
+        self.validate_update(baseline, candidate)
+        field = self._field_at(field_path)
+        if not field.repeatable or not field.editable:
+            raise AuthoringViolation(field_path, "field does not allow item provisioning")
+        result = deepcopy(dict(candidate))
+        target = _resolve_mutable_path(result, field_path)
+        if not isinstance(target, list):
+            raise AuthoringViolation(field_path, "repeatable field must contain an array")
+        target_items = cast(list[object], target)
+        locked_paths = field.locked_descendants
+        if locked_paths:
+            existing = self._index_items(target_items, locked_paths, field_path)
+            values: list[tuple[tuple[str, ...], object]] = []
+            for locked_path in locked_paths:
+                value = _resolve_path(item, locked_path)
+                if value is _MISSING:
+                    raise AuthoringViolation(
+                        (*field_path, *locked_path),
+                        "provisioned item locked identity is missing",
+                    )
+                values.append((locked_path, value))
+            if _canonical(values) in existing:
+                raise AuthoringViolation(
+                    field_path,
+                    "repeatable locked identity must be unique",
+                )
+        target_items.append(deepcopy(dict(item)))
+        return result
+
+    def _field_at(self, path: tuple[str, ...]) -> FieldPolicy:
+        if not path:
+            raise AuthoringViolation(path, "authoring field path is empty")
+        fields = self.fields
+        field: FieldPolicy | None = None
+        for part in path:
+            field = next((item for item in fields if item.field_key == part), None)
+            if field is None:
+                raise AuthoringViolation(path, "authoring field path is unknown")
+            fields = field.children
+        assert field is not None
+        return field
 
     def _validate_create_field(
         self,
@@ -247,18 +296,23 @@ class AuthoringPolicy:
             self._validate_update_field(child, old_mapping, new_mapping, path)
 
 
-def compile_authoring_policy(payload: Mapping[str, Any], *, checksum: str) -> AuthoringPolicy:
-    if not isinstance(payload, Mapping) or payload.get("kind") != "content_definition":
+def compile_authoring_policy(payload: object, *, checksum: str) -> AuthoringPolicy:
+    if not isinstance(payload, Mapping):
         raise AuthoringPolicyUnavailable("published content definition is unavailable")
-    spec = payload.get("spec")
-    if not isinstance(spec, Mapping):
+    payload_mapping = cast(Mapping[str, object], payload)
+    if payload_mapping.get("kind") != "content_definition":
+        raise AuthoringPolicyUnavailable("published content definition is unavailable")
+    raw_spec = payload_mapping.get("spec")
+    if not isinstance(raw_spec, Mapping):
         raise AuthoringPolicyUnavailable("published content definition has no policy spec")
+    spec = cast(Mapping[str, object], raw_spec)
     definition_key = spec.get("definition_key")
-    fields = spec.get("fields")
+    raw_fields = spec.get("fields")
     if not isinstance(definition_key, str) or not definition_key:
         raise AuthoringPolicyUnavailable("published content definition key is invalid")
-    if not isinstance(fields, list) or not fields:
+    if not isinstance(raw_fields, list) or not raw_fields:
         raise AuthoringPolicyUnavailable("published content definition fields are unavailable")
+    fields = cast(list[object], raw_fields)
     if type(checksum) is not str or len(checksum) != 64:
         raise AuthoringPolicyUnavailable("published content definition checksum is invalid")
     try:
@@ -274,30 +328,40 @@ def compile_authoring_policy(payload: Mapping[str, Any], *, checksum: str) -> Au
 def _compile_field(raw: object, parent_path: tuple[str, ...]) -> FieldPolicy:
     if not isinstance(raw, Mapping):
         raise TypeError("field must be an object")
-    key = raw.get("field_key")
-    field_type = raw.get("type")
-    editable = raw.get("editable")
-    deletable = raw.get("deletable")
+    mapping = cast(Mapping[str, object], raw)
+    key = mapping.get("field_key")
+    field_type = mapping.get("type")
+    editable = mapping.get("editable")
+    deletable = mapping.get("deletable")
     if (
-        type(key) is not str
+        not isinstance(key, str)
         or not key
-        or type(field_type) is not str
+        or not isinstance(field_type, str)
         or type(editable) is not bool
         or type(deletable) is not bool
     ):
         raise ValueError("field authoring flags are incomplete")
-    children_raw = raw.get("children", [])
+    children_raw = mapping.get("children", [])
     if not isinstance(children_raw, list):
         raise TypeError("field children must be an array")
-    children = tuple(_compile_field(child, (*parent_path, key)) for child in children_raw)
+    children = tuple(
+        _compile_field(child, (*parent_path, key)) for child in cast(list[object], children_raw)
+    )
     _require_unique((child.field_key for child in children), (*parent_path, key))
-    repeatable = raw.get("repeatable", field_type == "repeatable")
+    repeatable = mapping.get("repeatable", field_type == "repeatable")
     if type(repeatable) is not bool:
         raise TypeError("repeatable flag must be boolean")
-    return FieldPolicy(key, field_type, editable, deletable, repeatable, children)
+    return FieldPolicy(
+        key,
+        field_type,
+        editable,
+        deletable,
+        repeatable,
+        children,
+    )
 
 
-def _require_unique(values: Sequence[str] | Any, path: tuple[str, ...]) -> None:
+def _require_unique(values: Iterable[str], path: tuple[str, ...]) -> None:
     values = tuple(values)
     if len(values) != len(set(values)):
         raise ValueError(f"duplicate field key at {'.'.join(path)}")
@@ -306,15 +370,18 @@ def _require_unique(values: Sequence[str] | Any, path: tuple[str, ...]) -> None:
 def _require_sequence(value: object, path: tuple[str, ...]) -> Sequence[object]:
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         raise AuthoringViolation(path, "repeatable field must contain an array")
-    return value
+    return cast(Sequence[object], value)
 
 
 def _resolve_path(value: Mapping[str, Any], path: tuple[str, ...]) -> object:
     current: object = value
     for key in path:
-        if not isinstance(current, Mapping) or key not in current:
+        if not isinstance(current, Mapping):
             return _MISSING
-        current = current[key]
+        mapping = cast(Mapping[str, object], current)
+        if key not in mapping:
+            return _MISSING
+        current = mapping[key]
     return current
 
 
@@ -322,7 +389,19 @@ def _has_path(value: Mapping[str, Any], path: tuple[str, ...]) -> bool:
     return _resolve_path(value, path) is not _MISSING
 
 
-def _json_equal(left: object, right: object) -> bool:
+def _resolve_mutable_path(value: dict[str, Any], path: tuple[str, ...]) -> object:
+    current: object = value
+    for key in path:
+        if not isinstance(current, dict):
+            return _MISSING
+        mapping = cast(dict[str, object], current)
+        if key not in mapping:
+            return _MISSING
+        current = mapping[key]
+    return current
+
+
+def _json_equal(left: Any, right: Any) -> bool:
     return _canonical(left) == _canonical(right)
 
 

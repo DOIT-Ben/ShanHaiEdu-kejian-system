@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from apps.api.content_runtime.authoring_policy import (
@@ -7,6 +9,10 @@ from apps.api.content_runtime.authoring_policy import (
     AuthoringViolation,
     compile_authoring_policy,
 )
+from apps.api.content_runtime.package_source import load_builtin_courseware_release
+from workflow.content_package import canonical_json_sha256
+
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def _definition(*fields: dict[str, object]) -> dict[str, object]:
@@ -161,3 +167,122 @@ def test_repeatable_without_locked_descendants_can_add_items() -> None:
         {"items": [{"prompt": "before"}]},
         {"items": [{"prompt": "before"}, {"prompt": "new"}]},
     )
+
+
+def test_server_provision_can_add_one_unique_locked_repeatable_item() -> None:
+    policy = compile_authoring_policy(
+        _definition(
+            _field(
+                "items",
+                editable=True,
+                field_type="repeatable",
+                repeatable=True,
+                children=[
+                    _field("item_key", editable=False),
+                    _field("prompt", editable=True),
+                ],
+            )
+        ),
+        checksum="e" * 64,
+    )
+    baseline = {"items": [{"item_key": "one", "prompt": "before"}]}
+    candidate = {"items": [{"item_key": "one", "prompt": "edited"}]}
+
+    provisioned = policy.provision_repeatable_item(
+        baseline,
+        candidate,
+        field_path=("items",),
+        item={"item_key": "two", "prompt": "new"},
+    )
+    assert provisioned["items"][-1] == {"item_key": "two", "prompt": "new"}
+
+    with pytest.raises(AuthoringViolation):
+        policy.provision_repeatable_item(
+            baseline,
+            candidate,
+            field_path=("items",),
+            item={"item_key": "one", "prompt": "duplicate"},
+        )
+
+
+def test_repeatable_reorder_duplicate_and_deletion_follow_declared_policy() -> None:
+    locked_children = [
+        _field("item_key", editable=False),
+        _field("prompt", editable=True),
+    ]
+    fixed = compile_authoring_policy(
+        _definition(
+            _field(
+                "items",
+                editable=True,
+                deletable=False,
+                field_type="repeatable",
+                repeatable=True,
+                children=locked_children,
+            )
+        ),
+        checksum="f" * 64,
+    )
+    baseline = {
+        "items": [
+            {"item_key": "one", "prompt": "first"},
+            {"item_key": "two", "prompt": "second"},
+        ]
+    }
+    fixed.validate_update(
+        baseline,
+        {
+            "items": [
+                {"item_key": "two", "prompt": "edited"},
+                {"item_key": "one", "prompt": "first"},
+            ]
+        },
+    )
+    with pytest.raises(AuthoringViolation):
+        fixed.validate_update(
+            baseline,
+            {
+                "items": [
+                    {"item_key": "one", "prompt": "first"},
+                    {"item_key": "one", "prompt": "duplicate"},
+                ]
+            },
+        )
+    with pytest.raises(AuthoringViolation):
+        fixed.validate_update(
+            baseline,
+            {"items": [{"item_key": "one", "prompt": "first"}]},
+        )
+
+    deletable = compile_authoring_policy(
+        _definition(
+            _field(
+                "items",
+                editable=True,
+                deletable=True,
+                field_type="repeatable",
+                repeatable=True,
+                children=locked_children,
+            )
+        ),
+        checksum="1" * 64,
+    )
+    deletable.validate_update(
+        baseline,
+        {"items": [{"item_key": "one", "prompt": "first"}]},
+    )
+
+
+def test_all_current_builtin_definitions_compile_authoring_policy() -> None:
+    source = load_builtin_courseware_release(ROOT)
+    definitions = [
+        item
+        for key, item in source.items.items()
+        if source.manifest_entries[key]["kind"] == "content_definition"
+    ]
+
+    policies = [
+        compile_authoring_policy(item, checksum=canonical_json_sha256(item)) for item in definitions
+    ]
+    assert len(policies) == len(definitions)
+    assert all(policy.fields for policy in policies)

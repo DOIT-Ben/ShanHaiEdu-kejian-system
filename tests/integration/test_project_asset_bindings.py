@@ -19,7 +19,6 @@ from apps.api.assets.project_contracts import (
 )
 from apps.api.assets.project_models import AssetBinding, ProjectAssetSlot
 from apps.api.assets.project_service import ProjectAssetService
-from apps.api.content_runtime.registry import BUILTIN_CONTENT_DEFINITION_VERSION_ID
 from apps.api.database import build_engine, build_session_factory, utc_now
 from apps.api.errors import ApiError
 from apps.api.identity.models import Organization
@@ -28,6 +27,7 @@ from apps.api.lessons.models import LessonUnit
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.reliability.models import EventStreamEntry, OutboxEvent
+from tests.fakes.content_runtime import ensure_test_authoring_definition
 from tests.fakes.identity import seed_test_actor
 
 
@@ -403,12 +403,13 @@ def test_binding_preserves_matching_artifact_source_and_rejects_wrong_lesson(
         )
 
         artifact_service = ArtifactService(session, actor)
+        definition_id = ensure_test_authoring_definition(session, project.id)
         wrong_artifact = artifact_service.create(
             project.id,
             artifact_key="lesson-plan:lesson-02",
             artifact_type="lesson_plan",
             branch_key="lesson_plan",
-            content_definition_version_id=BUILTIN_CONTENT_DEFINITION_VERSION_ID,
+            content_definition_version_id=definition_id,
             draft_branch="main",
             initial_content={"title": "Wrong lesson"},
             request_id="req-wrong-source-create",
@@ -440,7 +441,7 @@ def test_binding_preserves_matching_artifact_source_and_rejects_wrong_lesson(
             artifact_key="lesson-plan:lesson-01",
             artifact_type="lesson_plan",
             branch_key="lesson_plan",
-            content_definition_version_id=BUILTIN_CONTENT_DEFINITION_VERSION_ID,
+            content_definition_version_id=definition_id,
             draft_branch="main",
             initial_content={"title": "Matching lesson"},
             request_id="req-matching-source-create",
