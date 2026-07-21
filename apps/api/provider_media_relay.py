@@ -92,20 +92,14 @@ def resolve_media_request(
     if not hmac.compare_digest(signature, expected_signature):
         raise ProviderMediaRequestError("invalid request signature")
 
-    try:
-        candidate = (config.root / filename).resolve()
-    except OSError as error:
-        raise ProviderMediaRequestError("media path cannot be resolved") from error
-    if candidate.parent != config.root:
-        raise ProviderMediaRequestError("media path escapes relay root")
-    expected_media_type = _ALLOWED_MEDIA_TYPES.get(candidate.suffix.lower())
+    expected_media_type = _ALLOWED_MEDIA_TYPES.get(Path(filename).suffix.lower())
     if expected_media_type is None:
         raise ProviderMediaRequestError("media type is not allowed")
-    content = _read_media_content(candidate, config.max_file_bytes)
+    content = _read_media_content(config.root, filename, config.max_file_bytes)
     if _detect_media_type(content) != expected_media_type:
         raise ProviderMediaRequestError("media bytes do not match the declared type")
     return ProviderMediaAsset(
-        path=candidate,
+        path=config.root / filename,
         media_type=expected_media_type,
         size_bytes=len(content),
         content=content,
@@ -235,10 +229,9 @@ def _signature_for(filename: str, expires: str, secret: str) -> str:
     return hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
 
 
-def _read_media_content(path: Path, max_file_bytes: int) -> bytes:
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+def _read_media_content(root: Path, filename: str, max_file_bytes: int) -> bytes:
     try:
-        descriptor = os.open(path, flags)
+        descriptor = _open_media_descriptor(root, filename)
     except OSError as error:
         raise ProviderMediaRequestError("media file is unavailable") from error
     try:
@@ -254,6 +247,19 @@ def _read_media_content(path: Path, max_file_bytes: int) -> bytes:
     if len(content) != metadata.st_size or len(content) > max_file_bytes:
         raise ProviderMediaRequestError("media file changed while being read")
     return content
+
+
+def _open_media_descriptor(root: Path, filename: str) -> int:
+    file_flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    if os.name == "nt":
+        return os.open(root / filename, file_flags)
+
+    root_flags = os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0)
+    root_descriptor = os.open(root, root_flags)
+    try:
+        return os.open(filename, file_flags, dir_fd=root_descriptor)
+    finally:
+        os.close(root_descriptor)
 
 
 def _detect_media_type(content: bytes) -> str | None:
