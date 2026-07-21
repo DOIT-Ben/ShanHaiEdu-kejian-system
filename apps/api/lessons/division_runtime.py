@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, cast
@@ -14,17 +13,22 @@ from apps.api.artifact_quality.contracts import (
     ValidatorOutcome,
     ValidatorRef,
 )
+from apps.api.lessons.division_quality import (
+    approved_evidence_keys,
+    coverage_findings,
+    teacher_constraint_findings,
+)
 from apps.api.lessons.domain import ApprovedLessonDivision, ApprovedLessonItem
 
 LESSON_DIVISION_SCHEMA_REF = ValidatorRef(
     key="validator.lesson_division.schema",
     semantic_version="1.0.0",
-    implementation_digest="983177b3209826d85693543561ff11f886ee702635a97c91514078a30bd31529",
+    implementation_digest="cfe7f18463f4ea3d172b3bd56bc02cea874cf864c0a7aaf895dbd1bc8bb397f7",
 )
 LESSON_DIVISION_COVERAGE_REF = ValidatorRef(
     key="validator.lesson_division.coverage",
     semantic_version="1.0.0",
-    implementation_digest="d5f63fea5edbd0f8ca4f4868a1a990826794864ec672d0dd48f6d29f7fd2bede",
+    implementation_digest="13f8548d4fb5a99f6c84d6a5b06bc3811ab5b7221517ca6aae5f859b48744967",
 )
 
 _REQUIRED_UNIT_TEXT_FIELDS = (
@@ -73,6 +77,12 @@ class LessonDivisionDiff:
 class LessonDivisionSchemaValidator:
     def validate(self, context: QualityValidationContext) -> ValidatorOutcome:
         findings = _schema_findings(context.source_content)
+        findings.extend(
+            teacher_constraint_findings(
+                context.source_content,
+                context.supporting_inputs,
+            )
+        )
         return ValidatorOutcome(
             validator=LESSON_DIVISION_SCHEMA_REF,
             passed=not findings,
@@ -86,16 +96,14 @@ class LessonDivisionSchemaValidator:
 
 class LessonDivisionCoverageValidator:
     def validate(self, context: QualityValidationContext) -> ValidatorOutcome:
-        findings = _coverage_findings(context.source_content, context.supporting_inputs)
+        findings = coverage_findings(context.source_content, context.supporting_inputs)
         return ValidatorOutcome(
             validator=LESSON_DIVISION_COVERAGE_REF,
             passed=not findings,
             findings=tuple(findings),
             evidence={
                 "source_version_id": str(context.source_version_id),
-                "approved_evidence_keys": sorted(
-                    _approved_evidence_keys(context.supporting_inputs)
-                ),
+                "approved_evidence_keys": sorted(approved_evidence_keys(context.supporting_inputs)),
             },
         )
 
@@ -219,82 +227,6 @@ def _unit_schema_findings(
                 _finding("LESSON_FIELD_REQUIRED", f"{field} is invalid", f"{path}/{field}")
             )
     return findings, key, position
-
-
-def _coverage_findings(
-    content: Mapping[str, Any],
-    supporting_inputs: Mapping[str, Mapping[str, Any]],
-) -> list[dict[str, Any]]:
-    approved = _approved_evidence_keys(supporting_inputs)
-    referenced: list[str] = []
-    for unit in _lesson_units(content):
-        values = unit.get("evidence_refs")
-        if isinstance(values, Sequence) and not isinstance(values, (str, bytes, bytearray)):
-            referenced.extend(
-                value for value in cast(Sequence[object], values) if isinstance(value, str)
-            )
-    findings: list[dict[str, Any]] = []
-    counts = Counter(referenced)
-    duplicated = sorted(key for key, count in counts.items() if count > 1)
-    out_of_scope = sorted(set(referenced) - approved)
-    omitted = sorted(approved - set(referenced))
-    if omitted:
-        findings.append(
-            _finding("MATERIAL_EVIDENCE_OMITTED", "approved evidence was not covered", keys=omitted)
-        )
-    if duplicated:
-        findings.append(
-            _finding(
-                "MATERIAL_EVIDENCE_DUPLICATED",
-                "approved evidence was assigned more than once",
-                keys=duplicated,
-            )
-        )
-    if out_of_scope:
-        findings.append(
-            _finding(
-                "MATERIAL_EVIDENCE_OUT_OF_SCOPE",
-                "lesson division references evidence outside the approved material",
-                keys=out_of_scope,
-            )
-        )
-    coverage = content.get("coverage_check")
-    coverage_values = cast(Mapping[str, Any], coverage) if isinstance(coverage, Mapping) else None
-    if coverage_values is None or coverage_values.get("all_evidence_covered") is not True:
-        findings.append(
-            _finding("MATERIAL_EVIDENCE_OMITTED", "coverage_check does not confirm coverage")
-        )
-    if coverage_values is None or coverage_values.get("overlap_free") is not True:
-        findings.append(_finding("LESSON_SCOPE_OVERLAP", "coverage_check reports overlap"))
-    if coverage_values is not None:
-        unresolved = coverage_values.get("unresolved_questions")
-        if unresolved not in ([], ()):
-            findings.append(
-                _finding(
-                    "LESSON_SCOPE_UNRESOLVED",
-                    "unresolved material questions must be resolved before approval",
-                )
-            )
-    return findings
-
-
-def _approved_evidence_keys(
-    supporting_inputs: Mapping[str, Mapping[str, Any]],
-) -> set[str]:
-    material = supporting_inputs.get("content:material_evidence")
-    if material is None:
-        return set()
-    evidence = material.get("material_evidence")
-    if not isinstance(evidence, Sequence) or isinstance(evidence, (str, bytes, bytearray)):
-        return set()
-    keys: set[str] = set()
-    for item in cast(Sequence[object], evidence):
-        if not isinstance(item, Mapping):
-            continue
-        key = cast(Mapping[str, Any], item).get("evidence_key")
-        if isinstance(key, str) and key.strip():
-            keys.add(key)
-    return keys
 
 
 def _lesson_units(content: Mapping[str, Any]) -> list[Mapping[str, Any]]:

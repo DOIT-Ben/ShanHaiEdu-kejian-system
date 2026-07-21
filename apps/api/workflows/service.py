@@ -150,6 +150,28 @@ class WorkflowRuntimeService:
                 run.project_id,
                 ProjectAction.EDIT,
             )
+        return self._transition_locked(node, run, target)
+
+    def approve_review_gate(self, node_run_id: UUID) -> NodeRun:
+        """Complete an existing human gate with REVIEW authority only."""
+
+        node = self._require_node(node_run_id, for_update=True)
+        run = self._require_run(node.workflow_run_id)
+        if not self._actor.is_system:
+            ProjectAccessService(self._session, self._actor).require(
+                run.project_id,
+                ProjectAction.REVIEW,
+            )
+        if NodeStatus(node.status) is not NodeStatus.REVIEW_REQUIRED:
+            raise WorkflowRuntimeError("the node is not awaiting review")
+        return self._transition_locked(node, run, NodeStatus.APPROVED)
+
+    def _transition_locked(
+        self,
+        node: NodeRun,
+        run: WorkflowRun,
+        target: NodeStatus,
+    ) -> NodeRun:
         try:
             ensure_node_transition(NodeStatus(node.status), target)
         except NodeStateError as exc:

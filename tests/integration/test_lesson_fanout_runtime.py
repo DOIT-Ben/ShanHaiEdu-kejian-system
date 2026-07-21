@@ -10,12 +10,21 @@ from apps.api.content_runtime.package_source import load_builtin_courseware_rele
 from apps.api.content_runtime.publication_service import ContentReleasePublisher
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import ApiError
-from apps.api.lessons.domain import ApprovedLessonDivision, ApprovedLessonItem
+from apps.api.lessons.domain import (
+    ApprovedLessonDivision,
+    ApprovedLessonItem,
+    BranchConfigurationChange,
+    BranchKey,
+)
 from apps.api.lessons.repository import LessonRepository
 from apps.api.lessons.service import LessonService
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.reliability.models import EventStreamEntry
+from apps.api.workflows.execution_port import (
+    SqlAlchemyWorkflowExecutionPort,
+    WorkflowExecutionPortError,
+)
 from apps.api.workflows.lesson_fanout import (
     LessonFanoutTarget,
     LessonWorkflowFanoutService,
@@ -128,6 +137,129 @@ def test_active_node_blocks_lesson_archive_until_cancellation_finishes(
 
         assert set(session.scalars(select(BranchRun.status))) == {"cancelled"}
         assert session.get(NodeRun, node.id).status == "cancelled"
+
+
+def test_branch_update_disables_existing_ready_entrypoint(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session:
+        with session.begin():
+            actor, run_id, lesson_id = _seed_lesson(session)
+            LessonWorkflowFanoutService(session, actor).synchronize(
+                run_id,
+                targets=_targets(session, actor, lesson_id),
+                archived_lesson_unit_ids=(),
+                request_id="req-branch-ready",
+            )
+            lesson = LessonRepository(session, actor).get(lesson_id)
+            assert lesson is not None
+            LessonService(session, actor).update_branches(
+                lesson_id,
+                expected_version=lesson.lock_version,
+                changes={
+                    BranchKey.INTRO_OPTIONS: BranchConfigurationChange(
+                        enabled=False,
+                        settings={},
+                    )
+                },
+                request_id="req-disable-intro",
+            )
+
+        branch = session.scalar(select(BranchRun).where(BranchRun.branch_key == "intro_options"))
+        node = session.scalar(select(NodeRun).where(NodeRun.node_key == "intro.generate_options"))
+        assert branch is not None and branch.status == "disabled"
+        assert node is not None and node.status == "disabled"
+
+
+def test_active_entrypoint_blocks_disable_until_cancelled_then_retry_succeeds(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session:
+        with session.begin():
+            actor, run_id, lesson_id = _seed_lesson(session)
+            LessonWorkflowFanoutService(session, actor).synchronize(
+                run_id,
+                targets=_targets(session, actor, lesson_id),
+                archived_lesson_unit_ids=(),
+                request_id="req-branch-active",
+            )
+            node = session.scalar(
+                select(NodeRun).where(NodeRun.node_key == "intro.generate_options")
+            )
+            lesson = LessonRepository(session, actor).get(lesson_id)
+            assert node is not None and lesson is not None
+            node.status = "queued"
+            expected_version = lesson.lock_version
+
+        with pytest.raises(ApiError) as caught:
+            with session.begin():
+                LessonService(session, actor).update_branches(
+                    lesson_id,
+                    expected_version=expected_version,
+                    changes={
+                        BranchKey.INTRO_OPTIONS: BranchConfigurationChange(
+                            enabled=False,
+                            settings={},
+                        )
+                    },
+                    request_id="req-disable-active",
+                )
+        assert caught.value.code == "LESSON_BRANCH_EXECUTION_ACTIVE"
+        session.rollback()
+
+        with session.begin():
+            locked = session.get(NodeRun, node.id)
+            lesson = LessonRepository(session, actor).get(lesson_id)
+            assert locked is not None and lesson is not None
+            locked.status = "cancelled"
+            LessonService(session, actor).update_branches(
+                lesson_id,
+                expected_version=lesson.lock_version,
+                changes={
+                    BranchKey.INTRO_OPTIONS: BranchConfigurationChange(
+                        enabled=False,
+                        settings={},
+                    )
+                },
+                request_id="req-disable-cancelled",
+            )
+
+        branch = session.scalar(select(BranchRun).where(BranchRun.branch_key == "intro_options"))
+        latest = session.scalar(
+            select(NodeRun)
+            .where(NodeRun.node_key == "intro.generate_options")
+            .order_by(NodeRun.run_no.desc())
+            .limit(1)
+        )
+        assert branch is not None and branch.status == "disabled"
+        assert latest is not None and latest.status == "disabled"
+
+
+def test_execution_context_rejects_ready_node_on_disabled_branch(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    with factory() as session, session.begin():
+        actor, run_id, lesson_id = _seed_lesson(session)
+        LessonWorkflowFanoutService(session, actor).synchronize(
+            run_id,
+            targets=_targets(session, actor, lesson_id),
+            archived_lesson_unit_ids=(),
+            request_id="req-disabled-execution",
+        )
+        branch = session.scalar(select(BranchRun).where(BranchRun.branch_key == "intro_options"))
+        node = session.scalar(select(NodeRun).where(NodeRun.node_key == "intro.generate_options"))
+        assert branch is not None and node is not None
+        branch.status = "disabled"
+
+        with pytest.raises(WorkflowExecutionPortError) as caught:
+            SqlAlchemyWorkflowExecutionPort(session, actor).require_context(
+                node.id,
+                for_update=True,
+            )
+        assert caught.value.code == "NODE_EXECUTION_BRANCH_DISABLED"
 
 
 def _seed_lesson(session):

@@ -79,6 +79,7 @@ def apply_declared_approval_effects(
         previous_version_id,
         version.id,
         selection=completion.stale_selection if completion is not None else None,
+        carry_forward_selection=(completion.retained_selection if completion is not None else None),
     )
 
 

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from collections.abc import Mapping
 from typing import Any, cast
 from uuid import UUID
@@ -18,6 +16,7 @@ from apps.api.ids import new_uuid7
 from apps.api.lessons.execution_port import LessonExecutionFacts, SqlAlchemyLessonExecutionPort
 from apps.api.runtime_boundary.ports import WorkflowExecutionContext
 from apps.api.workflows.execution_lease import SqlAlchemyNodeExecutionLeasePort
+from apps.api.workflows.execution_values import execution_snapshot_hash, plain_execution_snapshot
 from apps.api.workflows.models import (
     BranchRun,
     NodeInputSnapshot,
@@ -179,9 +178,9 @@ class SqlAlchemyWorkflowExecutionPort:
         request_id: str,
         snapshot: Mapping[str, Any],
     ) -> bool:
-        payload = _plain_json(snapshot)
+        payload = plain_execution_snapshot(snapshot)
         payload["request_id"] = request_id
-        content_hash = _content_hash(payload)
+        content_hash = execution_snapshot_hash(payload)
         existing = self._session.scalar(
             select(NodeInputSnapshot).where(
                 NodeInputSnapshot.node_run_id == execution.node_run_id,
@@ -254,8 +253,8 @@ class SqlAlchemyWorkflowExecutionPort:
                 "NODE_EXECUTION_IDEMPOTENCY_CONFLICT",
                 "the node run is not frozen for this execution request",
             )
-        payload = _plain_json(existing.snapshot_json)
-        if existing.content_hash != _content_hash(payload):
+        payload = plain_execution_snapshot(existing.snapshot_json)
+        if existing.content_hash != execution_snapshot_hash(payload):
             raise WorkflowExecutionPortError(
                 "NODE_EXECUTION_FROZEN_INPUT_INVALID",
                 "the frozen execution snapshot integrity check failed",
@@ -364,10 +363,15 @@ class SqlAlchemyWorkflowExecutionPort:
                 BranchRun.deleted_at.is_(None),
             )
         )
-        if branch is None:
+        if branch is None or branch.status != "active":
+            code = (
+                "NODE_EXECUTION_BRANCH_NOT_FOUND"
+                if branch is None
+                else "NODE_EXECUTION_BRANCH_DISABLED"
+            )
             raise WorkflowExecutionPortError(
-                "NODE_EXECUTION_BRANCH_NOT_FOUND",
-                "the lesson branch is not visible or active",
+                code,
+                "the lesson branch is not active or visible",
             )
         try:
             lesson = SqlAlchemyLessonExecutionPort(self._session, self._actor).require_active(
@@ -380,18 +384,3 @@ class SqlAlchemyWorkflowExecutionPort:
                 str(exc),
             ) from exc
         return branch.branch_key, lesson
-
-
-def _plain_json(value: Mapping[str, Any]) -> dict[str, Any]:
-    return cast(dict[str, Any], json.loads(json.dumps(value, sort_keys=True, allow_nan=False)))
-
-
-def _content_hash(value: Mapping[str, Any]) -> str:
-    payload = json.dumps(
-        value,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=True,
-        allow_nan=False,
-    )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()

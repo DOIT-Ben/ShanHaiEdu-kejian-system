@@ -546,6 +546,17 @@ def _seed_quality_node(
             snapshot=dict(source.content_json),
         )
         if include_supporting_input:
+            scope = session.get(ArtifactVersion, runtime.upstream_version_id)
+            assert scope is not None
+            workflow.add_input_snapshot(
+                node.id,
+                input_key="approval:material_scope",
+                source_type="artifact",
+                source_id=scope.artifact_id,
+                source_version_id=scope.id,
+                content_hash=scope.content_hash,
+                snapshot=dict(scope.content_json),
+            )
             workflow.add_input_snapshot(
                 node.id,
                 input_key="content:material_evidence",
@@ -701,13 +712,17 @@ def _create_replay_node(factory: sessionmaker[Session], seeded: QualitySeed) -> 
     with factory() as session, session.begin():
         first_node = session.get(NodeRun, seeded.node_run_id)
         source = session.get(ArtifactVersion, seeded.source_version_id)
-        supporting = session.scalar(
-            select(NodeInputSnapshot).where(
-                NodeInputSnapshot.node_run_id == seeded.node_run_id,
-                NodeInputSnapshot.input_key == "content:material_evidence",
+        supporting = list(
+            session.scalars(
+                select(NodeInputSnapshot).where(
+                    NodeInputSnapshot.node_run_id == seeded.node_run_id,
+                    NodeInputSnapshot.input_key.in_(
+                        ("approval:material_scope", "content:material_evidence")
+                    ),
+                )
             )
         )
-        assert first_node is not None and source is not None and supporting is not None
+        assert first_node is not None and source is not None and len(supporting) == 2
         workflow = WorkflowRuntimeService(session, seeded.actor)
         node = workflow.create_project_node_run(
             first_node.workflow_run_id,
@@ -723,15 +738,16 @@ def _create_replay_node(factory: sessionmaker[Session], seeded: QualitySeed) -> 
             content_hash=source.content_hash,
             snapshot=dict(source.content_json),
         )
-        workflow.add_input_snapshot(
-            node.id,
-            input_key=supporting.input_key,
-            source_type=supporting.source_type,
-            source_id=supporting.source_id,
-            source_version_id=supporting.source_version_id,
-            content_hash=supporting.content_hash,
-            snapshot=dict(supporting.snapshot_json),
-        )
+        for item in supporting:
+            workflow.add_input_snapshot(
+                node.id,
+                input_key=item.input_key,
+                source_type=item.source_type,
+                source_id=item.source_id,
+                source_version_id=item.source_version_id,
+                content_hash=item.content_hash,
+                snapshot=dict(item.snapshot_json),
+            )
     return node.id
 
 

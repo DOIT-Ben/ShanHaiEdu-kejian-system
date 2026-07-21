@@ -45,6 +45,7 @@ class LessonDivisionApprovalCommand:
 @dataclass(frozen=True, slots=True)
 class LessonApprovalCompletionResult:
     stale_selection: StaleImpactSelection
+    retained_selection: StaleImpactSelection
     lesson_count: int
 
 
@@ -80,7 +81,7 @@ class LessonDivisionApprovalPort:
         )
         fanout = LessonWorkflowFanoutService(self._session, self._actor)
         fanout.lock_archivable(run_id, archived_ids)
-        active = LessonService(self._session, self._actor).synchronize_approved_division(
+        active = LessonService(self._session, self._actor).synchronize_declared_approval(
             command.project_id,
             division,
             request_id=command.request_id,
@@ -95,7 +96,7 @@ class LessonDivisionApprovalPort:
             )
             for lesson in active
         )
-        fanout.synchronize(
+        fanout.synchronize_declared_approval(
             run_id,
             targets=targets,
             archived_lesson_unit_ids=archived_ids,
@@ -104,6 +105,7 @@ class LessonDivisionApprovalPort:
         workflow.complete_gate(run_id, command.approval_gate_node_key)
         return LessonApprovalCompletionResult(
             stale_selection=_stale_selection(diff),
+            retained_selection=_retained_selection(diff),
             lesson_count=len(active),
         )
 
@@ -115,6 +117,17 @@ def _stale_selection(diff: LessonDivisionDiff) -> StaleImpactSelection:
                 selector=ImpactSelector.LESSON_KEY,
                 changed_keys=diff.changed_keys,
                 archived_keys=diff.archived_keys,
+            ),
+        )
+    )
+
+
+def _retained_selection(diff: LessonDivisionDiff) -> StaleImpactSelection:
+    return StaleImpactSelection.exact(
+        (
+            StaleImpactDimension(
+                selector=ImpactSelector.LESSON_KEY,
+                changed_keys=diff.unchanged_keys,
             ),
         )
     )

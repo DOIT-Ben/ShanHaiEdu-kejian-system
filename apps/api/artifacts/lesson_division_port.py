@@ -6,9 +6,11 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from apps.api.artifacts.models import ArtifactVersion
+from apps.api.artifact_quality.contracts import QualitySource
+from apps.api.artifacts.models import Artifact, ArtifactVersion
 from apps.api.artifacts.quality_gate import ArtifactQualityApprovalGuard
 from apps.api.artifacts.repository import ArtifactRepository
 from apps.api.content_runtime.approval_port import ContentDefinitionApprovalReader
@@ -92,6 +94,39 @@ class ArtifactLessonDivisionReader:
         if version is None or version.organization_id != self._actor.organization_id:
             raise self._invalid("The previous approved lesson division is unavailable.")
         return version.content_json
+
+    def require_approved_material_scope(
+        self,
+        *,
+        project_id: UUID,
+        artifact_version_id: UUID,
+    ) -> QualitySource:
+        row = self._session.execute(
+            select(ArtifactVersion, Artifact)
+            .join(Artifact, Artifact.id == ArtifactVersion.artifact_id)
+            .where(
+                ArtifactVersion.id == artifact_version_id,
+                ArtifactVersion.organization_id == self._actor.organization_id,
+                Artifact.organization_id == self._actor.organization_id,
+                Artifact.project_id == project_id,
+                Artifact.lesson_unit_id.is_(None),
+                Artifact.branch_key == "project",
+                Artifact.artifact_type == "material_scope",
+                Artifact.current_approved_version_id == artifact_version_id,
+                Artifact.status == "approved",
+                Artifact.deleted_at.is_(None),
+            )
+        ).one_or_none()
+        if row is None:
+            raise self._invalid("The frozen approved material scope is unavailable.")
+        version, artifact = row
+        return QualitySource(
+            source_type="artifact",
+            source_id=artifact.id,
+            source_version_id=version.id,
+            content_hash=version.content_hash,
+            content=version.content_json,
+        )
 
     @staticmethod
     def _invalid(message: str) -> ApiError:

@@ -30,7 +30,10 @@ def test_binding_resolves_exact_published_source_and_canonical_validator_set() -
     binding = resolve_quality_report_binding(registered, "lesson.division.validate")
 
     assert binding.source_input_ref == "artifact:lesson_division"
-    assert binding.supporting_input_refs == ("content:material_evidence",)
+    assert binding.supporting_input_refs == (
+        "approval:material_scope",
+        "content:material_evidence",
+    )
     assert [item.key for item in binding.validator_refs] == [
         "validator.lesson_division.coverage",
         "validator.lesson_division.schema",

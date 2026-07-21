@@ -28,6 +28,7 @@ from apps.api.artifact_quality.contracts import (
 from apps.api.artifact_quality.models import ArtifactQualityReport
 from apps.api.artifact_quality.payloads import canonical_hash, plain_json
 from apps.api.artifact_quality.repository import ArtifactQualityReportRepository
+from apps.api.artifact_quality.source_resolver import resolve_quality_source
 from apps.api.artifact_quality.supporting_inputs import resolve_quality_supporting_inputs
 from apps.api.artifacts.quality_port import SqlAlchemyArtifactQualitySourcePort
 from apps.api.assets.quality_port import SqlAlchemyAssetQualitySourcePort
@@ -36,7 +37,7 @@ from apps.api.ids import new_uuid7
 from apps.api.reliability.events import EventResource, EventWriter
 from apps.api.runtime_boundary.ports import WorkflowExecutionContext
 from apps.api.workflows.execution_port import SqlAlchemyWorkflowExecutionPort
-from apps.api.workflows.quality_port import QualitySourceInput, SqlAlchemyQualityWorkflowPort
+from apps.api.workflows.quality_port import SqlAlchemyQualityWorkflowPort
 from workflow.registry import BUILTIN_WORKFLOW_REGISTRY
 
 
@@ -102,23 +103,19 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
             node_run_id,
             binding.source_input_ref,
         )
-        source = self._resolve_source(
+        source = resolve_quality_source(
             execution,
             binding,
             source_input,
+            self._artifact_sources,
+            self._asset_sources,
         )
         if source.content_hash != source_input.content_hash:
             raise ArtifactQualityTransactionError(
                 "QUALITY_SOURCE_HASH_MISMATCH",
                 "the frozen source hash does not match the exact artifact version",
             )
-        supporting_inputs = resolve_quality_supporting_inputs(
-            execution,
-            binding,
-            node_run_id,
-            self._quality_workflow,
-            self._asset_sources,
-        )
+        supporting_inputs = self._resolve_supporting_inputs(execution, binding, node_run_id)
         existing = self._reports.get_for_node(node_run_id)
         result = None if existing is None else _report_result(existing)
         if existing is not None:
@@ -149,29 +146,19 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
             existing_result=result,
         )
 
-    def _resolve_source(
+    def _resolve_supporting_inputs(
         self,
         execution: WorkflowExecutionContext,
         binding: QualityReportBinding,
-        source_input: QualitySourceInput,
-    ) -> QualitySource:
-        if source_input.source_type == "artifact":
-            return self._artifact_sources.load(
-                execution,
-                contract_ref=binding.source_input_ref,
-                source_id=source_input.source_id,
-                source_version_id=source_input.source_version_id,
-            )
-        if source_input.source_type == "asset":
-            return self._asset_sources.load(
-                execution,
-                contract_ref=binding.source_input_ref,
-                source_id=source_input.source_id,
-                source_version_id=source_input.source_version_id,
-            )
-        raise ArtifactQualityTransactionError(
-            "QUALITY_SOURCE_TYPE_UNSUPPORTED",
-            "the fixed quality source type is unsupported",
+        node_run_id: UUID,
+    ) -> dict[str, dict[str, Any]]:
+        return resolve_quality_supporting_inputs(
+            execution,
+            binding,
+            node_run_id,
+            self._quality_workflow,
+            self._artifact_sources,
+            self._asset_sources,
         )
 
     def complete(

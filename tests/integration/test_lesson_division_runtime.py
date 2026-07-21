@@ -25,7 +25,8 @@ from apps.api.content_runtime.package_source import load_builtin_courseware_rele
 from apps.api.content_runtime.publication_service import ContentReleasePublisher
 from apps.api.database import build_engine, build_session_factory, utc_now
 from apps.api.errors import ApiError
-from apps.api.identity.context import ActorContext
+from apps.api.identity.context import ActorContext, system_actor
+from apps.api.identity.models import ProjectMember
 from apps.api.ids import new_uuid7
 from apps.api.lessons.division_runtime import diff_lesson_divisions
 from apps.api.lessons.models import LessonBranchConfig, LessonUnit
@@ -42,6 +43,7 @@ from apps.api.prompt_runtime.lesson_context_port import (
     LessonContextSnapshotReader,
     MaterialEvidenceSnapshot,
 )
+from apps.api.prompt_runtime.models import ContextSnapshot
 from apps.api.reliability.models import EventStreamEntry
 from apps.api.uploads.models import SourceMaterial
 from apps.api.workflows.models import BranchRun, NodeInputSnapshot, NodeRun
@@ -105,6 +107,62 @@ async def test_generated_validated_approved_division_atomically_materializes_les
         assert "artifact.version.approved" in event_types
 
 
+async def test_generation_freezes_approved_scope_and_teacher_constraints(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
+    output = build_golden_branch_source_outputs(case)["lesson.division.generate"]
+
+    prepared = await _prepare_approval(factory, case, output)
+
+    with factory() as session:
+        context = session.scalar(
+            select(ContextSnapshot).where(ContextSnapshot.node_run_id == prepared.generate_node_id)
+        )
+        assert context is not None
+        bindings = {
+            binding["source"]: binding["items"] for binding in context.bindings_json["bindings"]
+        }
+        assert set(bindings) == {
+            "material.approved_parse",
+            "material_scope.approved_version",
+        }
+        scope = bindings["material_scope.approved_version"][0]["content"]
+        assert scope["duration_minutes"] == 40
+        assert scope["lesson_count_mode"] == "auto"
+        assert scope["requested_lesson_count"] is None
+        assert scope["lesson_type_preferences"] == ["new_learning"]
+        assert scope["special_requirements"] == "Keep the approved knowledge boundary."
+        assert scope["approved_evidence_keys"] == [
+            "EV-MAT-01",
+            "EV-MAT-02",
+            "EV-MAT-03",
+            "EV-MAT-04",
+        ]
+
+
+async def test_quality_coverage_uses_exact_approved_scope_not_the_whole_parse(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
+    output = build_golden_branch_source_outputs(case)["lesson.division.generate"]
+    output["lesson_units"][0]["evidence_refs"] = ["EV-MAT-01"]
+
+    prepared = await _prepare_approval(
+        factory,
+        case,
+        output,
+        approved_evidence_keys=("EV-MAT-01",),
+    )
+
+    with factory() as session:
+        report = session.get(ArtifactQualityReport, prepared.report_id)
+        assert report is not None
+        assert report.conclusion == "passed"
+
+
 async def test_completion_failure_rolls_back_approval_lessons_fanout_and_events(
     migrated_database_url: str,
     monkeypatch: pytest.MonkeyPatch,
@@ -118,7 +176,7 @@ async def test_completion_failure_rolls_back_approval_lessons_fanout_and_events(
         raise RuntimeError("fanout fault")
 
     monkeypatch.setattr(
-        "apps.api.workflows.lesson_fanout.LessonWorkflowFanoutService.synchronize",
+        "apps.api.workflows.lesson_fanout.LessonWorkflowFanoutService.synchronize_declared_approval",
         fail_fanout,
     )
     with factory() as session:
@@ -186,7 +244,7 @@ async def test_cross_project_context_snapshot_is_rejected_before_quality_staging
                 .select_from(NodeInputSnapshot)
                 .where(NodeInputSnapshot.node_run_id == prepared.validate_node_id)
             )
-            == 2
+            == 3
         )
 
 
@@ -304,6 +362,54 @@ async def test_concurrent_double_approval_materializes_one_lesson_runtime(
         )
 
 
+@pytest.mark.parametrize("approval_actor", ["reviewer", "system"])
+async def test_declared_completion_accepts_review_authority_without_edit_permission(
+    migrated_database_url: str,
+    approval_actor: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
+    output = build_golden_branch_source_outputs(case)["lesson.division.generate"]
+    prepared = await _prepare_approval(factory, case, output)
+
+    with factory() as session, session.begin():
+        if approval_actor == "system":
+            actor = system_actor(prepared.actor.organization_id)
+        else:
+            reviewer = seed_test_actor(
+                session,
+                organization_id=prepared.actor.organization_id,
+                user_id=UUID("01900000-0000-7000-8000-000000001251"),
+                principal_id=UUID("01900000-0000-7000-8000-000000001252"),
+                member_id=UUID("01900000-0000-7000-8000-000000001253"),
+                email="issue-125-reviewer@example.test",
+                display_name="Issue 125 Reviewer",
+            )
+            assert reviewer.user_id is not None
+            session.add(
+                ProjectMember(
+                    id=new_uuid7(),
+                    project_id=prepared.project_id,
+                    user_id=reviewer.user_id,
+                    role="reviewer",
+                    created_at=utc_now(),
+                )
+            )
+            session.flush()
+            actor = reviewer
+
+        ArtifactService(session, actor).review(
+            prepared.version_id,
+            action="approve",
+            comment="Approve with review authority",
+            request_id=f"issue-125-{approval_actor}-approval",
+        )
+
+    with factory() as session:
+        assert session.scalar(select(func.count()).select_from(LessonUnit)) == 1
+        assert session.get(NodeRun, prepared.gate_node_id).status == "approved"
+
+
 async def test_revision_reuses_stable_ids_and_stales_only_changed_or_archived_lessons(
     migrated_database_url: str,
 ) -> None:
@@ -387,6 +493,58 @@ async def test_revision_reuses_stable_ids_and_stales_only_changed_or_archived_le
         )
         assert session.get(Artifact, downstream["LESSON-02"]).status == "stale"
         assert session.get(Artifact, downstream["LESSON-03"]).status == "approved"
+
+
+async def test_unchanged_relation_carries_forward_then_stales_on_third_version_change(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
+    base = build_golden_branch_source_outputs(case)["lesson.division.generate"]
+    first_output = _four_lesson_output(base)
+    prepared = await _prepare_approval(factory, case, first_output)
+    with factory() as session, session.begin():
+        ArtifactService(session, prepared.actor).review(
+            prepared.version_id,
+            action="approve",
+            comment="Approve v1",
+            request_id="issue-125-carry-v1",
+        )
+        lesson_ids = {
+            lesson.lesson_key: lesson.id
+            for lesson in session.scalars(select(LessonUnit).order_by(LessonUnit.lesson_key))
+        }
+        downstream = _seed_keyed_downstream_artifacts(session, prepared, lesson_ids)
+
+    second_output = deepcopy(first_output)
+    second_output["lesson_units"][2]["position"] = 4
+    second_output["lesson_units"][3]["position"] = 3
+    second_version_id = await _execute_revision(factory, prepared, second_output)
+
+    with factory() as session:
+        target_version_id = session.get(
+            Artifact,
+            downstream["LESSON-03"],
+        ).current_approved_version_id
+        carried = session.scalar(
+            select(ArtifactRelation).where(
+                ArtifactRelation.from_artifact_version_id == second_version_id,
+                ArtifactRelation.to_artifact_version_id == target_version_id,
+            )
+        )
+        assert carried is not None
+        assert carried.impact_scope_json == {
+            "mode": "keyed",
+            "selector": "lesson_key",
+            "keys": ["LESSON-03"],
+        }
+
+    third_output = deepcopy(second_output)
+    third_output["lesson_units"][2]["core_learning_outcome"] = "Changed on version three"
+    await _execute_revision(factory, prepared, third_output)
+
+    with factory() as session:
+        assert session.get(Artifact, downstream["LESSON-03"]).status == "stale"
 
 
 async def _execute_revision(
@@ -519,6 +677,8 @@ async def _prepare_approval(
     factory: sessionmaker[Session],
     case,
     output: dict[str, object],
+    *,
+    approved_evidence_keys: tuple[str, ...] | None = None,
 ) -> PreparedApproval:
     with factory() as session, session.begin():
         actor = seed_test_actor(session)
@@ -537,7 +697,14 @@ async def _prepare_approval(
             )
         )
         assert definition is not None
-        _seed_material_and_scope(session, actor, project.id, definition.id, case)
+        _seed_material_and_scope(
+            session,
+            actor,
+            project.id,
+            definition.id,
+            case,
+            approved_evidence_keys=approved_evidence_keys,
+        )
         nodes = LessonDivisionRuntimeService(session, actor).initialize(project.id)
     execution = NodeExecutionService(
         SqlAlchemyNodeExecutionTransactionFactory(factory, actor),
@@ -568,7 +735,7 @@ async def _prepare_approval(
                 .select_from(NodeInputSnapshot)
                 .where(NodeInputSnapshot.node_run_id == validate_id)
             )
-            == 2
+            == 3
         )
     quality = ArtifactQualityService(
         SqlAlchemyArtifactQualityTransactionFactory(factory, actor),
@@ -590,7 +757,15 @@ async def _prepare_approval(
     )
 
 
-def _seed_material_and_scope(session, actor, project_id, definition_id, case) -> None:
+def _seed_material_and_scope(
+    session,
+    actor,
+    project_id,
+    definition_id,
+    case,
+    *,
+    approved_evidence_keys: tuple[str, ...] | None,
+) -> None:
     asset = FileAsset(
         id=new_uuid7(),
         organization_id=actor.organization_id,
@@ -674,8 +849,16 @@ def _seed_material_and_scope(session, actor, project_id, definition_id, case) ->
     session.flush()
     scope_content = {
         "knowledge_point": "1-5",
-        "material_evidence": case["material_evidence"],
         "knowledge_boundary": case["knowledge_boundary"],
+        "approved_evidence_keys": list(
+            approved_evidence_keys
+            or tuple(item["evidence_key"] for item in case["material_evidence"])
+        ),
+        "duration_minutes": 40,
+        "lesson_count_mode": "auto",
+        "requested_lesson_count": None,
+        "lesson_type_preferences": ["new_learning"],
+        "special_requirements": "Keep the approved knowledge boundary.",
     }
     scope = Artifact(
         id=new_uuid7(),

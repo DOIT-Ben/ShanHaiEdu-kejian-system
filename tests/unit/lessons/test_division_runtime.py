@@ -79,7 +79,15 @@ def validation_context(content: dict[str, object]) -> QualityValidationContext:
                     "must_teach": ["First approved claim", "Second approved claim"],
                     "must_not_preteach": ["Later topic"],
                 },
-            }
+            },
+            "approval:material_scope": {
+                "approved_evidence_keys": ["EV-01", "EV-02"],
+                "duration_minutes": 40,
+                "lesson_count_mode": "auto",
+                "requested_lesson_count": None,
+                "lesson_type_preferences": ["new_learning"],
+                "special_requirements": "Keep the approved boundary.",
+            },
         },
     )
 
@@ -172,6 +180,44 @@ def test_coverage_validator_rejects_omitted_duplicate_out_of_scope_and_overlap(
     assert outcome.passed is False
     assert expected_code in finding_codes(outcome)
     assert outcome.validator == LESSON_DIVISION_COVERAGE_REF
+
+
+def test_coverage_uses_approved_scope_subset_and_rejects_scope_outside_exact_parse() -> None:
+    content = division_content(lesson_unit("LESSON-01", 1))
+    context = validation_context(content)
+    context.supporting_inputs["approval:material_scope"]["approved_evidence_keys"] = ["EV-01"]
+
+    outcome = LessonDivisionCoverageValidator().validate(context)
+
+    assert outcome.passed is True
+    context.supporting_inputs["approval:material_scope"]["approved_evidence_keys"] = ["EV-99"]
+    invalid = LessonDivisionCoverageValidator().validate(context)
+    assert invalid.passed is False
+    assert "MATERIAL_SCOPE_EVIDENCE_INVALID" in finding_codes(invalid)
+
+
+@pytest.mark.parametrize(
+    ("scope_change", "expected_code"),
+    (
+        ({"duration_minutes": 45}, "LESSON_DURATION_CONSTRAINT_MISMATCH"),
+        (
+            {"lesson_count_mode": "specified", "requested_lesson_count": 1},
+            "LESSON_COUNT_CONSTRAINT_MISMATCH",
+        ),
+    ),
+)
+def test_schema_validator_enforces_frozen_teacher_constraints(
+    scope_change: dict[str, object],
+    expected_code: str,
+) -> None:
+    content = division_content(lesson_unit("LESSON-01", 1), lesson_unit("LESSON-02", 2))
+    context = validation_context(content)
+    context.supporting_inputs["approval:material_scope"].update(scope_change)
+
+    outcome = LessonDivisionSchemaValidator().validate(context)
+
+    assert outcome.passed is False
+    assert expected_code in finding_codes(outcome)
 
 
 def test_stable_key_diff_ignores_reorder_but_selects_changed_and_archived_keys() -> None:

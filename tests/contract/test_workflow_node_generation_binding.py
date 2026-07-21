@@ -124,6 +124,21 @@ def test_schema_and_complete_primary_math_catalog_are_valid() -> None:
     assert lesson_plan_index.quality_validate_node_key == "lesson_plan.validate"
     assert lesson_plan_index.quality_gate_node_key == "lesson_plan.approve"
     assert lesson_plan_index.quality_requirement_mode == "reports"
+    lesson_generate = node_by_key(catalog, "lesson.division.generate")
+    assert lesson_generate["context_policy"]["allowed_sources"] == [
+        "material.approved_parse",
+        "material_scope.approved_version",
+    ]
+    lesson_validate = node_by_key(catalog, "lesson.division.validate")
+    assert lesson_validate["input_contract_refs"] == [
+        "artifact:lesson_division",
+        "approval:material_scope",
+        "content:material_evidence",
+    ]
+    assert lesson_validate["quality_report_persistence"]["supporting_input_refs"] == [
+        "approval:material_scope",
+        "content:material_evidence",
+    ]
     for contract_ref, expected in {
         "prompt:image_request": {
             "ppt.cover.prompt.generate",
@@ -534,7 +549,10 @@ def test_catalog_encodes_context_and_reference_asset_boundaries() -> None:
     division = node_by_key(catalog, "lesson.division.generate")
     assert division["context_policy"] == {
         "mode": "declared",
-        "allowed_sources": ["material.approved_parse"],
+        "allowed_sources": [
+            "material.approved_parse",
+            "material_scope.approved_version",
+        ],
         "forbidden_sources": [],
     }
     assert division["reference_asset_policy"] == {"mode": "none", "roles": []}
@@ -594,7 +612,7 @@ def test_catalog_hash_is_deterministic_for_semantically_identical_objects() -> N
     assert first_validated.canonical_json == second_validated.canonical_json
     assert first_validated.content_hash == second_validated.content_hash
     assert first_validated.content_hash == (
-        "345e58e9b08f1ec4dd78fe385f155054178cb746b2fdf106d0ea45255fdd802a"
+        "aafde8ef907e82a6f127dc1016cc52323706de0f4898e17a6afe7717895c46b2"
     )
 
 

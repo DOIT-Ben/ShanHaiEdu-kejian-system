@@ -6,7 +6,10 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from apps.api.artifacts.lesson_division_port import ArtifactLessonDivisionReader
+from apps.api.artifacts.lesson_division_port import (
+    ArtifactLessonDivisionReader,
+    GeneratedLessonDivisionFact,
+)
 from apps.api.assets.quality_port import SqlAlchemyAssetQualitySourcePort
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext
@@ -49,24 +52,6 @@ class LessonDivisionRuntimeService:
             content_release_id=fact.content_release_id,
             workflow_definition_version_id=fact.workflow_definition_version_id,
         )
-        material_identity = LessonContextSnapshotReader(
-            self._session,
-            self._actor.organization_id,
-        ).material_evidence(fact.context_snapshot_id)
-        if (
-            material_identity.project_id != fact.project_id
-            or material_identity.node_run_id != fact.source_node_run_id
-        ):
-            raise _invalid("The frozen material context is outside the generated output scope.")
-        material = SqlAlchemyAssetQualitySourcePort(
-            self._session,
-            self._actor,
-        ).load_supporting(
-            fact.project_id,
-            contract_ref="content:material_evidence",
-            source_id=material_identity.source_material_id,
-            source_version_id=material_identity.material_parse_version_id,
-        )
         return self._workflow.stage_quality(
             run_id,
             output.quality_validate_node_key,
@@ -78,7 +63,49 @@ class LessonDivisionRuntimeService:
                 content_hash=fact.content_hash,
                 content=fact.content,
             ),
-            supporting=LessonDivisionInputSnapshot(
+            supporting=self._frozen_supporting_inputs(fact),
+        )
+
+    def _frozen_supporting_inputs(
+        self,
+        fact: GeneratedLessonDivisionFact,
+    ) -> tuple[LessonDivisionInputSnapshot, ...]:
+        reader = LessonContextSnapshotReader(
+            self._session,
+            self._actor.organization_id,
+        )
+        material_identity = reader.material_evidence(fact.context_snapshot_id)
+        scope_identity = reader.approved_material_scope(fact.context_snapshot_id)
+        if (
+            material_identity.project_id != fact.project_id
+            or material_identity.node_run_id != fact.source_node_run_id
+            or scope_identity.project_id != fact.project_id
+            or scope_identity.node_run_id != fact.source_node_run_id
+        ):
+            raise _invalid("The frozen material context is outside the generated output scope.")
+        material = SqlAlchemyAssetQualitySourcePort(
+            self._session,
+            self._actor,
+        ).load_supporting(
+            fact.project_id,
+            contract_ref="content:material_evidence",
+            source_id=material_identity.source_material_id,
+            source_version_id=material_identity.material_parse_version_id,
+        )
+        scope = self._artifacts.require_approved_material_scope(
+            project_id=fact.project_id,
+            artifact_version_id=scope_identity.artifact_version_id,
+        )
+        return (
+            LessonDivisionInputSnapshot(
+                input_key="approval:material_scope",
+                source_type="artifact",
+                source_id=scope.source_id,
+                source_version_id=scope.source_version_id,
+                content_hash=scope.content_hash,
+                content=dict(scope.content),
+            ),
+            LessonDivisionInputSnapshot(
                 input_key="content:material_evidence",
                 source_type="material_parse",
                 source_id=material.source_id,

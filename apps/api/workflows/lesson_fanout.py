@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
-from collections.abc import Mapping
-from dataclasses import dataclass
 from uuid import UUID
 
 from sqlalchemy import select
@@ -16,56 +13,21 @@ from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.permissions import ProjectAccessService
 from apps.api.ids import new_uuid7
 from apps.api.reliability.events import EventResource, EventWriter
+from apps.api.workflows.lesson_fanout_contracts import (
+    LessonBranchFanoutPlan,
+    LessonFanoutResult,
+    LessonFanoutTarget,
+    build_lesson_fanout_plan,
+)
 from apps.api.workflows.models import BranchRun, NodeRun, WorkflowDefinitionVersion, WorkflowRun
 from apps.api.workflows.repository import WorkflowRuntimeRepository
+from apps.api.workflows.service import WorkflowRuntimeService
 from workflow.node_state import NodeStatus
-from workflow.registry import BUILTIN_WORKFLOW_REGISTRY, RegisteredWorkflow
+from workflow.registry import BUILTIN_WORKFLOW_REGISTRY
 
 _ACTIVE_EXECUTION_STATUSES = frozenset(
     {NodeStatus.QUEUED.value, NodeStatus.RUNNING.value, NodeStatus.CANCEL_REQUESTED.value}
 )
-
-
-@dataclass(frozen=True, slots=True)
-class LessonBranchFanoutPlan:
-    branch_key: str
-    entrypoint_node_keys: tuple[str, ...]
-    entrypoint_dependencies: tuple[tuple[str, ...], ...]
-
-
-@dataclass(frozen=True, slots=True)
-class LessonFanoutTarget:
-    lesson_unit_id: UUID
-    branch_enabled: Mapping[str, bool]
-
-
-@dataclass(frozen=True, slots=True)
-class LessonFanoutResult:
-    created_branch_count: int
-    created_node_count: int
-    archived_branch_count: int
-
-
-def build_lesson_fanout_plan(
-    registered: RegisteredWorkflow,
-) -> tuple[LessonBranchFanoutPlan, ...]:
-    """Derive lesson entrypoints only from the immutable published graph."""
-
-    entrypoints: dict[str, list[tuple[str, tuple[str, ...]]]] = defaultdict(list)
-    for node in registered.graph.nodes:
-        if node.execution_scope != "lesson_unit" or not node.entrypoint:
-            continue
-        if node.branch_key is None:
-            raise ValueError("published lesson entrypoint has no branch_key")
-        entrypoints[node.branch_key].append((node.node_key, node.dependencies))
-    return tuple(
-        LessonBranchFanoutPlan(
-            branch_key=branch_key,
-            entrypoint_node_keys=tuple(node_key for node_key, _ in sorted(values)),
-            entrypoint_dependencies=tuple(dependencies for _, dependencies in sorted(values)),
-        )
-        for branch_key, values in sorted(entrypoints.items())
-    )
 
 
 class LessonWorkflowFanoutService:
@@ -92,6 +54,65 @@ class LessonWorkflowFanoutService:
             ProjectAction.EDIT,
             for_update=True,
         )
+        return self._synchronize_run(
+            run,
+            targets=targets,
+            archived_lesson_unit_ids=archived_lesson_unit_ids,
+            request_id=request_id,
+        )
+
+    def synchronize_declared_approval(
+        self,
+        workflow_run_id: UUID,
+        *,
+        targets: tuple[LessonFanoutTarget, ...],
+        archived_lesson_unit_ids: tuple[UUID, ...],
+        request_id: str | None,
+    ) -> LessonFanoutResult:
+        run = self._repository.get_run(workflow_run_id, for_update=True)
+        if run is None:
+            raise self._not_found()
+        ProjectAccessService(self._session, self._actor).require_review_completion(
+            run.project_id,
+            for_update=True,
+        )
+        return self._synchronize_run(
+            run,
+            targets=targets,
+            archived_lesson_unit_ids=archived_lesson_unit_ids,
+            request_id=request_id,
+        )
+
+    def synchronize_lesson_configuration(
+        self,
+        project_id: UUID,
+        target: LessonFanoutTarget,
+        *,
+        request_id: str | None,
+    ) -> LessonFanoutResult | None:
+        ProjectAccessService(self._session, self._actor).require(
+            project_id,
+            ProjectAction.EDIT,
+            for_update=True,
+        )
+        run = self._repository.active_for_project(project_id, for_update=True)
+        if run is None:
+            return None
+        return self._synchronize_run(
+            run,
+            targets=(target,),
+            archived_lesson_unit_ids=(),
+            request_id=request_id,
+        )
+
+    def _synchronize_run(
+        self,
+        run: WorkflowRun,
+        *,
+        targets: tuple[LessonFanoutTarget, ...],
+        archived_lesson_unit_ids: tuple[UUID, ...],
+        request_id: str | None,
+    ) -> LessonFanoutResult:
         workflow = self._session.get(WorkflowDefinitionVersion, run.workflow_definition_version_id)
         if workflow is None or workflow.status != "published":
             raise self._invalid("The fixed workflow definition is unavailable.")
@@ -224,6 +245,8 @@ class LessonWorkflowFanoutService:
         )
         desired = "active" if enabled else "disabled"
         if branch is not None:
+            if not enabled:
+                self._require_branch_idle(branch.id)
             if branch.status != desired:
                 branch.status = desired
                 branch.completed_at = None
@@ -275,13 +298,7 @@ class LessonWorkflowFanoutService:
                 .with_for_update(of=NodeRun)
             )
             desired = NodeStatus.READY.value if enabled else NodeStatus.DISABLED.value
-            if existing is not None and existing.status == desired:
-                continue
-            if existing is not None and existing.status not in {
-                NodeStatus.DISABLED.value,
-                NodeStatus.CANCELLED.value,
-                NodeStatus.SKIPPED.value,
-            }:
+            if self._reuse_existing_entrypoint(existing, desired, enabled=enabled):
                 continue
             node = NodeRun(
                 id=new_uuid7(),
@@ -300,6 +317,52 @@ class LessonWorkflowFanoutService:
             self._session.flush()
             created += 1
         return created
+
+    def _reuse_existing_entrypoint(
+        self,
+        existing: NodeRun | None,
+        desired: str,
+        *,
+        enabled: bool,
+    ) -> bool:
+        if existing is None:
+            return False
+        if existing.status == desired:
+            return True
+        if not enabled and existing.status in {
+            NodeStatus.NOT_READY.value,
+            NodeStatus.READY.value,
+        }:
+            WorkflowRuntimeService(self._session, self._actor).transition_node(
+                existing.id,
+                NodeStatus.DISABLED,
+            )
+            return True
+        return existing.status not in {
+            NodeStatus.DISABLED.value,
+            NodeStatus.CANCELLED.value,
+            NodeStatus.SKIPPED.value,
+        }
+
+    def _require_branch_idle(self, branch_run_id: UUID) -> None:
+        active = self._session.scalar(
+            select(NodeRun.id)
+            .where(
+                NodeRun.branch_run_id == branch_run_id,
+                NodeRun.organization_id == self._actor.organization_id,
+                NodeRun.status.in_(_ACTIVE_EXECUTION_STATUSES),
+                NodeRun.deleted_at.is_(None),
+            )
+            .order_by(NodeRun.id)
+            .limit(1)
+            .with_for_update()
+        )
+        if active is not None:
+            raise ApiError(
+                status_code=409,
+                code="LESSON_BRANCH_EXECUTION_ACTIVE",
+                message="Cancel active lesson executions before disabling the branch.",
+            )
 
     @staticmethod
     def _validate_targets(

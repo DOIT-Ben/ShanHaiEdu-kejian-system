@@ -227,7 +227,8 @@
       "context_policy": {
         "mode": "declared",
         "allowed_sources": [
-          "material.approved_parse"
+          "material.approved_parse",
+          "material_scope.approved_version"
         ],
         "forbidden_sources": []
       },
@@ -239,12 +240,12 @@
         {
           "key": "validator.lesson_division.schema",
           "semantic_version": "1.0.0",
-          "implementation_digest": "983177b3209826d85693543561ff11f886ee702635a97c91514078a30bd31529"
+          "implementation_digest": "cfe7f18463f4ea3d172b3bd56bc02cea874cf864c0a7aaf895dbd1bc8bb397f7"
         },
         {
           "key": "validator.lesson_division.coverage",
           "semantic_version": "1.0.0",
-          "implementation_digest": "d5f63fea5edbd0f8ca4f4868a1a990826794864ec672d0dd48f6d29f7fd2bede"
+          "implementation_digest": "13f8548d4fb5a99f6c84d6a5b06bc3811ab5b7221517ca6aae5f859b48744967"
         }
       ],
       "repair_policy": {
@@ -305,6 +306,7 @@
       "executor_ref": "executor.lesson.division_validate",
       "input_contract_refs": [
         "artifact:lesson_division",
+        "approval:material_scope",
         "content:material_evidence"
       ],
       "output_contract_refs": [
@@ -343,12 +345,12 @@
         {
           "key": "validator.lesson_division.schema",
           "semantic_version": "1.0.0",
-          "implementation_digest": "983177b3209826d85693543561ff11f886ee702635a97c91514078a30bd31529"
+          "implementation_digest": "cfe7f18463f4ea3d172b3bd56bc02cea874cf864c0a7aaf895dbd1bc8bb397f7"
         },
         {
           "key": "validator.lesson_division.coverage",
           "semantic_version": "1.0.0",
-          "implementation_digest": "d5f63fea5edbd0f8ca4f4868a1a990826794864ec672d0dd48f6d29f7fd2bede"
+          "implementation_digest": "13f8548d4fb5a99f6c84d6a5b06bc3811ab5b7221517ca6aae5f859b48744967"
         }
       ],
       "repair_policy": {
@@ -367,6 +369,7 @@
       "quality_report_persistence": {
         "source_input_ref": "artifact:lesson_division",
         "supporting_input_refs": [
+          "approval:material_scope",
           "content:material_evidence"
         ],
         "report_ref": "report:lesson_division_quality",
@@ -374,12 +377,12 @@
           {
             "key": "validator.lesson_division.schema",
             "semantic_version": "1.0.0",
-            "implementation_digest": "983177b3209826d85693543561ff11f886ee702635a97c91514078a30bd31529"
+            "implementation_digest": "cfe7f18463f4ea3d172b3bd56bc02cea874cf864c0a7aaf895dbd1bc8bb397f7"
           },
           {
             "key": "validator.lesson_division.coverage",
             "semantic_version": "1.0.0",
-            "implementation_digest": "d5f63fea5edbd0f8ca4f4868a1a990826794864ec672d0dd48f6d29f7fd2bede"
+            "implementation_digest": "13f8548d4fb5a99f6c84d6a5b06bc3811ab5b7221517ca6aae5f859b48744967"
           }
         ],
         "mapping": {
@@ -4987,13 +4990,13 @@
     {
       "key": "validator.lesson_division.coverage",
       "semantic_version": "1.0.0",
-      "implementation_digest": "d5f63fea5edbd0f8ca4f4868a1a990826794864ec672d0dd48f6d29f7fd2bede",
+      "implementation_digest": "13f8548d4fb5a99f6c84d6a5b06bc3811ab5b7221517ca6aae5f859b48744967",
       "implementation_status": "contract_only"
     },
     {
       "key": "validator.lesson_division.schema",
       "semantic_version": "1.0.0",
-      "implementation_digest": "983177b3209826d85693543561ff11f886ee702635a97c91514078a30bd31529",
+      "implementation_digest": "cfe7f18463f4ea3d172b3bd56bc02cea874cf864c0a7aaf895dbd1bc8bb397f7",
       "implementation_status": "contract_only"
     },
     {

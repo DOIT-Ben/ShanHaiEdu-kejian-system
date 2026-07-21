@@ -138,13 +138,13 @@ class LessonDivisionWorkflowPort:
         validate_node_key: str,
         *,
         source: LessonDivisionInputSnapshot,
-        supporting: LessonDivisionInputSnapshot,
+        supporting: tuple[LessonDivisionInputSnapshot, ...],
     ) -> UUID:
         validate = self._require_project_node(workflow_run_id, validate_node_key)
         runtime = WorkflowRuntimeService(self._session, self._actor)
         replayed = tuple(
             self._ensure_input_snapshot(validate.id, snapshot, runtime)
-            for snapshot in (source, supporting)
+            for snapshot in (source, *supporting)
         )
         inputs_replayed = all(replayed)
         if NodeStatus(validate.status) is NodeStatus.NOT_READY:
@@ -204,10 +204,7 @@ class LessonDivisionWorkflowPort:
         gate = self._require_project_node(workflow_run_id, gate_node_key)
         if NodeStatus(gate.status) is not NodeStatus.REVIEW_REQUIRED:
             raise self._invalid("The exact approval gate is not awaiting review.")
-        WorkflowRuntimeService(self._session, self._actor).transition_node(
-            gate.id,
-            NodeStatus.APPROVED,
-        )
+        WorkflowRuntimeService(self._session, self._actor).approve_review_gate(gate.id)
 
     def _create_chain(
         self,

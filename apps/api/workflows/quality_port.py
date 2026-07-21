@@ -77,7 +77,7 @@ class SqlAlchemyQualityWorkflowPort:
         )
         if (
             snapshot is None
-            or snapshot.source_type != "material_parse"
+            or snapshot.source_type not in {"artifact", "material_parse"}
             or snapshot.source_version_id is None
         ):
             raise WorkflowExecutionPortError(
