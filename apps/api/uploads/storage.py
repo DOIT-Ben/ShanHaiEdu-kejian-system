@@ -62,7 +62,7 @@ class ObjectStorage(Protocol):
         key: str,
         destination: Path,
         max_bytes: int,
-    ) -> int: ...
+    ) -> ObjectMetadata: ...
 
 
 class MinioObjectStorage:
@@ -170,25 +170,35 @@ class MinioObjectStorage:
         key: str,
         destination: Path,
         max_bytes: int,
-    ) -> int:
+    ) -> ObjectMetadata:
         if max_bytes <= 0:
             raise ValueError("object storage download limit must be positive")
         response = None
         completed = False
         try:
             response = self._client.get_object(bucket, key)
+            headers = {str(name).lower(): str(value) for name, value in response.headers.items()}
             size_header = response.headers.get("content-length")
             if size_header is not None and int(size_header) > max_bytes:
                 raise ObjectStorageError("object storage object exceeds download limit")
             bytes_written = 0
+            hasher = hashlib.sha256()
             with destination.open("wb") as output:
                 while chunk := response.read(64 * 1024):
                     bytes_written += len(chunk)
                     if bytes_written > max_bytes:
                         raise ObjectStorageError("object storage object exceeds download limit")
                     output.write(chunk)
+                    hasher.update(chunk)
             completed = True
-            return bytes_written
+            return ObjectMetadata(
+                bucket=bucket,
+                key=key,
+                etag=headers.get("etag", "").strip('"'),
+                size_bytes=bytes_written,
+                media_type=headers.get("content-type", ""),
+                sha256=hasher.hexdigest(),
+            )
         except ObjectStorageError:
             raise
         except (S3Error, HTTPError, OSError, ValueError) as exc:

@@ -8,6 +8,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from apps.api.artifacts.approval_service import ArtifactApprovalService
+from apps.api.artifacts.authoring_guard import ArtifactAuthoringGuard
 from apps.api.artifacts.domain import ApprovalAction, canonical_content_hash
 from apps.api.artifacts.models import (
     Approval,
@@ -33,6 +34,7 @@ class ArtifactService:
         self._actor = actor
         self._repository = ArtifactRepository(session, actor)
         self._validation = ArtifactValidation(session, actor)
+        self._authoring = ArtifactAuthoringGuard(session, actor)
 
     def create(
         self,
@@ -62,6 +64,7 @@ class ArtifactService:
         definition = self._validation.require_definition(
             content_definition_version_id, project.content_release_id
         )
+        self._authoring.validate(definition.id, initial_content, baseline=None)
         artifact = self._new_artifact(
             project.id,
             lesson_unit_id,
@@ -98,6 +101,8 @@ class ArtifactService:
         artifact = self._require_artifact(artifact_id, ProjectAction.EDIT, for_update=True)
         draft = self._require_draft(artifact.id, draft_branch, expected_lock_version)
         definition = self._validation.require_artifact_definition(artifact)
+        baseline = self._authoring.baseline(artifact, draft)
+        self._authoring.validate(definition.id, content, baseline=baseline)
         draft.content_json = content
         draft.validation_report_json = self._validation.validation_report(definition, content)
         draft.autosaved_at = utc_now()
@@ -237,6 +242,8 @@ class ArtifactService:
         draft: ArtifactDraft,
     ) -> tuple[str, dict[str, Any]]:
         definition = self._validation.require_artifact_definition(artifact)
+        baseline = self._authoring.baseline(artifact, draft)
+        self._authoring.validate(definition.id, draft.content_json, baseline=baseline)
         report = self._validation.validation_report(definition, draft.content_json)
         if not report["valid"]:
             raise ApiError(

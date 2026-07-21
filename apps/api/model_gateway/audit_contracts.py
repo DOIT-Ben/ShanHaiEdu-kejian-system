@@ -81,4 +81,5 @@ class AttemptAuditSink(Protocol):
         error: ModelGatewayError,
         *,
         latency_ms: int,
+        result: AttemptSuccessAudit | None = None,
     ) -> None: ...

@@ -93,7 +93,7 @@ class FakeObjectStorage:
         key: str,
         destination: Path,
         max_bytes: int,
-    ) -> int:
+    ) -> ObjectMetadata:
         try:
             payload = self._payloads[(bucket, key)]
         except KeyError as exc:
@@ -101,4 +101,9 @@ class FakeObjectStorage:
         if len(payload) > max_bytes:
             raise ObjectStorageError("fake object exceeds download limit")
         destination.write_bytes(payload)
-        return len(payload)
+        metadata = self._objects[(bucket, key)]
+        return replace(
+            metadata,
+            size_bytes=len(payload),
+            sha256=hashlib.sha256(payload).hexdigest(),
+        )

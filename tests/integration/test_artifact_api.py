@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 import httpx
 
-from apps.api.content_runtime.registry import BUILTIN_CONTENT_DEFINITION_VERSION_ID
+from apps.api.database import build_session_factory
 from apps.api.main import create_app
 from apps.api.settings import Settings
 from tests.conftest import run_migration
 from tests.contract.test_stage0_resources import assert_contract_response
+from tests.fakes.content_runtime import ensure_test_authoring_definition
 from tests.fakes.identity import configure_test_identity
 
 
@@ -34,6 +37,9 @@ async def test_artifact_draft_submit_and_approval_api_matches_contract(
                 },
             )
             project_id = project_response.json()["data"]["id"]
+            factory = build_session_factory(app.state.database_engine)
+            with factory() as session, session.begin():
+                definition_id = ensure_test_authoring_definition(session, UUID(project_id))
 
             created = await client.post(
                 f"/api/v2/projects/{project_id}/artifacts",
@@ -42,7 +48,7 @@ async def test_artifact_draft_submit_and_approval_api_matches_contract(
                     "artifact_key": "lesson-plan:lesson-01",
                     "artifact_type": "lesson_plan",
                     "branch_key": "lesson_plan",
-                    "content_definition_version_id": str(BUILTIN_CONTENT_DEFINITION_VERSION_ID),
+                    "content_definition_version_id": str(definition_id),
                     "draft_branch": "main",
                     "content": {"title": "Draft"},
                 },

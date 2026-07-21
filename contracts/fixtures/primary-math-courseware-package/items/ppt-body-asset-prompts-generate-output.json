@@ -38,6 +38,7 @@
         "deletable": false,
         "repeatable": true,
         "min_items": 1,
+        "max_items": 100,
         "children": [
           {
             "field_key": "body_item_key",
@@ -45,7 +46,15 @@
             "type": "text",
             "required": true,
             "editable": false,
-            "deletable": false
+            "deletable": false,
+            "validation_rules": [
+              {
+                "min_length": 1
+              },
+              {
+                "max_length": 160
+              }
+            ]
           },
           {
             "field_key": "body_page_key",
@@ -77,7 +86,18 @@
             "type": "text",
             "required": true,
             "editable": false,
-            "deletable": false
+            "deletable": false,
+            "validation_rules": [
+              {
+                "min_length": 1
+              },
+              {
+                "max_length": 160
+              },
+              {
+                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+              }
+            ]
           },
           {
             "field_key": "body_prompt_text",
@@ -85,7 +105,15 @@
             "type": "rich_text",
             "required": true,
             "editable": true,
-            "deletable": false
+            "deletable": false,
+            "validation_rules": [
+              {
+                "min_length": 1
+              },
+              {
+                "max_length": 50000
+              }
+            ]
           },
           {
             "field_key": "body_negative_constraints",
@@ -109,7 +137,15 @@
             "type": "text",
             "required": true,
             "editable": false,
-            "deletable": false
+            "deletable": false,
+            "validation_rules": [
+              {
+                "min_length": 1
+              },
+              {
+                "max_length": 160
+              }
+            ]
           }
         ]
       },

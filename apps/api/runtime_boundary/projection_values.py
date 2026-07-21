@@ -273,6 +273,11 @@ def validate_artifact_declaration(binding: Mapping[str, Any], artifact: Mapping[
             "OUTPUT_PROJECTION_ARTIFACT_BRANCH_MISMATCH",
             "artifact branch does not match the execution scope",
         )
+    if artifact.get("content") != {"source": "output", "pointer": ""}:
+        raise OutputProjectionError(
+            "OUTPUT_PROJECTION_CONTENT_SOURCE_INVALID",
+            "artifact content must preserve the validated output root",
+        )
 
 
 def require_mapping(value: object, code: str) -> Mapping[str, Any]:

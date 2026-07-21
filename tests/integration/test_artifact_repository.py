@@ -7,12 +7,12 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 from apps.api.artifacts.models import ArtifactDraft, ArtifactVersion
 from apps.api.artifacts.repository import ArtifactRepository
 from apps.api.artifacts.service import ArtifactService
-from apps.api.content_runtime.registry import BUILTIN_CONTENT_DEFINITION_VERSION_ID
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import ApiError
 from apps.api.ids import new_uuid7
 from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
+from tests.fakes.content_runtime import ensure_test_authoring_definition
 from tests.fakes.identity import seed_test_actor
 
 
@@ -30,12 +30,13 @@ def test_active_draft_is_unique_and_autosave_uses_optimistic_lock(
         with session.begin():
             actor = seed_test_actor(session)
             project = create_project(session, actor)
+            definition_id = ensure_test_authoring_definition(session, project.id)
             artifact = ArtifactService(session, actor).create(
                 project.id,
                 artifact_key="lesson-plan:lesson-01",
                 artifact_type="lesson_plan",
                 branch_key="lesson_plan",
-                content_definition_version_id=BUILTIN_CONTENT_DEFINITION_VERSION_ID,
+                content_definition_version_id=definition_id,
                 draft_branch="main",
                 initial_content={"title": "First"},
                 request_id="req-create",
@@ -92,12 +93,13 @@ def test_submit_is_deterministic_and_artifact_version_is_database_immutable(
         with session.begin():
             actor = seed_test_actor(session)
             project = create_project(session, actor)
+            definition_id = ensure_test_authoring_definition(session, project.id)
             artifact = ArtifactService(session, actor).create(
                 project.id,
                 artifact_key="lesson-plan:lesson-01",
                 artifact_type="lesson_plan",
                 branch_key="lesson_plan",
-                content_definition_version_id=BUILTIN_CONTENT_DEFINITION_VERSION_ID,
+                content_definition_version_id=definition_id,
                 draft_branch="main",
                 initial_content={"title": "Stable"},
                 request_id="req-create",

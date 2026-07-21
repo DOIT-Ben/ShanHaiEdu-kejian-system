@@ -45,6 +45,13 @@ def test_env_example_is_a_loadable_local_quick_start_configuration() -> None:
     assert settings.text_provider_base_url is None
     assert settings.text_provider_model is None
     assert settings.text_provider_secret_env == "NEWAPI_TEXT_API_KEY"
+    assert settings.video_provider_name is None
+    assert settings.video_provider_base_url is None
+    assert settings.video_provider_model is None
+    assert settings.video_provider_secret_env == "MODEL_GATEWAY_API_KEY"
+    assert settings.provider_media_root is None
+    assert settings.provider_media_public_base_url is None
+    assert settings.provider_media_signing_secret_env == "SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET"
 
 
 def test_production_requires_all_dependency_configuration() -> None:

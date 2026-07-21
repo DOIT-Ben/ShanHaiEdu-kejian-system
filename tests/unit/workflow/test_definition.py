@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from workflow.definition import (
@@ -55,6 +57,10 @@ def model_node(
             },
             "output_persistence": {
                 "artifact": {
+                    "identity": {
+                        "strategy": "lesson_unit_singleton",
+                        "artifact_key_prefix": f"{key}-artifact",
+                    },
                     "artifact_type": "test",
                     "branch_key": branch_key,
                     "content_definition_ref": {
@@ -67,29 +73,127 @@ def model_node(
     )
 
 
+def quality_graph(
+    *,
+    gate_dependencies: tuple[str, ...] | None = ("generate", "validate"),
+    validator_output_refs: tuple[str, ...] = ("report:quality",),
+) -> WorkflowGraph:
+    producer = model_node("generate")
+    validator = WorkflowNodeDefinition(
+        node_key="validate",
+        execution_kind="deterministic",
+        execution_scope="lesson_unit",
+        branch_key="lesson_plan",
+        entrypoint=False,
+        dependencies=("generate",),
+        input_contract_refs=("artifact:output",),
+        output_contract_refs=validator_output_refs,
+        binding={
+            "quality_report_persistence": {
+                "source_input_ref": "artifact:output",
+                "report_ref": "report:quality",
+                "validator_refs": [
+                    {
+                        "key": "validator.quality",
+                        "semantic_version": "1.0.0",
+                        "implementation_digest": "a" * 64,
+                    }
+                ],
+            }
+        },
+    )
+    if gate_dependencies is None:
+        return WorkflowGraph(nodes=(producer, validator))
+    gate = WorkflowNodeDefinition(
+        node_key="approve",
+        execution_kind="human_gate",
+        execution_scope="lesson_unit",
+        branch_key="lesson_plan",
+        entrypoint=False,
+        dependencies=gate_dependencies,
+        input_contract_refs=("artifact:output", "report:quality"),
+        output_contract_refs=("approval:quality",),
+        binding={
+            "quality_requirement": {
+                "mode": "reports",
+                "report_refs": ["report:quality"],
+            }
+        },
+    )
+    return WorkflowGraph(nodes=(producer, validator, gate))
+
+
 def test_valid_workflow_graph_returns_dependency_order() -> None:
     graph = WorkflowGraph(nodes=(node("prepare"), node("generate", "prepare")))
 
     assert validate_workflow_graph(graph) == ("prepare", "generate")
 
 
+def test_internal_input_producer_must_be_in_dependency_closure() -> None:
+    start = node("start")
+    producer = replace(
+        node("producer", "start"),
+        output_contract_refs=("artifact:source",),
+    )
+    parallel = node("parallel", "start")
+    consumer = replace(
+        node("consumer", "parallel"),
+        input_contract_refs=("artifact:source",),
+    )
+
+    with pytest.raises(WorkflowDefinitionError) as caught:
+        validate_workflow_graph(WorkflowGraph(nodes=(start, producer, parallel, consumer)))
+    assert caught.value.code == "WORKFLOW_INPUT_DEPENDENCY_MISSING"
+
+    ordered_consumer = replace(consumer, dependencies=("producer",))
+    assert validate_workflow_graph(
+        WorkflowGraph(nodes=(start, producer, parallel, ordered_consumer))
+    ) == ("start", "producer", "parallel", "consumer")
+
+
+def test_direct_quality_gate_must_consume_the_producer_output() -> None:
+    producer = model_node("generate")
+    gate = WorkflowNodeDefinition(
+        node_key="approve",
+        execution_kind="human_gate",
+        execution_scope="lesson_unit",
+        branch_key="lesson_plan",
+        entrypoint=False,
+        dependencies=("generate",),
+        input_contract_refs=("approval:other",),
+        output_contract_refs=("approval:quality",),
+        binding={"quality_requirement": {"mode": "none"}},
+    )
+
+    with pytest.raises(WorkflowDefinitionError) as caught:
+        build_workflow_indexes(WorkflowGraph(nodes=(producer, gate)))
+    assert caught.value.code == "WORKFLOW_OUTPUT_QUALITY_GATE_INVALID"
+
+
 @pytest.mark.parametrize(
-    ("graph", "message"),
+    ("graph", "code"),
     (
-        (WorkflowGraph(nodes=(node("same"), node("same"))), "duplicate"),
-        (WorkflowGraph(nodes=(node("generate", "missing"),)), "missing"),
+        (
+            WorkflowGraph(nodes=(node("same"), node("same"))),
+            "WORKFLOW_NODE_KEY_DUPLICATE",
+        ),
+        (
+            WorkflowGraph(nodes=(node("generate", "missing"),)),
+            "WORKFLOW_DEPENDENCY_MISSING",
+        ),
         (
             WorkflowGraph(nodes=(node("first", "second"), node("second", "first"))),
-            "cycle",
+            "WORKFLOW_DEPENDENCY_CYCLE",
         ),
     ),
 )
 def test_invalid_workflow_graph_is_rejected_before_publication(
     graph: WorkflowGraph,
-    message: str,
+    code: str,
 ) -> None:
-    with pytest.raises(WorkflowDefinitionError, match=message):
+    with pytest.raises(WorkflowDefinitionError) as caught:
         validate_workflow_graph(graph)
+    assert caught.value.code == code
 
 
 def test_missing_contract_reference_is_rejected_before_publication() -> None:
@@ -148,8 +252,9 @@ def test_dependency_must_stay_in_one_execution_scope_and_branch(
 def test_entrypoint_declaration_must_match_dependencies(invalid: WorkflowNodeDefinition) -> None:
     dependencies = (node("root"),) if invalid.dependencies else ()
 
-    with pytest.raises(WorkflowDefinitionError, match="entrypoint"):
+    with pytest.raises(WorkflowDefinitionError) as caught:
         validate_workflow_graph(WorkflowGraph(nodes=(*dependencies, invalid)))
+    assert caught.value.code == "WORKFLOW_ENTRYPOINT_INVALID"
 
 
 @pytest.mark.parametrize(
@@ -222,3 +327,31 @@ def test_workflow_indexes_reject_same_branch_contract_producers() -> None:
         build_workflow_indexes(WorkflowGraph(nodes=(first, second)))
 
     assert caught.value.code == "WORKFLOW_OUTPUT_PRODUCER_DUPLICATE"
+
+
+def test_quality_gate_must_depend_on_producer_and_validator() -> None:
+    graph = quality_graph(gate_dependencies=("generate",))
+
+    with pytest.raises(WorkflowDefinitionError) as caught:
+        build_workflow_indexes(graph)
+
+    assert caught.value.code == "WORKFLOW_OUTPUT_QUALITY_GATE_INVALID"
+
+
+def test_invalid_quality_report_contract_precedes_missing_gate_error() -> None:
+    graph = quality_graph(
+        gate_dependencies=None,
+        validator_output_refs=("report:different",),
+    )
+
+    with pytest.raises(WorkflowDefinitionError) as caught:
+        build_workflow_indexes(graph)
+
+    assert caught.value.code == "WORKFLOW_OUTPUT_QUALITY_INVALID"
+
+
+def test_missing_quality_gate_has_stable_error_after_valid_report_chain() -> None:
+    with pytest.raises(WorkflowDefinitionError) as caught:
+        build_workflow_indexes(quality_graph(gate_dependencies=None))
+
+    assert caught.value.code == "WORKFLOW_OUTPUT_QUALITY_GATE_MISSING"

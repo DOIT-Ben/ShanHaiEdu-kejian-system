@@ -7,6 +7,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
+from apps.api.content_runtime._creation_package_projection import (
+    validate_creation_package_projection,
+)
 from workflow.content_package import canonical_json_sha256, validate_content_package
 from workflow.node_generation_binding import load_workflow_node_catalog
 from workflow.registry import BUILTIN_WORKFLOW_REGISTRY
@@ -110,7 +113,7 @@ def load_builtin_courseware_release(root: Path) -> BuiltinCoursewareReleaseSourc
 def _validate_catalog_content_definitions(
     catalog: dict[str, Any],
     items: Mapping[str, dict[str, Any]],
-    manifest_entries: dict[str, dict[str, Any]],
+    manifest_entries: Mapping[str, dict[str, Any]],
 ) -> None:
     for node in cast(list[dict[str, Any]], catalog["nodes"]):
         if node["execution_kind"] != "model_generation":
@@ -133,3 +136,15 @@ def _validate_catalog_content_definitions(
             raise ContentPublicationConflict(
                 f"content definition is missing from the published package: {output_key}"
             )
+        _validate_creation_package_projection(node, items[output_key])
+
+
+def _validate_creation_package_projection(
+    node: dict[str, Any],
+    output_definition: dict[str, Any],
+) -> None:
+    validate_creation_package_projection(
+        node,
+        output_definition,
+        conflict_type=ContentPublicationConflict,
+    )

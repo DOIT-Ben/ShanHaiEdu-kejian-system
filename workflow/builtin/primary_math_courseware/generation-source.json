@@ -931,16 +931,17 @@
             "deletable": false,
             "repeatable": true,
             "min_items": 1,
+            "max_items": 100,
             "children": [
-              {"field_key": "body_item_key", "label": "任务键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "body_item_key", "label": "任务键", "type": "text", "required": true, "editable": false, "deletable": false, "validation_rules": [{"min_length": 1}, {"max_length": 160}]},
               {"field_key": "body_page_key", "label": "页面键", "type": "reference", "required": true, "editable": false, "deletable": false},
               {"field_key": "body_requirement_key", "label": "资产要求键", "type": "reference", "required": true, "editable": false, "deletable": false},
               {"field_key": "body_asset_role", "label": "资产角色", "type": "enum", "required": true, "editable": false, "deletable": false},
-              {"field_key": "body_target_slot", "label": "目标槽位", "type": "text", "required": true, "editable": false, "deletable": false},
-              {"field_key": "body_prompt_text", "label": "完整图片提示词", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "body_target_slot", "label": "目标槽位", "type": "text", "required": true, "editable": false, "deletable": false, "validation_rules": [{"min_length": 1}, {"max_length": 160}, {"pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"}]},
+              {"field_key": "body_prompt_text", "label": "完整图片提示词", "type": "rich_text", "required": true, "editable": true, "deletable": false, "validation_rules": [{"min_length": 1}, {"max_length": 50000}]},
               {"field_key": "body_negative_constraints", "label": "负面约束", "type": "list", "required": true, "editable": false, "deletable": false},
               {"field_key": "body_aspect_ratio", "label": "画幅", "type": "text", "required": true, "editable": false, "deletable": false},
-              {"field_key": "body_consistency_key", "label": "一致性键", "type": "text", "required": true, "editable": false, "deletable": false}
+              {"field_key": "body_consistency_key", "label": "一致性键", "type": "text", "required": true, "editable": false, "deletable": false, "validation_rules": [{"min_length": 1}, {"max_length": 160}]}
             ]
           },
           {"field_key": "body_asset_coverage", "label": "资产覆盖检查", "type": "rubric", "required": true, "editable": false, "deletable": false}
@@ -1417,15 +1418,16 @@
             "deletable": false,
             "repeatable": true,
             "min_items": 1,
+            "max_items": 100,
             "children": [
-              {"field_key": "video_asset_item_key", "label": "任务键", "type": "text", "required": true, "editable": false, "deletable": false},
+              {"field_key": "video_asset_item_key", "label": "任务键", "type": "text", "required": true, "editable": false, "deletable": false, "validation_rules": [{"min_length": 1}, {"max_length": 160}]},
               {"field_key": "video_asset_source_key", "label": "资产键", "type": "reference", "required": true, "editable": false, "deletable": false},
               {"field_key": "video_asset_prompt_type", "label": "资产类型", "type": "enum", "required": true, "editable": false, "deletable": false},
-              {"field_key": "video_asset_prompt_target_slot", "label": "目标槽位", "type": "text", "required": true, "editable": false, "deletable": false},
-              {"field_key": "video_asset_prompt_text", "label": "完整图片提示词", "type": "rich_text", "required": true, "editable": true, "deletable": false},
+              {"field_key": "video_asset_prompt_target_slot", "label": "目标槽位", "type": "text", "required": true, "editable": false, "deletable": false, "validation_rules": [{"min_length": 1}, {"max_length": 160}, {"pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"}]},
+              {"field_key": "video_asset_prompt_text", "label": "完整图片提示词", "type": "rich_text", "required": true, "editable": true, "deletable": false, "validation_rules": [{"min_length": 1}, {"max_length": 50000}]},
               {"field_key": "video_asset_negative_constraints", "label": "负面约束", "type": "list", "required": true, "editable": false, "deletable": false},
               {"field_key": "video_asset_prompt_aspect_ratio", "label": "画幅", "type": "text", "required": true, "editable": false, "deletable": false},
-              {"field_key": "video_asset_prompt_consistency_key", "label": "一致性键", "type": "text", "required": true, "editable": false, "deletable": false}
+              {"field_key": "video_asset_prompt_consistency_key", "label": "一致性键", "type": "text", "required": true, "editable": false, "deletable": false, "validation_rules": [{"min_length": 1}, {"max_length": 160}]}
             ]
           },
           {"field_key": "video_asset_prompt_coverage", "label": "任务覆盖检查", "type": "rubric", "required": true, "editable": false, "deletable": false}

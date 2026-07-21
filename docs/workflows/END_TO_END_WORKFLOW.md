@@ -18,7 +18,7 @@ flowchart TD
     Plan --> Delivery
 ```
 
-上图是业务分支概览，不是完整可执行节点图。可执行拓扑以`WorkflowNodeGenerationBinding v2`与`WorkflowRegistry`解析的发布`graph_json`为准；`dependencies`只表达同`execution_scope/branch_key`内的直接生产者，跨组事实通过输入合同和Context白名单解析。
+上图是业务分支概览，不是完整可执行节点图。#130与PR #141已经把`WorkflowNodeGenerationBinding v2`候选拓扑合入主线，#146继续加固其发布和运行时安全边界；只有#146合并并通过PostgreSQL前向发布复验后，运行时才把对应`graph_json`作为新项目默认。`dependencies`只表达同`execution_scope/branch_key`内的直接生产者，跨组事实通过输入合同和Context白名单解析。
 
 教案正文和课堂导入设计是课时划分后的兄弟产物。三类九套默认作为教案正文之后的独立附录展示，但两者状态、版本和审核互不阻塞。PPT依赖已批准教案；视频依赖已选择导入方案，不读取教案正文。PPT与视频互不依赖。
 
@@ -43,7 +43,7 @@ flowchart TD
 
 ### 首套内置生成基线
 
-`shanhai.primary_math.courseware@1.1.0`是当前首套可执行业务内容基线；`1.0.0`已发布Release与既有项目绑定不改写。其声明源位于`workflow/builtin/primary_math_courseware/generation-source.json`，确定性构建后为47节点目录中的22个`model_generation`节点各提供：
+`shanhai.primary_math.courseware@1.1.0`是#130合入主线、由#146继续加固的前向候选；#146合并并通过PostgreSQL前向发布复验前，当前正式发布基线仍是`1.0.0`，既有项目绑定不改写。候选声明源位于`workflow/builtin/primary_math_courseware/generation-source.json`，确定性构建后为47节点目录中的22个`model_generation`节点各提供：
 
 - 教师输入、系统补全和Context注入字段；
 - 可编辑业务Prompt与只读方法、质量门；
@@ -51,7 +51,9 @@ flowchart TD
 - 教师可读投影和GenerationTemplate引用；
 - 逻辑模型能力和风格预设，不含Provider名称、密钥或私有参数。
 
-每个模型节点还声明不可变Artifact输出投影；非package节点只形成Artifact，package节点在Artifact版本落库取得版本ID后再形成CreationPackage。当前目录同时声明13个`deterministic`节点和12个`human_gate`节点；这些声明不等于#89执行器、真实Provider或业务validator已经实现。
+每个`model_generation`节点还声明不可变Artifact输出投影；未声明`creation_package`的模型节点只形成Artifact，声明该投影的模型节点在Artifact版本落库取得版本ID后再形成CreationPackage。13个`deterministic`节点和12个`human_gate`节点不属于这条模型输出投影编译路径；其中`delivery.package`等确定性节点仍由各自平台执行器负责。#89已经实现通用模型节点的确定性Fake执行、恢复和原子写回，但不代表真实Provider、媒体Adapter或业务validator已经实现。
+
+旧v1 Release继续固定原有工作流语义；仅当调用方要求消费其未声明的v2输出投影时，才以`WORKFLOW_RELEASE_UNSUPPORTED`拒绝，不能把该错误扩大为旧工作流整体不可启动。
 
 “1～5的认识”黄金项目只提交教材哈希、物理页3～5与印刷页14～16映射、脱敏证据和结构期望。它验证教案、PPT和视频可从各自固定输入独立启动，并明确禁止视频读取教案、教材和PPT。普通CI据此使用确定性Fixture；真实文本、图片和视频调用仍必须在对应适配器任务及阶段出口单独冒烟，不能用内容包通过替代。TTS仅保留未来音频计划数据，待音频Provider可用后独立验收。
 

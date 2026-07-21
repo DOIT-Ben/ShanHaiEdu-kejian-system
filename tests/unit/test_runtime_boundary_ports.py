@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import fields
+from dataclasses import fields, replace
 from pathlib import Path
+from typing import cast
 from uuid import uuid4
 
 import pytest
@@ -10,8 +11,13 @@ from apps.api.artifacts.domain import ArtifactInvariantError, ArtifactRelationTy
 from apps.api.ids import new_uuid7
 from apps.api.runtime_boundary.ports import (
     ArtifactPort,
+    ArtifactWriteResult,
     AssetPort,
+    CreationPackageItemSpec,
     CreationPackagePort,
+    CreationPackageReferenceAssetSpec,
+    CreationPackageSpec,
+    CreationPackageWriteResult,
     GeneratedArtifactRelation,
     GeneratedArtifactWrite,
     ModelInvocationPort,
@@ -19,6 +25,36 @@ from apps.api.runtime_boundary.ports import (
     RuntimeDefinitionReader,
     WorkflowExecutionPort,
 )
+
+
+def _generated_write() -> GeneratedArtifactWrite:
+    return GeneratedArtifactWrite(
+        project_id=uuid4(),
+        lesson_unit_id=None,
+        node_run_id=uuid4(),
+        context_snapshot_id=uuid4(),
+        prompt_snapshot_id=uuid4(),
+        artifact_key="lesson.01.plan",
+        artifact_type="lesson_plan",
+        branch_key="lesson_plan",
+        content_definition_version_id=uuid4(),
+        content={},
+        request_id="req-generated-artifact",
+    )
+
+
+def _package_item(*, position: int = 1) -> CreationPackageItemSpec:
+    return CreationPackageItemSpec(
+        item_key=f"item-{position}",
+        position=position,
+        title=f"Item {position}",
+        business_prompt="Create a classroom-safe visual.",
+        prompt={},
+        reference_assets=(),
+        output_spec={},
+        target_slot_key=f"ppt.page-{position}.main-visual",
+        consistency_key=None,
+    )
 
 
 def test_runtime_boundary_exposes_only_the_minimum_issue_89_ports() -> None:
@@ -38,7 +74,7 @@ def test_runtime_boundary_exposes_only_the_minimum_issue_89_ports() -> None:
 
 
 def test_generated_artifact_write_carries_immutable_relation_declarations() -> None:
-    scope = {
+    scope: dict[str, object] = {
         "mode": "keyed",
         "selector": "lesson_key",
         "keys": ["LESSON-001"],
@@ -49,7 +85,8 @@ def test_generated_artifact_write_carries_immutable_relation_declarations() -> N
         binding_key="lesson-scope",
         impact_scope=scope,
     )
-    scope["keys"].append("LESSON-002")
+    keys = cast(list[str], scope["keys"])
+    keys.append("LESSON-002")
     assert relation.from_artifact_version_id
     assert relation.relation_type is ArtifactRelationType.DERIVES_FROM
     assert relation.impact_scope == {
@@ -72,11 +109,36 @@ def test_generated_artifact_write_carries_immutable_relation_declarations() -> N
         artifact_type="lesson_plan",
         branch_key="lesson_plan",
         content_definition_version_id=uuid4(),
-        content={},
+        content={"nested": {"value": 1}},
         request_id="req-generated-artifact",
         relations=[relation],  # type: ignore[arg-type]
     )
     assert write.relations == (relation,)
+    with pytest.raises(TypeError):
+        dict.__setitem__(write.content, "forged", True)  # type: ignore[arg-type]
+    with pytest.raises(TypeError):
+        dict.__setitem__(write.content["nested"], "value", 2)  # type: ignore[arg-type]
+
+    item = replace(_package_item(), output_spec={"size": {"width": 1920}})
+    with pytest.raises(TypeError):
+        dict.__setitem__(item.output_spec, "forged", True)  # type: ignore[arg-type]
+    with pytest.raises(TypeError):
+        dict.__setitem__(item.output_spec["size"], "width", 1)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("artifact_key", ""),
+        ("artifact_type", ""),
+        ("branch_key", ""),
+        ("request_id", ""),
+        ("content", "not-an-object"),
+    ],
+)
+def test_generated_artifact_write_rejects_invalid_port_values(field: str, value: object) -> None:
+    with pytest.raises(ArtifactInvariantError):
+        replace(_generated_write(), **{field: value})
 
 
 @pytest.mark.parametrize(
@@ -146,6 +208,94 @@ def test_generated_artifact_write_rejects_non_json_content(value: object) -> Non
             content_definition_version_id=uuid4(),
             request_id="req-json",
         )
+
+
+def test_creation_package_item_rejects_nonsemantic_slot_and_duplicate_asset_ids() -> None:
+    with pytest.raises(ArtifactInvariantError, match="target slot"):
+        replace(_package_item(), target_slot_key="../../foreign-project")
+
+    asset_id = uuid4()
+    assets = (
+        CreationPackageReferenceAssetSpec(asset_id, "style"),
+        CreationPackageReferenceAssetSpec(asset_id, "character"),
+    )
+    with pytest.raises(ArtifactInvariantError, match="asset IDs"):
+        replace(_package_item(), reference_assets=assets)
+
+
+def test_creation_package_spec_enforces_artifact_key_and_item_limit() -> None:
+    artifact_version_id = uuid4()
+    common = {
+        "project_id": uuid4(),
+        "workflow_run_id": uuid4(),
+        "node_run_id": uuid4(),
+        "lesson_unit_id": None,
+        "artifact_version_id": artifact_version_id,
+        "context_snapshot_id": uuid4(),
+        "prompt_snapshot_id": uuid4(),
+        "package_key": f"ppt-body:{artifact_version_id}",
+        "package_type": "presentation",
+        "items": (_package_item(),),
+        "target_rules": {
+            "replace_modes": ["reject_if_occupied"],
+            "allow_download": True,
+        },
+        "request_id": "req-package",
+    }
+    package = CreationPackageSpec(**common)  # type: ignore[arg-type]
+
+    with pytest.raises(ArtifactInvariantError, match="bound to its artifact"):
+        replace(package, package_key="unrelated-key")
+    with pytest.raises(ArtifactInvariantError, match="items are invalid"):
+        replace(
+            package,
+            items=tuple(_package_item(position=index) for index in range(1, 102)),
+        )
+
+
+@pytest.mark.parametrize(
+    ("result_type", "kwargs"),
+    [
+        (
+            CreationPackageWriteResult,
+            {
+                "creation_package_id": "not-a-uuid",
+                "status": "ready",
+                "content_hash": "a" * 64,
+            },
+        ),
+        (
+            CreationPackageWriteResult,
+            {
+                "creation_package_id": uuid4(),
+                "status": "unknown",
+                "content_hash": "a" * 64,
+            },
+        ),
+        (
+            ArtifactWriteResult,
+            {
+                "artifact_id": uuid4(),
+                "artifact_version_id": uuid4(),
+                "content_hash": "not-a-hash",
+                "project_id": uuid4(),
+                "node_run_id": uuid4(),
+                "context_snapshot_id": uuid4(),
+                "prompt_snapshot_id": uuid4(),
+                "artifact_key": "artifact",
+                "artifact_type": "lesson_plan",
+                "branch_key": "lesson_plan",
+                "lesson_unit_id": None,
+                "content_definition_version_id": uuid4(),
+            },
+        ),
+    ],
+)
+def test_write_results_reject_invalid_adapter_values(
+    result_type: type[object], kwargs: dict[str, object]
+) -> None:
+    with pytest.raises(ArtifactInvariantError):
+        result_type(**kwargs)
 
 
 def test_backend_boundary_document_records_ports_and_live_size_baseline() -> None:

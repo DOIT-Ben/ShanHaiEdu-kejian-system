@@ -7,7 +7,6 @@ from sqlalchemy.exc import IntegrityError
 from apps.api.artifacts.models import ArtifactRelation
 from apps.api.artifacts.repository import ArtifactRepository
 from apps.api.artifacts.service import ArtifactService
-from apps.api.content_runtime.registry import BUILTIN_CONTENT_DEFINITION_VERSION_ID
 from apps.api.creation.models import CreationPackage
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import ApiError
@@ -16,18 +15,20 @@ from apps.api.projects.repository import ProjectRepository
 from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.reliability.models import EventStreamEntry
 from apps.api.workflows.models import NodeRun
+from tests.fakes.content_runtime import ensure_test_authoring_definition
 from tests.fakes.identity import seed_test_actor
 from tests.integration.test_creation_lifecycle import seed_project_package
 
 
 def create_approved(session, actor, project_id, key: str, content: dict[str, object]):
     service = ArtifactService(session, actor)
+    definition_id = ensure_test_authoring_definition(session, project_id)
     artifact = service.create(
         project_id,
         artifact_key=key,
         artifact_type="test_content",
         branch_key="lesson_plan",
-        content_definition_version_id=BUILTIN_CONTENT_DEFINITION_VERSION_ID,
+        content_definition_version_id=definition_id,
         draft_branch="main",
         initial_content=content,
         request_id=f"req-create-{key}",
@@ -64,11 +65,9 @@ def test_stale_propagates_only_along_real_relations_and_accept_stale_clears_it(
                 session, actor, project.id, "upstream", {"value": 1}
             )
             downstream, downstream_v1 = create_approved(
-                session, actor, project.id, "downstream", {"value": "derived"}
+                session, actor, project.id, "downstream", {"value": 10}
             )
-            unrelated, _ = create_approved(
-                session, actor, project.id, "unrelated", {"value": "manual"}
-            )
+            unrelated, _ = create_approved(session, actor, project.id, "unrelated", {"value": 20})
             ArtifactService(session, actor).add_relation(
                 from_version_id=upstream_v1.id,
                 to_version_id=downstream_v1.id,
@@ -340,7 +339,7 @@ def test_revoking_an_upstream_approval_marks_real_downstream_stale(
             session, actor, project.id, "upstream-revoke", {"value": 1}
         )
         downstream, downstream_version = create_approved(
-            session, actor, project.id, "downstream-revoke", {"value": "derived"}
+            session, actor, project.id, "downstream-revoke", {"value": 10}
         )
         service = ArtifactService(session, actor)
         service.add_relation(

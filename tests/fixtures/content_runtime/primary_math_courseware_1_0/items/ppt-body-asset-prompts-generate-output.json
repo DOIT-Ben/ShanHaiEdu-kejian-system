@@ -1,0 +1,126 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "ppt.body_asset_prompts.generate.output",
+    "name": "PPT正文图片任务包输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "ppt.body_asset_prompts.generate.output",
+    "title": "PPT正文图片任务包输出",
+    "description": "每个正文图片资产一个独立生成项，包含来源页面、提示词、负面约束和固定槽位。",
+    "definition_role": "artifact",
+    "fields": [
+      {
+        "field_key": "body_package_key",
+        "label": "图片任务包键",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "body_style_contract_ref",
+        "label": "视觉合同版本",
+        "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "body_asset_items",
+        "label": "正文图片任务",
+        "type": "repeatable",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "repeatable": true,
+        "min_items": 1,
+        "children": [
+          {
+            "field_key": "body_item_key",
+            "label": "任务键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "body_page_key",
+            "label": "页面键",
+            "type": "reference",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "body_requirement_key",
+            "label": "资产要求键",
+            "type": "reference",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "body_asset_role",
+            "label": "资产角色",
+            "type": "enum",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "body_target_slot",
+            "label": "目标槽位",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "body_prompt_text",
+            "label": "完整图片提示词",
+            "type": "rich_text",
+            "required": true,
+            "editable": true,
+            "deletable": false
+          },
+          {
+            "field_key": "body_negative_constraints",
+            "label": "负面约束",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "body_aspect_ratio",
+            "label": "画幅",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "body_consistency_key",
+            "label": "一致性键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "body_asset_coverage",
+        "label": "资产覆盖检查",
+        "type": "rubric",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      }
+    ]
+  }
+}

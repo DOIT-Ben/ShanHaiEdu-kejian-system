@@ -62,12 +62,15 @@ def test_real_minio_presign_put_stat_copy_and_bounded_download(tmp_path: Path) -
         assert copied.key == immutable_key
         assert copied.sha256 == sha256
         download_path = tmp_path / "downloaded.pdf"
-        assert storage.download_to_path(
+        downloaded = storage.download_to_path(
             bucket=settings.object_storage_bucket,
             key=immutable_key,
             destination=download_path,
             max_bytes=len(content),
-        ) == len(content)
+        )
+        assert downloaded.size_bytes == len(content)
+        assert downloaded.media_type == "application/pdf"
+        assert downloaded.sha256 == sha256
         assert download_path.read_bytes() == content
         rejected_path = tmp_path / "rejected.pdf"
         with pytest.raises(ObjectStorageError):

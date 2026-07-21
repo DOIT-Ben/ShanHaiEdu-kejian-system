@@ -117,6 +117,25 @@ class FileAssetRepository:
         statement = self._scope_to_member(statement, SourceMaterial.project_id)
         return list(self._session.scalars(statement))
 
+    def list_succeeded_parses_for_project(
+        self,
+        project_id: UUID,
+    ) -> list[MaterialParseVersion]:
+        statement = (
+            select(MaterialParseVersion)
+            .join(SourceMaterial, SourceMaterial.id == MaterialParseVersion.source_material_id)
+            .where(
+                MaterialParseVersion.organization_id == self._actor.organization_id,
+                MaterialParseVersion.status == "succeeded",
+                SourceMaterial.organization_id == self._actor.organization_id,
+                SourceMaterial.project_id == project_id,
+                SourceMaterial.deleted_at.is_(None),
+            )
+            .order_by(MaterialParseVersion.completed_at.desc(), MaterialParseVersion.id.desc())
+        )
+        statement = self._scope_to_member(statement, SourceMaterial.project_id)
+        return list(self._session.scalars(statement))
+
     def lock_material(self, material_id: UUID) -> SourceMaterial | None:
         return self._session.scalar(self._material_statement(material_id).with_for_update())
 

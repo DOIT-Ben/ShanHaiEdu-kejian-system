@@ -306,7 +306,7 @@
       "kind": "content_definition",
       "path": "items/ppt-body-asset-prompts-generate-output.json",
       "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
-      "sha256": "74979e362f348b87be159cb4321a297e276af32324bd0acea114b86499e7acc3"
+      "sha256": "2166c09dd88eab3dfd00bfe295055c6e9a89e5beaffbccf619cff12c689e016c"
     },
     {
       "item_key": "ppt.body_asset_prompts.generate.prompt",
@@ -551,7 +551,7 @@
       "kind": "content_definition",
       "path": "items/video-asset-prompts-generate-output.json",
       "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
-      "sha256": "81f09266399c6092d515df8fa1496cb30db85ec856a9323db4d69cf46ae8718c"
+      "sha256": "1dc6ca167c30826bbee353b5c7ffb9605bf83be09daa9f75424b8b9ceed64550"
     },
     {
       "item_key": "video.asset_prompts.generate.prompt",
