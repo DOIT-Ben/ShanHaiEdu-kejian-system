@@ -7,7 +7,7 @@ Type=oneshot
 User=shanhai-dev
 Group=shanhai-dev
 WorkingDirectory=/srv/shanhaiedu/repository
-EnvironmentFile=/etc/shanhaiedu/provider-media-relay.env
+EnvironmentFile=/etc/shanhaiedu/provider-media-cleanup.env
 Environment=PYTHONDONTWRITEBYTECODE=1
 ExecStart=/srv/shanhaiedu/repository/.venv/bin/python -m apps.api.cli provider-media-cleanup
 

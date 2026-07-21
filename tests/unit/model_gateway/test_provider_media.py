@@ -15,6 +15,7 @@ from apps.api.model_gateway.provider_media import (
     ProviderMediaReferenceResolver,
     ProviderMediaResolutionError,
     ProviderMediaResolverConfig,
+    cleanup_expired_provider_media,
 )
 from tests.fakes.object_storage import FakeObjectStorage
 
@@ -165,15 +166,38 @@ def test_resolver_removes_only_expired_opaque_relay_files(tmp_path: Path) -> Non
     stale = tmp_path / f"{'a' * 32}.png"
     stale.write_bytes(PNG_BYTES)
     os.utime(stale, (time() - 61, time() - 61))
-    keep = tmp_path / "operator-note.txt"
-    keep.write_text("preserve", encoding="utf-8")
+    stale_partial = tmp_path / f".provider-media-{'b' * 32}.partial"
+    stale_partial.write_bytes(PNG_BYTES)
+    os.utime(stale_partial, (time() - 61, time() - 61))
+    keeps = [tmp_path / f"operator-note-{index}.txt" for index in range(3)]
+    for keep in keeps:
+        keep.write_text("preserve", encoding="utf-8")
     resolver = _resolver(tmp_path, FakeAssetReader(None), FakeObjectStorage(), ttl_seconds=60)
 
     removed = resolver.cleanup_expired(now=time())
 
+    assert removed == 2
+    assert not stale.exists()
+    assert not stale_partial.exists()
+    assert all(keep.read_text(encoding="utf-8") == "preserve" for keep in keeps)
+
+
+def test_cleanup_limit_counts_candidates_not_unrelated_files(tmp_path: Path) -> None:
+    for index in range(3):
+        (tmp_path / f"unrelated-{index}.txt").write_text("preserve", encoding="utf-8")
+    stale = tmp_path / f"{'c' * 32}.webp"
+    stale.write_bytes(PNG_BYTES)
+    os.utime(stale, (time() - 61, time() - 61))
+
+    removed = cleanup_expired_provider_media(
+        tmp_path,
+        ttl_seconds=60,
+        now=time(),
+        scan_limit=1,
+    )
+
     assert removed == 1
     assert not stale.exists()
-    assert keep.read_text(encoding="utf-8") == "preserve"
 
 
 def _resolver(

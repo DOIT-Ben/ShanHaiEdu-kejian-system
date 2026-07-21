@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import os
 import re
-import tempfile
 import time
 from dataclasses import dataclass
 from itertools import islice
@@ -24,6 +23,7 @@ _MIME_EXTENSIONS = {
     "image/webp": ".webp",
 }
 _OPAQUE_FILENAME = re.compile(r"[0-9a-f]{32}\.(?:png|jpg|webp)", re.ASCII)
+_PARTIAL_FILENAME = re.compile(r"\.provider-media-[0-9a-f]{32}\.partial", re.ASCII)
 _MAX_PROVIDER_URL_LENGTH = 4096
 
 
@@ -135,13 +135,16 @@ class ProviderMediaReferenceResolver:
             raise ProviderMediaResolutionError("provider media reference is invalid")
 
     def _temporary_path(self) -> Path:
-        descriptor, raw_path = tempfile.mkstemp(
-            dir=self._config.relay_root,
-            prefix=".provider-media-",
-            suffix=".partial",
-        )
-        os.close(descriptor)
-        return Path(raw_path)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
+        for _attempt in range(3):
+            path = self._config.relay_root / f".provider-media-{uuid4().hex}.partial"
+            try:
+                descriptor = os.open(path, flags, 0o600)
+            except FileExistsError:
+                continue
+            os.close(descriptor)
+            return path
+        raise ProviderMediaResolutionError("provider media temporary file is unavailable")
 
     def _validate_download(
         self,
@@ -211,9 +214,16 @@ def cleanup_expired_provider_media(
         raise ValueError("relay_root must be an existing directory")
     cutoff = (time.time() if now is None else now) - ttl_seconds
     removed = 0
-    for candidate in islice(root.iterdir(), scan_limit):
-        if not _OPAQUE_FILENAME.fullmatch(candidate.name) or candidate.is_symlink():
-            continue
+    candidates = (
+        candidate
+        for candidate in root.iterdir()
+        if (
+            _OPAQUE_FILENAME.fullmatch(candidate.name)
+            or _PARTIAL_FILENAME.fullmatch(candidate.name)
+        )
+        and not candidate.is_symlink()
+    )
+    for candidate in islice(candidates, scan_limit):
         try:
             if candidate.is_file() and candidate.stat().st_mtime <= cutoff:
                 candidate.unlink()

@@ -6,22 +6,28 @@ This service exposes one short-lived, signed PNG/JPEG/WebP GET path to an extern
 
 ## Prerequisites
 
-- The deployed checkout is `/srv/shanhaiedu/repository` and its `.venv` contains the checked-out relay module.
+- The source checkout is `/srv/shanhaiedu/repository`; deployment installs the standard-library-only relay module into a root-owned, non-writable runtime under `/opt/shanhaiedu/provider-media-relay`.
 - The existing TLS vhost is `/etc/nginx/sites-enabled/newapi.doitbenai.cloud`.
 - The runtime image directory is private and writable only by the trusted server-side producer. This relay must never be pointed at MinIO data, uploads, or an application-wide filesystem root.
 - The operator has root access. Do not paste the signing secret into tickets, shell history, CI logs, Git, or a client application.
 
 ## Deploy
 
-1. On the server, create the dedicated runtime directory and install the root-only configuration file:
+1. On the server, create a dedicated relay identity, the runtime directory, and separate relay/cleanup configuration files. The cleanup process must never receive the signing secret:
 
    ```bash
+   id -u shanhai-relay >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin shanhai-relay
+   install -d -m 0755 -o root -g root /opt/shanhaiedu/provider-media-relay
+   install -m 0555 -o root -g root apps/api/provider_media_relay.py /opt/shanhaiedu/provider-media-relay/provider_media_relay.py
    install -d -m 0750 -o shanhai-dev -g shanhai-dev /srv/shanhaiedu/runtime/provider-media
    install -d -m 0750 -o root -g root /etc/shanhaiedu
    install -m 0600 -o root -g root infra/provider-media-relay/provider-media-relay.env.example /etc/shanhaiedu/provider-media-relay.env
+   install -m 0600 -o root -g root infra/provider-media-relay/provider-media-cleanup.env.example /etc/shanhaiedu/provider-media-cleanup.env
    ```
 
-2. Edit `/etc/shanhaiedu/provider-media-relay.env` only on the server. Replace the placeholder with a unique random 64-hex-character secret. Keep `SHANHAI_PROVIDER_MEDIA_ROOT` on the dedicated runtime directory and use a TTL no greater than 300 seconds.
+   If `shanhai-relay` already exists, verify it is a locked system account with no interactive shell instead of recreating it. The relay runs root-owned installed code as `shanhai-relay` with the `shanhai-dev` group so it can read opaque `0640` relay files without sharing a UID or writable executable code with the producer.
+
+2. Edit `/etc/shanhaiedu/provider-media-relay.env` only on the server. Replace the placeholder with a unique random 64-hex-character secret. Keep `SHANHAI_PROVIDER_MEDIA_ROOT` on the dedicated runtime directory and use a TTL no greater than 300 seconds. When migrating from a relay that ran under the producer UID, rotate the signing secret before restart because the previous process environment must be treated as exposed to that UID. Keep `/etc/shanhaiedu/provider-media-cleanup.env` limited to the non-sensitive root and TTL values.
 
 3. Install the relay, independent expiry-cleanup timer, and Nginx location. Back up the exact vhost before modifying it:
 
