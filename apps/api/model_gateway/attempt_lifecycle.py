@@ -239,12 +239,6 @@ class AttemptExecutionCoordinator:
                     result.finish_reason if isinstance(result, TextProviderResult) else None
                 ),
                 usage=result.usage,
-                recovery_text=(
-                    result.text
-                    if isinstance(result, TextProviderResult)
-                    and context.persist_result_for_recovery
-                    else None
-                ),
             ),
             latency_ms=latency_ms,
         )

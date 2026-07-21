@@ -349,7 +349,7 @@ async def test_worker_recovery_after_t1_does_not_repeat_provider_call(
         assert _count(session, UsageRecord, "node_run_id", seeded.node_run_id) == 1
 
 
-async def test_successful_attempt_before_t2_recovers_without_second_attempt(
+async def test_successful_attempt_before_t2_fails_closed_without_second_attempt(
     migrated_database_url: str,
 ) -> None:
     factory = build_session_factory(build_engine(migrated_database_url))
@@ -383,17 +383,13 @@ async def test_successful_attempt_before_t2_recovers_without_second_attempt(
             audit_sink=SqlAlchemyAttemptAuditSink(factory),
         ),
     )
-    result = await service.execute(seeded.node_run_id, request_id="issue-89-lost-t2")
+    with pytest.raises(NodeExecutionError) as caught:
+        await service.execute(seeded.node_run_id, request_id="issue-89-lost-t2")
 
-    assert result.attempt_id is not None
+    assert caught.value.code == "NODE_EXECUTION_RESULT_UNAVAILABLE"
     assert provider.calls == 0
     with factory() as session:
-        attempt = session.scalar(
-            select(GenerationAttempt).where(GenerationAttempt.node_run_id == seeded.node_run_id)
-        )
-        assert attempt is not None
-        assert attempt.error_details_json.get("recovery_text")
-        assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 1
+        assert _count(session, ArtifactVersion, "source_node_run_id", seeded.node_run_id) == 0
         assert _count(session, GenerationAttempt, "node_run_id", seeded.node_run_id) == 1
         assert _count(session, UsageRecord, "node_run_id", seeded.node_run_id) == 1
 

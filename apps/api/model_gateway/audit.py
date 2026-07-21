@@ -201,8 +201,6 @@ class SqlAlchemyAttemptAuditSink:
                     "retryable": False,
                     "retry_after_seconds": None,
                 }
-            elif result.recovery_text is not None:
-                attempt.error_details_json = {"recovery_text": result.recovery_text}
             session.add(
                 self._usage_record(
                     attempt,

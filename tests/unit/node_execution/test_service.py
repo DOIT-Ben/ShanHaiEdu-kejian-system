@@ -57,8 +57,12 @@ def prepared() -> PreparedNodeExecution:
     )
 
 
-def prepared_recovery() -> PreparedNodeExecution:
-    return replace(prepared(), recovered_result_text='{"title":"Lesson 1"}')
+def prepared_recovery_failure() -> PreparedNodeExecution:
+    return replace(
+        prepared(),
+        pre_model_error_code="NODE_EXECUTION_RESULT_UNAVAILABLE",
+        pre_model_error_message="the successful model result was lost before T2",
+    )
 
 
 def gateway_result(text: str = '{"title":"Lesson 1"}') -> TextGatewayResult:
@@ -139,7 +143,7 @@ class FakeTransactionFactory:
 class RecoveryFailureTransaction(FakeTransaction):
     def prepare(self, node_run_id: UUID, request_id: str) -> PreparedNodeExecution:
         self.events.append("prepare")
-        return prepared_recovery()
+        return prepared_recovery_failure()
 
 
 class RecoveryFailureTransactionFactory(FakeTransactionFactory):
@@ -225,21 +229,22 @@ async def test_model_failure_uses_a_separate_short_terminal_transaction() -> Non
     ]
 
 
-async def test_persisted_successful_result_commits_without_reinvoking_model() -> None:
+async def test_lost_successful_result_fails_closed_without_reinvoking_model() -> None:
     events: list[str] = []
     model = FakeModel(events)
     service = NodeExecutionService(RecoveryFailureTransactionFactory(events), model)
 
-    result = await service.execute(NODE_RUN_ID, request_id="request-89")
+    with pytest.raises(NodeExecutionError) as caught:
+        await service.execute(NODE_RUN_ID, request_id="request-89")
 
-    assert result.artifact_version_id == ARTIFACT_VERSION_ID
+    assert caught.value.code == "NODE_EXECUTION_RESULT_UNAVAILABLE"
     assert model.calls == 0
     assert events == [
         "tx1:open",
         "prepare",
         "tx1:commit",
         "tx2:open",
-        "commit",
+        "terminal:NODE_EXECUTION_RESULT_UNAVAILABLE:False",
         "tx2:commit",
     ]
 

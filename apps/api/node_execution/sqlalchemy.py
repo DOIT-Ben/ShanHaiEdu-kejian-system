@@ -157,7 +157,6 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
             )
         owner_token = self._claim_owner(node_run_id)
         self._workflow.start(node_run_id)
-        result_unavailable = succeeded is not None and succeeded.recovery_text is None
         return PreparedNodeExecution(
             node_run_id=node_run_id,
             request=compiled.request,
@@ -165,12 +164,11 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
             output_schema=materials.output_schema,
             execution_owner_token=owner_token,
             pre_model_error_code=(
-                "NODE_EXECUTION_RESULT_UNAVAILABLE" if result_unavailable else None
+                "NODE_EXECUTION_RESULT_UNAVAILABLE" if succeeded is not None else None
             ),
             pre_model_error_message=(
-                "the successful model result was lost before T2" if result_unavailable else None
+                "the successful model result was lost before T2" if succeeded is not None else None
             ),
-            recovered_result_text=(succeeded.recovery_text if succeeded is not None else None),
             commit_context=NodeExecutionCommitContext(
                 definition=materials.definition,
                 execution=execution,

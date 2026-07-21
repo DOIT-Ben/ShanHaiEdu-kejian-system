@@ -48,7 +48,6 @@ class PreparedNodeExecution:
     execution_owner_token: str | None = None
     pre_model_error_code: str | None = None
     pre_model_error_message: str | None = None
-    recovered_result_text: str | None = None
     commit_context: NodeExecutionCommitContext | None = None
     committed_result: CommittedNodeExecution | None = None
 
