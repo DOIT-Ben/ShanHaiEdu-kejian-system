@@ -5,13 +5,13 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=shanhai-dev
+User=shanhai-relay
 Group=shanhai-dev
-WorkingDirectory=/srv/shanhaiedu/repository
+WorkingDirectory=/opt/shanhaiedu/provider-media-relay
 EnvironmentFile=/etc/shanhaiedu/provider-media-relay.env
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/srv/shanhaiedu/repository/.venv/bin/python -m apps.api.provider_media_relay --port 8201
+ExecStart=/usr/bin/python3 /opt/shanhaiedu/provider-media-relay/provider_media_relay.py --port 8201
 Restart=on-failure
 RestartSec=2
 

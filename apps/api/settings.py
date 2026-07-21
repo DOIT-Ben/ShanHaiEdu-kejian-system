@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal, Self
 
 from pydantic import Field, HttpUrl, SecretStr, model_validator
@@ -71,6 +72,14 @@ class Settings(BaseSettings):
         ge=1,
         le=1_073_741_824,
     )
+    provider_media_root: Path | None = None
+    provider_media_public_base_url: HttpUrl | None = None
+    provider_media_signing_secret_env: str = Field(
+        default="SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET",
+        pattern=r"^[A-Z][A-Z0-9_]{2,127}$",
+    )
+    provider_media_max_ttl_seconds: int = Field(default=300, ge=1, le=3600)
+    provider_media_max_file_bytes: int = Field(default=10_485_760, ge=1)
 
     @model_validator(mode="after")
     def require_production_dependencies(self) -> Self:

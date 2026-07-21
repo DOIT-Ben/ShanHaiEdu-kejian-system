@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from uuid import UUID
 
 from apps.api.model_gateway.attempt_lifecycle import AttemptExecutionCoordinator
 from apps.api.model_gateway.audit_contracts import AttemptAuditSink, AttemptSuccessAudit
@@ -181,10 +182,28 @@ class ModelGateway:
         *,
         cancellation: CancellationToken | None = None,
         audit_context: ModelAuditContext | None = None,
+        media_organization_id: UUID | None = None,
     ) -> VideoGatewayResult:
+        audit_organization_id = audit_context.organization_id if audit_context is not None else None
+        if (
+            media_organization_id is not None
+            and audit_organization_id is not None
+            and media_organization_id != audit_organization_id
+        ):
+            raise ModelGatewayError(GatewayErrorCode.INVALID_RESPONSE, retryable=False)
+        organization_id = media_organization_id or audit_organization_id
+        if request.references:
+
+            async def invoke(provider: VideoProvider) -> VideoProviderResult:
+                return await provider.submit(request, organization_id=organization_id)
+        else:
+
+            async def invoke(provider: VideoProvider) -> VideoProviderResult:
+                return await provider.submit(request)
+
         return await self._run_video(
             request,
-            lambda provider: provider.submit(request),
+            invoke,
             operation_kind="video_submit",
             cancellation=cancellation,
             audit_context=audit_context,

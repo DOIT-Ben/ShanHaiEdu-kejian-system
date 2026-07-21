@@ -5,7 +5,9 @@ from __future__ import annotations
 import os
 
 from pydantic import SecretStr
+from sqlalchemy.orm import Session
 
+from apps.api.assets.provider_media import SqlAlchemyProviderMediaAssetReader
 from apps.api.model_gateway.contracts import (
     GatewayErrorCode,
     ModelCapability,
@@ -21,7 +23,12 @@ from apps.api.model_gateway.openai_compatible import (
     OpenAICompatibleConfig,
     OpenAICompatibleTextProvider,
 )
+from apps.api.model_gateway.provider_media import (
+    ProviderMediaReferenceResolver,
+    ProviderMediaResolverConfig,
+)
 from apps.api.settings import Settings
+from apps.api.uploads.storage import ObjectStorage
 
 
 def build_real_text_gateway(
@@ -52,6 +59,7 @@ def build_real_video_gateway(
     settings: Settings,
     *,
     store: VideoResultStore,
+    media_reference_resolver: ProviderMediaReferenceResolver | None = None,
 ) -> tuple[ModelGateway, NewApiVideoProvider]:
     if not (
         settings.video_provider_name
@@ -72,6 +80,7 @@ def build_real_video_gateway(
             max_download_bytes=settings.video_provider_max_download_bytes,
         ),
         store=store,
+        media_reference_resolver=media_reference_resolver,
     )
     return (
         ModelGateway(
@@ -79,4 +88,28 @@ def build_real_video_gateway(
             video_routes={ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S: provider},
         ),
         provider,
+    )
+
+
+def build_provider_media_reference_resolver(
+    settings: Settings,
+    *,
+    session: Session,
+    storage: ObjectStorage,
+) -> ProviderMediaReferenceResolver:
+    if settings.provider_media_root is None or settings.provider_media_public_base_url is None:
+        raise ModelGatewayError(GatewayErrorCode.ROUTE_UNAVAILABLE, retryable=False)
+    secret = os.environ.get(settings.provider_media_signing_secret_env)
+    if not secret:
+        raise ModelGatewayError(GatewayErrorCode.ROUTE_UNAVAILABLE, retryable=False)
+    return ProviderMediaReferenceResolver(
+        asset_reader=SqlAlchemyProviderMediaAssetReader(session),
+        storage=storage,
+        config=ProviderMediaResolverConfig(
+            relay_root=settings.provider_media_root,
+            public_base_url=str(settings.provider_media_public_base_url),
+            signing_secret=secret,
+            ttl_seconds=settings.provider_media_max_ttl_seconds,
+            max_file_bytes=settings.provider_media_max_file_bytes,
+        ),
     )

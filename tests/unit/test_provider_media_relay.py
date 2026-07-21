@@ -141,3 +141,34 @@ def test_http_relay_serves_valid_image_without_caching(tmp_path: Path) -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=1)
+
+
+def test_expired_media_cleanup_is_scheduled_independently() -> None:
+    root = Path(__file__).resolve().parents[2]
+    relay_service = (root / "infra/provider-media-relay/provider-media-relay.service").read_text(
+        encoding="utf-8"
+    )
+    service = (root / "infra/provider-media-relay/provider-media-cleanup.service").read_text(
+        encoding="utf-8"
+    )
+    timer = (root / "infra/provider-media-relay/provider-media-cleanup.timer").read_text(
+        encoding="utf-8"
+    )
+
+    cleanup_env = (
+        root / "infra/provider-media-relay/provider-media-cleanup.env.example"
+    ).read_text(encoding="utf-8")
+    runbook = (root / "infra/provider-media-relay/README.md").read_text(encoding="utf-8")
+
+    assert "User=shanhai-relay" in relay_service
+    assert "User=shanhai-dev" not in relay_service
+    assert "/opt/shanhaiedu/provider-media-relay/provider_media_relay.py" in relay_service
+    assert "/srv/shanhaiedu/repository" not in relay_service
+    assert "provider-media-cleanup.env" in service
+    assert "provider-media-relay.env" not in service
+    assert "SIGNING_SECRET" not in cleanup_env
+    assert "ReadWritePaths=/srv/shanhaiedu/runtime/provider-media" in service
+    assert "OnUnitActiveSec=60s" in timer
+    assert "Persistent=true" in timer
+    assert "systemctl restart shanhai-provider-media-relay.service" in runbook
+    assert "/proc/${relay_pid}/environ" in runbook

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 from decimal import Decimal
 from enum import StrEnum
+from uuid import UUID
 
 from apps.api.model_gateway.contracts import (
     GatewayErrorCode,
@@ -116,7 +117,12 @@ class DeterministicFakeVideoProvider:
         self.submit_calls = 0
         self.cancel_calls = 0
 
-    async def submit(self, request: VideoModelRequest) -> VideoProviderResult:
+    async def submit(
+        self,
+        request: VideoModelRequest,
+        *,
+        organization_id: UUID | None = None,
+    ) -> VideoProviderResult:
         self.submit_calls += 1
         if self._scenario == FakeVideoScenario.SUBMISSION_UNKNOWN:
             raise ModelGatewayError(GatewayErrorCode.SUBMISSION_UNKNOWN, retryable=False)
