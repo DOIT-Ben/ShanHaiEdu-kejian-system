@@ -291,7 +291,7 @@ def build_package(source_path: Path, output_root: Path, *, contracts_root: Path)
             contracts_root=contracts_root,
         )
 
-    for artifact in cast(list[dict[str, Any]], source["artifacts"]):
+    for artifact in cast(list[dict[str, Any]], source.get("artifacts", [])):
         key = cast(str, artifact["definition_key"])
         if key in node_keys:
             raise ValueError(f"duplicate content item: {key}")

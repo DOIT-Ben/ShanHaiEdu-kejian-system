@@ -171,6 +171,7 @@ def _ensure_test_authoring_workflow(session, published_version_id):
         dependencies=[],
         entrypoint=True,
     )
+    prepare.pop("output_persistence")
     material_entry = next(
         item for item in graph["nodes"] if item["node_key"] == "material.file_validate"
     )

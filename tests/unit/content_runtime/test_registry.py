@@ -87,7 +87,7 @@ def test_registry_loads_the_published_catalog_with_one_deterministic_order() -> 
     intro = registered.node_by_key["intro.generate_options"]
     assert intro.optional_input_contract_refs == ("artifact:intro_option_set_source",)
     assert intro.binding["optional_input_contract_refs"] == ("artifact:intro_option_set_source",)
-    assert len(registered.output_definition_index) == 24
+    assert len(registered.output_definition_index) == 25
     assert registered.output_definition_index is registered.indexes.output_definition_index
     assert {
         producer.node_key for producer in registered.producers_by_contract["asset:image_candidates"]
