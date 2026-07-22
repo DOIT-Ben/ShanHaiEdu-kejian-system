@@ -26,6 +26,13 @@ CONTEXT_SOURCE_REGISTRY = MappingProxyType(
         "intro_selection.snapshot": ContextSourceDefinition(
             "artifact", "selection:intro", ("intro_selection",), "lesson", "intro_options"
         ),
+        "intro_options.existing_version": ContextSourceDefinition(
+            "artifact",
+            "artifact:intro_option_set_source",
+            ("intro_option_set",),
+            "lesson",
+            "intro_options",
+        ),
         "lesson_division.approved_version": ContextSourceDefinition(
             "artifact",
             "approval:lesson_division",
@@ -140,6 +147,21 @@ ARTIFACT_CONTRACT_REGISTRY = MappingProxyType(
             ("intro_option_set",),
             "lesson",
             "intro_options",
+        ),
+        "artifact:intro_option_set_source": ContextSourceDefinition(
+            "artifact",
+            "artifact:intro_option_set_source",
+            ("intro_option_set",),
+            "lesson",
+            "intro_options",
+        ),
+        "approval:intro_option_set": ContextSourceDefinition(
+            "artifact",
+            "approval:intro_option_set",
+            ("intro_option_set",),
+            "lesson",
+            "intro_options",
+            True,
         ),
         "artifact:ppt_outline": ContextSourceDefinition(
             "artifact", "artifact:ppt_outline", ("ppt_outline",), "lesson", "ppt"

@@ -10,7 +10,7 @@
   "spec": {
     "template_key": "intro.generate_options",
     "title": "课程驱动导入方案",
-    "description": "以已批准课时、知识边界、最小教材证据和教师偏好，在一次生成中产出一套或三类九套最终课堂导入方案；完善已有创意时绑定一个exact来源版本。",
+    "description": "以已批准课时、知识边界、最小教材证据和教师偏好，在一次生成中产出一套或三类九套最终课堂导入方案。",
     "model_capability": "text.structured.creative_education",
     "input_definition_ref": {
       "item_key": "intro.generate_options.input",

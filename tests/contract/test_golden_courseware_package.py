@@ -187,10 +187,11 @@ def test_lesson_plan_has_twelve_sections_and_intro_is_a_separate_artifact() -> N
     scores = [option["recommendation_score"] for option in options]
     assert scores.count(max(scores)) == 1
     assert case["intro_selection"]["selection_method"] == "teacher_selected"
-    assert case["intro_option_set"]["existing_idea_version_ref"] is None
+    assert case["intro_option_set"]["source_intro_option_version_refs"] == []
     assert case["intro_selection"]["approval_ref"]["status"] == "approved"
-    assert case["intro_selection"]["approval_ref"]["artifact_version_id"] == (
-        case["intro_option_set"]["artifact_version_id"]
+    assert (
+        case["intro_selection"]["approval_ref"]["artifact_version_id"]
+        == (case["intro_option_set"]["artifact_version_id"])
     )
 
 
@@ -214,6 +215,49 @@ def test_teacher_selection_may_override_the_unique_recommendation() -> None:
     with pytest.raises(GoldenCoursewareValidationError) as caught:
         _validate_intro(case)
     assert caught.value.code == "GOLDEN_INTRO_SELECTION_INVALID"
+
+
+def test_intro_generation_modes_enforce_exact_source_cardinality() -> None:
+    case = copy.deepcopy(load_json(GOLDEN_CASE))
+    case["intro_option_set"]["source_intro_option_version_refs"] = [
+        "018f2000-0000-7000-8000-000000000029"
+    ]
+    with pytest.raises(GoldenCoursewareValidationError) as caught:
+        _validate_intro(case)
+    assert caught.value.code == "GOLDEN_INTRO_SOURCE_INVALID"
+
+    refined = copy.deepcopy(load_json(GOLDEN_CASE))
+    option = copy.deepcopy(refined["intro_option_set"]["options"][0])
+    refined["intro_option_set"].update(
+        {
+            "generation_mode": "refine_existing",
+            "source_intro_option_version_refs": [],
+            "options": [option],
+        }
+    )
+    refined["intro_selection"].update(
+        {"option_key": option["option_key"], "snapshot": copy.deepcopy(option)}
+    )
+    with pytest.raises(GoldenCoursewareValidationError) as caught:
+        _validate_intro(refined)
+    assert caught.value.code == "GOLDEN_INTRO_SOURCE_INVALID"
+
+    refined["intro_option_set"]["source_intro_option_version_refs"] = [
+        "018f2000-0000-7000-8000-000000000029"
+    ]
+    _validate_intro(refined)
+
+
+def test_intro_selection_requires_the_exact_approved_option_set_version() -> None:
+    case = copy.deepcopy(load_json(GOLDEN_CASE))
+    case["intro_selection"]["approval_ref"]["artifact_version_id"] = (
+        "018f2000-0000-7000-8000-000000000099"
+    )
+
+    with pytest.raises(GoldenCoursewareValidationError) as caught:
+        _validate_intro(case)
+
+    assert caught.value.code == "GOLDEN_INTRO_APPROVAL_INVALID"
 
 
 def test_lesson_ppt_and_video_can_start_from_fixed_branch_inputs() -> None:
@@ -409,7 +453,7 @@ def test_course_grounded_intro_options_keep_one_current_contract() -> None:
     ]
 
     output_fields = {field["field_key"] for field in generate_options["output"]["fields"]}
-    assert {"generation_mode", "existing_idea_version_ref"} <= output_fields
+    assert {"generation_mode", "source_intro_option_version_refs"} <= output_fields
 
 
 def test_retired_intro_contract_tokens_are_absent_from_current_tree() -> None:

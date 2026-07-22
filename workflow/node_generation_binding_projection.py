@@ -144,12 +144,18 @@ def _validate_artifact_declaration(
 
 def _validate_artifact_relations(node: dict[str, Any], artifact: dict[str, Any]) -> None:
     relation_keys: set[tuple[str, str]] = set()
+    optional_inputs = set(cast(list[str], node.get("optional_input_contract_refs", [])))
     for relation in cast(list[dict[str, Any]], artifact["relations"]):
         source_binding = cast(str, relation["source_binding"])
         if source_binding not in node["input_contract_refs"]:
             raise NodeGenerationBindingError(
                 "NODE_BINDING_RELATION_SOURCE_INVALID",
                 f"relation source is not an input contract: {source_binding}",
+            )
+        if (relation.get("optional") is True) != (source_binding in optional_inputs):
+            raise NodeGenerationBindingError(
+                "NODE_BINDING_RELATION_OPTIONALITY_INVALID",
+                f"relation optionality does not match its input: {source_binding}",
             )
         identity_key = (source_binding, cast(str, relation["binding_key"]))
         if identity_key in relation_keys:

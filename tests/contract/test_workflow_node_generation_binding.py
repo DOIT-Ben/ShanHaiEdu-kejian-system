@@ -125,6 +125,10 @@ def test_schema_and_complete_primary_math_catalog_are_valid() -> None:
     assert lesson_plan_index.quality_validate_node_key == "lesson_plan.validate"
     assert lesson_plan_index.quality_gate_node_key == "lesson_plan.approve"
     assert lesson_plan_index.quality_requirement_mode == "reports"
+    intro_index = validated.indexes.output_definition_index["intro.generate_options.output"]
+    assert intro_index.quality_validate_node_key == "intro.validate"
+    assert intro_index.quality_gate_node_key == "intro.approve"
+    assert intro_index.quality_requirement_mode == "reports"
     lesson_generate = node_by_key(catalog, "lesson.division.generate")
     assert lesson_generate["context_policy"]["allowed_sources"] == [
         "material.approved_parse",
@@ -636,12 +640,13 @@ def test_intro_approval_is_independent_from_selection() -> None:
     assert generate["input_contract_refs"] == [
         "approval:lesson_division",
         "content:material_evidence",
-        "artifact:intro_option_set",
+        "artifact:intro_option_set_source",
     ]
+    assert generate["optional_input_contract_refs"] == ["artifact:intro_option_set_source"]
     source_relation = next(
         relation
         for relation in generate["output_persistence"]["artifact"]["relations"]
-        if relation["source_binding"] == "artifact:intro_option_set"
+        if relation["source_binding"] == "artifact:intro_option_set_source"
     )
     assert source_relation["optional"] is True
     assert validate["output_contract_refs"] == ["report:intro_quality"]
@@ -665,6 +670,33 @@ def test_intro_approval_is_independent_from_selection() -> None:
     assert select["dependencies"] == ["intro.approve"]
     assert select["quality_requirement"] == {"mode": "none"}
     assert select["approval_policy"]["mode"] == "policy_allowed"
+
+
+def test_optional_inputs_must_be_declared_inputs() -> None:
+    catalog = load_catalog()
+    generate = node_by_key(catalog, "intro.generate_options")
+    generate["optional_input_contract_refs"] = ["artifact:undeclared"]
+
+    assert_rejected(catalog, "NODE_BINDING_OPTIONAL_INPUT_INVALID")
+
+
+@pytest.mark.parametrize(("declare_input", "optional_relation"), [(False, True), (True, False)])
+def test_relation_optionality_must_match_the_input_contract(
+    declare_input: bool, optional_relation: bool
+) -> None:
+    catalog = load_catalog()
+    generate = node_by_key(catalog, "intro.generate_options")
+    generate["optional_input_contract_refs"] = (
+        ["artifact:intro_option_set_source"] if declare_input else []
+    )
+    source_relation = next(
+        relation
+        for relation in generate["output_persistence"]["artifact"]["relations"]
+        if relation["source_binding"] == "artifact:intro_option_set_source"
+    )
+    source_relation["optional"] = optional_relation
+
+    assert_rejected(catalog, "NODE_BINDING_RELATION_OPTIONALITY_INVALID")
 
 
 def test_catalog_hides_internal_structure_and_exposes_only_business_prompt() -> None:
@@ -695,7 +727,7 @@ def test_catalog_hash_is_deterministic_for_semantically_identical_objects() -> N
     assert first_validated.canonical_json == second_validated.canonical_json
     assert first_validated.content_hash == second_validated.content_hash
     assert first_validated.content_hash == (
-        "80ba4a5f69537c4838a7b43ad19161ed6359083119f98dd3ca5a71e02df23bb2"
+        "79610697638fcc78ae1d0db0ac8a98a5007ae50942af9f17a99ca1f8168dc105"
     )
 
 

@@ -10,7 +10,7 @@
   "spec": {
     "template_key": "intro.generate_options.prompt",
     "title": "课程驱动导入方案业务Prompt",
-    "description": "以已批准课时、知识边界、最小教材证据和教师偏好，在一次生成中产出一套或三类九套最终课堂导入方案；完善已有创意时绑定一个exact来源版本。",
+    "description": "以已批准课时、知识边界、最小教材证据和教师偏好，在一次生成中产出一套或三类九套最终课堂导入方案。",
     "model_capability": "text.structured.creative_education",
     "input_definition_ref": {
       "item_key": "intro.generate_options.input",
@@ -31,7 +31,7 @@
       {
         "section_key": "task",
         "layer": "task",
-        "content": "读取目标课时稳定键、知识点、一句话学习目标、教学内容边界、must_not_preteach、年级或年龄段、教材证据摘要及可选教师创意、媒介和时长偏好，在一次调用中直接生成最终intro_option_set。default_nine禁止已有创意来源并生成九套；refine_existing必须基于一个exact已有方案版本只完善一套。不要生成教案正文、PPT、分镜、旁白、字幕、资产、Provider参数或费用。",
+        "content": "读取目标课时稳定键、知识点、一句话学习目标、教学内容边界、must_not_preteach、年级或年龄段、教材证据摘要及可选教师创意、媒介和时长偏好，在一次调用中直接生成最终intro_option_set。default_nine生成九套；refine_existing只完善一套。不要生成教案正文、PPT、分镜、旁白、字幕、资产、Provider参数或费用。",
         "editable": true,
         "visible_to_teacher": true
       },
@@ -45,7 +45,7 @@
       {
         "section_key": "quality_gate",
         "layer": "quality_gate",
-        "content": "default_nine来源版本为0、主要倾向各恰好三套且至少一套包含两个以上辅助倾向；refine_existing来源版本恰好1且方案恰好1套。每套必须可追溯目标课时、知识点和教材证据，创意与课程依据存在实质关联；不得提前讲出需要学生发现的定义、写法、方法或结论；default_nine最高推荐分必须唯一；不得把三种倾向解释为互斥类别；输出不含完整教案、PPT、视频产物、Provider和费用。",
+        "content": "default_nine主要倾向各恰好三套，至少一套包含两个以上辅助倾向；refine_existing恰好一套。每套必须可追溯目标课时、知识点和教材证据，创意与课程依据存在实质关联；不得提前讲出需要学生发现的定义、写法、方法或结论；default_nine最高推荐分必须唯一；不得把三种倾向解释为互斥类别；输出不含完整教案、PPT、视频产物、Provider和费用。",
         "editable": false,
         "visible_to_teacher": false
       }
@@ -66,14 +66,6 @@
         "exposure": "summary",
         "max_items": 50,
         "max_bytes": 300000
-      },
-      {
-        "binding_key": "existing_intro_option",
-        "source": "intro_options.existing_version",
-        "required": false,
-        "exposure": "full",
-        "max_items": 1,
-        "max_bytes": 100000
       }
     ],
     "user_edit_policy": {

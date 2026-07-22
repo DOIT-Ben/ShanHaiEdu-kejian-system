@@ -11,7 +11,7 @@
 - `sse-event.schema.json`：统一事件信封。
 - `creation-lifecycle-event.schema.json`：提示词版本、候选采用、项目写回和下游stale传播事件。
 - `workflow-node-status.schema.json`：节点状态枚举。
-- `intro-option-set.schema.json`：课程驱动的三类九套导入设计、课程追溯和选择交接。
+- `intro-option-set.schema.json`：课程驱动的一套/三类九套导入设计、0/1 exact来源版本和课程追溯。
 - `ppt-page-spec.schema.json`：PPT逐页四层结构、白底和可编辑内容合同。
 - `video-shot.schema.json`：细分镜、垫图引用和6至30秒逻辑生成合同。
 - `creation-package.schema.json`：项目导入通用创作台的不可变包；兼容旧包，2.0包强制工作流来源、上下文快照和目标槽位。
@@ -19,20 +19,20 @@
 - `material-evidence-package.schema.json`：教材PDF页级文本块、图片引用和来源追溯合同。
 - `content-package-manifest.schema.json`：可导入内容包的版本、条目、路径、Schema和哈希清单。
 - `content-item.schema.json`：内容项共同信封。
-- `input-definition.schema.json`：教师输入、系统补全、上下文注入和UI可见性。
+- `input-definition.schema.json`：教师输入、系统补全、上下文注入、UI可见性和跨字段条件要求。
 - `style-preset.schema.json`：图片、视频和PPT的视觉语言及模态扩展。
 - `prompt-template.schema.json`：业务Prompt分层、Context白名单和教师修订策略。
 - `projection-template.schema.json`：结构化事实到完整提示词和教师可读文档的确定性投影。
 - `generation-template.schema.json`：输入、风格、Prompt、输出、投影和逻辑能力的组合。
 - `builtin-generation-source.schema.json`：仓库内置业务生成源的紧凑声明合同；由确定性构建器展开为可发布内容包。
 - `golden-courseware-case.schema.json`：黄金教材、教案、三类九套、PPT、视频、音频和交付期望的跨成果测试合同。
-- `workflow-node-generation-binding.schema.json`：v2业务节点执行类型、47节点显式拓扑、生成模板、validator descriptor、三类参考策略、Artifact/CreationPackage输出投影、质量报告和人工门禁的声明式绑定目录。
+- `workflow-node-generation-binding.schema.json`：v2业务节点执行类型、48节点显式拓扑、必需/可选输入、生成模板、validator descriptor、三类参考策略、Artifact/CreationPackage输出投影、质量报告和人工/策略门禁的声明式绑定目录。
 - `markdown-template-draft.schema.json`：普通Markdown导入后的可审核模板草稿。
 - `markdown-template-compilation-profile.schema.json`：已审核模板草稿编译为内容包时的显式发布配置。
 - `mock-scenarios.json`：前端必须覆盖的关键 Mock 场景。
 - `fixtures/stage0/`：项目、上传、任务、工作流聚合、错误和SSE的确定性合同样例。
 - `fixtures/creation-lifecycle/`：project/standalone批次、提示词版本、采用、项目写回、CreationPackage 2.0和stale事件样例。
-- `fixtures/workflow-node-generation-bindings/`：覆盖教材、课时、教案、三类九套、PPT、图片、视频、音频和交付的47节点完整脱敏目录样例（22个`model_generation`、13个`deterministic`、12个`human_gate`）。
+- `fixtures/workflow-node-generation-bindings/`：覆盖教材、课时、教案、三类九套、PPT、图片、视频、音频和交付的48节点完整脱敏目录样例（22个`model_generation`、13个`deterministic`、13个`human_gate`）。
 - `fixtures/primary-math-courseware-package/`：由内置生成源确定性展开的首套小学数学业务内容包；22个模型节点均有输入、Prompt、输出、投影和生成模板。
 - `fixtures/golden-projects/`：不包含原教材和媒体文件的脱敏黄金项目；固定可复现实例、上下文隔离、跨成果质量不变量和分支可消费的精确规划输出。
 - `generated/`：由当前OpenAPI确定性生成的bundle和TypeScript类型，不是第二份手工合同。

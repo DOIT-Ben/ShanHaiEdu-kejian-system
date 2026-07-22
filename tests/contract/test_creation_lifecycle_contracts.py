@@ -6,6 +6,7 @@ import pytest
 from jsonschema import ValidationError
 
 from apps.api.main import create_app
+from apps.api.projects.policy_schemas import UpdateAutomationPolicyRequest
 from apps.api.settings import Settings
 from tests.contract.test_stage0_contracts import (
     CONTRACTS,
@@ -86,6 +87,12 @@ def test_execution_modes_share_a_new_policy_contract_without_removing_legacy_inp
     validate({**shared_project, "execution_mode": "guided"}, current_project)
     validate({**shared_project, "automation_mode": "assisted"}, legacy_project)
     assert_invalid({**shared_project, "automation_mode": "assisted"}, current_project)
+
+    explicit_selection = UpdateAutomationPolicyRequest(
+        node_rules=[{"node_key": "intro.select", "auto_select": True}]
+    )
+    assert explicit_selection.node_rules is not None
+    assert explicit_selection.node_rules[0].auto_select is True
 
 
 def test_project_limits_and_policy_etags_match_runtime_contract() -> None:

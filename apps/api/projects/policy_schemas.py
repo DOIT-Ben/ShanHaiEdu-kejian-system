@@ -18,6 +18,7 @@ class AutomationNodeRule(BaseModel):
     auto_start: bool | None = None
     auto_submit: bool | None = None
     auto_approve: bool | None = None
+    auto_select: bool | None = None
     auto_adopt: bool | None = None
     auto_save_to_project: bool | None = None
     pause_after: bool | None = None
@@ -55,6 +56,7 @@ MANUAL_DISABLED_RULE = AutomationNodeRule(
     auto_start=False,
     auto_submit=False,
     auto_approve=False,
+    auto_select=False,
     auto_adopt=False,
     auto_save_to_project=False,
     pause_after=True,

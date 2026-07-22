@@ -75,8 +75,8 @@ def test_registry_loads_the_published_catalog_with_one_deterministic_order() -> 
 
     registered = BUILTIN_WORKFLOW_REGISTRY.load(catalog)
 
-    assert len(registered.graph.nodes) == 47
-    assert len(registered.topological_order) == 47
+    assert len(registered.graph.nodes) == 48
+    assert len(registered.topological_order) == 48
     assert set(registered.topological_order) == {node["node_key"] for node in catalog["nodes"]}
     lesson_plan = registered.node_by_key["lesson_plan.generate"]
     assert lesson_plan.execution_scope == "lesson_unit"
@@ -84,6 +84,9 @@ def test_registry_loads_the_published_catalog_with_one_deterministic_order() -> 
     assert lesson_plan.entrypoint is True
     assert lesson_plan.dependencies == ()
     assert lesson_plan.binding["output_persistence"]
+    intro = registered.node_by_key["intro.generate_options"]
+    assert intro.optional_input_contract_refs == ("artifact:intro_option_set_source",)
+    assert intro.binding["optional_input_contract_refs"] == ("artifact:intro_option_set_source",)
     assert len(registered.output_definition_index) == 22
     assert registered.output_definition_index is registered.indexes.output_definition_index
     assert {
@@ -93,6 +96,17 @@ def test_registry_loads_the_published_catalog_with_one_deterministic_order() -> 
         "video.style_master.image.generate",
     }
     assert registered.require_output_projection() is None
+
+
+def test_registry_rejects_optional_inputs_outside_declared_inputs() -> None:
+    catalog = load_catalog()
+    intro = next(node for node in catalog["nodes"] if node["node_key"] == "intro.generate_options")
+    intro["optional_input_contract_refs"] = ["artifact:undeclared"]
+
+    with pytest.raises(WorkflowDefinitionError) as caught:
+        BUILTIN_WORKFLOW_REGISTRY.load(catalog)
+
+    assert caught.value.code == "WORKFLOW_OPTIONAL_INPUT_INVALID"
 
 
 @pytest.mark.parametrize("explicit_version", (False, True))

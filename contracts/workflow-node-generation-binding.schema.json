@@ -422,6 +422,7 @@
         "source_binding": {"$ref": "#/$defs/contractRef"},
         "relation_type": {"enum": ["derives_from", "references", "constrains"]},
         "binding_key": {"$ref": "#/$defs/key"},
+        "optional": {"type": "boolean", "default": false},
         "impact_scope": {"$ref": "#/$defs/impactScope"}
       }
     },
@@ -717,6 +718,12 @@
           "maxItems": 100,
           "items": {"$ref": "#/$defs/contractRef"}
         },
+        "optional_input_contract_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 100,
+          "items": {"$ref": "#/$defs/contractRef"}
+        },
         "output_contract_refs": {
           "type": "array",
           "minItems": 1,
@@ -828,7 +835,9 @@
               },
               "approval_policy": {
                 "type": "object",
-                "properties": {"mode": {"const": "human_required"}},
+                "properties": {
+                  "mode": {"enum": ["human_required", "policy_allowed"]}
+                },
                 "required": ["mode"]
               }
             }

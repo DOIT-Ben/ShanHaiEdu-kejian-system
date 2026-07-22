@@ -793,7 +793,11 @@
       },
       "input_contract_refs": [
         "approval:lesson_division",
-        "content:material_evidence"
+        "content:material_evidence",
+        "artifact:intro_option_set_source"
+      ],
+      "optional_input_contract_refs": [
+        "artifact:intro_option_set_source"
       ],
       "output_contract_refs": [
         "artifact:intro_option_set"
@@ -836,7 +840,8 @@
         "mode": "declared",
         "allowed_sources": [
           "lesson_division.approved_version",
-          "material.approved_parse"
+          "material.approved_parse",
+          "intro_options.existing_version"
         ],
         "forbidden_sources": [
           "lesson_plan.approved_version",
@@ -919,6 +924,20 @@
               "source_binding": "approval:lesson_division",
               "relation_type": "derives_from",
               "binding_key": "upstream.approval.lesson_division",
+              "impact_scope": {
+                "mode": "keyed",
+                "selector": "lesson_key",
+                "keys": {
+                  "source": "runtime",
+                  "pointer": "/lesson_key"
+                }
+              }
+            },
+            {
+              "source_binding": "artifact:intro_option_set_source",
+              "relation_type": "derives_from",
+              "binding_key": "upstream.artifact.intro_option_set_source",
+              "optional": true,
               "impact_scope": {
                 "mode": "keyed",
                 "selector": "lesson_key",
@@ -1040,13 +1059,77 @@
       }
     },
     {
+      "node_key": "intro.approve",
+      "title": "导入方案集批准",
+      "phase": "intro",
+      "execution_kind": "human_gate",
+      "input_contract_refs": [
+        "artifact:intro_option_set",
+        "report:intro_quality"
+      ],
+      "output_contract_refs": [
+        "approval:intro_option_set"
+      ],
+      "prompt_exposure_policy": {
+        "teacher_business_prompt": "not_applicable",
+        "internal_template": "server_only",
+        "output_contract": "server_only",
+        "validation_and_repair": "server_only",
+        "provider_format": "server_only",
+        "structure_change_authority": "administrator_release_only"
+      },
+      "instruction_policy": {
+        "mode": "none",
+        "refs": []
+      },
+      "context_policy": {
+        "mode": "none",
+        "allowed_sources": [],
+        "forbidden_sources": []
+      },
+      "reference_asset_policy": {
+        "mode": "none",
+        "roles": []
+      },
+      "validator_refs": [
+        {
+          "key": "validator.approval.actor",
+          "semantic_version": "1.0.0",
+          "implementation_digest": "7cd7e6e75a7b72ca7f3810fe8f49932c85a2c47898eb636c988cc3aa9ce2869d"
+        }
+      ],
+      "repair_policy": {
+        "mode": "none"
+      },
+      "approval_policy": {
+        "mode": "policy_allowed",
+        "required_before_downstream": true
+      },
+      "execution_scope": "lesson_unit",
+      "branch_key": "intro_options",
+      "dependencies": [
+        "intro.generate_options",
+        "intro.validate"
+      ],
+      "entrypoint": false,
+      "quality_requirement": {
+        "mode": "reports",
+        "report_refs": [
+          "report:intro_quality"
+        ],
+        "accepted_conclusions": [
+          "passed"
+        ]
+      }
+    },
+    {
       "node_key": "intro.select",
       "title": "课堂导入方案选择",
       "phase": "intro",
       "execution_kind": "human_gate",
       "input_contract_refs": [
         "artifact:intro_option_set",
-        "report:intro_quality"
+        "approval:intro_option_set"
       ],
       "output_contract_refs": [
         "selection:intro"
@@ -1088,24 +1171,17 @@
         "mode": "none"
       },
       "approval_policy": {
-        "mode": "human_required",
+        "mode": "policy_allowed",
         "required_before_downstream": true
       },
       "execution_scope": "lesson_unit",
       "branch_key": "intro_options",
       "dependencies": [
-        "intro.generate_options",
-        "intro.validate"
+        "intro.approve"
       ],
       "entrypoint": false,
       "quality_requirement": {
-        "mode": "reports",
-        "report_refs": [
-          "report:intro_quality"
-        ],
-        "accepted_conclusions": [
-          "passed"
-        ]
+        "mode": "none"
       }
     },
     {
@@ -5257,6 +5333,7 @@
   ],
   "external_input_contract_refs": [
     "content:lesson_plan",
+    "artifact:intro_option_set_source",
     "material:file_asset"
   ]
 }

@@ -241,12 +241,17 @@ def _validate_intro(case: dict[str, Any]) -> None:
         _fail("GOLDEN_INTRO_KNOWLEDGE_SOURCE_INVALID", "intro knowledge point differs from lesson")
     counts = Counter(option["primary_tendency"] for option in options)
     generation_mode = cast(str, option_set["generation_mode"])
+    source_refs = cast(list[str], option_set["source_intro_option_version_refs"])
     if generation_mode == "default_nine":
+        if source_refs:
+            _fail("GOLDEN_INTRO_SOURCE_INVALID", "default_nine forbids an existing source")
         if counts != Counter({"science": 3, "application": 3, "story": 3}):
             _fail("GOLDEN_INTRO_TENDENCY_COUNT_INVALID", "primary tendencies must be three each")
         if not any(len(option["secondary_tendencies"]) >= 2 for option in options):
             _fail("GOLDEN_INTRO_TENDENCY_CROSS_MISSING", "golden options need crossed tendencies")
     elif generation_mode == "refine_existing":
+        if len(source_refs) != 1:
+            _fail("GOLDEN_INTRO_SOURCE_INVALID", "refine_existing requires one exact source")
         if len(options) != 1:
             _fail("GOLDEN_INTRO_TENDENCY_COUNT_INVALID", "refine_existing must keep one option")
     else:
@@ -273,6 +278,15 @@ def _validate_intro(case: dict[str, Any]) -> None:
                 "intro option omits forbidden preteach items",
             )
     selection = cast(dict[str, Any], case["intro_selection"])
+    approval_ref = cast(dict[str, Any], selection["approval_ref"])
+    if (
+        approval_ref["status"] != "approved"
+        or approval_ref["artifact_version_id"] != option_set["artifact_version_id"]
+    ):
+        _fail(
+            "GOLDEN_INTRO_APPROVAL_INVALID",
+            "intro selection must bind the approved option-set version",
+        )
     selected = next(
         (option for option in options if option["option_key"] == selection["option_key"]),
         None,

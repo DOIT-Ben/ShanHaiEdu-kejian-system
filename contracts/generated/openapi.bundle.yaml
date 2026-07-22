@@ -981,6 +981,8 @@ components:
           type: boolean
         auto_approve:
           type: boolean
+        auto_select:
+          type: boolean
         auto_adopt:
           type: boolean
         auto_save_to_project:
@@ -3525,6 +3527,7 @@ components:
         - option_set_id
         - lesson_unit_id
         - generation_mode
+        - source_intro_option_version_refs
         - source_lesson_unit_key
         - knowledge_point
         - status
@@ -3542,6 +3545,13 @@ components:
           enum:
             - default_nine
             - refine_existing
+        source_intro_option_version_refs:
+          type: array
+          maxItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
         source_lesson_unit_key:
           type: string
           minLength: 1
@@ -3573,11 +3583,16 @@ components:
                 const: default_nine
           then:
             properties:
+              source_intro_option_version_refs:
+                maxItems: 0
               options:
                 minItems: 9
                 maxItems: 9
           else:
             properties:
+              source_intro_option_version_refs:
+                minItems: 1
+                maxItems: 1
               options:
                 minItems: 1
                 maxItems: 1

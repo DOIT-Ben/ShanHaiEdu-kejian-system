@@ -342,9 +342,7 @@ def test_optional_relation_is_omitted_only_when_its_source_is_absent() -> None:
     with_source = _compile(binding)
 
     assert without_source.artifact_write.relations == ()
-    assert with_source.artifact_write.relations[0].from_artifact_version_id == (
-        UPSTREAM_VERSION_ID
-    )
+    assert with_source.artifact_write.relations[0].from_artifact_version_id == (UPSTREAM_VERSION_ID)
 
 
 def test_required_relation_still_rejects_a_missing_source() -> None:

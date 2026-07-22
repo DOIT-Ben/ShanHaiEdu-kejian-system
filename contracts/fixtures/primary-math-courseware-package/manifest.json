@@ -4,7 +4,7 @@
   "name": "小学数学标准课件生产内容包",
   "semantic_version": "1.1.0",
   "runtime_constraint": ">=0.1.0 <1.0.0",
-  "change_summary": "发布显式47节点拓扑、22个模型节点输出持久化、质量报告/人工门禁声明和受限Artifact/CreationPackage投影合同；保留首套课时、教案、导入、PPT、图片、视频和音频业务生成合同。",
+  "change_summary": "发布显式48节点拓扑、22个模型节点输出持久化、质量报告/人工门禁声明和受限Artifact/CreationPackage投影合同；固定导入方案一套/九套、exact来源、独立批准和选择语义。",
   "dependencies": [],
   "items": [
     {
@@ -89,21 +89,21 @@
       "kind": "input_definition",
       "path": "items/intro-generate-options-input.json",
       "schema_id": "https://shanhaiedu.local/contracts/input-definition.schema.json",
-      "sha256": "a6e6d98dd5d350667b9e13121ea8dcfd22c4aa8bd034b2b201f6e853f8b8d5d9"
+      "sha256": "205904030fdf9c5323f093a075edcf3641b4d26534775e23da050031e45705a7"
     },
     {
       "item_key": "intro.generate_options.output",
       "kind": "content_definition",
       "path": "items/intro-generate-options-output.json",
       "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
-      "sha256": "3b52fafba7e37543d1e29d3377a1bdf4f625b8a6cec035f217583d1c8474cf28"
+      "sha256": "b9cc12772863821d328889319cd958108f49f4d5af296839869bce237099cd0a"
     },
     {
       "item_key": "intro.generate_options.prompt",
       "kind": "prompt_template",
       "path": "items/intro-generate-options-prompt.json",
       "schema_id": "https://shanhaiedu.local/contracts/prompt-template.schema.json",
-      "sha256": "ac5e793a14fb0d6e9d769edfded4d2bc3061af29774c4c00fb7e00b73bcb055b"
+      "sha256": "4a38faaeec92bcd61151eb172a3517e4b00024b04986260cf0ad7342b4e3486d"
     },
     {
       "item_key": "intro.generate_options.projection",
@@ -117,7 +117,7 @@
       "kind": "generation_template",
       "path": "items/intro-generate-options-generation.json",
       "schema_id": "https://shanhaiedu.local/contracts/generation-template.schema.json",
-      "sha256": "9140b8fa6b7470cda58dbfe09eed145af16fe09b63b4d6ecac65ac95ffaf481a"
+      "sha256": "b898282ebe7917d0b454694906d62feea1bf580e37073a9c6c61cba8ba9dad06"
     },
     {
       "item_key": "ppt.content_analyze.input",
