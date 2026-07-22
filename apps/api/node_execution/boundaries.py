@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
 from apps.api.runtime_boundary.ports import RuntimeNodeDefinition, WorkflowExecutionContext
@@ -42,6 +42,7 @@ def validate_execution_boundary(
             "NODE_EXECUTION_BINDING_MISMATCH",
             "the node binding does not match the fixed execution context",
         )
+    _validate_optional_inputs(binding)
     _require_template(binding, definition)
     persistence = _as_mapping(binding.get("output_persistence"))
     if persistence is None or _as_mapping(persistence.get("artifact")) is None:
@@ -116,6 +117,26 @@ def _require_template(
             "NODE_EXECUTION_TEMPLATE_MISMATCH",
             "the published generation template identity is inconsistent",
         )
+
+
+def _validate_optional_inputs(binding: Mapping[str, Any]) -> None:
+    inputs = _string_set(binding.get("input_contract_refs", ()))
+    optional = _string_set(binding.get("optional_input_contract_refs", ()))
+    if inputs is None or optional is None or not optional <= inputs:
+        raise NodeExecutionBoundaryError(
+            "NODE_EXECUTION_OPTIONAL_INPUT_INVALID",
+            "the published optional inputs are inconsistent with declared inputs",
+        )
+
+
+def _string_set(value: object) -> set[str] | None:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        return None
+    items = tuple(cast(Sequence[object], value))
+    if any(type(item) is not str or not item for item in items):
+        return None
+    strings = cast(tuple[str, ...], items)
+    return set(strings) if len(strings) == len(set(strings)) else None
 
 
 def _require_equal(left: object, right: object, code: str) -> None:

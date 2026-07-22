@@ -29,6 +29,7 @@ class WorkflowNodeDefinition:
     input_contract_refs: tuple[str, ...]
     output_contract_refs: tuple[str, ...]
     binding: Mapping[str, Any]
+    optional_input_contract_refs: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

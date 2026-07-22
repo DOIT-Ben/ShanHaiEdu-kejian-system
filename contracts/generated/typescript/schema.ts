@@ -625,6 +625,7 @@ export interface components {
             auto_start?: boolean;
             auto_submit?: boolean;
             auto_approve?: boolean;
+            auto_select?: boolean;
             auto_adopt?: boolean;
             auto_save_to_project?: boolean;
             pause_after?: boolean;
@@ -1520,6 +1521,7 @@ export interface components {
             lesson_unit_id: string;
             /** @enum {unknown} */
             generation_mode: "default_nine" | "refine_existing";
+            source_intro_option_version_refs: string[];
             source_lesson_unit_key: string;
             knowledge_point: string;
             /** @enum {unknown} */

@@ -6,6 +6,7 @@ import pytest
 from jsonschema import ValidationError
 
 from apps.api.main import create_app
+from apps.api.projects.policy_schemas import UpdateAutomationPolicyRequest
 from apps.api.settings import Settings
 from tests.contract.test_stage0_contracts import (
     CONTRACTS,
@@ -44,6 +45,7 @@ def test_execution_modes_share_a_new_policy_contract_without_removing_legacy_inp
     assert schemas["AutomationPolicyMode"]["enum"] == ["guided", "automatic"]
     assert schemas["AutomationMode"]["deprecated"] is True
     assert schemas["AutomationMode"]["enum"] == ["manual", "assisted", "automatic"]
+    assert "auto_select" in schemas["AutomationNodeRule"]["properties"]
 
     create_project = deepcopy(schemas["CreateProjectRequest"])
     create_project["components"] = deepcopy(openapi["components"])
@@ -86,6 +88,12 @@ def test_execution_modes_share_a_new_policy_contract_without_removing_legacy_inp
     validate({**shared_project, "automation_mode": "assisted"}, legacy_project)
     assert_invalid({**shared_project, "automation_mode": "assisted"}, current_project)
 
+    explicit_selection = UpdateAutomationPolicyRequest(
+        node_rules=[{"node_key": "intro.select", "auto_select": True}]
+    )
+    assert explicit_selection.node_rules is not None
+    assert explicit_selection.node_rules[0].auto_select is True
+
 
 def test_project_limits_and_policy_etags_match_runtime_contract() -> None:
     openapi = load_openapi()
@@ -106,6 +114,7 @@ def test_project_limits_and_policy_etags_match_runtime_contract() -> None:
     runtime = create_app(settings=Settings(_env_file=None, environment="test")).openapi()
     runtime_operations = operations_by_id(runtime)
     runtime_schemas = runtime["components"]["schemas"]
+    assert "auto_select" in runtime_schemas["AutomationNodeRule"]["properties"]
     assert (
         runtime_schemas["SavePromptVersionRequest"]["properties"]["reference_asset_version_ids"][
             "uniqueItems"

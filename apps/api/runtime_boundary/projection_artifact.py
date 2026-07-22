@@ -180,6 +180,15 @@ def _compile_relations(
     compiled: list[GeneratedArtifactRelation] = []
     identities: set[tuple[str, str]] = set()
     for raw in cast(Sequence[object], raw_relations):
+        declaration = require_mapping(raw, "OUTPUT_PROJECTION_RELATION_INVALID")
+        source = declaration.get("source_binding")
+        if (
+            declaration.get("optional") is True
+            and isinstance(source, str)
+            and source in allowed_source_bindings
+            and source not in upstream_artifacts
+        ):
+            continue
         relation = _compile_relation(
             raw,
             execution=execution,
@@ -188,7 +197,6 @@ def _compile_relations(
             upstream_artifacts=upstream_artifacts,
             allowed_source_bindings=allowed_source_bindings,
         )
-        source = require_mapping(raw, "OUTPUT_PROJECTION_RELATION_INVALID").get("source_binding")
         identity = (cast(str, source), relation.binding_key)
         if identity in identities:
             raise OutputProjectionError(

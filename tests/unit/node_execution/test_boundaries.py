@@ -106,6 +106,7 @@ def test_rejects_execution_context_mismatches_before_model_call(
         ("template_ref", "NODE_EXECUTION_TEMPLATE_MISMATCH"),
         ("template_payload", "NODE_EXECUTION_TEMPLATE_MISMATCH"),
         ("missing_projection", "NODE_EXECUTION_PROJECTION_MISSING"),
+        ("optional_input", "NODE_EXECUTION_OPTIONAL_INPUT_INVALID"),
     ],
 )
 def test_rejects_untrusted_or_incomplete_definition_before_model_call(
@@ -130,8 +131,11 @@ def test_rejects_untrusted_or_incomplete_definition_before_model_call(
         }
     elif mutation == "template_payload":
         template["spec"] = {"template_key": "other.generate"}
-    else:
+    elif mutation == "missing_projection":
         binding.pop("output_persistence")
+    else:
+        binding["input_contract_refs"] = ["approval:lesson_plan"]
+        binding["optional_input_contract_refs"] = ["artifact:undeclared"]
     current = replace(current, node_binding=binding, generation_template=template)
 
     with pytest.raises(NodeExecutionBoundaryError) as caught:

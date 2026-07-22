@@ -10,7 +10,7 @@
   "spec": {
     "definition_key": "intro.generate_options.output",
     "title": "课程驱动导入方案输出",
-    "description": "一套或三类九套完整导入方案、0或1个exact来源版本、默认路径唯一最高推荐分和可冻结选择快照。",
+    "description": "一套或三类九套完整导入方案、默认路径唯一最高推荐分和可冻结选择快照。",
     "definition_role": "artifact",
     "fields": [
       {
@@ -21,37 +21,6 @@
         "editable": false,
         "deletable": false,
         "visibility": "hidden"
-      },
-      {
-        "field_key": "generation_mode",
-        "label": "生成方式",
-        "type": "enum",
-        "required": true,
-        "editable": false,
-        "deletable": false,
-        "visibility": "hidden",
-        "options": [
-          {
-            "value": "default_nine",
-            "label": "三类九套"
-          },
-          {
-            "value": "refine_existing",
-            "label": "完善已有创意"
-          }
-        ]
-      },
-      {
-        "field_key": "source_intro_option_version_refs",
-        "label": "已有创意来源版本",
-        "type": "list",
-        "required": true,
-        "editable": false,
-        "deletable": false,
-        "visibility": "hidden",
-        "min_items": 0,
-        "max_items": 1,
-        "generation_instruction": "default_nine固定为空；refine_existing固定一个exact ArtifactVersion ID"
       },
       {
         "field_key": "source_lesson_unit_key",

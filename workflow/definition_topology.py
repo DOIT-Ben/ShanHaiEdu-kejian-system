@@ -69,6 +69,11 @@ def _validate_node_shape(node: WorkflowNodeDefinition) -> None:
             f"workflow node {node.node_key} entrypoint must be a boolean",
             code="WORKFLOW_NODE_ENTRYPOINT_INVALID",
         )
+    if not set(node.optional_input_contract_refs) <= set(node.input_contract_refs):
+        raise WorkflowDefinitionError(
+            f"workflow node {node.node_key} has optional inputs outside its declared inputs",
+            code="WORKFLOW_OPTIONAL_INPUT_INVALID",
+        )
 
 
 def _validate_node_dependencies(
