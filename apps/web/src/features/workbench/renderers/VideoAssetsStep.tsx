@@ -10,7 +10,7 @@ import {
   createAssetsFromApprovedStory,
   createShotsFromApprovedStory,
 } from "@/features/workbench/lib/videoWorkflow";
-import { useMockRuntime } from "@/shared/api/mocks/runtime";
+import { useMockRuntime } from "@/shared/api/mockClient";
 import { listMockSavedResults } from "@/shared/api/mocks/savedResults";
 import { buttonVariants } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";

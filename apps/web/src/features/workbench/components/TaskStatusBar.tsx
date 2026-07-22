@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useMockRuntime } from "@/shared/api/mocks/runtime";
+import { useMockRuntime } from "@/shared/api/mockClient";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 
 export function TaskStatusBar({ projectId }: { projectId: string }) {

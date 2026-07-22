@@ -20,7 +20,7 @@ import {
   saveMockDraft,
   updateMockNodeState,
   useMockRuntime,
-} from "@/shared/api/mocks/runtime";
+} from "@/shared/api/mockClient";
 import { saveMockResult, type MockSavedResult } from "@/shared/api/mocks/savedResults";
 import { Button } from "@/shared/ui/Button";
 import { StatusBadge } from "@/shared/ui/StatusBadge";

@@ -1,6 +1,6 @@
 import type { LessonSummary } from "@/entities/project/model";
 import { demoProjectId, lessons as demoLessons } from "@/shared/data/mockData";
-import type { MockRuntimeState } from "@/shared/api/mocks/runtime";
+import type { MockRuntimeState } from "@/shared/api/mockClient";
 
 function isLessonSummary(value: unknown): value is LessonSummary {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;

@@ -5,7 +5,7 @@ import {
   mockRuntime,
   type MockRole,
   type MockSession,
-} from "@/shared/api/mocks/runtime";
+} from "@/shared/api/mockClient";
 import { developmentMockAccounts } from "@/shared/auth/mockCredentials.development";
 
 export type { MockRole, MockSession };

@@ -6,7 +6,7 @@ import { WorkbenchPageFrame } from "@/features/workbench/components/WorkbenchPag
 import { StaleContentNotice } from "@/features/workbench/components/StaleContentNotice";
 import { markPptCoverDependentsStale } from "@/features/workbench/lib/invalidateDependents";
 import { useWorkbenchUi } from "@/features/workbench/model/workbenchUi";
-import { saveMockDraft, updateMockNodeState, useMockRuntime } from "@/shared/api/mocks/runtime";
+import { saveMockDraft, updateMockNodeState, useMockRuntime } from "@/shared/api/mockClient";
 import { downloadExampleFile } from "@/shared/lib/downloadExampleFile";
 import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";

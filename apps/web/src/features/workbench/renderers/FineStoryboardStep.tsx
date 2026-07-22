@@ -15,7 +15,7 @@ import {
   getApprovedVideoStyle,
 } from "@/features/workbench/lib/videoWorkflow";
 import { markFineStoryboardDependentsStale } from "@/features/workbench/lib/invalidateDependents";
-import { saveMockDraft, updateMockNodeState, useMockRuntime } from "@/shared/api/mocks/runtime";
+import { saveMockDraft, updateMockNodeState, useMockRuntime } from "@/shared/api/mockClient";
 import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";

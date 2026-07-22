@@ -1,7 +1,7 @@
 import { ArrowRight, BookOpen, Clock3 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
-import { useMockRuntime } from "@/shared/api/mocks/runtime";
+import { useMockRuntime } from "@/shared/api/mockClient";
 import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { NavLink, useLocation, useParams } from "react-router-dom";
 import type { WorkflowStatus } from "@/entities/workflow/model";
 import { getWorkbenchStepStatus } from "@/features/workbench/lib/stepAccess";
-import { useMockRuntime } from "@/shared/api/mocks/runtime";
+import { useMockRuntime } from "@/shared/api/mockClient";
 import { projectSteps } from "@/shared/data/mockData";
 import { cn } from "@/shared/lib/cn";
 

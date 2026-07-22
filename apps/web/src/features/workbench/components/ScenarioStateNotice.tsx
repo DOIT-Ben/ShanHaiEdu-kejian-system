@@ -1,7 +1,7 @@
 import { AlertTriangle, CirclePause, CloudCog, MessageSquareText } from "lucide-react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useWorkbenchUi } from "@/features/workbench/model/workbenchUi";
-import { createMockTask, saveMockDraft, updateMockNodeState } from "@/shared/api/mocks/runtime";
+import { createMockTask, saveMockDraft, updateMockNodeState } from "@/shared/api/mockClient";
 import { Button } from "@/shared/ui/Button";
 
 export function ScenarioStateNotice({ scenario }: { scenario: string | null }) {

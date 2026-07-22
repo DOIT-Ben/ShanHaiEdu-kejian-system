@@ -10,7 +10,7 @@ import {
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ProjectLessonGrid } from "@/features/projects/components/ProjectOverviewContent";
 import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
-import { saveMockDraft, useMockRuntime } from "@/shared/api/mocks/runtime";
+import { saveMockDraft, useMockRuntime } from "@/shared/api/mockClient";
 import { Button, buttonVariants } from "@/shared/ui/Button";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";

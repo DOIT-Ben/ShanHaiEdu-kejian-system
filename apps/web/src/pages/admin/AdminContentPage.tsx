@@ -1,7 +1,7 @@
 import * as Tabs from "@radix-ui/react-tabs";
 import { Check, ChevronRight, FileUp, FlaskConical, Plus, UploadCloud } from "lucide-react";
 import { useRef, useState } from "react";
-import { getMockDraft, saveMockDraft } from "@/shared/api/mocks/runtime";
+import { getMockDraft, saveMockDraft } from "@/shared/api/mockClient";
 import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { HorizontalScrollArea } from "@/shared/ui/HorizontalScrollArea";

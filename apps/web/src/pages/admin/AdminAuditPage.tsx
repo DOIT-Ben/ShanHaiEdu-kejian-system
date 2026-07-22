@@ -1,6 +1,6 @@
 import { CalendarDays, Download, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { getMockDraft, saveMockDraft } from "@/shared/api/mocks/runtime";
+import { getMockDraft, saveMockDraft } from "@/shared/api/mockClient";
 import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { HorizontalScrollArea } from "@/shared/ui/HorizontalScrollArea";

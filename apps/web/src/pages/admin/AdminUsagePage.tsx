@@ -6,7 +6,7 @@ import {
   saveMockDraft,
   updateMockTask,
   useMockRuntime,
-} from "@/shared/api/mocks/runtime";
+} from "@/shared/api/mockClient";
 import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";

@@ -3,7 +3,7 @@ import { introOptions } from "@/features/intro-options/data";
 import { isPreviewAdopted, readIntroOptionsDraft } from "@/features/intro-options/state";
 import { readLessonList } from "@/features/workbench/lib/projectLessons";
 import { getApprovedDraftValue } from "@/features/workbench/lib/approvedDraft";
-import type { MockRuntimeState } from "@/shared/api/mocks/runtime";
+import type { MockRuntimeState } from "@/shared/api/mockClient";
 
 type StepRequirement = {
   actionLabel: string;

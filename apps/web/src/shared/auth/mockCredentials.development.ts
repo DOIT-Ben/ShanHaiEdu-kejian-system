@@ -1,4 +1,4 @@
-import type { MockRole } from "@/shared/api/mocks/runtime";
+import type { MockRole } from "@/shared/api/mockClient";
 
 export type DevelopmentMockAccount = {
   email: string;

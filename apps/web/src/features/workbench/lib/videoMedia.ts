@@ -4,7 +4,7 @@ import {
   saveMockDraft,
   updateMockNodeState,
   type MockRuntimeState,
-} from "@/shared/api/mocks/runtime";
+} from "@/shared/api/mockClient";
 
 export type PlayableVideoMedia = {
   mimeType: string;

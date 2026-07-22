@@ -5,7 +5,7 @@ import { WorkbenchPageFrame } from "@/features/workbench/components/WorkbenchPag
 import { StaleContentNotice } from "@/features/workbench/components/StaleContentNotice";
 import { getApprovedDraftValue } from "@/features/workbench/lib/approvedDraft";
 import { readPptOutlinePages, type PptOutlinePage } from "@/features/workbench/lib/pptOutline";
-import { useMockRuntime } from "@/shared/api/mocks/runtime";
+import { useMockRuntime } from "@/shared/api/mockClient";
 import { downloadExampleFile } from "@/shared/lib/downloadExampleFile";
 import { Button } from "@/shared/ui/Button";
 import { StatusBadge } from "@/shared/ui/StatusBadge";

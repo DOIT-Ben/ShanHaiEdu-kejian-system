@@ -1,5 +1,5 @@
-import type { MockRuntimeState, MockRuntimeStore } from "@/shared/api/mocks/runtime";
-import { mockRuntime, updateMockNodeState } from "@/shared/api/mocks/runtime";
+import type { MockRuntimeState, MockRuntimeStore } from "@/shared/api/mockClient";
+import { mockRuntime, updateMockNodeState } from "@/shared/api/mockClient";
 import { readLessonList } from "@/features/workbench/lib/projectLessons";
 
 export type DependentNode = readonly [nodeKey: string, title: string];

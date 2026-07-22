@@ -19,7 +19,7 @@ import { VideoStyleStep } from "@/features/workbench/renderers/VideoStyleStep";
 import { ScenarioStateNotice } from "@/features/workbench/components/ScenarioStateNotice";
 import { getWorkbenchStepBlocker } from "@/features/workbench/lib/stepAccess";
 import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
-import { useMockRuntime } from "@/shared/api/mocks/runtime";
+import { useMockRuntime } from "@/shared/api/mockClient";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { buttonVariants } from "@/shared/ui/Button";
 

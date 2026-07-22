@@ -13,7 +13,7 @@ import { parseLessonPlan, serializeLessonPlan } from "@/features/workbench/lib/d
 import { markLessonPlanDependentsStale } from "@/features/workbench/lib/invalidateDependents";
 import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
 import { useWorkbenchUi } from "@/features/workbench/model/workbenchUi";
-import { saveMockDraft, updateMockNodeState, useMockRuntime } from "@/shared/api/mocks/runtime";
+import { saveMockDraft, updateMockNodeState, useMockRuntime } from "@/shared/api/mockClient";
 import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { IconButton } from "@/shared/ui/IconButton";

@@ -1,4 +1,4 @@
-import type { MockRuntimeState } from "@/shared/api/mocks/runtime";
+import type { MockRuntimeState } from "@/shared/api/mockClient";
 
 export function getApprovedDraftValue<T>(
   runtime: MockRuntimeState,

@@ -1,7 +1,7 @@
 import type { ScriptScene } from "@/features/workbench/lib/documentMarkdown";
 import { getApprovedDraftValue } from "@/features/workbench/lib/approvedDraft";
 import type { VideoAsset, VideoShot, VideoStoryBeat } from "@/features/workbench/lib/videoContent";
-import type { MockRuntimeState } from "@/shared/api/mocks/runtime";
+import type { MockRuntimeState } from "@/shared/api/mockClient";
 
 type ApprovedMasterScript = {
   scenes?: ScriptScene[];

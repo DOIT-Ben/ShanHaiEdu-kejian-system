@@ -10,7 +10,7 @@ import { WorkbenchPageFrame } from "@/features/workbench/components/WorkbenchPag
 import { getApprovedDraftValue } from "@/features/workbench/lib/approvedDraft";
 import { markPptDesignDependentsStale } from "@/features/workbench/lib/invalidateDependents";
 import { readPptOutlinePages, type PptOutlinePage } from "@/features/workbench/lib/pptOutline";
-import { saveMockDraft, updateMockNodeState, useMockRuntime } from "@/shared/api/mocks/runtime";
+import { saveMockDraft, updateMockNodeState, useMockRuntime } from "@/shared/api/mockClient";
 import { Button, buttonVariants } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";

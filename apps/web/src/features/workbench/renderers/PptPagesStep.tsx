@@ -23,7 +23,7 @@ import {
   saveMockDraft,
   updateMockNodeState,
   useMockRuntime,
-} from "@/shared/api/mocks/runtime";
+} from "@/shared/api/mockClient";
 import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { IconButton } from "@/shared/ui/IconButton";

@@ -1,6 +1,6 @@
 import { CheckCircle2, KeyRound, PlugZap, Plus, Server } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { getMockDraft, saveMockDraft } from "@/shared/api/mocks/runtime";
+import { getMockDraft, saveMockDraft } from "@/shared/api/mockClient";
 import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { HorizontalScrollArea } from "@/shared/ui/HorizontalScrollArea";

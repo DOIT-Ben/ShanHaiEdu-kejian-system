@@ -5,7 +5,7 @@ import {
   getPlayableFinalVideo,
   type PlayableVideoMedia,
 } from "@/features/workbench/lib/videoMedia";
-import type { MockRuntimeState } from "@/shared/api/mocks/runtime";
+import type { MockRuntimeState } from "@/shared/api/mockClient";
 
 const disabledVideoStatuses = new Set<WorkflowStatus>(["disabled", "skipped"]);
 const unresolvedStatusPriority: readonly WorkflowStatus[] = [

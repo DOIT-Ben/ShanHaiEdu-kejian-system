@@ -17,7 +17,7 @@ import { ConfirmedVideoResult } from "@/features/project-results/ConfirmedVideoR
 import { getProjectVideoSummary } from "@/features/project-results/projectVideoResults";
 import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
 import type { PlayableVideoMedia } from "@/features/workbench/lib/videoMedia";
-import { saveMockDraft, useMockRuntime } from "@/shared/api/mocks/runtime";
+import { saveMockDraft, useMockRuntime } from "@/shared/api/mockClient";
 import {
   listMockSavedResultHistory,
   listMockSavedResults,

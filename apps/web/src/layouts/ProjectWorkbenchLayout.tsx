@@ -20,7 +20,7 @@ import { TaskStatusBar } from "@/features/workbench/components/TaskStatusBar";
 import { getPreviousWorkbenchStepKey } from "@/features/workbench/lib/stepAccess";
 import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
 import { useWorkbenchUi } from "@/features/workbench/model/workbenchUi";
-import { saveMockDraft, updateMockProject, useMockRuntime } from "@/shared/api/mocks/runtime";
+import { saveMockDraft, updateMockProject, useMockRuntime } from "@/shared/api/mockClient";
 import { useProjectEvents } from "@/shared/api/useProjectEvents";
 import { projectSteps } from "@/shared/data/mockData";
 import { cn } from "@/shared/lib/cn";

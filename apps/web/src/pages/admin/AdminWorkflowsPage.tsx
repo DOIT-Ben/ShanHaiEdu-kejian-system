@@ -1,6 +1,6 @@
 import { AlertTriangle, CheckCircle2, GripVertical, Plus, Save } from "lucide-react";
 import { useState } from "react";
-import { getMockDraft, saveMockDraft } from "@/shared/api/mocks/runtime";
+import { getMockDraft, saveMockDraft } from "@/shared/api/mockClient";
 import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { Select } from "@/shared/ui/Select";

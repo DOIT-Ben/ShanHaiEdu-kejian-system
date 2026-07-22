@@ -12,7 +12,7 @@ import {
 import { ProjectEntryFrame } from "@/features/projects/components/ProjectEntryFrame";
 import { projectKeys } from "@/features/projects/hooks/useProjectsQuery";
 import { apiConfig } from "@/shared/api/config";
-import { addMockTextbookFile } from "@/shared/api/mocks/runtime";
+import { addMockTextbookFile } from "@/shared/api/mockClient";
 import { Button } from "@/shared/ui/Button";
 
 const projectSchema = z.object({

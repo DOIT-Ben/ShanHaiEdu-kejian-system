@@ -14,7 +14,7 @@ import {
   saveMockDraft,
   updateMockNodeState,
   useMockRuntime,
-} from "@/shared/api/mocks/runtime";
+} from "@/shared/api/mockClient";
 import { Button } from "@/shared/ui/Button";
 import { IconButton } from "@/shared/ui/IconButton";
 import { demoProjectId } from "@/shared/data/mockData";

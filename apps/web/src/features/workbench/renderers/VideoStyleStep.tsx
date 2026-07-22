@@ -12,7 +12,7 @@ import {
 } from "@/features/workbench/lib/videoContent";
 import { getApprovedVideoTitle } from "@/features/workbench/lib/videoWorkflow";
 import { markVideoStyleDependentsStale } from "@/features/workbench/lib/invalidateDependents";
-import { saveMockDraft, updateMockNodeState, useMockRuntime } from "@/shared/api/mocks/runtime";
+import { saveMockDraft, updateMockNodeState, useMockRuntime } from "@/shared/api/mockClient";
 import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { IconButton } from "@/shared/ui/IconButton";

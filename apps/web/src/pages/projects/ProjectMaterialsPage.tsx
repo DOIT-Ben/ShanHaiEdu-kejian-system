@@ -18,7 +18,7 @@ import {
   updateMockNodeState,
   updateMockProject,
   useMockRuntime,
-} from "@/shared/api/mocks/runtime";
+} from "@/shared/api/mockClient";
 import { apiConfig } from "@/shared/api/config";
 import { demoProjectId, lessons } from "@/shared/data/mockData";
 import { markLessonDivisionDependentsStaleForLessons } from "@/features/workbench/lib/invalidateDependents";

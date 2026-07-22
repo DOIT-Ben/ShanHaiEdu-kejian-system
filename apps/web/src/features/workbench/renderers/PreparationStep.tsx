@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { WorkbenchPageFrame } from "@/features/workbench/components/WorkbenchPageFrame";
 import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
 import { hasReadyTextbook } from "@/features/workbench/lib/stepAccess";
-import { useMockRuntime } from "@/shared/api/mocks/runtime";
+import { useMockRuntime } from "@/shared/api/mockClient";
 import { buttonVariants } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";

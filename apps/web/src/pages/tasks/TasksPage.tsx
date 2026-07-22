@@ -9,13 +9,13 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
-import { saveMockDraft, updateMockTask, useMockRuntime } from "@/shared/api/mocks/runtime";
+import { saveMockDraft, updateMockTask, useMockRuntime } from "@/shared/api/mockClient";
 import { apiConfig } from "@/shared/api/config";
 import { demoProjectId } from "@/shared/data/mockData";
 import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
-import type { MockRuntimeState, MockTask } from "@/shared/api/mocks/runtime";
+import type { MockRuntimeState, MockTask } from "@/shared/api/mockClient";
 
 const actionStatuses = new Set([
   "queued",

@@ -1,7 +1,7 @@
 import { ChevronRight, FolderOpen } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { NavLink, Outlet, useLocation, useParams } from "react-router-dom";
-import { useMockRuntime } from "@/shared/api/mocks/runtime";
+import { useMockRuntime } from "@/shared/api/mockClient";
 import { cn } from "@/shared/lib/cn";
 
 const tabs = [

@@ -11,7 +11,7 @@ import {
 } from "@/features/workbench/lib/videoContent";
 import { createStoryBeatsFromApprovedMaster } from "@/features/workbench/lib/videoWorkflow";
 import { markRoughStoryboardDependentsStale } from "@/features/workbench/lib/invalidateDependents";
-import { saveMockDraft, updateMockNodeState, useMockRuntime } from "@/shared/api/mocks/runtime";
+import { saveMockDraft, updateMockNodeState, useMockRuntime } from "@/shared/api/mockClient";
 import { reorderItem } from "@/shared/lib/reorderItem";
 import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";

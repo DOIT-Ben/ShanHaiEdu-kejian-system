@@ -1,5 +1,5 @@
-import type { MockRuntimeState, MockRuntimeStore } from "@/shared/api/mocks/runtime";
-import { mockRuntime } from "@/shared/api/mocks/runtime";
+import type { MockRuntimeState, MockRuntimeStore } from "@/shared/api/mockClient";
+import { mockRuntime } from "@/shared/api/mockClient";
 import { markDependentsStale } from "@/features/workbench/lib/invalidateDependents";
 
 const dependentNodes = [

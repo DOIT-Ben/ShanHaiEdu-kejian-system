@@ -32,7 +32,7 @@ import {
   saveMockDraft,
   updateMockNodeState,
   useMockRuntime,
-} from "@/shared/api/mocks/runtime";
+} from "@/shared/api/mockClient";
 import { downloadExampleFile } from "@/shared/lib/downloadExampleFile";
 import { downloadRemoteFile } from "@/shared/lib/downloadRemoteFile";
 import { Button } from "@/shared/ui/Button";

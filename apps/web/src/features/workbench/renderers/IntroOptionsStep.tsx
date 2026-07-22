@@ -23,7 +23,7 @@ import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { SelectableCard } from "@/shared/ui/SelectableCard";
 import { requiredItem } from "@/shared/lib/requiredItem";
-import { saveMockDraft, updateMockNodeState, useMockRuntime } from "@/shared/api/mocks/runtime";
+import { saveMockDraft, updateMockNodeState, useMockRuntime } from "@/shared/api/mockClient";
 import { demoProjectId } from "@/shared/data/mockData";
 
 const categories: Array<{ value: "all" | IntroCategory; label: string }> = [

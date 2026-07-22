@@ -5,7 +5,7 @@ import {
   createMockSaveConflict,
   resolveMockSaveConflict,
   useMockRuntime,
-} from "@/shared/api/mocks/runtime";
+} from "@/shared/api/mockClient";
 import {
   listMockSavedResults,
   saveMockResult,

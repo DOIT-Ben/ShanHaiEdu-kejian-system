@@ -17,7 +17,7 @@ import {
   type PlayableVideoMedia,
   type SubtitleFormat,
 } from "@/features/workbench/lib/videoMedia";
-import { saveMockDraft, type MockRuntimeState, useMockRuntime } from "@/shared/api/mocks/runtime";
+import { saveMockDraft, type MockRuntimeState, useMockRuntime } from "@/shared/api/mockClient";
 import { listMockSavedResults } from "@/shared/api/mocks/savedResults";
 import { downloadExampleFile } from "@/shared/lib/downloadExampleFile";
 import { downloadRemoteFile } from "@/shared/lib/downloadRemoteFile";

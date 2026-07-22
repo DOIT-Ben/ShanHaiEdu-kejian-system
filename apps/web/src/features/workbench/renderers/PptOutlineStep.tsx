@@ -1,7 +1,7 @@
 import { ArrowRight, Check, GripVertical, PencilLine, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { saveMockDraft, updateMockNodeState, useMockRuntime } from "@/shared/api/mocks/runtime";
+import { saveMockDraft, updateMockNodeState, useMockRuntime } from "@/shared/api/mockClient";
 import { WorkbenchPageFrame } from "@/features/workbench/components/WorkbenchPageFrame";
 import { StaleContentNotice } from "@/features/workbench/components/StaleContentNotice";
 import { getApprovedDraftValue } from "@/features/workbench/lib/approvedDraft";
