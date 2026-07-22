@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.artifact_quality.models import ArtifactQualityReport
-from apps.api.artifact_quality.service import ArtifactQualityService
+from apps.api.artifact_quality.service import ArtifactQualityError, ArtifactQualityService
 from apps.api.artifact_quality.sqlalchemy import SqlAlchemyArtifactQualityTransactionFactory
 from apps.api.artifacts.models import Approval, Artifact, ArtifactRelation, ArtifactVersion
 from apps.api.artifacts.service import ArtifactService
@@ -188,6 +188,9 @@ async def test_cross_tenant_source_is_rejected_before_provider_and_usage(
         outsider = system_actor(outsider_organization_id)
 
     with factory() as session:
+        attempt_count = session.scalar(select(func.count()).select_from(GenerationAttempt))
+        usage_count = session.scalar(select(func.count()).select_from(UsageRecord))
+    with factory() as session:
         with pytest.raises(ApiError):
             with session.begin():
                 IntroOptionRuntimeService(session, outsider).stage_generation(
@@ -196,8 +199,9 @@ async def test_cross_tenant_source_is_rejected_before_provider_and_usage(
                     generation_mode="refine_existing",
                     source_artifact_version_id=source.version_id,
                 )
-        assert session.scalar(select(func.count()).select_from(GenerationAttempt)) == 1
-        assert session.scalar(select(func.count()).select_from(UsageRecord)) == 1
+    with factory() as session:
+        assert session.scalar(select(func.count()).select_from(GenerationAttempt)) == attempt_count
+        assert session.scalar(select(func.count()).select_from(UsageRecord)) == usage_count
 
 
 async def test_quality_failure_rolls_back_report_terminal_and_event_atomically(
@@ -214,7 +218,7 @@ async def test_quality_failure_rolls_back_report_terminal_and_event_atomically(
         if stage == "after_report":
             raise RuntimeError("intro quality transaction fault")
 
-    with pytest.raises(RuntimeError, match="intro quality transaction fault"):
+    with pytest.raises(ArtifactQualityError) as caught:
         ArtifactQualityService(
             SqlAlchemyArtifactQualityTransactionFactory(
                 factory,
@@ -223,6 +227,7 @@ async def test_quality_failure_rolls_back_report_terminal_and_event_atomically(
             ),
             intro_runtime_quality_validator_registry(),
         ).execute(validate_id)
+    assert caught.value.code == "QUALITY_REPORT_COMMIT_FAILED"
 
     with factory() as session:
         validate = session.get(NodeRun, validate_id)

@@ -56,9 +56,7 @@ def test_one_and_nine_modes_pass_the_same_declared_quality_chain(mode: str) -> N
             "INTRO_TENDENCY_DISTRIBUTION_INVALID",
         ),
         (
-            lambda value: value["options"][0].update(
-                source_material_evidence_keys=["EV-MAT-UNKNOWN"]
-            ),
+            lambda value: value.update(source_material_evidence_keys=[]),
             "INTRO_MATERIAL_EVIDENCE_INVALID",
         ),
     ],
@@ -89,7 +87,9 @@ def test_refine_existing_requires_one_exact_source_and_one_option() -> None:
 def test_unique_recommendation_and_no_preteach_fail_closed() -> None:
     content = _content("default_nine")
     options = cast(list[dict[str, Any]], content["options"])
-    options[1]["recommendation_score"] = options[0]["recommendation_score"]
+    maximum = max(cast(int, option["recommendation_score"]) for option in options)
+    non_maximum = next(option for option in options if option["recommendation_score"] != maximum)
+    non_maximum["recommendation_score"] = maximum
     options[0]["creative_concept"] = "直接讲出比较大小的方法"
 
     schema = IntroOptionSchemaQualityValidator().validate(_context(content))
