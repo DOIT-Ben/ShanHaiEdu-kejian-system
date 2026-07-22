@@ -76,10 +76,10 @@ def test_schema_and_complete_primary_math_catalog_are_valid() -> None:
     node_keys = {node["node_key"] for node in catalog["nodes"]}
     assert catalog["api_version"] == "shanhai.workflow-node-generation-binding/v2"
     assert catalog["semantic_version"] == "1.1.0"
-    assert len(node_keys) == 47
+    assert len(node_keys) == 48
     assert {
         "project": 7,
-        "lesson_unit": 40,
+        "lesson_unit": 41,
     } == {
         scope: sum(node["execution_scope"] == scope for node in catalog["nodes"])
         for scope in ("project", "lesson_unit")
@@ -87,7 +87,7 @@ def test_schema_and_complete_primary_math_catalog_are_valid() -> None:
     assert {
         "model_generation": 22,
         "deterministic": 13,
-        "human_gate": 12,
+        "human_gate": 13,
     } == {
         kind: sum(node["execution_kind"] == kind for node in catalog["nodes"])
         for kind in ("model_generation", "deterministic", "human_gate")
@@ -106,6 +106,7 @@ def test_schema_and_complete_primary_math_catalog_are_valid() -> None:
         "lesson.division.generate",
         "lesson_plan.generate",
         "intro.generate_options",
+        "intro.approve",
         "ppt.pages.generate",
         "ppt.cover.image.generate",
         "ppt.body_assets.generate",
@@ -602,6 +603,7 @@ def test_catalog_encodes_context_and_reference_asset_boundaries() -> None:
     assert set(generate_options["context_policy"]["allowed_sources"]) == {
         "lesson_division.approved_version",
         "material.approved_parse",
+        "intro_options.existing_version",
     }
     assert {
         "lesson_plan.approved_version",
@@ -622,6 +624,47 @@ def test_catalog_encodes_context_and_reference_asset_boundaries() -> None:
         role["requirement"] == "required"
         for role in shot_generation["reference_asset_policy"]["roles"]
     )
+
+
+def test_intro_approval_is_independent_from_selection() -> None:
+    catalog = load_catalog()
+    generate = node_by_key(catalog, "intro.generate_options")
+    validate = node_by_key(catalog, "intro.validate")
+    approve = node_by_key(catalog, "intro.approve")
+    select = node_by_key(catalog, "intro.select")
+
+    assert generate["input_contract_refs"] == [
+        "approval:lesson_division",
+        "content:material_evidence",
+        "artifact:intro_option_set",
+    ]
+    source_relation = next(
+        relation
+        for relation in generate["output_persistence"]["artifact"]["relations"]
+        if relation["source_binding"] == "artifact:intro_option_set"
+    )
+    assert source_relation["optional"] is True
+    assert validate["output_contract_refs"] == ["report:intro_quality"]
+    assert approve["input_contract_refs"] == [
+        "artifact:intro_option_set",
+        "report:intro_quality",
+    ]
+    assert approve["output_contract_refs"] == ["approval:intro_option_set"]
+    assert approve["dependencies"] == ["intro.generate_options", "intro.validate"]
+    assert approve["quality_requirement"] == {
+        "mode": "reports",
+        "report_refs": ["report:intro_quality"],
+        "accepted_conclusions": ["passed"],
+    }
+    assert approve["approval_policy"]["mode"] == "policy_allowed"
+    assert select["input_contract_refs"] == [
+        "artifact:intro_option_set",
+        "approval:intro_option_set",
+    ]
+    assert select["output_contract_refs"] == ["selection:intro"]
+    assert select["dependencies"] == ["intro.approve"]
+    assert select["quality_requirement"] == {"mode": "none"}
+    assert select["approval_policy"]["mode"] == "policy_allowed"
 
 
 def test_catalog_hides_internal_structure_and_exposes_only_business_prompt() -> None:

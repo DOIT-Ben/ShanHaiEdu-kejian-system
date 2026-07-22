@@ -44,6 +44,7 @@ def test_execution_modes_share_a_new_policy_contract_without_removing_legacy_inp
     assert schemas["AutomationPolicyMode"]["enum"] == ["guided", "automatic"]
     assert schemas["AutomationMode"]["deprecated"] is True
     assert schemas["AutomationMode"]["enum"] == ["manual", "assisted", "automatic"]
+    assert "auto_select" in schemas["AutomationNodeRule"]["properties"]
 
     create_project = deepcopy(schemas["CreateProjectRequest"])
     create_project["components"] = deepcopy(openapi["components"])
@@ -106,6 +107,7 @@ def test_project_limits_and_policy_etags_match_runtime_contract() -> None:
     runtime = create_app(settings=Settings(_env_file=None, environment="test")).openapi()
     runtime_operations = operations_by_id(runtime)
     runtime_schemas = runtime["components"]["schemas"]
+    assert "auto_select" in runtime_schemas["AutomationNodeRule"]["properties"]
     assert (
         runtime_schemas["SavePromptVersionRequest"]["properties"]["reference_asset_version_ids"][
             "uniqueItems"

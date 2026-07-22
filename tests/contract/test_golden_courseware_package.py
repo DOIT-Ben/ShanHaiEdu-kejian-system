@@ -187,6 +187,11 @@ def test_lesson_plan_has_twelve_sections_and_intro_is_a_separate_artifact() -> N
     scores = [option["recommendation_score"] for option in options]
     assert scores.count(max(scores)) == 1
     assert case["intro_selection"]["selection_method"] == "teacher_selected"
+    assert case["intro_option_set"]["existing_idea_version_ref"] is None
+    assert case["intro_selection"]["approval_ref"]["status"] == "approved"
+    assert case["intro_selection"]["approval_ref"]["artifact_version_id"] == (
+        case["intro_option_set"]["artifact_version_id"]
+    )
 
 
 def test_teacher_selection_may_override_the_unique_recommendation() -> None:
@@ -392,6 +397,19 @@ def test_course_grounded_intro_options_keep_one_current_contract() -> None:
         if field["source"] == "teacher" and key.endswith("preferences")
     } == {"medium_preferences", "creative_preferences"}
     assert input_fields["duration_preference_seconds"]["source"] == "teacher"
+    assert generate_options["input"]["conditional_requirements"] == [
+        {
+            "when": {"field_key": "generation_mode", "equals": "default_nine"},
+            "forbidden_fields": ["existing_idea_ref"],
+        },
+        {
+            "when": {"field_key": "generation_mode", "equals": "refine_existing"},
+            "required_fields": ["existing_idea_ref"],
+        },
+    ]
+
+    output_fields = {field["field_key"] for field in generate_options["output"]["fields"]}
+    assert {"generation_mode", "existing_idea_version_ref"} <= output_fields
 
 
 def test_retired_intro_contract_tokens_are_absent_from_current_tree() -> None:
