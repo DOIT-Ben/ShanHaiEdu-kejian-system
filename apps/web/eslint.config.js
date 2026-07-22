@@ -28,4 +28,25 @@ export default tseslint.config(
       "@typescript-eslint/no-confusing-void-expression": "off",
     },
   },
+  {
+    files: [
+      "src/app/RuntimeApp.tsx",
+      "src/layouts/Runtime*.tsx",
+      "src/pages/runtime/**/*.{ts,tsx}",
+      "src/pages/projects/Runtime*.{ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/app/MockApp", "@/shared/api/mocks/*", "@/shared/data/mockData"],
+              message: "Runtime 页面只能消费真实 API 和无状态产品组件，不能导入 MockRuntime。",
+            },
+          ],
+        },
+      ],
+    },
+  },
 );
