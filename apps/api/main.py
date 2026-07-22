@@ -14,6 +14,7 @@ from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import register_error_handlers
 from apps.api.health import ReadinessProvider, build_readiness_service
 from apps.api.identity.authentication import Authenticator
+from apps.api.intro_options.router import router as intro_options_router
 from apps.api.jobs.router import router as jobs_router
 from apps.api.lessons.router import router as lessons_router
 from apps.api.logging import configure_logging
@@ -46,7 +47,6 @@ def create_app(
         database_engine = build_engine(resolved_settings.database_url.get_secret_value())
         resolved_session_factory = build_session_factory(database_engine)
     resolved_object_storage = object_storage or build_object_storage(resolved_settings)
-
     app = FastAPI(
         title="ShanHaiEdu Platform API",
         version="0.1.0",
@@ -68,6 +68,7 @@ def create_app(
     app.include_router(projects_router)
     app.include_router(prompt_runtime_router)
     app.include_router(lessons_router)
+    app.include_router(intro_options_router)
     app.include_router(uploads_router)
     app.include_router(jobs_router)
     app.include_router(workflows_router)

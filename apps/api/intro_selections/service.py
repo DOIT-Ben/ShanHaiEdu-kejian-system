@@ -142,6 +142,18 @@ class IntroSelectionService:
             )
         return read
 
+    def current(
+        self,
+        *,
+        project_id: UUID,
+        lesson_unit_id: UUID,
+    ) -> IntroSelectionRead | None:
+        self._authorize_read(project_id)
+        record = self._repository.current(lesson_unit_id)
+        if record is None or record.project_id != project_id:
+            return None
+        return self._read(record)
+
     def _select_teacher(
         self,
         project_id: UUID,

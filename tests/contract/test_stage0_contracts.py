@@ -60,7 +60,7 @@ def response_schema(
     if isinstance(schema, dict) and isinstance(schema.get("$ref"), str):
         reference = schema["$ref"]
         if reference.startswith("./"):
-            return load_json(CONTRACTS / reference[2:])
+            return load_external_schema(reference)
     wrapped = deepcopy(schema)
     wrapped["components"] = deepcopy(openapi["components"])
     return resolve_external_refs(wrapped)
@@ -73,10 +73,31 @@ def resolve_external_refs(value: Any) -> Any:
         return value
     reference = value.get("$ref")
     if isinstance(reference, str) and not reference.startswith("#"):
-        relative_reference = reference[2:] if reference.startswith("./") else reference
-        if "://" not in relative_reference:
-            return resolve_external_refs(load_json(CONTRACTS / relative_reference))
+        if "://" not in reference:
+            return resolve_external_refs(load_external_schema(reference))
     return {key: resolve_external_refs(item) for key, item in value.items()}
+
+
+def load_external_schema(reference: str) -> dict[str, Any]:
+    relative_reference = reference[2:] if reference.startswith("./") else reference
+    path_text, separator, fragment = relative_reference.partition("#")
+    document = load_json(CONTRACTS / path_text)
+    if not separator:
+        return document
+    resolved = resolve_local(document, {"$ref": f"#{fragment}"})
+    assert isinstance(resolved, dict)
+    return resolve_fragment_local_refs(document, deepcopy(resolved))
+
+
+def resolve_fragment_local_refs(document: dict[str, Any], value: Any) -> Any:
+    if isinstance(value, list):
+        return [resolve_fragment_local_refs(document, item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    resolved = resolve_local(document, value)
+    if resolved is not value:
+        return resolve_fragment_local_refs(document, deepcopy(resolved))
+    return {key: resolve_fragment_local_refs(document, item) for key, item in value.items()}
 
 
 def validate(instance: dict[str, Any], schema: dict[str, Any]) -> None:
@@ -93,6 +114,7 @@ def test_mock_registry_and_all_stage0_fixtures_match_contracts() -> None:
     scenario_ids: set[str] = set()
     contract_scenarios = [
         *registry["stage0_contract_scenarios"],
+        *registry["intro_contract_scenarios"],
         *registry["creation_contract_scenarios"],
     ]
     for scenario in contract_scenarios:

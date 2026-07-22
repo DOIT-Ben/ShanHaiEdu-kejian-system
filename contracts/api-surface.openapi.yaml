@@ -311,6 +311,43 @@ paths:
                 $ref: '#/components/schemas/LessonEnvelope'
         '4XX':
           $ref: '#/components/responses/Error'
+  /lessons/{lesson_id}/intro-options:
+    get:
+      summary: 获取课时导入方案与当前选择
+      operationId: getLessonIntroOptions
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Safe approved, pending, and current-selection projection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntroOptionsEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /lessons/{lesson_id}/intro-selections:
+    post:
+      summary: 教师选择一个已批准课堂导入方案
+      operationId: selectLessonIntroOption
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SelectIntroOptionRequest'
+      responses:
+        '201':
+          description: Immutable teacher selection created or replayed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntroSelectionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
   /projects/{project_id}/materials/uploads:
     post:
       summary: 创建教材私有直传会话
@@ -868,6 +905,113 @@ components:
   schemas:
     IntroOptionSet:
       $ref: './intro-option-set.schema.json'
+    IntroOption:
+      $ref: './intro-option-set.schema.json#/$defs/option'
+    IntroOptionSetPublic:
+      type: object
+      additionalProperties: false
+      required: [generation_mode, lesson_unit_key, knowledge_point, options, created_at]
+      properties:
+        generation_mode: {type: string, enum: [default_nine, refine_existing]}
+        lesson_unit_key: {type: string, minLength: 1}
+        knowledge_point: {type: string, minLength: 1}
+        options:
+          type: array
+          minItems: 1
+          maxItems: 9
+          items: {$ref: '#/components/schemas/IntroOption'}
+        created_at: {type: string, format: date-time}
+    IntroOptionVersion:
+      type: object
+      additionalProperties: false
+      required:
+        - artifact_version_id
+        - version_no
+        - approval_status
+        - stale
+        - selectable
+        - option_set
+      properties:
+        artifact_version_id: {type: string, format: uuid}
+        version_no: {type: integer, minimum: 1}
+        approval_status:
+          type: string
+          enum: [approved, pending_review, changes_requested, revoked, unapproved]
+        stale: {type: boolean}
+        selectable: {type: boolean}
+        option_set: {$ref: '#/components/schemas/IntroOptionSetPublic'}
+    IntroSelection:
+      type: object
+      additionalProperties: false
+      required:
+        - selection_id
+        - artifact_version_id
+        - option_key
+        - selection_method
+        - snapshot
+        - reason
+        - active
+        - consumable
+        - unconsumable_reason
+        - selected_at
+        - deactivated_at
+      properties:
+        selection_id: {type: string, format: uuid}
+        artifact_version_id: {type: string, format: uuid}
+        option_key: {type: string, minLength: 1, maxLength: 120}
+        selection_method: {type: string, enum: [teacher_selected, policy_default]}
+        snapshot: {$ref: '#/components/schemas/IntroOption'}
+        reason: {type: string, minLength: 1}
+        active: {type: boolean}
+        consumable: {type: boolean}
+        unconsumable_reason: {type: [string, 'null']}
+        selected_at: {type: string, format: date-time}
+        deactivated_at: {type: [string, 'null'], format: date-time}
+    IntroOptions:
+      type: object
+      additionalProperties: false
+      required:
+        - artifact_id
+        - current_approved_version_id
+        - display_version
+        - pending_version
+        - current_selection
+      properties:
+        artifact_id: {type: string, format: uuid}
+        current_approved_version_id: {type: [string, 'null'], format: uuid}
+        display_version:
+          oneOf:
+            - {$ref: '#/components/schemas/IntroOptionVersion'}
+            - {type: 'null'}
+        pending_version:
+          oneOf:
+            - {$ref: '#/components/schemas/IntroOptionVersion'}
+            - {type: 'null'}
+        current_selection:
+          oneOf:
+            - {$ref: '#/components/schemas/IntroSelection'}
+            - {type: 'null'}
+    IntroOptionsEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/IntroOptions'}
+        request_id: {type: string, minLength: 1}
+    SelectIntroOptionRequest:
+      type: object
+      additionalProperties: false
+      required: [artifact_version_id, option_key]
+      properties:
+        artifact_version_id: {type: string, format: uuid}
+        option_key: {type: string, minLength: 1, maxLength: 120}
+    IntroSelectionEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/IntroSelection'}
+        request_id: {type: string, minLength: 1}
     AutomationMode:
       type: string
       enum: [manual, assisted, automatic]

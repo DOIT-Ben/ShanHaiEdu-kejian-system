@@ -1,0 +1,36 @@
+{
+  "data": {
+    "selection_id": "01900000-0000-7000-8000-000000001293",
+    "artifact_version_id": "01900000-0000-7000-8000-000000001292",
+    "option_key": "INTRO-SCI-01",
+    "selection_method": "teacher_selected",
+    "snapshot": {
+      "option_key": "INTRO-SCI-01",
+      "lesson_unit_key": "LESSON-001",
+      "knowledge_point": "Counting objects from 1 to 5",
+      "primary_tendency": "science",
+      "secondary_tendencies": ["story"],
+      "title": "Signals in the fog",
+      "creative_concept": "Observe changing lights before counting them.",
+      "hook": "A signal disappears before the class can count it.",
+      "viewer_value": "The class needs a reliable way to track every light.",
+      "suggested_medium": "video",
+      "duration_seconds": 60,
+      "course_anchor": "Count visible objects once without omission.",
+      "classroom_first_question": "How can we count every light exactly once?",
+      "handoff_moment": "Stop when all lights become visible together.",
+      "must_not_preteach": ["Do not state the counting method."],
+      "fit_reason": "The observation creates a concrete counting need.",
+      "risks": ["Keep the number of lights within five."],
+      "recommendation_score": 96,
+      "recommendation_reason": "Clear observation and classroom handoff."
+    },
+    "reason": "Selected by a teacher through the runtime API.",
+    "active": true,
+    "consumable": true,
+    "unconsumable_reason": null,
+    "selected_at": "2026-07-22T12:05:00Z",
+    "deactivated_at": null
+  },
+  "request_id": "req_intro_teacher_selection"
+}

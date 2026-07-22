@@ -230,7 +230,7 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
         column["name"] for column in database_inspector.get_columns("node_execution_leases")
     }
     assert {"node_run_id", "owner_token", "lease_expires_at"}.issubset(lease_columns)
-    assert ScriptDirectory.from_config(config).get_current_head() == "i3d4e5f6a708"
+    assert ScriptDirectory.from_config(config).get_current_head() == "j4e5f6a7b809"
     previous = os.environ.get("SHANHAI_DATABASE_URL")
     os.environ["SHANHAI_DATABASE_URL"] = postgres_database_url
     try:

@@ -59,7 +59,7 @@ class IntroSelectionArtifactReader:
             or artifact.artifact_key != f"intro-options:{lesson_key}"
             or artifact.artifact_type != "intro_option_set"
             or artifact.branch_key != "intro_options"
-            or artifact.status != "approved"
+            or artifact.status in {"stale", "archived"}
             or artifact.current_approved_version_id != version.id
             or approval is None
             or approval.action not in {"approve", "accept_stale"}
@@ -84,7 +84,7 @@ class IntroSelectionArtifactReader:
             return IntroSelectionConsumability(False, "source_stale")
         approval = self._latest_approval(version.id)
         if (
-            artifact.status != "approved"
+            artifact.status == "archived"
             or artifact.current_approved_version_id != version.id
             or approval is None
             or approval.id != source_approval_id

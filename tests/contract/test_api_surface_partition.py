@@ -15,10 +15,12 @@ GENERATED_TYPES = ROOT / "contracts/generated/typescript/schema.ts"
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 INITIAL_PLANNED_OPERATIONS = {
     "createCreationPackage",
-    "getLessonIntroOptions",
-    "selectLessonIntroOption",
     "startNodeRun",
     "updateProject",
+}
+PROMOTED_INTRO_OPERATIONS = {
+    "getLessonIntroOptions",
+    "selectLessonIntroOption",
 }
 
 
@@ -68,3 +70,14 @@ def test_generated_frontend_types_exclude_planned_operations() -> None:
     for operation_id in INITIAL_PLANNED_OPERATIONS:
         assert f'operations["{operation_id}"]' not in generated
         assert f"    {operation_id}:" not in generated
+
+
+def test_intro_operations_are_runtime_only_and_generated() -> None:
+    current_operations = operations_by_id(load_yaml(CURRENT_CONTRACT))
+    planned_operations = operations_by_id(load_yaml(PLANNED_CONTRACT))
+    generated = GENERATED_TYPES.read_text(encoding="utf-8")
+
+    assert PROMOTED_INTRO_OPERATIONS.issubset(current_operations)
+    assert PROMOTED_INTRO_OPERATIONS.isdisjoint(planned_operations)
+    for operation_id in PROMOTED_INTRO_OPERATIONS:
+        assert f"    {operation_id}:" in generated

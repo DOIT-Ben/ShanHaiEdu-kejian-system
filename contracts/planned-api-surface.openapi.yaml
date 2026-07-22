@@ -51,54 +51,6 @@ paths:
                 $ref: './api-surface.openapi.yaml#/components/schemas/ProjectEnvelope'
         '4XX':
           $ref: './api-surface.openapi.yaml#/components/responses/Error'
-  /lessons/{lesson_id}/intro-options:
-    get:
-      summary: 获取课时三类九套导入设计
-      operationId: getLessonIntroOptions
-      x-shanhai-availability: planned
-      parameters:
-        - $ref: './api-surface.openapi.yaml#/components/parameters/LessonId'
-      responses:
-        '200':
-          description: Three categories and nine approved or draft introduction options
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [data, request_id]
-                properties:
-                  data: {$ref: './intro-option-set.schema.json'}
-                  request_id: {type: string}
-        '4XX':
-          $ref: './api-surface.openapi.yaml#/components/responses/Error'
-  /lessons/{lesson_id}/intro-selections:
-    post:
-      summary: 选择一个课堂导入方案
-      operationId: selectLessonIntroOption
-      x-shanhai-availability: planned
-      parameters:
-        - $ref: './api-surface.openapi.yaml#/components/parameters/LessonId'
-        - $ref: './api-surface.openapi.yaml#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [intro_option_set_version_id, option_key]
-              properties:
-                intro_option_set_version_id: {type: string, format: uuid}
-                option_key: {type: string}
-      responses:
-        '201':
-          description: Immutable active selection created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/IntroSelectionEnvelope'
-        '4XX':
-          $ref: './api-surface.openapi.yaml#/components/responses/Error'
   /node-runs/{node_run_id}/start:
     post:
       summary: 启动节点运行
@@ -146,20 +98,3 @@ components:
   securitySchemes:
     cookieAuth:
       $ref: './api-surface.openapi.yaml#/components/securitySchemes/cookieAuth'
-  schemas:
-    IntroSelectionEnvelope:
-      type: object
-      required: [data, request_id]
-      properties:
-        data:
-          type: object
-          additionalProperties: false
-          required: [selection_id, option_set_version_id, option_key, choice_mode, snapshot, selected_at]
-          properties:
-            selection_id: {type: string, format: uuid}
-            option_set_version_id: {type: string, format: uuid}
-            option_key: {type: string}
-            choice_mode: {enum: [teacher_selected, policy_default]}
-            snapshot: {$ref: './intro-option-set.schema.json#/$defs/option'}
-            selected_at: {type: string, format: date-time}
-        request_id: {type: string}
