@@ -374,7 +374,9 @@
   },
   "intro_option_set": {
     "option_set_key": "INTRO-SET-001",
+    "artifact_version_id": "018f2000-0000-7000-8000-000000000030",
     "generation_mode": "default_nine",
+    "source_intro_option_version_refs": [],
     "lesson_unit_key": "LESSON-001",
     "knowledge_point": "把具体物体的数量与点子、数字1～5建立稳定对应。",
     "options": [
@@ -579,6 +581,11 @@
   },
   "intro_selection": {
     "selection_key": "INTRO-SELECTION-001",
+    "approval_ref": {
+      "approval_id": "018f2000-0000-7000-8000-000000000031",
+      "artifact_version_id": "018f2000-0000-7000-8000-000000000030",
+      "status": "approved"
+    },
     "selection_method": "teacher_selected",
     "option_key": "INTRO-STO-01",
     "snapshot": {

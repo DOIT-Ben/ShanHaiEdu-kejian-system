@@ -35,7 +35,6 @@
       {
         "field_key": "existing_idea_ref",
         "label": "已有创意",
-        "description": "default_nine禁止填写；refine_existing必须选择一个同课时exact方案集版本",
         "value_type": "reference",
         "required": false,
         "source": "teacher",
@@ -147,26 +146,6 @@
         "validation": {
           "max_length": 4000
         }
-      }
-    ],
-    "conditional_requirements": [
-      {
-        "when": {
-          "field_key": "generation_mode",
-          "equals": "default_nine"
-        },
-        "forbidden_fields": [
-          "existing_idea_ref"
-        ]
-      },
-      {
-        "when": {
-          "field_key": "generation_mode",
-          "equals": "refine_existing"
-        },
-        "required_fields": [
-          "existing_idea_ref"
-        ]
       }
     ]
   }

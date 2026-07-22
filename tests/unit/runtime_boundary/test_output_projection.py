@@ -334,6 +334,24 @@ def test_compiles_lesson_identity_and_trusted_keyed_relation() -> None:
     }
 
 
+def test_optional_relation_is_omitted_only_when_its_source_is_absent() -> None:
+    binding = _binding()
+    binding["output_persistence"]["artifact"]["relations"][0]["optional"] = True
+
+    without_source = _compile(binding, upstream_artifacts={})
+    with_source = _compile(binding)
+
+    assert without_source.artifact_write.relations == ()
+    assert with_source.artifact_write.relations[0].from_artifact_version_id == (UPSTREAM_VERSION_ID)
+
+
+def test_required_relation_still_rejects_a_missing_source() -> None:
+    with pytest.raises(OutputProjectionError) as caught:
+        _compile(_binding(), upstream_artifacts={})
+
+    assert caught.value.code == "OUTPUT_PROJECTION_RELATION_SOURCE_MISSING"
+
+
 @pytest.mark.parametrize(
     ("field", "value", "code"),
     [

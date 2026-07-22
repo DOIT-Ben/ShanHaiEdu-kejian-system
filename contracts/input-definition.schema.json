@@ -13,10 +13,47 @@
       "type": "array",
       "minItems": 1,
       "items": {"$ref": "#/$defs/field"}
+    },
+    "conditional_requirements": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/conditionalRequirement"}
     }
   },
   "$defs": {
     "key": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{1,159}$"},
+    "fieldCondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field_key", "equals"],
+      "properties": {
+        "field_key": {"$ref": "#/$defs/key"},
+        "equals": {"type": "string", "minLength": 1}
+      }
+    },
+    "conditionalRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["when"],
+      "properties": {
+        "when": {"$ref": "#/$defs/fieldCondition"},
+        "required_fields": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/key"}
+        },
+        "forbidden_fields": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/key"}
+        }
+      },
+      "anyOf": [
+        {"required": ["required_fields"]},
+        {"required": ["forbidden_fields"]}
+      ]
+    },
     "field": {
       "type": "object",
       "additionalProperties": false,

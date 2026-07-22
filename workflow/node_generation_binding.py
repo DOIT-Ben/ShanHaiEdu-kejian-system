@@ -126,6 +126,9 @@ def _build_catalog_indexes(nodes: list[dict[str, Any]]) -> WorkflowIndexes:
                 entrypoint=cast(bool, node["entrypoint"]),
                 dependencies=tuple(cast(list[str], node["dependencies"])),
                 input_contract_refs=tuple(cast(list[str], node["input_contract_refs"])),
+                optional_input_contract_refs=tuple(
+                    cast(list[str], node.get("optional_input_contract_refs", []))
+                ),
                 output_contract_refs=tuple(cast(list[str], node["output_contract_refs"])),
                 binding=cast(Mapping[str, Any], copy.deepcopy(node)),
             )

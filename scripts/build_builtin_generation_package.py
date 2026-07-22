@@ -105,6 +105,14 @@ def _build_node_items(
     output_source = cast(Mapping[str, Any], node["output"])
     prompt_source = cast(Mapping[str, Any], node["prompt"])
     projection_source = cast(Mapping[str, Any], node["projection"])
+    input_spec = {
+        "definition_key": input_key,
+        "title": f"{title}输入",
+        "description": input_source["description"],
+        "fields": input_source["fields"],
+    }
+    if "conditional_requirements" in input_source:
+        input_spec["conditional_requirements"] = input_source["conditional_requirements"]
     prompt_sections = [
         {
             "section_key": "role",
@@ -141,12 +149,7 @@ def _build_node_items(
             "input_definition",
             input_key,
             f"{title}输入",
-            {
-                "definition_key": input_key,
-                "title": f"{title}输入",
-                "description": input_source["description"],
-                "fields": input_source["fields"],
-            },
+            input_spec,
         ),
         _item(
             "content_definition",

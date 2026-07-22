@@ -18,6 +18,13 @@ def validate_node(node: dict[str, Any]) -> None:
     validate_execution_kind_declaration(node)
     _validate_prompt_exposure(node)
     validate_unique_strings(node, "input_contract_refs", "NODE_BINDING_CONTRACT_REF_DUPLICATE")
+    if "optional_input_contract_refs" in node:
+        validate_unique_strings(
+            node,
+            "optional_input_contract_refs",
+            "NODE_BINDING_OPTIONAL_INPUT_INVALID",
+        )
+    _validate_optional_inputs(node)
     validate_unique_strings(node, "output_contract_refs", "NODE_BINDING_CONTRACT_REF_DUPLICATE")
     validate_validator_refs(node)
     _validate_instruction_policy(cast(dict[str, Any], node["instruction_policy"]))
@@ -37,6 +44,16 @@ def validate_node(node: dict[str, Any]) -> None:
         raise NodeGenerationBindingError(
             "NODE_BINDING_HUMAN_GATE_INVALID",
             f"human gate must block downstream execution: {node['node_key']}",
+        )
+
+
+def _validate_optional_inputs(node: dict[str, Any]) -> None:
+    optional = set(cast(list[str], node.get("optional_input_contract_refs", [])))
+    inputs = set(cast(list[str], node["input_contract_refs"]))
+    if not optional <= inputs:
+        raise NodeGenerationBindingError(
+            "NODE_BINDING_OPTIONAL_INPUT_INVALID",
+            f"optional inputs must be declared inputs: {node['node_key']}",
         )
 
 

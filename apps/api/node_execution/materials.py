@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any, cast
 from uuid import UUID
 
+from apps.api.artifacts.context_source_registry import resolve_artifact_source
 from apps.api.model_gateway.contracts import ModelAuditContext, ModelCapability, TextModelRequest
 from apps.api.runtime_boundary.contract_values import plain_json_value
 from apps.api.runtime_boundary.ports import (
@@ -78,20 +79,57 @@ def collect_upstream_artifacts(
     execution: WorkflowExecutionContext,
     binding: Mapping[str, Any],
 ) -> dict[str, ArtifactContextVersion]:
-    refs = binding.get("input_contract_refs")
-    if not isinstance(refs, Sequence) or isinstance(refs, (str, bytes, bytearray)):
+    refs = _contract_refs(binding.get("input_contract_refs"))
+    optional = _contract_refs(binding.get("optional_input_contract_refs", ()))
+    if not set(optional) <= set(refs):
+        raise NodeExecutionError(
+            "NODE_EXECUTION_OPTIONAL_INPUT_INVALID",
+            "published optional inputs must be declared inputs",
+        )
+    upstream: dict[str, ArtifactContextVersion] = {}
+    for raw in refs:
+        values = artifacts.list_context_versions(execution, raw)
+        if len(values) > 1:
+            raise NodeExecutionError(
+                "NODE_EXECUTION_INPUT_CONTRACT_AMBIGUOUS",
+                "a published artifact input resolved to multiple versions",
+            )
+        if len(values) == 1:
+            value = values[0]
+            if (
+                value.contract_ref != raw
+                or value.project_id != execution.project_id
+                or (
+                    value.lesson_unit_id is not None
+                    and value.lesson_unit_id != execution.lesson_unit_id
+                )
+            ):
+                raise NodeExecutionError(
+                    "NODE_EXECUTION_INPUT_CONTRACT_MISMATCH",
+                    "an artifact input does not match the fixed project, lesson, or contract",
+                )
+            upstream[raw] = value
+        elif raw not in optional and resolve_artifact_source(raw) is not None:
+            raise NodeExecutionError(
+                "NODE_EXECUTION_INPUT_CONTRACT_MISSING",
+                "a required artifact input version is unavailable",
+            )
+    return upstream
+
+
+def _contract_refs(value: object) -> tuple[str, ...]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         raise NodeExecutionError(
             "NODE_EXECUTION_INPUT_CONTRACT_INVALID",
             "the published input contract list is invalid",
         )
-    upstream: dict[str, ArtifactContextVersion] = {}
-    for raw in cast(Sequence[object], refs):
-        if type(raw) is not str:
-            continue
-        values = artifacts.list_context_versions(execution, raw)
-        if len(values) == 1:
-            upstream[raw] = values[0]
-    return upstream
+    refs = tuple(cast(Sequence[object], value))
+    if any(type(ref) is not str or not ref for ref in refs) or len(refs) != len(set(refs)):
+        raise NodeExecutionError(
+            "NODE_EXECUTION_INPUT_CONTRACT_INVALID",
+            "the published input contract list is invalid",
+        )
+    return cast(tuple[str, ...], refs)
 
 
 def execution_snapshot(

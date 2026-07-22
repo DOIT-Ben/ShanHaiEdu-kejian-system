@@ -68,6 +68,10 @@ def parse_node(raw: object) -> WorkflowNodeDefinition:
             "input_contract_refs",
             required=True,
         ),
+        optional_input_contract_refs=parse_string_array(
+            values,
+            "optional_input_contract_refs",
+        ),
         output_contract_refs=parse_string_array(
             values,
             "output_contract_refs",

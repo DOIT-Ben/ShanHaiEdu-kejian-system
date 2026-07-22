@@ -155,8 +155,45 @@
       "required": ["description", "fields"],
       "properties": {
         "description": {"type": "string"},
-        "fields": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/inputField"}}
+        "fields": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/inputField"}},
+        "conditional_requirements": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/conditionalRequirement"}
+        }
       }
+    },
+    "fieldCondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field_key", "equals"],
+      "properties": {
+        "field_key": {"$ref": "#/$defs/key"},
+        "equals": {"type": "string", "minLength": 1}
+      }
+    },
+    "conditionalRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["when"],
+      "properties": {
+        "when": {"$ref": "#/$defs/fieldCondition"},
+        "required_fields": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/key"}
+        },
+        "forbidden_fields": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/key"}
+        }
+      },
+      "anyOf": [
+        {"required": ["required_fields"]},
+        {"required": ["forbidden_fields"]}
+      ]
     },
     "output": {
       "type": "object",

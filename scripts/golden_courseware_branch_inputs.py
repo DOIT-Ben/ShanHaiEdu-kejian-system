@@ -210,6 +210,10 @@ def _intro_generate_options_output(case: dict[str, Any]) -> dict[str, Any]:
     )
     return {
         "option_set_key": option_set["option_set_key"],
+        "generation_mode": option_set["generation_mode"],
+        "source_intro_option_version_refs": copy.deepcopy(
+            option_set["source_intro_option_version_refs"]
+        ),
         "source_lesson_unit_key": option_set["lesson_unit_key"],
         "source_knowledge_point": option_set["knowledge_point"],
         "source_material_evidence_keys": copy.deepcopy(target_lesson["evidence_refs"]),
