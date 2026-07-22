@@ -115,11 +115,21 @@ class AttemptExecutionCoordinator:
         error: ModelGatewayError,
         *,
         latency_ms: int,
+        result: AttemptSuccessAudit | None = None,
     ) -> None:
         if lease is None or context is None or self._audit_sink is None:
             return
         try:
-            self._audit_sink.fail(lease, context, error, latency_ms=latency_ms)
+            if result is None:
+                self._audit_sink.fail(lease, context, error, latency_ms=latency_ms)
+            else:
+                self._audit_sink.fail(
+                    lease,
+                    context,
+                    error,
+                    latency_ms=latency_ms,
+                    result=result,
+                )
         except Exception:
             log_audit_recovery_failure(error.code)
 

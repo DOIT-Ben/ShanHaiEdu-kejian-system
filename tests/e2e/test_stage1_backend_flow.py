@@ -40,10 +40,7 @@ from apps.api.assets.project_contracts import (
 from apps.api.assets.project_models import AssetBinding
 from apps.api.assets.project_service import ProjectAssetService
 from apps.api.assets.pypdf_parser import PypdfMaterialParser
-from apps.api.content_runtime.registry import (
-    BUILTIN_CONTENT_DEFINITION_VERSION_ID,
-    BUILTIN_RUNTIME_DEFAULTS,
-)
+from apps.api.content_runtime.registry import BUILTIN_RUNTIME_DEFAULTS
 from apps.api.database import build_session_factory, utc_now
 from apps.api.errors import ApiError
 from apps.api.identity.context import system_actor
@@ -72,6 +69,7 @@ from apps.api.uploads.schemas import ConfirmUploadRequest, CreateUploadSessionRe
 from apps.api.uploads.session_service import UploadSessionService
 from apps.api.workflows.service import WorkflowRuntimeService
 from tests.conftest import run_migration
+from tests.fakes.content_runtime import ensure_test_authoring_definition
 from tests.fakes.identity import configure_test_identity
 from workers.material_parse import MaterialParseJobRunner
 from workflow.node_state import NodeStatus
@@ -238,15 +236,16 @@ def create_approved_artifact(
     value: str,
 ):
     service = ArtifactService(session, actor)
+    definition_id = ensure_test_authoring_definition(session, project_id)
     artifact = service.create(
         project_id,
         artifact_key=key,
         artifact_type="stage1_fixture",
         branch_key="lesson_plan",
-        content_definition_version_id=BUILTIN_CONTENT_DEFINITION_VERSION_ID,
+        content_definition_version_id=definition_id,
         lesson_unit_id=lesson_id,
         draft_branch="main",
-        initial_content={"value": value},
+        initial_content={"title": value},
         request_id=f"req-{key}-create",
     )
     draft = ArtifactRepository(session, actor).get_draft(artifact.id, "main")

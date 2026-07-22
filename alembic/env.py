@@ -8,6 +8,7 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
+from apps.api.artifact_quality import models as artifact_quality_models
 from apps.api.artifacts import models as artifact_models
 from apps.api.assets import models as asset_models
 from apps.api.assets import project_models as project_asset_models
@@ -18,6 +19,7 @@ from apps.api.identity import models as identity_models
 from apps.api.jobs import models as job_models
 from apps.api.lessons import models as lesson_models
 from apps.api.model_gateway import audit_models as model_gateway_audit_models
+from apps.api.node_execution import models as node_execution_models
 from apps.api.projects import models as project_models
 from apps.api.prompt_runtime import models as prompt_runtime_models
 from apps.api.reliability import models as reliability_models
@@ -30,6 +32,7 @@ if config.config_file_name is not None:
 
 _registered_models = (
     artifact_models,
+    artifact_quality_models,
     asset_models,
     project_asset_models,
     content_runtime_models,
@@ -38,6 +41,7 @@ _registered_models = (
     job_models,
     lesson_models,
     model_gateway_audit_models,
+    node_execution_models,
     project_models,
     prompt_runtime_models,
     reliability_models,

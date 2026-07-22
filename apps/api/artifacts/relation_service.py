@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from collections import defaultdict
 from collections.abc import Mapping
 from typing import Any
@@ -19,6 +18,11 @@ from apps.api.artifacts.domain import (
     ensure_relation_is_acyclic,
 )
 from apps.api.artifacts.models import Artifact, ArtifactDraft, ArtifactRelation, ArtifactVersion
+from apps.api.artifacts.relation_carry_forward import (
+    active_relations_with_carry,
+    build_stale_reason,
+    stale_reason_code,
+)
 from apps.api.artifacts.repository import ArtifactRepository
 from apps.api.database import utc_now
 from apps.api.errors import ApiError
@@ -155,6 +159,7 @@ class ArtifactRelationService:
         replacement_version_id: UUID | None,
         *,
         selection: StaleImpactSelection | None = None,
+        carry_forward_selection: StaleImpactSelection | None = None,
     ) -> tuple[list[UUID], list[UUID]]:
         if previous_version_id is None or previous_version_id == replacement_version_id:
             return [], []
@@ -183,11 +188,7 @@ class ArtifactRelationService:
         }
         stale_ids: list[UUID] = []
         stale_node_ids: list[UUID] = []
-        reason_code = (
-            "UPSTREAM_APPROVAL_REVOKED"
-            if replacement_version_id is None
-            else "UPSTREAM_APPROVED_VERSION_CHANGED"
-        )
+        reason_code = stale_reason_code(replacement_version_id)
         for artifact_id in target_artifact_ids:
             downstream = locked_targets[artifact_id]
             if downstream is None:
@@ -196,18 +197,21 @@ class ArtifactRelationService:
                 downstream.current_submitted_version_id,
                 downstream.current_approved_version_id,
             }
-            active = [
-                relation
-                for relation in grouped[artifact_id]
-                if relation.to_artifact_version_id in current_ids
-                and relation.relation_type != ArtifactRelationType.SUPERSEDES.value
-            ]
+            active = active_relations_with_carry(
+                self._session,
+                self._actor,
+                source_artifact.id,
+                grouped[artifact_id],
+                current_ids,
+                replacement_version_id,
+                carry_forward_selection,
+            )
             if not active:
                 continue
             matched = self._matched_relations(active, selection, replacement_version_id)
             if not matched:
                 continue
-            stale_reason = self._stale_reason(
+            stale_reason = build_stale_reason(
                 previous_version_id, replacement_version_id, matched, reason_code
             )
             downstream.status = "stale"
@@ -282,37 +286,6 @@ class ArtifactRelationService:
             node.stale_reason_json = stale_reason
             self._touch(node)
         return [node.id for node in nodes]
-
-    @staticmethod
-    def _stale_reason(
-        previous_version_id: UUID,
-        replacement_version_id: UUID | None,
-        relations: list[tuple[ArtifactRelation, ArtifactImpactScope]],
-        reason_code: str,
-    ) -> dict[str, Any]:
-        bindings = [
-            {
-                "relation_type": relation.relation_type,
-                "binding_key": relation.binding_key,
-                "impact_scope": effective_scope.as_dict(),
-            }
-            for relation, effective_scope in relations
-        ]
-        bindings.sort(
-            key=lambda item: (
-                item["relation_type"],
-                item["binding_key"],
-                json.dumps(item["impact_scope"], sort_keys=True),
-            )
-        )
-        return {
-            "reason_code": reason_code,
-            "replaced_upstream_version_id": str(previous_version_id),
-            "replacement_version_id": (
-                str(replacement_version_id) if replacement_version_id is not None else None
-            ),
-            "bindings": bindings,
-        }
 
     def _find_existing(
         self,

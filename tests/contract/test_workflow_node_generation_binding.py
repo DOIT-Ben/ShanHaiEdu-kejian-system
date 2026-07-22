@@ -124,6 +124,21 @@ def test_schema_and_complete_primary_math_catalog_are_valid() -> None:
     assert lesson_plan_index.quality_validate_node_key == "lesson_plan.validate"
     assert lesson_plan_index.quality_gate_node_key == "lesson_plan.approve"
     assert lesson_plan_index.quality_requirement_mode == "reports"
+    lesson_generate = node_by_key(catalog, "lesson.division.generate")
+    assert lesson_generate["context_policy"]["allowed_sources"] == [
+        "material.approved_parse",
+        "material_scope.approved_version",
+    ]
+    lesson_validate = node_by_key(catalog, "lesson.division.validate")
+    assert lesson_validate["input_contract_refs"] == [
+        "artifact:lesson_division",
+        "approval:material_scope",
+        "content:material_evidence",
+    ]
+    assert lesson_validate["quality_report_persistence"]["supporting_input_refs"] == [
+        "approval:material_scope",
+        "content:material_evidence",
+    ]
     for contract_ref, expected in {
         "prompt:image_request": {
             "ppt.cover.prompt.generate",
@@ -443,6 +458,20 @@ def test_output_persistence_forbids_implicit_or_extra_targets() -> None:
     assert caught.value.code == "NODE_BINDING_ARTIFACT_CONTENT_INVALID"
 
 
+def test_lesson_division_declares_approval_completion_without_runtime_inference() -> None:
+    catalog = load_catalog()
+    persistence = node_by_key(catalog, "lesson.division.generate")["output_persistence"]
+
+    assert persistence["approval_completion"] == {
+        "kind": "lesson_unit_sync",
+        "collection_pointer": "/lesson_units",
+        "stable_key_field": "lesson_unit_key",
+    }
+
+    persistence["approval_completion"]["stable_key_field"] = "id"
+    assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
+
+
 def test_semantic_validator_rejects_reference_asset_schema_bypasses() -> None:
     catalog = load_catalog()
     mapping = node_by_key(catalog, "ppt.body_asset_prompts.generate")["output_persistence"][
@@ -520,7 +549,10 @@ def test_catalog_encodes_context_and_reference_asset_boundaries() -> None:
     division = node_by_key(catalog, "lesson.division.generate")
     assert division["context_policy"] == {
         "mode": "declared",
-        "allowed_sources": ["material.approved_parse"],
+        "allowed_sources": [
+            "material.approved_parse",
+            "material_scope.approved_version",
+        ],
         "forbidden_sources": [],
     }
     assert division["reference_asset_policy"] == {"mode": "none", "roles": []}
@@ -580,7 +612,7 @@ def test_catalog_hash_is_deterministic_for_semantically_identical_objects() -> N
     assert first_validated.canonical_json == second_validated.canonical_json
     assert first_validated.content_hash == second_validated.content_hash
     assert first_validated.content_hash == (
-        "205a7c2c2e7053269f52f9c2a8f138c77d02f039f37cb19d8d19f11a5e405f9a"
+        "aafde8ef907e82a6f127dc1016cc52323706de0f4898e17a6afe7717895c46b2"
     )
 
 

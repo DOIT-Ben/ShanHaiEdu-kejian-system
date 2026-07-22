@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import cast
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from apps.api.database import utc_now
@@ -11,6 +14,7 @@ from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.permissions import ProjectAccessService
 from apps.api.ids import new_uuid7
 from apps.api.projects.policy_service import AutomationPolicyService
+from apps.api.reliability.events import EventResource, EventWriter
 from apps.api.workflows.models import (
     NodeInputSnapshot,
     NodeRun,
@@ -20,6 +24,21 @@ from apps.api.workflows.models import (
 from apps.api.workflows.repository import WorkflowRuntimeRepository
 from workflow.node_state import NodeStateError, NodeStatus, ensure_node_transition
 from workflow.registry import BUILTIN_WORKFLOW_REGISTRY, RegisteredWorkflow
+
+_BRANCH_RETIREMENT_PATHS: dict[NodeStatus, tuple[NodeStatus, ...]] = {
+    NodeStatus.DISABLED: (),
+    NodeStatus.NOT_READY: (NodeStatus.DISABLED,),
+    NodeStatus.READY: (NodeStatus.DISABLED,),
+    NodeStatus.DRAFT: (NodeStatus.STALE, NodeStatus.SKIPPED),
+    NodeStatus.REVIEW_REQUIRED: (NodeStatus.STALE, NodeStatus.SKIPPED),
+    NodeStatus.APPROVED: (NodeStatus.STALE, NodeStatus.SKIPPED),
+    NodeStatus.PARTIALLY_COMPLETED: (NodeStatus.FAILED, NodeStatus.SKIPPED),
+    NodeStatus.FAILED: (NodeStatus.SKIPPED,),
+    NodeStatus.PAUSED: (NodeStatus.CANCELLED,),
+    NodeStatus.CANCELLED: (),
+    NodeStatus.STALE: (NodeStatus.SKIPPED,),
+    NodeStatus.SKIPPED: (),
+}
 
 
 class WorkflowRuntimeError(ValueError):
@@ -135,15 +154,65 @@ class WorkflowRuntimeService:
         )
         self._session.add(record)
         self._session.flush()
+        self._queue_quality_validation_if_ready(node, run, input_key=input_key)
         return record
 
     def transition_node(self, node_run_id: UUID, target: NodeStatus) -> NodeRun:
         node = self._require_node(node_run_id, for_update=True)
         run = self._require_run(node.workflow_run_id)
-        ProjectAccessService(self._session, self._actor).require(
-            run.project_id,
-            ProjectAction.EDIT,
-        )
+        if not self._actor.is_system:
+            ProjectAccessService(self._session, self._actor).require(
+                run.project_id,
+                ProjectAction.EDIT,
+            )
+        return self._transition_locked(node, run, target)
+
+    def approve_review_gate(self, node_run_id: UUID) -> NodeRun:
+        """Complete an existing human gate with REVIEW authority only."""
+
+        node = self._require_node(node_run_id, for_update=True)
+        run = self._require_run(node.workflow_run_id)
+        if not self._actor.is_system:
+            ProjectAccessService(self._session, self._actor).require(
+                run.project_id,
+                ProjectAction.REVIEW,
+            )
+        if NodeStatus(node.status) is not NodeStatus.REVIEW_REQUIRED:
+            raise WorkflowRuntimeError("the node is not awaiting review")
+        return self._transition_locked(node, run, NodeStatus.APPROVED)
+
+    def retire_branch_node(
+        self,
+        node_run_id: UUID,
+        *,
+        review_completion: bool,
+    ) -> NodeRun:
+        """Permanently retire a non-active branch node through declared transitions."""
+
+        node = self._require_node(node_run_id, for_update=True)
+        run = self._require_run(node.workflow_run_id)
+        if not self._actor.is_system:
+            access = ProjectAccessService(self._session, self._actor)
+            if review_completion:
+                access.require_review_completion(run.project_id, for_update=False)
+            else:
+                access.require(run.project_id, ProjectAction.EDIT, for_update=False)
+        status = NodeStatus(node.status)
+        path = _BRANCH_RETIREMENT_PATHS.get(status)
+        if path is None:
+            raise WorkflowRuntimeError(
+                f"active node {node.id} must finish cancellation before branch retirement"
+            )
+        for target in path:
+            self._transition_locked(node, run, target)
+        return node
+
+    def _transition_locked(
+        self,
+        node: NodeRun,
+        run: WorkflowRun,
+        target: NodeStatus,
+    ) -> NodeRun:
         try:
             ensure_node_transition(NodeStatus(node.status), target)
         except NodeStateError as exc:
@@ -170,6 +239,8 @@ class WorkflowRuntimeService:
         if target in {NodeStatus.CANCELLED, NodeStatus.SKIPPED}:
             node.finished_at = now
         self._session.flush()
+        if target is NodeStatus.READY:
+            self._queue_quality_validation_if_ready(node, run, input_key=None)
         return node
 
     def _require_run(self, run_id: UUID) -> WorkflowRun:
@@ -189,3 +260,45 @@ class WorkflowRuntimeService:
         if definition is None or definition.status != "published":
             raise WorkflowRuntimeError("project workflow definition is not published")
         return BUILTIN_WORKFLOW_REGISTRY.load(definition.graph_json)
+
+    def _queue_quality_validation_if_ready(
+        self,
+        node: NodeRun,
+        run: WorkflowRun,
+        *,
+        input_key: str | None,
+    ) -> None:
+        if NodeStatus(node.status) is not NodeStatus.READY:
+            return
+        registered = self._load_registered_workflow(run.workflow_definition_version_id)
+        definition = registered.node_by_key.get(node.node_key)
+        persistence = (
+            definition.binding.get("quality_report_persistence") if definition is not None else None
+        )
+        if not isinstance(persistence, Mapping):
+            return
+        values = cast(Mapping[str, object], persistence)
+        source_input_ref = values.get("source_input_ref")
+        if type(source_input_ref) is not str:
+            return
+        if input_key is not None and source_input_ref != input_key:
+            return
+        snapshot_exists = self._session.scalar(
+            select(NodeInputSnapshot.id).where(
+                NodeInputSnapshot.node_run_id == node.id,
+                NodeInputSnapshot.input_key == source_input_ref,
+            )
+        )
+        if snapshot_exists is None:
+            return
+        EventWriter(self._session, self._actor.organization_id).append(
+            project_id=run.project_id,
+            event_type="artifact.quality_validation.queued",
+            resource=EventResource(type="node_run", id=node.id),
+            payload={
+                "node_run_id": str(node.id),
+                "content_release_id": str(run.content_release_id),
+                "workflow_definition_version_id": str(run.workflow_definition_version_id),
+            },
+            request_id=None,
+        )

@@ -229,8 +229,16 @@
             "source": "material.approved_parse",
             "required": true,
             "exposure": "full",
-            "max_items": 50,
+            "max_items": 1,
             "max_bytes": 500000
+          },
+          {
+            "binding_key": "approved_scope_and_course_target",
+            "source": "material_scope.approved_version",
+            "required": true,
+            "exposure": "full",
+            "max_items": 1,
+            "max_bytes": 50000
           }
         ],
         "max_chars": 30000

@@ -63,6 +63,16 @@ class WorkflowOutputDefinitionBinding:
     quality_validator_refs: tuple[tuple[str, str, str], ...]
     quality_gate_node_key: str | None
     quality_requirement_mode: str
+    approval_completion: WorkflowApprovalCompletionBinding | None
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowApprovalCompletionBinding:
+    """Explicit application effect attached to an approved generated output."""
+
+    kind: str
+    collection_pointer: str
+    stable_key_field: str
 
 
 @dataclass(frozen=True, slots=True)

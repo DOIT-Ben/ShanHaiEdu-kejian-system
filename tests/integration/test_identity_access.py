@@ -7,10 +7,7 @@ from uuid import UUID
 import httpx
 from sqlalchemy.orm import Session
 
-from apps.api.content_runtime.registry import (
-    BUILTIN_CONTENT_DEFINITION_VERSION_ID,
-    BUILTIN_RUNTIME_DEFAULTS,
-)
+from apps.api.content_runtime.registry import BUILTIN_RUNTIME_DEFAULTS
 from apps.api.database import build_session_factory
 from apps.api.identity.context import AuthenticatedIdentity, system_actor
 from apps.api.identity.dependencies import get_authenticated_identity
@@ -28,6 +25,7 @@ from apps.api.main import create_app
 from apps.api.projects.models import Project
 from apps.api.settings import Settings
 from tests.conftest import run_migration
+from tests.fakes.content_runtime import ensure_test_authoring_definition
 from tests.fakes.object_storage import FakeObjectStorage
 
 ORG_A = UUID("01910000-0000-7000-8000-000000000001")
@@ -283,14 +281,6 @@ async def test_idempotent_replay_rechecks_current_project_membership(
         settings=Settings(_env_file=None, environment="test", database_url=postgres_database_url)
     )
     factory = build_session_factory(app.state.database_engine)
-    payload = {
-        "artifact_key": "lesson-plan:lesson-01",
-        "artifact_type": "lesson_plan",
-        "branch_key": "lesson_plan",
-        "content_definition_version_id": str(BUILTIN_CONTENT_DEFINITION_VERSION_ID),
-        "draft_branch": "main",
-        "content": {"title": "Private draft"},
-    }
     try:
         with factory() as session, session.begin():
             add_organization(session, ORG_A, "replay-membership-org")
@@ -305,6 +295,17 @@ async def test_idempotent_replay_rechecks_current_project_membership(
         use_identity(app, user_id=OWNER_USER, organization_id=ORG_A)
         async for client in client_for(app):
             project_id = await create_project(client, "replay-membership-project")
+        with factory() as session, session.begin():
+            definition_id = ensure_test_authoring_definition(session, project_id)
+        payload = {
+            "artifact_key": "lesson-plan:lesson-01",
+            "artifact_type": "lesson_plan",
+            "branch_key": "lesson_plan",
+            "content_definition_version_id": str(definition_id),
+            "draft_branch": "main",
+            "content": {"title": "Private draft"},
+        }
+        async for client in client_for(app):
             first = await client.post(
                 f"/api/v2/projects/{project_id}/artifacts",
                 headers={"Idempotency-Key": "replay-membership-artifact"},

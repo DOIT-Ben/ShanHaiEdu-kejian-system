@@ -1,10 +1,10 @@
 # 当前项目状态
 
-更新时间：2026-07-20
+更新时间：2026-07-22
 
-验证基线：`main`，实现事实以本文件所在提交的代码、迁移和测试为准；任务状态以链接的GitHub Issue和Pull Request为准
+验证基线：`main`；#130与PR #141、#146与PR #148、#89与PR #147、#133与PR #164已经合并，#134批准守卫已在当前树实现，Decision #153已经关闭；`1.1.0`/v2继续保持发布候选且旧项目绑定不变；实现事实以本文件所在提交的代码、迁移和测试为准，任务状态以链接的GitHub Issue和Pull Request为准
 
-当前阶段：阶段0出口尚未关闭；阶段1通用口径校准、后端轨道、首套业务机器合同和后端治理审计已经关闭，阶段2后端已经关闭Prompt公共投影与Attempt恢复门禁，下一步按#86、#123、#130串行收口通用执行器的剩余合同门禁
+当前阶段：阶段0出口尚未关闭；阶段1通用口径校准、后端轨道、首套业务机器合同和后端治理审计已经关闭，阶段2共享运行时已完成#146安全与发布固定性收口、#89通用节点执行闭环、#131字段级编辑权限、#133不可变质量报告、#134 exact批准守卫和#125课时划分运行时；下一项按#126逐课时教案推进
 
 本文件只描述现在，不保存开发日志。任务细节、负责人、讨论和交接以GitHub Issue与Pull Request为准。
 
@@ -13,12 +13,10 @@
 - 后端已经具备可运行的FastAPI模块化单体、PostgreSQL、Redis、MinIO、Alembic、Worker、Outbox、SSE和幂等基座。
 - API和测试已经覆盖租户与用户边界、项目、课时与分支、上传、文件资产与不可变版本、内容发布、工作流运行、产物审核与依赖、Prompt与Context快照、教材PDF解析以及项目资产原子绑定。
 - OpenAPI、JSON Schema、生成TypeScript客户端、确定性Mock/Fake和后端CI已经进入自动门禁；文本模型网关已经完成受控真实冒烟。
-- 首套小学数学业务内容包已经为22个模型节点固定输入、Prompt、输出、投影和逻辑能力；三类九套由课程驱动单节点直接生成最终方案集。“1～5的认识”黄金Fixture可以分别启动教案、PPT和视频合同测试，但不代表真实模型或媒体生产完成。
+- 正式发布的`shanhai.primary_math.courseware@1.0.0`继续固定原内容、v1工作流和既有项目绑定；主线已经包含#130合并的`1.1.0`/v2前向候选，#146加固与PostgreSQL前向发布复验已经完成，但该候选尚未显式发布或激活为新项目默认。“1～5的认识”黄金Fixture可以分别启动教案、PPT和视频合同测试，但不代表真实模型或媒体生产完成。
 - 已审核的Markdown TemplateDraft可以通过显式CompilationProfile确定性编译为同一套结构化内容包合同；该能力不替代内容发布服务或模型节点执行运行时。
-- 当前可以通过自动化测试和API/CLI验证后端链路；生产前端已经在Open Draft [PR #111](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/111)恢复远端源码与审查载体，但尚未完成浏览器到部署后端的阶段1真实联调，不得描述为阶段1产品完成。
-- PR #111已经把生产`RuntimeApp`与开发`MockApp`隔离；生产入口实现项目创建、教材SHA-256、刷新恢复、上传会话、对象存储直传、上传确认、Generation Job REST/SSE、课时读取和项目概览的前端纵向链，生产构建不以Mock Runtime、合同测试入口或演示凭据兜底。
-- 项目、上传、课时、Workflow、Artifact、素材槽位、创作四动作、Generation Job和项目/Job SSE均已有runtime OpenAPI类型化客户端；当前只有项目、上传、Job、课时、AutomationPolicy与SSE进入生产页面，其余客户端仍待页面编排和真实环境验收。
-- 独立Runtime Playwright门禁已经用合同级确定性网络桩覆盖生产路由、CSRF安全阻断、上传刷新恢复与Job/项目SSE；它不替代目标部署环境联调。真实认证bootstrap、当前用户与退出合同仍缺失，相关写操作保持禁用；后端真实图片/视频Provider Adapter与受控冒烟也尚未完成。开发Mock页面、静态关键帧和确定性Fake都不能作为真实认证、媒体生成或完整业务闭环证据。
+- 当前可以通过自动化测试和API/CLI验证后端链路，但尚未完成浏览器到真实API的阶段1纵向演示，不得描述为阶段1产品完成。
+- 生产前端仍由[Issue #4](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)独立负责；先前的PR #33已经关闭且未合并，当前开放的Draft [PR #111](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/111)尚未达到Ready或合并，#11仍等待可联调的生产前端源码，任何本地前端分支或交付ZIP都不能替代远端源码交接。
 
 ## 已完成
 
@@ -31,10 +29,17 @@
 - [Issue #57](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/57)与[PR #60](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/60)已经合并：OpenAPI、JSON Schema、生成客户端、Mock和兼容测试已经统一到新口径。
 - [Issue #58](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/58)与[PR #63](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/63)已经合并：`automatic/guided`策略快照、项目/独立创作来源、不可变创作包、四个独立动作、Outbox/SSE、原子写回和真实依赖stale传播已经进入主线。
 - [Issue #68](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/68)与[PR #71](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/71)已经合并首套内置内容包和黄金Fixture；[Decision #99](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/99)、[Issue #100](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/100)与[PR #101](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/101)随后把三类九套纠正为知识点驱动的单节点生成，#48字段阻塞保持解除。
-- [Issue #88](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/88)与[PR #105](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/105)已经把纠偏后的黄金内容包、111个内容项、22个内容定义投影和47节点目录正式发布到数据库；新项目从追加式默认版本固定Release与工作流，旧项目保持原绑定。
+- [Issue #88](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/88)与[PR #105](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/105)已经把`shanhai.primary_math.courseware@1.0.0`、111个内容项、22个内容定义投影和47节点v1目录正式发布到数据库；新项目从追加式默认版本固定Release与工作流，旧项目保持原绑定。
 - [Issue #61](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/61)与[PR #62](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/62)已经完成Provider中立文本、图片和视频合同、Port、路由、确定性Fake、统一错误、异步任务标识和用量审计；真实媒体Adapter与冒烟仍由后续独立任务负责。
 - [Issue #112](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/112)与[PR #120](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/120)已经为#89合并最小应用接口和跨模块ORM、文件/函数增长门禁，没有扩大为#92全量重构。
 - [Issue #51](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/51)与[PR #119](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/119)已经收窄教师公共Prompt投影；教师端只获得可编辑业务提示词与编辑元数据，完整Prompt、Context、Schema与Provider约束继续只保留在服务端快照中。
+- [Issue #123](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/123)已经退役Prompt领域从未实现的`append`教师修订模式；受控发布模板inventory为22条`replace_editable_layer`、0条Prompt `append`。
+- [Issue #130](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/130)与[PR #141](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/141)已经合并47节点v2拓扑、22个模型节点的Artifact/CreationPackage输出投影、validator descriptor、质量报告和人工门禁声明；合并后的安全缺口由#146独立收口。
+- [Issue #146](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/146)与[PR #148](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/148)已经关闭并合并，P0安全与发布固定性缺口已经收口。
+- [Issue #89](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/89)、[Decision #153](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/153)与[PR #147](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/147)已经关闭并合并：通用节点执行器、两阶段事务、确定性Fake、完整血缘、幂等/取消/恢复/回滚/并发、私有恢复事实保留期和CreationPackage固定条件已经进入主线。
+- [Issue #133](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/133)与[PR #164](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/164)已经关闭并合并：Artifact与FileAsset质量源可形成不可变ArtifactQualityReport，并与validate NodeRun终态和事件原子提交。
+- [Issue #134](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/134)与[PR #174](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/174)已经在当前树实现：所有Artifact批准入口从项目固定发布合同解析exact质量要求，只接受当前submitted版本的passing报告，用户与系统身份不能伪造或绕过服务端证据。
+- [Issue #125](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/125)与[PR #177](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/177)已经在当前树实现：正式教材证据驱动课时划分generate/validate/approve三节点，批准时按稳定课时键原子同步LessonUnit、发布拓扑分支与入口NodeRun，并只传播changed/archived下游stale。
 - [Issue #90](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/90)已经完成GenerationAttempt租约、心跳、过期恢复、并发安全序号、未知提交与取消协调；失去租约的Worker不能覆盖终态，历史未知提交不会自动重提或重复写入用量。
 - [Issue #85](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/85)与[PR #98](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/98)已经把37个运行时操作与5个规划操作分层，生成客户端只保留真实可调用接口，CI会拒绝静态合同与FastAPI运行时双向漂移。
 - [Issue #44](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/44)的实现已经提供TemplateDraft到结构化内容包的确定性编译入口、CompilationProfile、CLI和合同测试。
@@ -46,23 +51,22 @@
 ## 当前工作
 
 - [Decision #73](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/73)已经批准：PPT通常推荐10至20页，视频按故事和服务端价格事实推荐60至180秒，教师可以覆盖；TTS延后独立实施。
-- [Issue #48](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/48)：全流程生成节点与可配置模型I/O绑定的父任务保持`status:ready`；黄金内容包已正式发布，通用执行器由#89承接。
-- [Issue #86](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/86)：阶段2下一门禁，统一ArtifactRelation类型、方向与stale影响语义。
-- [Issue #123](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/123)：在#86合并后串行退役Prompt领域从未实现的`append`教师修订模式；当前仍为`status:blocked`，不代表合同已收窄。
-- [Issue #130](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/130)：在#123合并后串行补齐模型输出的Artifact/CreationPackage持久化投影；当前仍为`status:blocked`，不代表投影合同已存在。
-- [Issue #89](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/89)：继续保持`status:blocked`；#51、#90与#112已经完成，只有#86、#123与#130也全部合并并在最新`main`上对六项门禁完成新鲜复验后，才作为唯一后端主实现启动。
-- [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)：与生产前端完成真实合同联调；PR #111已经提供开放源码载体和教材上传纵向链，但仍为Draft，真实认证、目标部署环境和后续Runtime页面未达到完整联调出口，不以开发Mock或静态素材代替。
+- [Issue #48](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/48)：全流程生成节点与可配置模型I/O绑定的父任务当前为`status:in-progress`；黄金内容包`1.0.0`已正式发布，#89通用执行器已经合并。
+- [Issue #86](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/86)：已由PR #138合并关闭，统一ArtifactRelation类型、方向与stale影响语义。
+- [Issue #131](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/131)：已由PR #161完成ContentDefinition字段级编辑权限、不可变策略来源、可信生成首写和窄化服务端provision守卫。
+- [Issue #126](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/126)：逐课时十二部分教案生成、编辑、返修、重新校验与批准闭环是#125合并复验后的唯一下一项；只消费冻结的NodeRun、QualityReport、Approval与LessonUnit运行时，不复制状态机、DTO、迁移或事务边界。
+- [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)：与生产前端完成真实合同联调；当前因Issue #4没有开放源码PR而等待，不以本地分支、ZIP或Mock代替。
 
 ## 当前阻塞
 
-- 阶段1整体产品出口仍缺少生产前端在真实认证和目标部署环境中的API联调；PR #111中的前端实现与确定性测试不等于完整阶段1产品完成。
-- #48已有机器合同和黄金数据，但主线尚无读取数据库已发布GenerationTemplate并完成Prompt/Context冻结、模型调用、结构校验和Artifact原子落库的通用执行器；#51、#90与#112已经完成，#89仍等待#86、#123与#130串行收口，然后在最新`main`上对六项门禁完成新鲜复验。
+- 阶段1整体产品出口仍缺少生产前端的真实API联调；后端轨道通过不代表完整阶段1产品完成。
+- #48的机器合同和黄金数据已由#89接入通用执行器，#131字段级编辑权限、#133不可变质量报告、#134批准守卫与#125课时划分运行时已完成；#126必须从#125合并后的固定事实启动，不得绕过依赖或把确定性Fake冒充真实Provider或媒体出口。
 - ShanHaiEdu已经具备Provider中立媒体基础层和Attempt租约恢复，但真实图片/视频Adapter、供应商私有状态映射与受控真实冒烟仍未实现，不能把确定性Fake或恢复基座描述为真实媒体出口。
 - TTS与实时价格计算当前不实现、不冒烟，也不阻塞教材到教案纵向链；PPTX装配、媒体生成和最终交付仍需独立Issue与真实阶段验收。
 
 ## 下一个阶段出口
 
-通用口径校准、首套业务内容合同、#100课程驱动纠偏、#88黄金内容发布、阶段1后端轨道、#51 Prompt公共投影和#90 Attempt恢复门禁已经关闭；当前按#86关系语义、#123 Prompt合同收窄、#130输出持久化投影的顺序收口#89剩余门禁。阶段0前端已经有Open Draft PR #111作为源码交接与审查载体，下一出口是完成真实认证条件、剩余Runtime页面、前端门禁和目标环境联调，而不是重新等待源码。
+通用口径校准、首套业务内容合同、#100课程驱动纠偏、#88黄金内容发布、阶段1后端轨道、#51 Prompt公共投影、#90 Attempt恢复、#86关系语义、#123 Prompt合同收窄、#130输出投影、#146安全收口、#89通用执行器、#131字段级编辑权限、#133不可变ArtifactQualityReport、#134 exact批准守卫和#125课时划分运行时已经完成。下一项为[#126](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/126)逐课时十二部分教案闭环。阶段0前端联调出口继续独立等待生产前端源码交接。
 
 口径校准门禁必须按顺序满足：
 
@@ -83,7 +87,7 @@
 - 生产前端工程达到Issue #4的阶段0范围并通过前端门禁，源码通过PR进入`main`。
 - 前端通过#11消费当前OpenAPI、JSON Schema和SSE合同，完成真实API联调；Mock不能作为出口。
 
-进入阶段2“教材到教案纵向链路”时，#51、#88、#90和#112已经完成，当前按[交付路线](docs/governance/DELIVERY_ROADMAP.md)串行推进#86 → #123 → #130。任一时刻后端主任务不超过三个，修改同一合同或跨模块事务的任务不得并发。#89通用执行器仅在#51、#90、#112、#86、#123和#130全部合并并从最新`main`完成新鲜复验后单独启动。随后基于已发布黄金输入交付课时/教案与三类九套/选择快照；PPT/图片和视频在阶段2运行时稳定后使用独立短分支并行推进。TTS继续延后，#11等待生产前端达到联调条件。所有新任务默认在阿里云Linux的仓库外短worktree中开发，Windows只作应急回退。
+进入阶段2“教材到教案纵向链路”时，#51、#88、#90、#112、#86、#123、#130、#146、#89、#131、#133、#134和#125已经完成或在当前树实现，当前按[交付路线](docs/governance/DELIVERY_ROADMAP.md)转入#126。任一时刻后端主任务不超过三个，修改同一合同或跨模块事务的任务不得并发。#126消费#125正式LessonUnit、#89冻结端口、#131 authoring guard与#133/#134质量门实现十二部分教案闭环，不复制执行器、DTO、迁移或事务边界。随后基于已发布黄金输入交付三类九套/选择快照；PPT/图片和视频继续走各自已批准的独立任务，不与#126并发修改课时/教案共享合同。TTS继续延后，#11等待生产前端达到联调条件。所有新任务使用仓库外隔离短worktree；同一Issue只保留一个任务分支和一个活动现场。
 
 ## 接手提示
 
@@ -95,4 +99,4 @@
 4. 被分配的Issue和PR
 5. 与任务直接相关的模块文档、合同、代码和测试
 
-新对话从最新Linux `main`推进#86关系语义门禁，再串行收口#123和#130；#51、#90与#112已经完成，#89仍须等待#86、#123与#130全部合并并在最新`main`上对六项门禁完成新鲜复验。#88已完成正式内容发布，不得回退到Fixture常量或覆盖既有项目Release。当前API客户端只从runtime合同生成，planned合同不可用于联调。不得从外部旧Skill恢复七部分教案、固定50秒视频、视频读取教案/PPT、第二套DTO或把TemplateDraft编译器当成模型执行运行时。
+新对话先从最新`main`复验#125，再按#126建立独立任务分支。不恢复已撤销的云端、#130现场或已清理的#89工作树。#88正式发布的`1.0.0`及既有项目绑定必须保持不变；`1.1.0`/v2继续是候选。当前API客户端只从runtime合同生成，planned合同不可用于联调。不得从外部旧Skill恢复七部分教案、固定50秒视频、视频读取教案/PPT、第二套DTO或把TemplateDraft编译器当成模型执行运行时。

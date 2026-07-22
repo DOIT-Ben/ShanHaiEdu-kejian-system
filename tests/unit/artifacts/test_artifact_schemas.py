@@ -5,7 +5,7 @@ from uuid import UUID
 import pytest
 from pydantic import ValidationError
 
-from apps.api.artifacts.schemas import ArtifactStaleReasonRead
+from apps.api.artifacts.schemas import ArtifactStaleReasonRead, ReviewArtifactVersionRequest
 
 
 def _reason(**overrides: object) -> dict[str, object]:
@@ -100,3 +100,11 @@ def test_revoke_requires_null_replacement() -> None:
         )
     )
     assert reason.replacement_version_id is None
+
+
+@pytest.mark.parametrize("field", ["report_id", "quality_evidence"])
+def test_review_request_rejects_client_quality_evidence(field: str) -> None:
+    with pytest.raises(ValidationError):
+        ReviewArtifactVersionRequest.model_validate(
+            {"action": "approve", field: "forged" if field == "report_id" else {}}
+        )

@@ -30,6 +30,7 @@ EXPECTED_TABLES = {
     "approvals",
     "asset_bindings",
     "artifact_drafts",
+    "artifact_quality_reports",
     "artifact_relations",
     "artifact_versions",
     "artifacts",
@@ -112,9 +113,46 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
     }
     assert "fk_artifact_versions_context_snapshot" in artifact_foreign_keys
     assert "fk_artifact_versions_prompt_snapshot" in artifact_foreign_keys
+    quality_report_foreign_keys = {
+        foreign_key["name"]
+        for foreign_key in database_inspector.get_foreign_keys("artifact_quality_reports")
+    }
+    assert {
+        "fk_artifact_quality_reports_content_release",
+        "fk_artifact_quality_reports_lesson_unit",
+        "fk_artifact_quality_reports_organization",
+        "fk_artifact_quality_reports_project",
+        "fk_artifact_quality_reports_source_file_asset_version",
+        "fk_artifact_quality_reports_source_version",
+        "fk_artifact_quality_reports_validate_node_run",
+        "fk_artifact_quality_reports_workflow_version",
+    }.issubset(quality_report_foreign_keys)
+    quality_report_indexes = {
+        index["name"] for index in database_inspector.get_indexes("artifact_quality_reports")
+    }
+    assert "uq_artifact_quality_reports_source_workflow_validators" in quality_report_indexes
+    assert "uq_artifact_quality_reports_asset_source_workflow_validators" in quality_report_indexes
+    assert "uq_artifact_quality_reports_validate_node_run" in quality_report_indexes
+    quality_report_columns = {
+        column["name"] for column in database_inspector.get_columns("artifact_quality_reports")
+    }
+    assert {"source_type", "source_file_asset_version_id"}.issubset(quality_report_columns)
     binding_indexes = {index["name"] for index in database_inspector.get_indexes("asset_bindings")}
     assert "uq_asset_bindings_active_slot_position" in binding_indexes
     with engine.connect() as connection:
+        assert (
+            connection.scalar(
+                text(
+                    "SELECT count(*) FROM pg_trigger "
+                    "WHERE tgname IN ("
+                    "'trg_artifact_quality_reports_immutable', "
+                    "'trg_artifact_quality_reports_scope'"
+                    ") "
+                    "AND NOT tgisinternal"
+                )
+            )
+            == 2
+        )
         assert (
             connection.scalar(
                 text(
@@ -167,7 +205,31 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
             )
             == 1
         )
-    assert ScriptDirectory.from_config(config).get_current_head() == "f2a7b9c1d304"
+    package_columns = {
+        column["name"] for column in database_inspector.get_columns("creation_packages")
+    }
+    package_indexes = {
+        index["name"] for index in database_inspector.get_indexes("creation_packages")
+    }
+    package_foreign_keys = {
+        foreign_key["name"]
+        for foreign_key in database_inspector.get_foreign_keys("creation_packages")
+    }
+    assert {"source_artifact_version_id", "lesson_unit_id"}.issubset(package_columns)
+    assert "ix_creation_packages_source_artifact_version" in package_indexes
+    assert {
+        "fk_creation_packages_source_artifact_version",
+        "fk_creation_packages_lesson_unit",
+    }.issubset(package_foreign_keys)
+    package_item_columns = {
+        column["name"] for column in database_inspector.get_columns("creation_package_items")
+    }
+    assert "reference_assets_json" in package_item_columns
+    lease_columns = {
+        column["name"] for column in database_inspector.get_columns("node_execution_leases")
+    }
+    assert {"node_run_id", "owner_token", "lease_expires_at"}.issubset(lease_columns)
+    assert ScriptDirectory.from_config(config).get_current_head() == "h2c3d4e5f607"
     previous = os.environ.get("SHANHAI_DATABASE_URL")
     os.environ["SHANHAI_DATABASE_URL"] = postgres_database_url
     try:

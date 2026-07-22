@@ -79,6 +79,28 @@ class ProjectAccessService:
             )
         return project
 
+    def require_review_completion(
+        self,
+        project_id: UUID,
+        *,
+        for_update: bool,
+    ) -> Project:
+        """Authorize one declared approval effect without granting edit access."""
+
+        if not self._actor.is_system:
+            return self.require(project_id, ProjectAction.REVIEW, for_update=for_update)
+        statement = select(Project).where(
+            Project.id == project_id,
+            Project.organization_id == self._actor.organization_id,
+            Project.deleted_at.is_(None),
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        project = self._session.scalar(statement)
+        if project is None:
+            raise self._not_found()
+        return project
+
     @staticmethod
     def _not_found() -> ApiError:
         return ApiError(

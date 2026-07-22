@@ -33,6 +33,7 @@
 | 上游快照 | 是否必须 | 注入范围 |
 | --- | --- | --- |
 | `material.approved_parse` | 是 | 完整快照 |
+| `material_scope.approved_version` | 是 | 完整快照 |
 
 ### 实际提示词
 

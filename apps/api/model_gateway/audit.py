@@ -4,22 +4,24 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timedelta
+from datetime import timedelta
 from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
+from apps.api.database import database_wall_clock
 from apps.api.ids import new_uuid7
 from apps.api.jobs.service import (
     GenerationJobAttemptBindingReader,
     GenerationJobBinding,
     GenerationJobCancellationReader,
 )
+from apps.api.model_gateway.attempt_success import bounded, complete_attempt_success
 from apps.api.model_gateway.audit_contracts import (
     AttemptCompletion,
     AttemptHeartbeat,
@@ -40,14 +42,6 @@ from apps.api.model_gateway.contracts import (
     ModelUsage,
 )
 from apps.api.workflows.models import NodeRun, WorkflowRun
-
-
-def database_wall_clock(session: Session) -> datetime:
-    """Return PostgreSQL wall time instead of the transaction-start timestamp."""
-    current_time = session.scalar(select(func.clock_timestamp()))
-    if current_time is None:
-        raise RuntimeError("database wall clock is unavailable")
-    return current_time
 
 
 class SqlAlchemyAttemptAuditSink:
@@ -185,40 +179,12 @@ class SqlAlchemyAttemptAuditSink:
         latency_ms: int,
     ) -> AttemptCompletion:
         with self._session_factory() as session, session.begin():
-            attempt = self._require_owned_running(session, lease, context)
-            now = database_wall_clock(session)
-            outcome = (
-                AttemptCompletion.CANCELLED
-                if attempt.cancel_requested_at is not None
-                or self._job_cancel_requested(session, attempt)
-                else AttemptCompletion.SUCCEEDED
-            )
-            if outcome == AttemptCompletion.CANCELLED:
-                attempt.cancel_requested_at = attempt.cancel_requested_at or now
-            attempt.status = outcome.value
-            attempt.provider_request_id = _bounded(result.provider_request_id, 255)
-            attempt.provider_task_id = _bounded(result.provider_task_id, 255)
-            attempt.finished_at = now
-            attempt.latency_ms = latency_ms
-            attempt.lease_owner = None
-            attempt.lease_expires_at = None
-            if outcome == AttemptCompletion.CANCELLED:
-                attempt.error_code = GatewayErrorCode.CANCELLED.value
-                attempt.error_details_json = {
-                    "retryable": False,
-                    "retry_after_seconds": None,
-                }
-            session.add(
-                self._usage_record(
-                    attempt,
-                    context,
-                    input_units=_input_units(result.usage),
-                    output_units=_output_units(result.usage),
-                    actual_cost=result.usage.cost,
-                    currency=result.usage.currency,
-                    latency_ms=latency_ms,
-                    provider_model=_bounded(result.actual_model, 160),
-                )
+            outcome, _ = complete_attempt_success(
+                session,
+                lease,
+                context,
+                result,
+                latency_ms=latency_ms,
             )
             return outcome
 
@@ -229,6 +195,7 @@ class SqlAlchemyAttemptAuditSink:
         error: ModelGatewayError,
         *,
         latency_ms: int,
+        result: AttemptSuccessAudit | None = None,
     ) -> None:
         with self._session_factory() as session, session.begin():
             attempt = self._require_owned_running(session, lease, context)
@@ -258,18 +225,10 @@ class SqlAlchemyAttemptAuditSink:
             attempt.latency_ms = latency_ms
             attempt.lease_owner = None
             attempt.lease_expires_at = None
-            session.add(
-                self._usage_record(
-                    attempt,
-                    context,
-                    input_units={"prompt_tokens": 0},
-                    output_units={"completion_tokens": 0, "total_tokens": 0},
-                    actual_cost=None,
-                    currency="USD",
-                    latency_ms=latency_ms,
-                    provider_model=attempt.provider_model,
-                )
-            )
+            if result is not None:
+                attempt.provider_request_id = bounded(result.provider_request_id, 255)
+                attempt.provider_task_id = bounded(result.provider_task_id, 255)
+            session.add(self._failed_usage(attempt, context, result, latency_ms))
 
     @staticmethod
     def _require_owned_running(
@@ -317,6 +276,40 @@ class SqlAlchemyAttemptAuditSink:
             project_id=attempt.project_id,
         )
         return binding in GenerationJobCancellationReader(session).requested_bindings({binding})
+
+    def _failed_usage(
+        self,
+        attempt: GenerationAttempt,
+        context: ModelAuditContext,
+        result: AttemptSuccessAudit | None,
+        latency_ms: int,
+    ) -> UsageRecord:
+        input_units = (
+            {**result.usage.input_units, "prompt_tokens": result.usage.prompt_tokens}
+            if result is not None
+            else {"prompt_tokens": 0}
+        )
+        output_units = (
+            {
+                **result.usage.output_units,
+                "completion_tokens": result.usage.completion_tokens,
+                "total_tokens": result.usage.total_tokens,
+            }
+            if result is not None
+            else {"completion_tokens": 0, "total_tokens": 0}
+        )
+        return self._usage_record(
+            attempt,
+            context,
+            input_units=input_units,
+            output_units=output_units,
+            actual_cost=result.usage.cost if result is not None else None,
+            currency=result.usage.currency if result is not None else "USD",
+            latency_ms=latency_ms,
+            provider_model=(
+                bounded(result.actual_model, 160) if result is not None else attempt.provider_model
+            ),
+        )
 
     @staticmethod
     def _allocate_attempt_no(session: Session, node_run_id: UUID) -> int:

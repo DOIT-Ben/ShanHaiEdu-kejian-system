@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -24,6 +25,7 @@ from apps.api.lessons.domain import (
 from apps.api.lessons.models import LessonBranchConfig, LessonUnit
 from apps.api.lessons.repository import LessonRepository
 from apps.api.reliability.events import EventResource, EventWriter
+from apps.api.workflows.lesson_fanout import LessonFanoutTarget, LessonWorkflowFanoutService
 
 
 class LessonService:
@@ -44,6 +46,39 @@ class LessonService:
             ProjectAction.EDIT,
             for_update=True,
         )
+        return self._synchronize_approved_division(
+            project,
+            division,
+            request_id=request_id,
+        )
+
+    def synchronize_declared_approval(
+        self,
+        project_id: UUID,
+        division: ApprovedLessonDivision,
+        *,
+        request_id: str | None,
+    ) -> list[LessonUnit]:
+        """Apply a declared approval effect after REVIEW authorization."""
+
+        project = ProjectAccessService(self._session, self._actor).require_review_completion(
+            project_id,
+            for_update=True,
+        )
+        return self._synchronize_approved_division(
+            project,
+            division,
+            request_id=request_id,
+        )
+
+    def _synchronize_approved_division(
+        self,
+        project: Any,
+        division: ApprovedLessonDivision,
+        *,
+        request_id: str | None,
+    ) -> list[LessonUnit]:
+        project_id = project.id
         if project.lesson_division_version_id == division.version_id:
             return self._repository.list_for_project(project_id)
 
@@ -164,6 +199,14 @@ class LessonService:
             for config in self._repository.list_branch_configs(lesson_id, for_update=True)
         }
         self._apply_branch_changes(configs, changes)
+        LessonWorkflowFanoutService(self._session, self._actor).synchronize_lesson_configuration(
+            visible.project_id,
+            LessonFanoutTarget(
+                lesson_unit_id=lesson.id,
+                branch_enabled={config.branch_key: config.enabled for config in configs.values()},
+            ),
+            request_id=request_id,
+        )
         lesson.lock_version += 1
         lesson.updated_by = self._actor.principal_id
         lesson.updated_at = utc_now()

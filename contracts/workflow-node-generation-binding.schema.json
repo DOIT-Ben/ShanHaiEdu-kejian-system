@@ -555,13 +555,24 @@
         "target_rules": {"$ref": "#/$defs/targetRules"}
       }
     },
+    "approvalCompletion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "collection_pointer", "stable_key_field"],
+      "properties": {
+        "kind": {"const": "lesson_unit_sync"},
+        "collection_pointer": {"const": "/lesson_units"},
+        "stable_key_field": {"const": "lesson_unit_key"}
+      }
+    },
     "outputPersistence": {
       "type": "object",
       "additionalProperties": false,
       "required": ["artifact"],
       "properties": {
         "artifact": {"$ref": "#/$defs/artifactPersistence"},
-        "creation_package": {"$ref": "#/$defs/creationPackagePersistence"}
+        "creation_package": {"$ref": "#/$defs/creationPackagePersistence"},
+        "approval_completion": {"$ref": "#/$defs/approvalCompletion"}
       }
     },
     "qualityReportPersistence": {
@@ -571,6 +582,12 @@
       "properties": {
         "source_input_ref": {"$ref": "#/$defs/contractRef"},
         "report_ref": {"$ref": "#/$defs/contractRef"},
+        "supporting_input_refs": {
+          "type": "array",
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/contractRef"}
+        },
         "validator_refs": {
           "type": "array",
           "minItems": 1,
