@@ -62,6 +62,11 @@ LEGACY_PACKAGE_CHECKSUM = "894771a7472723cb70a4586a7905af480e04f5baee636351a4cc0
 LEGACY_WORKFLOW_CHECKSUM = "268f503e9e7e455aab936e885d1c67b1934384d45c2ef0e4d0399683e579e7ea"
 PREVIOUS_PACKAGE_CHECKSUM = "84bfc3e5aac3a94b877513ca451c72b4ac9c5b516bc773abe3d90715a6393023"
 PREVIOUS_WORKFLOW_CHECKSUM = "8249b49fc0d5ee03d9a598851a15f8effec9ed89a2fb66b7abd863483529e623"
+PREVIOUS_INTRO_SINGLE_ANCHOR = {
+    "key": "validator.intro.single_anchor",
+    "semantic_version": "1.0.0",
+    "implementation_digest": "c32be2ad3444760ff6d7454d7bc3e7a9a3518e223931d2792fabf2980e8a36dd",
+}
 PREVIOUS_CHANGE_SUMMARY = (
     "发布显式48节点拓扑、22个模型节点输出持久化、质量报告/人工门禁声明和受限"
     "Artifact/CreationPackage投影合同；固定导入方案一套/九套、exact来源、独立批准和选择语义。"  # noqa: RUF001
@@ -79,6 +84,14 @@ def package_node(catalog: dict[str, Any], node_key: str) -> dict[str, Any]:
     node = next(item for item in nodes if item["node_key"] == node_key)
     assert isinstance(node, dict)
     return node
+
+
+def replace_validator_ref(
+    refs: list[dict[str, Any]],
+    replacement: dict[str, str],
+) -> None:
+    index = next(index for index, ref in enumerate(refs) if ref.get("key") == replacement["key"])
+    refs[index] = {**refs[index], **replacement}
 
 
 def validate_catalog_source(
@@ -599,7 +612,11 @@ def previous_courseware_release(
     persistence.pop("approval_completion")
     validate = package_node(catalog, "intro.validate")
     validate["input_contract_refs"] = ["artifact:intro_option_set"]
-    validate["quality_report_persistence"].pop("supporting_input_refs")
+    report = validate["quality_report_persistence"]
+    report.pop("supporting_input_refs")
+    replace_validator_ref(validate["validator_refs"], PREVIOUS_INTRO_SINGLE_ANCHOR)
+    replace_validator_ref(report["validator_refs"], PREVIOUS_INTRO_SINGLE_ANCHOR)
+    replace_validator_ref(catalog["validator_descriptors"], PREVIOUS_INTRO_SINGLE_ANCHOR)
     package_checksum = canonical_json_sha256(manifest)
     workflow_checksum = hashlib.sha256(canonical_catalog_json(catalog)).hexdigest()
     if (
@@ -614,6 +631,26 @@ def previous_courseware_release(
         package_checksum=package_checksum,
         workflow_checksum=workflow_checksum,
     )
+
+
+def test_previous_release_reconstruction_preserves_published_validator_snapshot(
+    builtin_courseware_source: BuiltinCoursewareReleaseSource,
+) -> None:
+    previous = previous_courseware_release(builtin_courseware_source)
+    validate = package_node(previous.workflow_catalog, "intro.validate")
+    refs = [
+        *validate["validator_refs"],
+        *validate["quality_report_persistence"]["validator_refs"],
+        *previous.workflow_catalog["validator_descriptors"],
+    ]
+    restored = [ref for ref in refs if ref.get("key") == PREVIOUS_INTRO_SINGLE_ANCHOR["key"]]
+
+    assert restored == [
+        PREVIOUS_INTRO_SINGLE_ANCHOR,
+        PREVIOUS_INTRO_SINGLE_ANCHOR,
+        {**PREVIOUS_INTRO_SINGLE_ANCHOR, "implementation_status": "contract_only"},
+    ]
+    assert previous.workflow_checksum == PREVIOUS_WORKFLOW_CHECKSUM
 
 
 def test_legacy_courseware_release_uses_v1_shape_and_fails_projection_closed(
