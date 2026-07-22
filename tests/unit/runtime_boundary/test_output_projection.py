@@ -440,6 +440,32 @@ def test_rejects_unknown_superseding_and_untrusted_relations() -> None:
         assert caught.value.code == code
 
 
+def test_accepts_trusted_same_type_artifact_supersedes_relation() -> None:
+    binding = _binding()
+    source = "artifact:intro_option_set_source"
+    binding["input_contract_refs"] = [source]
+    relation = binding["output_persistence"]["artifact"]["relations"][0]
+    relation.update(
+        source_binding=source,
+        relation_type="supersedes",
+        impact_scope={"mode": "all"},
+    )
+    execution = _execution()
+    upstream = ArtifactContextVersion(
+        project_id=execution.project_id,
+        lesson_unit_id=execution.lesson_unit_id,
+        artifact_version_id=UPSTREAM_VERSION_ID,
+        contract_ref=source,
+        artifact_type="ppt_body_asset_prompt_package",
+        content={},
+        content_hash="a" * 64,
+    )
+
+    plan = _compile(binding, upstream_artifacts={source: upstream})
+
+    assert plan.artifact_write.relations[0].relation_type is ArtifactRelationType.SUPERSEDES
+
+
 @pytest.mark.parametrize("pointer", ["relative", "/bad~2", "/#", "/*", "/..", "/items/01"])
 def test_rejects_unsafe_or_noncanonical_projection_pointers(pointer: str) -> None:
     binding = _binding(package=True)

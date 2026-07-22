@@ -75,7 +75,7 @@ def test_schema_and_complete_primary_math_catalog_are_valid() -> None:
 
     node_keys = {node["node_key"] for node in catalog["nodes"]}
     assert catalog["api_version"] == "shanhai.workflow-node-generation-binding/v2"
-    assert catalog["semantic_version"] == "1.1.0"
+    assert catalog["semantic_version"] == "1.2.0"
     assert len(node_keys) == 48
     assert {
         "project": 7,
@@ -517,6 +517,45 @@ def test_lesson_plan_declares_exact_workflow_gate_completion() -> None:
     assert_rejected(catalog, "NODE_BINDING_OUTPUT_APPROVAL_COMPLETION_INVALID")
 
 
+def test_intro_declares_same_artifact_supersession_and_workflow_gate_completion() -> None:
+    catalog = load_catalog()
+    persistence = node_by_key(catalog, "intro.generate_options")["output_persistence"]
+    relation = next(
+        item
+        for item in persistence["artifact"]["relations"]
+        if item["source_binding"] == "artifact:intro_option_set_source"
+    )
+
+    assert relation == {
+        "source_binding": "artifact:intro_option_set_source",
+        "relation_type": "supersedes",
+        "binding_key": "upstream.artifact.intro_option_set_source",
+        "optional": True,
+        "impact_scope": {"mode": "all"},
+    }
+    assert persistence["approval_completion"] == {
+        "kind": "workflow_gate",
+        "source_input_ref": "artifact:intro_option_set",
+    }
+    validate = node_by_key(catalog, "intro.validate")
+    assert validate["input_contract_refs"] == [
+        "artifact:intro_option_set",
+        "approval:lesson_division",
+        "content:material_evidence",
+    ]
+    assert validate["quality_report_persistence"]["supporting_input_refs"] == [
+        "approval:lesson_division",
+        "content:material_evidence",
+    ]
+
+    relation["impact_scope"] = {
+        "mode": "keyed",
+        "selector": "lesson_key",
+        "keys": {"source": "runtime", "pointer": "/lesson_key"},
+    }
+    assert_rejected(catalog, "NODE_BINDING_SUPERSEDES_DECLARATION_INVALID")
+
+
 def test_semantic_validator_rejects_reference_asset_schema_bypasses() -> None:
     catalog = load_catalog()
     mapping = node_by_key(catalog, "ppt.body_asset_prompts.generate")["output_persistence"][
@@ -724,7 +763,7 @@ def test_catalog_hash_is_deterministic_for_semantically_identical_objects() -> N
     assert first_validated.canonical_json == second_validated.canonical_json
     assert first_validated.content_hash == second_validated.content_hash
     assert first_validated.content_hash == (
-        "8249b49fc0d5ee03d9a598851a15f8effec9ed89a2fb66b7abd863483529e623"
+        "9e988bcaf97b063dd4ad11e28d6e4e687c411c549628909f12f5cb1be20204c8"
     )
 
 

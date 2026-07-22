@@ -420,7 +420,7 @@
       "required": ["source_binding", "relation_type", "binding_key", "impact_scope"],
       "properties": {
         "source_binding": {"$ref": "#/$defs/contractRef"},
-        "relation_type": {"enum": ["derives_from", "references", "constrains"]},
+        "relation_type": {"enum": ["derives_from", "references", "constrains", "supersedes"]},
         "binding_key": {"$ref": "#/$defs/key"},
         "optional": {"type": "boolean", "default": false},
         "impact_scope": {"$ref": "#/$defs/impactScope"}

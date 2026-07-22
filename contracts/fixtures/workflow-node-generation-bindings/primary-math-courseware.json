@@ -2,7 +2,7 @@
   "api_version": "shanhai.workflow-node-generation-binding/v2",
   "catalog_key": "primary_math.courseware",
   "workflow_key": "primary_math.courseware",
-  "semantic_version": "1.1.0",
+  "semantic_version": "1.2.0",
   "nodes": [
     {
       "node_key": "material.file_validate",
@@ -935,19 +935,18 @@
             },
             {
               "source_binding": "artifact:intro_option_set_source",
-              "relation_type": "derives_from",
+              "relation_type": "supersedes",
               "binding_key": "upstream.artifact.intro_option_set_source",
               "optional": true,
               "impact_scope": {
-                "mode": "keyed",
-                "selector": "lesson_key",
-                "keys": {
-                  "source": "runtime",
-                  "pointer": "/lesson_key"
-                }
+                "mode": "all"
               }
             }
           ]
+        },
+        "approval_completion": {
+          "kind": "workflow_gate",
+          "source_input_ref": "artifact:intro_option_set"
         }
       }
     },
@@ -958,7 +957,9 @@
       "execution_kind": "deterministic",
       "executor_ref": "executor.intro.validate",
       "input_contract_refs": [
-        "artifact:intro_option_set"
+        "artifact:intro_option_set",
+        "approval:lesson_division",
+        "content:material_evidence"
       ],
       "output_contract_refs": [
         "report:intro_quality"
@@ -1000,8 +1001,8 @@
         },
         {
           "key": "validator.intro.single_anchor",
-          "semantic_version": "1.0.0",
-          "implementation_digest": "c32be2ad3444760ff6d7454d7bc3e7a9a3518e223931d2792fabf2980e8a36dd"
+          "semantic_version": "1.1.0",
+          "implementation_digest": "f37001db813669d7148ac43d25045472c0c4b84427df414e303f4a99e5b40220"
         },
         {
           "key": "validator.intro.unique_recommendation",
@@ -1024,6 +1025,10 @@
       "entrypoint": false,
       "quality_report_persistence": {
         "source_input_ref": "artifact:intro_option_set",
+        "supporting_input_refs": [
+          "approval:lesson_division",
+          "content:material_evidence"
+        ],
         "report_ref": "report:intro_quality",
         "validator_refs": [
           {
@@ -1033,8 +1038,8 @@
           },
           {
             "key": "validator.intro.single_anchor",
-            "semantic_version": "1.0.0",
-            "implementation_digest": "c32be2ad3444760ff6d7454d7bc3e7a9a3518e223931d2792fabf2980e8a36dd"
+            "semantic_version": "1.1.0",
+            "implementation_digest": "f37001db813669d7148ac43d25045472c0c4b84427df414e303f4a99e5b40220"
           },
           {
             "key": "validator.intro.unique_recommendation",
@@ -5055,8 +5060,8 @@
     },
     {
       "key": "validator.intro.single_anchor",
-      "semantic_version": "1.0.0",
-      "implementation_digest": "c32be2ad3444760ff6d7454d7bc3e7a9a3518e223931d2792fabf2980e8a36dd",
+      "semantic_version": "1.1.0",
+      "implementation_digest": "f37001db813669d7148ac43d25045472c0c4b84427df414e303f4a99e5b40220",
       "implementation_status": "contract_only"
     },
     {

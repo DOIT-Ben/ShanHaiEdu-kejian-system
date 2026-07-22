@@ -32,10 +32,7 @@ from apps.api.node_execution.contracts import (
     PreparedNodeExecution,
 )
 from apps.api.node_execution.fresh_inputs import compile_fresh_inputs
-from apps.api.node_execution.materials import (
-    audit_context,
-    execution_snapshot,
-)
+from apps.api.node_execution.materials import audit_context, execution_snapshot
 from apps.api.node_execution.preparation import (
     build_frozen_invocation,
     build_prepared_execution,
@@ -54,6 +51,7 @@ from apps.api.node_execution.transaction_steps import (
 )
 from apps.api.prompt_runtime.execution_port import SqlAlchemyPromptSnapshotPort
 from apps.api.runtime_boundary.ports import PromptSnapshotPort, WorkflowExecutionContext
+from apps.api.workflows.artifact_input_selection import ArtifactInputSelectionReader
 from apps.api.workflows.execution_port import SqlAlchemyWorkflowExecutionPort
 from workflow.node_state import NodeStatus
 
@@ -162,6 +160,10 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
             node_run_id=node_run_id,
             model_request_id=self._attempts.next_model_request_id(node_run_id),
             user_id=self._actor.user_id,
+            artifact_selection=ArtifactInputSelectionReader(
+                self._session,
+                self._actor,
+            ).for_node(node_run_id),
         )
         self._workflow.freeze_execution(
             execution,

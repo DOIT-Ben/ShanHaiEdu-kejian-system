@@ -77,6 +77,13 @@ class LessonContextSnapshotReader:
             artifact_version_id=_uuid_value(items[0].get("source_version_id")),
         )
 
+    def artifact_version(self, context_snapshot_id: UUID, source: str) -> UUID:
+        context = self._require_context(context_snapshot_id)
+        items = self._items_for_source(context, source)
+        if len(items) != 1:
+            raise self._invalid("Exactly one frozen Artifact version is required.")
+        return _uuid_value(items[0].get("source_version_id"))
+
     def _require_context(self, context_snapshot_id: UUID) -> ContextSnapshot:
         context = self._session.get(ContextSnapshot, context_snapshot_id)
         if context is None or context.organization_id != self._organization_id:

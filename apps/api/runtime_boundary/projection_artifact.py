@@ -56,6 +56,7 @@ def compile_artifact_write(
         output=output,
         runtime=runtime,
         upstream_artifacts=upstream_artifacts,
+        target_artifact_type=artifact_type,
         allowed_source_bindings=require_text_sequence(
             binding.get("input_contract_refs"),
             "OUTPUT_PROJECTION_INPUT_CONTRACTS_INVALID",
@@ -168,6 +169,7 @@ def _compile_relations(
     output: Mapping[str, Any],
     runtime: Mapping[str, Any],
     upstream_artifacts: Mapping[str, ArtifactContextVersion],
+    target_artifact_type: str,
     allowed_source_bindings: tuple[str, ...],
 ) -> tuple[GeneratedArtifactRelation, ...]:
     if not isinstance(raw_relations, Sequence) or isinstance(
@@ -195,6 +197,7 @@ def _compile_relations(
             output=output,
             runtime=runtime,
             upstream_artifacts=upstream_artifacts,
+            target_artifact_type=target_artifact_type,
             allowed_source_bindings=allowed_source_bindings,
         )
         identity = (cast(str, source), relation.binding_key)
@@ -215,32 +218,16 @@ def _compile_relation(
     output: Mapping[str, Any],
     runtime: Mapping[str, Any],
     upstream_artifacts: Mapping[str, ArtifactContextVersion],
+    target_artifact_type: str,
     allowed_source_bindings: tuple[str, ...],
 ) -> GeneratedArtifactRelation:
     declaration = require_mapping(raw, "OUTPUT_PROJECTION_RELATION_INVALID")
-    source = declaration.get("source_binding")
-    if (
-        not isinstance(source, str)
-        or source not in allowed_source_bindings
-        or source not in upstream_artifacts
-    ):
-        raise OutputProjectionError(
-            "OUTPUT_PROJECTION_RELATION_SOURCE_MISSING",
-            "relation source binding is not present in runtime context",
-        )
-    upstream = upstream_artifacts[source]
-    if (
-        upstream.contract_ref != source
-        or upstream.project_id != execution.project_id
-        or (
-            upstream.lesson_unit_id is not None
-            and upstream.lesson_unit_id != execution.lesson_unit_id
-        )
-    ):
-        raise OutputProjectionError(
-            "OUTPUT_PROJECTION_RELATION_SOURCE_MISMATCH",
-            "relation source does not belong to the declared project, lesson, or contract",
-        )
+    source, upstream = _require_relation_source(
+        declaration,
+        execution=execution,
+        upstream_artifacts=upstream_artifacts,
+        allowed_source_bindings=allowed_source_bindings,
+    )
     upstream_id = cast(object, upstream.artifact_version_id)
     if not isinstance(upstream_id, UUID):
         raise OutputProjectionError(
@@ -254,11 +241,13 @@ def _compile_relation(
             "OUTPUT_PROJECTION_RELATION_TYPE_INVALID",
             "relation type is unsupported",
         ) from exc
-    if relation_type is ArtifactRelationType.SUPERSEDES:
-        raise OutputProjectionError(
-            "OUTPUT_PROJECTION_RELATION_TYPE_INVALID",
-            "generated output cannot declare supersedes",
-        )
+    _validate_supersedes_source(
+        relation_type,
+        source=source,
+        source_artifact_type=upstream.artifact_type,
+        target_artifact_type=target_artifact_type,
+        impact_scope=declaration.get("impact_scope"),
+    )
     return GeneratedArtifactRelation(
         from_artifact_version_id=upstream_id,
         relation_type=relation_type,
@@ -267,6 +256,60 @@ def _compile_relation(
             declaration.get("impact_scope"), output=output, runtime=runtime
         ),
     )
+
+
+def _require_relation_source(
+    declaration: Mapping[str, Any],
+    *,
+    execution: WorkflowExecutionContext,
+    upstream_artifacts: Mapping[str, ArtifactContextVersion],
+    allowed_source_bindings: tuple[str, ...],
+) -> tuple[str, ArtifactContextVersion]:
+    source = declaration.get("source_binding")
+    if (
+        not isinstance(source, str)
+        or source not in allowed_source_bindings
+        or source not in upstream_artifacts
+    ):
+        raise OutputProjectionError(
+            "OUTPUT_PROJECTION_RELATION_SOURCE_MISSING",
+            "relation source binding is not present in runtime context",
+        )
+    upstream = upstream_artifacts[source]
+    lesson_mismatch = (
+        upstream.lesson_unit_id is not None and upstream.lesson_unit_id != execution.lesson_unit_id
+    )
+    if (
+        upstream.contract_ref != source
+        or upstream.project_id != execution.project_id
+        or lesson_mismatch
+    ):
+        raise OutputProjectionError(
+            "OUTPUT_PROJECTION_RELATION_SOURCE_MISMATCH",
+            "relation source does not belong to the declared project, lesson, or contract",
+        )
+    return source, upstream
+
+
+def _validate_supersedes_source(
+    relation_type: ArtifactRelationType,
+    *,
+    source: str,
+    source_artifact_type: str,
+    target_artifact_type: str,
+    impact_scope: object,
+) -> None:
+    if relation_type is not ArtifactRelationType.SUPERSEDES:
+        return
+    if (
+        not source.startswith("artifact:")
+        or source_artifact_type != target_artifact_type
+        or impact_scope != {"mode": "all"}
+    ):
+        raise OutputProjectionError(
+            "OUTPUT_PROJECTION_RELATION_TYPE_INVALID",
+            "supersedes requires a same-type artifact source and all impact scope",
+        )
 
 
 def _compile_impact_scope(

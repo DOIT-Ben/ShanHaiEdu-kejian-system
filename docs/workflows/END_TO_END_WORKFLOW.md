@@ -43,7 +43,7 @@ flowchart TD
 
 ### 首套内置生成基线
 
-`shanhai.primary_math.courseware@1.1.0`是#130建立、#146加固并由#116补齐Intro exact来源/独立批准/选择边界的前向候选；显式PostgreSQL发布前，当前正式发布基线仍是`1.0.0`，既有项目绑定不改写。候选声明源位于`workflow/builtin/primary_math_courseware/generation-source.json`，确定性构建后为48节点目录中的22个`model_generation`节点各提供：
+`shanhai.primary_math.courseware@1.2.0`是#127与Decision #185在不可变`1.1.0`之后建立的前向候选，修正Intro同一Artifact `supersedes`血缘、workflow gate批准终态和质量支持输入；显式PostgreSQL发布前，当前正式发布基线仍是`1.0.0`，`1.1.0`与既有项目绑定不改写。候选声明源位于`workflow/builtin/primary_math_courseware/generation-source.json`，确定性构建后为48节点目录中的22个`model_generation`节点各提供：
 
 - 教师输入、系统补全和Context注入字段；
 - 可编辑业务Prompt与只读方法、质量门；
