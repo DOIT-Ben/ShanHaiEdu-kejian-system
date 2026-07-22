@@ -12,6 +12,7 @@ def register_models() -> None:
     from apps.api.content_runtime import models as content_runtime_models
     from apps.api.creation import models as creation_models
     from apps.api.identity import models as identity_models
+    from apps.api.intro_selections import models as intro_selection_models
     from apps.api.jobs import models as job_models
     from apps.api.lessons import models as lesson_models
     from apps.api.model_gateway import audit_models as model_gateway_audit_models
@@ -28,6 +29,7 @@ def register_models() -> None:
         content_runtime_models,
         creation_models,
         identity_models,
+        intro_selection_models,
         job_models,
         lesson_models,
         model_gateway_audit_models,

@@ -336,5 +336,5 @@ def test_live_orm_baseline_exactly_matches_detected_dependencies() -> None:
     assert errors == []
     actual = {(item.source, item.target, item.names) for item in detected}
     expected = {(item.source, item.target, item.names) for item in baseline.model_imports}
-    assert len(actual) == 48
+    assert len(actual) == 49
     assert actual == expected
