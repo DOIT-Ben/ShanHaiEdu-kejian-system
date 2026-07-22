@@ -11,7 +11,7 @@ export type WorkbenchStatusItem = {
 
 type WorkbenchStatusBoardProps = {
   errorMessage?: string;
-  items: WorkbenchStatusItem[];
+  items: readonly WorkbenchStatusItem[];
   state?: "error" | "loading" | "ready";
 };
 
@@ -32,7 +32,7 @@ function badgeStatus(status: string): WorkflowStatus {
 }
 
 export function WorkbenchStatusBoard({
-  errorMessage = "服务端状态暂时无法读取，请稍后重试。",
+  errorMessage = "制作进度暂时无法读取，请稍后重试。",
   items,
   state = "ready",
 }: WorkbenchStatusBoardProps) {
@@ -59,7 +59,7 @@ export function WorkbenchStatusBoard({
   if (items.length === 0) {
     return (
       <p className="mt-3 rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-soft)] px-3 py-3 text-sm leading-6 text-[var(--sh-ink-muted)]">
-        这一步还没有服务端节点记录。先完成上游确认，系统才会创建可执行的制作任务。
+        这一步还没有制作任务。完成前一步后，新的任务会显示在这里。
       </p>
     );
   }

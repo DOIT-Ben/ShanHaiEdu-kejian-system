@@ -8,6 +8,7 @@ import {
   Video,
 } from "lucide-react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { ProjectLessonGrid } from "@/features/projects/components/ProjectOverviewContent";
 import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
 import { saveMockDraft, useMockRuntime } from "@/shared/api/mocks/runtime";
 import { Button, buttonVariants } from "@/shared/ui/Button";
@@ -54,6 +55,20 @@ export function ProjectOverviewPage() {
   const showBudgetNotice = budgetPaused || budgetResumed;
   const automationPaused = runtime.drafts[`project:${projectId}:automation`]?.value === true;
   const projectTasks = runtime.tasks.filter((task) => task.project_id === projectId);
+  const lessonSummaries = projectLessons.map((lesson) => ({
+    branches: branchDefinitions.map((branch) => ({
+      enabled:
+        (runtime.nodeStates[`${projectId}:${lesson.id}:${branch.nodeKey}`]?.status ??
+          branch.fallbackStatus) !== "not_ready",
+      key: branch.nodeKey,
+      label: branch.title,
+      to: `/app/projects/${projectId}/lessons/${lesson.id}/work/${branch.to}`,
+    })),
+    durationMinutes: lesson.duration,
+    id: lesson.id,
+    scope: lesson.scope,
+    title: lesson.title,
+  }));
 
   if (!project) {
     return (
@@ -186,43 +201,7 @@ export function ProjectOverviewPage() {
         ) : null}
       </section>
 
-      <section aria-labelledby="lessons-title">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-[var(--sh-ink-strong)]" id="lessons-title">
-            课时
-          </h2>
-          <Link
-            className="text-sm font-semibold text-[var(--sh-brand-600)]"
-            to={`/app/projects/${projectId}/lessons`}
-          >
-            查看课时工作台
-          </Link>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          {projectLessons.map((lesson) => (
-            <article
-              className="rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-5"
-              key={lesson.id}
-            >
-              <div className="flex items-start gap-4">
-                <span className="grid size-11 shrink-0 place-items-center rounded-[var(--sh-radius-sm)] bg-[var(--sh-brand-50)] text-[var(--sh-brand-600)]">
-                  <BookOpen aria-hidden="true" className="size-5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-semibold text-[var(--sh-ink-strong)]">{lesson.title}</h3>
-                  <p className="mt-1 text-sm text-[var(--sh-ink-muted)]">{lesson.scope}</p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <StatusBadge status={lesson.planStatus} />
-                    <span className="text-xs text-[var(--sh-ink-muted)]">
-                      {lesson.duration} 分钟
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+      <ProjectLessonGrid lessons={lessonSummaries} />
 
       <section aria-labelledby="branches-title">
         <h2 className="text-xl font-bold text-[var(--sh-ink-strong)]" id="branches-title">

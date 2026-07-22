@@ -105,6 +105,10 @@ async function json(route: Route, body: unknown, status = 200, headers?: Record<
 }
 
 export async function installRuntimeApi(page: Page, options: RuntimeApiOptions = {}) {
+  let currentProject = {
+    ...baseProject,
+    execution_mode: baseProject.execution_mode as "guided" | "automatic",
+  };
   const state: RuntimeApiState = {
     confirmRequests: 0,
     createProjectRequests: 0,
@@ -171,26 +175,20 @@ export async function installRuntimeApi(page: Page, options: RuntimeApiOptions =
         textbook_edition?: string;
         title?: string;
       };
-      await json(
-        route,
-        envelope(
-          {
-            ...baseProject,
-            execution_mode: body.execution_mode ?? "guided",
-            grade: body.grade ?? baseProject.grade,
-            knowledge_point: body.knowledge_point ?? baseProject.knowledge_point,
-            textbook_edition: body.textbook_edition ?? baseProject.textbook_edition,
-            title: body.title ?? baseProject.title,
-          },
-          "req_create_project",
-        ),
-        201,
-      );
+      currentProject = {
+        ...baseProject,
+        execution_mode: body.execution_mode === "automatic" ? "automatic" : "guided",
+        grade: body.grade ?? baseProject.grade,
+        knowledge_point: body.knowledge_point ?? baseProject.knowledge_point,
+        textbook_edition: body.textbook_edition ?? baseProject.textbook_edition,
+        title: body.title ?? baseProject.title,
+      };
+      await json(route, envelope(currentProject, "req_create_project"), 201);
       return;
     }
 
     if (method === "GET" && path === `/api/v2/projects/${projectId}`) {
-      await json(route, envelope(baseProject, "req_project"), 200, { ETag: '"project-v1"' });
+      await json(route, envelope(currentProject, "req_project"), 200, { ETag: '"project-v1"' });
       return;
     }
 

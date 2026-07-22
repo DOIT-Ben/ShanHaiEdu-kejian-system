@@ -103,7 +103,7 @@ export function RuntimeProjectSetupPage() {
             </h2>
             <p className="mt-1 text-sm text-[var(--sh-ink-muted)]">
               {job?.progress_message ??
-                (jobQuery.isError ? "暂时无法读取进度，请检查网络后重试。" : "正在等待服务端更新")}
+                (jobQuery.isError ? "暂时无法读取进度，请检查网络后重试。" : "正在等待新进度")}
             </p>
           </div>
           {running ? (
@@ -144,7 +144,7 @@ export function RuntimeProjectSetupPage() {
             className="border-t border-[var(--sh-line-subtle)] px-5 py-3 text-xs text-[var(--sh-warning)]"
             role="status"
           >
-            安全会话尚未就绪，暂时不能取消任务。请刷新后重试。
+            暂时不能取消任务，请刷新页面后重试。
           </p>
         ) : null}
       </section>

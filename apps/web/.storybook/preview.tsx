@@ -20,6 +20,14 @@ const preview: Preview = {
     a11y: { test: "error" },
     backgrounds: { disable: true },
     layout: "fullscreen",
+    viewport: {
+      options: {
+        desktop1440: { name: "Desktop 1440", styles: { height: "900px", width: "1440px" } },
+        desktop1280: { name: "Desktop 1280", styles: { height: "800px", width: "1280px" } },
+        tablet1024: { name: "Tablet 1024", styles: { height: "768px", width: "1024px" } },
+        narrow390: { name: "Narrow 390", styles: { height: "844px", width: "390px" } },
+      },
+    },
   },
   tags: ["autodocs"],
 };

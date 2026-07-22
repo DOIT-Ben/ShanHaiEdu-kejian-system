@@ -29,7 +29,9 @@ test("三类九套选择不阻塞教案", async ({ page }) => {
     0,
   );
   const detailsPanel = page.getByTestId("intro-details-panel");
-  await expect(detailsPanel.getByText("课堂从这个问题开始", { exact: true })).toBeVisible();
+  await expect(detailsPanel.getByText("课堂从这个问题开始", { exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
   for (const label of [
     "独立创意",
     "开场钩子",

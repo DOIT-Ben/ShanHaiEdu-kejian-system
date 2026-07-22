@@ -1,8 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { BookOpen, FileText, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import {
@@ -14,10 +13,13 @@ import {
 } from "@/features/materials/api/materialsApi";
 import { createProject } from "@/features/projects/api/projectsApi";
 import { projectKeys } from "@/features/projects/hooks/useProjectsQuery";
+import { ProjectEntryFrame } from "@/features/projects/components/ProjectEntryFrame";
+import {
+  RuntimeProjectEntryForm,
+  type ProjectEntryFormValues,
+} from "@/features/projects/components/RuntimeProjectEntryForm";
 import { isCsrfTokenAvailable } from "@/shared/api/client";
 import { Button } from "@/shared/ui/Button";
-import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
-import { Select } from "@/shared/ui/Select";
 import {
   clearRuntimeNewProjectRecovery,
   createRuntimeNewProjectRecovery,
@@ -43,16 +45,8 @@ const projectSchema = z.object({
   title: z.string().min(2, "请输入项目名称"),
 });
 
-type ProjectForm = z.infer<typeof projectSchema>;
+type ProjectForm = z.infer<typeof projectSchema> & ProjectEntryFormValues;
 type SubmitStage = RuntimeNewProjectStage;
-
-const stageLabels: Record<SubmitStage, string> = {
-  checking: "正在核对教材",
-  confirming: "正在建立课堂任务",
-  creating: "正在创建课程",
-  idle: "创建项目并上传教材",
-  uploading: "正在上传教材",
-};
 
 function normalizeForm(
   value: Partial<ProjectForm>,
@@ -77,7 +71,7 @@ function stageDescription(stage: RuntimeNewProjectStage) {
     case "uploading":
       return "教材上传尚未完成。重新选择同一份 PDF 后可以继续上传。";
     case "confirming":
-      return "教材已经传输，正在等待服务端建立解析任务。";
+      return "教材已经传输，正在建立解析任务。";
     default:
       return "已记住这份教材和课程信息，刷新后可以继续。";
   }
@@ -120,6 +114,7 @@ export function RuntimeNewProjectPage() {
     handleSubmit,
     register,
     reset,
+    setValue,
     watch,
   } = useForm<ProjectForm>({
     defaultValues: initialRecovery.form,
@@ -327,8 +322,6 @@ export function RuntimeNewProjectPage() {
     }
   });
 
-  const inputClass =
-    "mt-1.5 min-h-10 w-full rounded-[var(--sh-radius-sm)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)] px-3 text-sm text-[var(--sh-ink-strong)] outline-none transition focus:border-[var(--sh-brand-300)] focus:shadow-[var(--sh-shadow-focus)]";
   const hasPendingProject = Boolean(recovery.projectId);
   const canContinueJob = Boolean(recovery.projectId && recovery.jobId);
   const writeReady = isCsrfTokenAvailable();
@@ -337,12 +330,12 @@ export function RuntimeNewProjectPage() {
   const anchorSummary = `${watch("grade")} · ${watch("textbookEdition")} · ${watch("knowledgePoint") || "待填写知识点"}`;
 
   return (
-    <div className="mx-auto max-w-[1120px] px-4 py-5 md:px-6 lg:px-8">
-      <FocusPageHeader
-        description="先确定课程范围；有教材时上传 PDF，没有教材时可直接用课程锚点创建。"
-        title="新建课堂项目"
-      />
-
+    <ProjectEntryFrame
+      onSourceModeChange={(mode) =>
+        setValue("sourceMode", mode, { shouldDirty: true, shouldValidate: true })
+      }
+      sourceMode={sourceMode}
+    >
       {hasPendingProject ? (
         <section
           aria-label="已保存的课程进度"
@@ -379,200 +372,21 @@ export function RuntimeNewProjectPage() {
         </p>
       ) : null}
 
-      <form
-        aria-busy={submitting}
-        className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]"
+      <RuntimeProjectEntryForm
+        anchorSummary={anchorSummary}
+        control={control}
+        errors={errors}
+        file={file}
+        message={message}
+        onFileChange={selectFile}
         onSubmit={(event) => void submit(event)}
-      >
-        <fieldset className="lg:col-span-2" disabled={submitting}>
-          <legend className="text-sm font-semibold text-[var(--sh-ink-strong)]">
-            课程内容来源
-          </legend>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {[
-              ["textbook", "使用 PDF 教材", "上传教材并进入解析流程"],
-              ["anchor", "暂不使用教材", "用年级、版本和知识点限定课程范围"],
-            ].map(([value, label, detail]) => (
-              <label
-                className={`flex cursor-pointer items-start gap-3 rounded-[var(--sh-radius-md)] border px-4 py-3 transition-colors ${sourceMode === value ? "border-[var(--sh-action-primary)] bg-[var(--sh-brand-50)]" : "border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)] hover:bg-[var(--sh-surface-soft)]"}`}
-                key={value}
-              >
-                <input
-                  className="mt-1 size-4 accent-[var(--sh-action-primary)]"
-                  type="radio"
-                  value={value}
-                  {...register("sourceMode")}
-                />
-                <span>
-                  <span className="block text-sm font-semibold text-[var(--sh-ink-strong)]">
-                    {label}
-                  </span>
-                  <span className="mt-1 block text-xs leading-5 text-[var(--sh-ink-muted)]">
-                    {detail}
-                  </span>
-                </span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        <section className="rounded-[var(--sh-radius-lg)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-5 shadow-[var(--sh-shadow-card)]">
-          <div className="flex items-center gap-2 text-[var(--sh-brand-700)]">
-            <BookOpen aria-hidden="true" className="size-5" />
-            <h2 className="font-semibold">这节课讲什么</h2>
-          </div>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <label className="text-sm font-medium text-[var(--sh-ink-default)]">
-              项目名称
-              <input
-                className={inputClass}
-                disabled={submitting}
-                {...register("title")}
-                placeholder="例如：认识百分数"
-              />
-              {errors.title ? (
-                <span className="mt-1 block text-xs text-[var(--sh-danger)]">
-                  {errors.title.message}
-                </span>
-              ) : null}
-            </label>
-            <label className="text-sm font-medium text-[var(--sh-ink-default)]">
-              知识点
-              <input
-                className={inputClass}
-                disabled={submitting}
-                {...register("knowledgePoint")}
-                placeholder="例如：百分数的意义"
-              />
-              {errors.knowledgePoint ? (
-                <span className="mt-1 block text-xs text-[var(--sh-danger)]">
-                  {errors.knowledgePoint.message}
-                </span>
-              ) : null}
-            </label>
-            <Controller
-              control={control}
-              name="grade"
-              render={({ field }) => (
-                <label className="text-sm font-medium text-[var(--sh-ink-default)]">
-                  年级
-                  <Select
-                    ariaLabel="选择年级"
-                    className="mt-1.5 w-full"
-                    disabled={submitting}
-                    onValueChange={field.onChange}
-                    options={["一年级", "二年级", "三年级", "四年级", "五年级", "六年级"].map(
-                      (value) => ({ label: value, value }),
-                    )}
-                    value={field.value}
-                  />
-                </label>
-              )}
-            />
-            <Controller
-              control={control}
-              name="textbookEdition"
-              render={({ field }) => (
-                <label className="text-sm font-medium text-[var(--sh-ink-default)]">
-                  教材版本
-                  <Select
-                    ariaLabel="选择教材版本"
-                    className="mt-1.5 w-full"
-                    disabled={submitting}
-                    onValueChange={field.onChange}
-                    options={["人教版", "北师大版", "苏教版"].map((value) => ({
-                      label: value,
-                      value,
-                    }))}
-                    value={field.value}
-                  />
-                </label>
-              )}
-            />
-          </div>
-          <div className="mt-4">
-            <p className="text-sm font-medium text-[var(--sh-ink-default)]">制作方式</p>
-            <Controller
-              control={control}
-              name="executionMode"
-              render={({ field }) => (
-                <Select
-                  ariaLabel="选择制作方式"
-                  className="mt-1.5 w-full sm:w-72"
-                  disabled={submitting}
-                  onValueChange={field.onChange}
-                  options={[
-                    { label: "边看边确认", value: "guided" },
-                    { label: "自动完成可执行步骤", value: "automatic" },
-                  ]}
-                  value={field.value}
-                />
-              )}
-            />
-          </div>
-        </section>
-
-        <section className="rounded-[var(--sh-radius-lg)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-5 shadow-[var(--sh-shadow-card)]">
-          <div className="flex items-center gap-2 text-[var(--sh-brand-700)]">
-            <FileText aria-hidden="true" className="size-5" />
-            <h2 className="font-semibold">
-              {sourceMode === "textbook" ? "上传教材" : "确认课程范围"}
-            </h2>
-          </div>
-          {sourceMode === "textbook" ? (
-            <label className="mt-4 grid min-h-40 cursor-pointer place-items-center rounded-[var(--sh-radius-md)] border border-dashed border-[var(--sh-brand-300)] bg-[var(--sh-brand-50)] p-5 text-center hover:border-[var(--sh-brand-500)]">
-              <input
-                accept="application/pdf"
-                className="sr-only"
-                disabled={submitting}
-                onChange={(event) => selectFile(event.target.files?.[0] ?? null)}
-                type="file"
-              />
-              <span>
-                <Upload aria-hidden="true" className="mx-auto size-7 text-[var(--sh-brand-600)]" />
-                <span className="mt-2 block text-sm font-semibold text-[var(--sh-ink-strong)]">
-                  {file?.name ?? (recovery.file?.name ? "重新选择同一份 PDF" : "选择 PDF 教材")}
-                </span>
-                <span className="mt-1 block text-xs text-[var(--sh-ink-muted)]">
-                  {file ? (file.size / 1024 / 1024).toFixed(1) + " MB" : "文件会直接上传到受控存储"}
-                </span>
-              </span>
-            </label>
-          ) : (
-            <div
-              aria-label="课程锚点摘要"
-              className="mt-4 rounded-[var(--sh-radius-md)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-soft)] px-4 py-4"
-              role="region"
-            >
-              <p className="text-xs font-medium text-[var(--sh-ink-faint)]">课程锚点</p>
-              <p className="mt-2 text-sm font-semibold leading-6 text-[var(--sh-ink-strong)]">
-                {anchorSummary}
-              </p>
-              <p className="mt-2 text-xs leading-5 text-[var(--sh-ink-muted)]">
-                创建后仍可在项目中补充教材；当前不会建立教材解析任务。
-              </p>
-            </div>
-          )}
-          {message ? (
-            <p className="mt-3 text-sm text-[var(--sh-danger)]" role="alert">
-              {message}
-            </p>
-          ) : null}
-          <Button className="mt-4 w-full" disabled={submitting || !writeReady} type="submit">
-            {stage === "idle" && sourceMode === "textbook" ? <Upload aria-hidden="true" /> : null}
-            {stage === "idle" && sourceMode === "anchor" ? "创建课程项目" : stageLabels[stage]}
-          </Button>
-          {!writeReady ? (
-            <p className="mt-3 text-xs leading-5 text-[var(--sh-warning)]" role="status">
-              安全会话尚未就绪，请刷新后重试。
-            </p>
-          ) : null}
-          <p className="mt-3 text-xs leading-5 text-[var(--sh-ink-faint)]">
-            {sourceMode === "textbook"
-              ? "上传完成后会进入教材解析。页面只展示服务端返回的真实状态。"
-              : "项目创建后直接进入课程空间，不会显示虚假的上传或解析进度。"}
-          </p>
-        </section>
-      </form>
-    </div>
+        recoveredFileName={recovery.file?.name}
+        register={register}
+        sourceMode={sourceMode}
+        stage={stage}
+        submitting={submitting}
+        writeReady={writeReady}
+      />
+    </ProjectEntryFrame>
   );
 }

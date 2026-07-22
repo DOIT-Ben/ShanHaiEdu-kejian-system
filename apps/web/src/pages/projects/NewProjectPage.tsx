@@ -6,16 +6,17 @@ import { Controller, useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { createProject } from "@/features/projects/api/projectsApi";
+import { ProjectEntryFrame } from "@/features/projects/components/ProjectEntryFrame";
 import { projectKeys } from "@/features/projects/hooks/useProjectsQuery";
 import { apiConfig } from "@/shared/api/config";
 import { addMockTextbookFile } from "@/shared/api/mocks/runtime";
 import { Button } from "@/shared/ui/Button";
-import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { Select } from "@/shared/ui/Select";
 
 const projectSchema = z.object({
   title: z.string().min(2, "请输入项目名称"),
   knowledgePoint: z.string().min(2, "请输入本次要制作的知识点"),
+  sourceMode: z.enum(["textbook", "anchor"]),
   grade: z.string().min(1, "请选择年级"),
   textbookEdition: z.string().min(1, "请选择教材版本"),
   automationMode: z.enum(["manual", "assisted", "automatic"]),
@@ -38,11 +39,14 @@ export function NewProjectPage() {
     formState: { errors, isSubmitting },
     handleSubmit,
     register,
+    setValue,
+    watch,
   } = useForm<ProjectForm>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
       automationMode: "assisted",
       grade: "六年级",
+      sourceMode: "textbook",
       textbookEdition: "人教版",
     },
   });
@@ -58,7 +62,7 @@ export function NewProjectPage() {
   }, []);
 
   const submit = handleSubmit(async (values) => {
-    if (!file) {
+    if (values.sourceMode === "textbook" && !file) {
       setFileError("请选择教材 PDF");
       return;
     }
@@ -74,8 +78,9 @@ export function NewProjectPage() {
       automation_mode: values.automationMode,
     };
     const fingerprint = JSON.stringify({
-      file: [file.name, file.size, file.lastModified],
+      file: file ? [file.name, file.size, file.lastModified] : null,
       input,
+      sourceMode: values.sourceMode,
     });
     if (fingerprint !== createIntentFingerprint.current) {
       createIntentFingerprint.current = fingerprint;
@@ -91,14 +96,20 @@ export function NewProjectPage() {
       return;
     }
     createIntentKey.current = crypto.randomUUID();
-    addMockTextbookFile(project.id, {
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      lastModified: file.lastModified,
-    });
+    if (file && values.sourceMode === "textbook") {
+      addMockTextbookFile(project.id, {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: file.lastModified,
+      });
+    }
     await queryClient.invalidateQueries({ queryKey: projectKeys.all });
-    await navigate(`/app/projects/${project.id}/materials`);
+    await navigate(
+      values.sourceMode === "textbook"
+        ? `/app/projects/${project.id}/materials`
+        : `/app/projects/${project.id}`,
+    );
   });
 
   const selectFile = (nextFile: File | null) => {
@@ -121,26 +132,17 @@ export function NewProjectPage() {
     setFileError("");
   };
 
+  const sourceMode = watch("sourceMode");
+
   return (
-    <div className="mx-auto max-w-5xl px-5 pb-24 pt-6 md:px-8 lg:pb-6">
-      <FocusPageHeader
-        description="上传一个小知识点的教材 PDF，系统会先检查文件和范围，再安排课时。"
-        eyebrow="新项目"
-        title="从教材开始一套课堂作品"
-      />
-
-      <ol
-        aria-label="创建项目步骤"
-        className="mt-5 grid grid-cols-2 rounded-[var(--sh-radius-sm)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-1 lg:hidden"
-      >
-        <li className="rounded-lg bg-[var(--sh-surface-soft)] px-3 py-2 text-xs font-semibold text-[var(--sh-brand-700)]">
-          1&nbsp; 填写项目信息
-        </li>
-        <li className="px-3 py-2 text-xs font-medium text-[var(--sh-ink-muted)]">
-          2&nbsp; 上传教材
-        </li>
-      </ol>
-
+    <ProjectEntryFrame
+      eyebrow="新项目"
+      onSourceModeChange={(mode) => {
+        setValue("sourceMode", mode, { shouldDirty: true, shouldValidate: true });
+        if (mode === "anchor") setFileError("");
+      }}
+      sourceMode={sourceMode}
+    >
       {createProjectMutation.isError ? (
         <div className="mt-6 rounded-[var(--sh-radius-sm)] bg-[var(--sh-danger-soft)] p-4 text-sm text-[var(--sh-danger)]">
           项目暂时无法创建，已保留你填写的内容。请检查网络后重试。
@@ -268,12 +270,20 @@ export function NewProjectPage() {
           id="textbook-upload-step"
           ref={uploadStepRef}
         >
-          <h2 className="text-lg font-semibold text-[var(--sh-ink-strong)]">教材文件</h2>
+          <h2 className="text-lg font-semibold text-[var(--sh-ink-strong)]">
+            {sourceMode === "textbook" ? "教材文件" : "课程范围"}
+          </h2>
           <p className="mt-1 text-sm text-[var(--sh-ink-muted)]">
-            支持 PDF，建议只包含当前知识点的相关页。
+            {sourceMode === "textbook"
+              ? "支持 PDF，建议只包含当前知识点的相关页。"
+              : "不上传教材，直接使用左侧填写的年级、版本和知识点。"}
           </p>
 
-          {file ? (
+          {sourceMode === "anchor" ? (
+            <div className="mt-5 rounded-[var(--sh-radius-sm)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-soft)] p-4 text-sm leading-6 text-[var(--sh-ink-muted)]">
+              创建后将直接进入项目；不会显示教材上传或解析进度。
+            </div>
+          ) : file ? (
             <div className="mt-6 rounded-[var(--sh-radius-sm)] border border-[var(--sh-success)] bg-[var(--sh-success-soft)] p-4">
               <div className="flex items-center gap-3">
                 <span className="grid size-10 place-items-center rounded-md bg-[var(--sh-surface-elevated)] text-[var(--sh-success)]">
@@ -340,7 +350,10 @@ export function NewProjectPage() {
           <Button
             className="mt-6 w-full"
             disabled={
-              apiConfig.mode !== "mock" || !file || isSubmitting || createProjectMutation.isPending
+              apiConfig.mode !== "mock" ||
+              (sourceMode === "textbook" && !file) ||
+              isSubmitting ||
+              createProjectMutation.isPending
             }
             size="lg"
             type="submit"
@@ -349,16 +362,20 @@ export function NewProjectPage() {
               ? "教材上传暂时不可用"
               : isSubmitting || createProjectMutation.isPending
                 ? "正在创建项目"
-                : "创建项目并检查教材"}
+                : sourceMode === "textbook"
+                  ? "创建项目并检查教材"
+                  : "创建课程项目"}
           </Button>
           <p className="mt-3 text-center text-xs text-[var(--sh-ink-faint)]">
-            {!file
-              ? "请先选择教材 PDF；创建后仍可确认教材范围和课时。"
-              : "创建后不会立即生成教案，你可以先确认教材范围和课时。"}
+            {sourceMode === "anchor"
+              ? "课程范围会随项目保存；当前项目暂不能追加教材。"
+              : !file
+                ? "请先选择教材 PDF；创建后仍可确认教材范围和课时。"
+                : "创建后不会立即生成教案，你可以先确认教材范围和课时。"}
           </p>
         </section>
       </form>
-      {!uploadStepVisible ? (
+      {sourceMode === "textbook" && !uploadStepVisible ? (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--sh-line-default)] bg-[var(--sh-surface-canvas)]/95 px-3 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 shadow-[var(--sh-shadow-floating)] backdrop-blur-lg lg:hidden">
           <Button
             className="mx-auto flex w-full max-w-sm"
@@ -368,6 +385,6 @@ export function NewProjectPage() {
           </Button>
         </div>
       ) : null}
-    </div>
+    </ProjectEntryFrame>
   );
 }

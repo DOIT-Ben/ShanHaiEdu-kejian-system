@@ -11,6 +11,9 @@ export default defineConfig(({ command }) => ({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  optimizeDeps: {
+    entries: ["index.html"],
+  },
   server: {
     port: 5173,
   },

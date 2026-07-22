@@ -21,7 +21,7 @@ test("教材文件随新建项目进入教材页", async ({ page }) => {
   await loginAsTeacher(page);
   await page.goto("/app/projects/new");
   await page.getByLabel("项目名称").fill("百分数综合练习");
-  await page.getByLabel("知识点").fill("百分数的综合应用");
+  await page.getByRole("textbox", { name: "知识点", exact: true }).fill("百分数的综合应用");
   await page.locator('input[type="file"]').setInputFiles({
     name: "百分数综合练习.pdf",
     mimeType: "application/pdf",
@@ -45,7 +45,7 @@ test("新项目可以只通过页面操作走到真实视频生成门槛", async
   await loginAsTeacher(page);
   await page.goto("/app/projects/new");
   await page.getByLabel("项目名称").fill("百分数视频课例");
-  await page.getByLabel("知识点").fill("百分数的综合应用");
+  await page.getByRole("textbox", { name: "知识点", exact: true }).fill("百分数的综合应用");
   await page.locator('input[type="file"]').setInputFiles({
     name: "百分数视频课例.pdf",
     mimeType: "application/pdf",

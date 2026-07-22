@@ -5,10 +5,10 @@ import { getLesson } from "@/features/lessons/api/lessonsApi";
 import { getProject } from "@/features/projects/api/projectsApi";
 import { projectKeys } from "@/features/projects/hooks/useProjectsQuery";
 import { getProjectWorkflow } from "@/features/workflow/api/workflowApi";
+import { LessonWorkbenchSummary } from "@/features/workbench/components/LessonWorkbenchSummary";
 import { useProjectEvents } from "@/shared/api/useProjectEvents";
 import { buttonVariants } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
-import { WorkbenchStatusBoard } from "@/features/workbench/components/WorkbenchStatusBoard";
 
 const stepLabels: Record<string, string> = {
   lesson_plan: "教案",
@@ -50,7 +50,7 @@ export function RuntimeLessonWorkbenchPage() {
     return (
       <div className="mx-auto max-w-[900px] px-4 py-8 md:px-6">
         <FocusPageHeader
-          description="服务端暂时没有返回这节课时的完整数据。"
+          description="这节课的数据暂时没有读取完整，请检查网络后重试。"
           title="暂时无法打开课时"
         />
         <Link className={buttonVariants({ className: "mt-6" })} to={`/app/projects/${projectId}`}>
@@ -66,7 +66,6 @@ export function RuntimeLessonWorkbenchPage() {
   const workflow = workflowQuery.data;
   if (!project || !lesson || !workflow) return null;
 
-  const currentBranch = lesson.branches.find((branch) => branch.branch_key === stepKey);
   const nodeRuns = workflow.node_runs.filter((node) => {
     const normalizedKey = node.node_key.toLowerCase();
     return (
@@ -90,68 +89,26 @@ export function RuntimeLessonWorkbenchPage() {
         description={`${project.title} · ${lesson.title} · ${stepLabels[stepKey] ?? stepKey}`}
         title={`${lesson.title} · ${stepLabels[stepKey] ?? "当前步骤"}`}
       />
-
-      <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <section aria-labelledby="runtime-workbench-title" className="min-w-0">
-          <div className="rounded-[var(--sh-radius-lg)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-5 shadow-[var(--sh-shadow-card)] md:p-6">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--sh-ink-faint)]">
-                  当前课时
-                </p>
-                <h2
-                  className="mt-2 text-xl font-semibold text-[var(--sh-ink-strong)]"
-                  id="runtime-workbench-title"
-                >
-                  {lesson.title}
-                </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--sh-ink-muted)]">
-                  {lesson.objective_summary || lesson.scope_summary}
-                </p>
-              </div>
-              <span className="rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-soft)] px-3 py-1.5 text-xs text-[var(--sh-ink-muted)]">
-                {lesson.estimated_minutes
-                  ? `${String(lesson.estimated_minutes)} 分钟`
-                  : "课时已建立"}
-              </span>
-            </div>
-
-            <div className="mt-6 border-t border-[var(--sh-line-subtle)] pt-5">
-              <h3 className="text-sm font-semibold text-[var(--sh-ink-strong)]">服务端当前状态</h3>
-              <WorkbenchStatusBoard
-                items={nodeRuns.map((node) => ({
-                  id: node.id,
-                  status: node.status,
-                  title: node.title || node.node_key,
-                }))}
-              />
-            </div>
-          </div>
-        </section>
-
-        <aside className="h-fit rounded-[var(--sh-radius-lg)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-5 shadow-[var(--sh-shadow-card)]">
-          <h2 className="font-semibold text-[var(--sh-ink-strong)]">课时分支</h2>
-          <p className="mt-2 text-sm leading-6 text-[var(--sh-ink-muted)]">
-            选择要查看的课时成果分支，项目和课时上下文会保持不变。
-          </p>
-          <nav aria-label="课时分支" className="mt-4 grid gap-1.5">
-            {lesson.branches.map((branch) => (
-              <Link
-                className={`flex items-center justify-between rounded-[var(--sh-radius-sm)] px-3 py-2.5 text-sm transition-colors ${branch.branch_key === stepKey ? "bg-[var(--sh-brand-50)] font-medium text-[var(--sh-brand-700)]" : "text-[var(--sh-ink-muted)] hover:bg-[var(--sh-surface-soft)] hover:text-[var(--sh-ink-strong)]"}`}
-                key={branch.branch_key}
-                to={`/app/projects/${projectId}/lessons/${lesson.id}/work/${branch.branch_key}`}
-              >
-                <span>{stepLabels[branch.branch_key] ?? branch.branch_key}</span>
-                <span className="text-xs">{branch.enabled ? "可用" : "未启用"}</span>
-              </Link>
-            ))}
-          </nav>
-          {currentBranch && !currentBranch.enabled ? (
-            <p className="mt-4 text-xs leading-5 text-[var(--sh-ink-muted)]">
-              该分支当前未启用，不会创建新的制作任务。
-            </p>
-          ) : null}
-        </aside>
+      <div className="mt-5">
+        <LessonWorkbenchSummary
+          branches={lesson.branches.map((branch) => ({
+            enabled: branch.enabled,
+            key: branch.branch_key,
+            label: stepLabels[branch.branch_key] ?? branch.branch_key,
+            to: `/app/projects/${projectId}/lessons/${lesson.id}/work/${branch.branch_key}`,
+          }))}
+          currentBranchKey={stepKey}
+          durationLabel={
+            lesson.estimated_minutes ? `${String(lesson.estimated_minutes)} 分钟` : "课时已建立"
+          }
+          lessonTitle={lesson.title}
+          objective={lesson.objective_summary || lesson.scope_summary}
+          statuses={nodeRuns.map((node) => ({
+            id: node.id,
+            status: node.status,
+            title: node.title || node.node_key,
+          }))}
+        />
       </div>
     </div>
   );

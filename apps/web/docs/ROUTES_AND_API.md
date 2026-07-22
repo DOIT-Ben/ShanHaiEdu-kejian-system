@@ -71,8 +71,8 @@
 | 制作方式       | `GET/PATCH /projects/{project_id}/automation-policy`                                                                                                                                           | `features/projects/api/automationPolicyApi.ts`      | 项目概览已接入，写入使用 ETag/`If-Match`         |
 | 教材           | `POST /projects/{project_id}/materials/uploads`；对象存储直传；`POST /projects/{project_id}/materials/{material_id}/confirm`                                                                   | `features/materials/api/materialsApi.ts`            | 上传三段式链已接入新建项目页                     |
 | 教材读取       | `GET .../file-asset`；`GET .../parse-versions`                                                                                                                                                 | `features/materials/api/materialsApi.ts`            | 客户端已实现，Runtime 页面待接入                 |
-| 课时           | `GET/PATCH /projects/{project_id}/lessons`；`GET /lessons/{lesson_id}`；`PATCH /lessons/{lesson_id}/branches`                                                                                  | `features/lessons/api/lessonsApi.ts`                | 课时列表已接入；编辑集合、单课时和分支页面待接入 |
-| Workflow       | `GET /projects/{project_id}/workflow`                                                                                                                                                          | `features/workflow/api/workflowApi.ts`              | 客户端已实现，Runtime 工作台待接入               |
+| 课时           | `GET/PATCH /projects/{project_id}/lessons`；`GET /lessons/{lesson_id}`；`PATCH /lessons/{lesson_id}/branches`                                                                                  | `features/lessons/api/lessonsApi.ts`                | 列表和单课时读取已接入；编辑集合与分支写入待接入 |
+| Workflow       | `GET /projects/{project_id}/workflow`                                                                                                                                                          | `features/workflow/api/workflowApi.ts`              | Runtime 课时工作台已接入只读状态                 |
 | Artifact       | `POST /projects/{project_id}/artifacts`；`GET /artifacts/{artifact_id}`；`PUT .../drafts/{draft_branch}`；`POST .../versions`；`POST /artifact-versions/{artifact_version_id}/approvals`       | `features/artifacts/api/artifactsApi.ts`            | 客户端已实现，Runtime 成果与审核页面待接入       |
 | 素材槽位       | `GET /projects/{project_id}/asset-slots`；`GET .../asset-package`；`POST /asset-slots/{slot_id}/bindings`；`POST /asset-bindings/{binding_id}/unbind`                                          | `features/assets/api/assetsApi.ts`                  | 客户端已实现，Runtime 素材页面待接入             |
 | 创作           | `POST /creation-batches`                                                                                                                                                                       | `features/creation-studio/api/creationApi.ts`       | 批次客户端已实现，Runtime 创作页待接入           |
@@ -90,6 +90,8 @@
 
 - 教材模式：创建项目后建立上传会话、计算 SHA-256、直传 PDF、确认教材并进入解析 Job；
 - 无教材模式：仅用年级、教材版本、知识点和标题调用 `POST /projects`，创建成功后进入项目概览，不建立上传会话，也不显示虚假的解析进度。
+
+现行 `CreateProjectRequest` 和 `Project` 没有内容来源字段；教材上传也没有“为已有无教材项目补充教材”的页面级读取/恢复口径。因此来源选择只用于决定本次创建是否继续上传，不能在项目详情中持久显示，也不能承诺创建后追加教材。这个合同缺口关联 #11，前端不得用 `sessionStorage` 或 MockRuntime 伪造服务端来源事实。
 
 1. 校验 PDF，并在浏览器计算文件 SHA-256；
 2. `POST /projects` 创建项目；
@@ -118,4 +120,4 @@
 - 后端目前只有 Provider 中立媒体合同和确定性 Fake，真实图片/视频 Adapter 与受控冒烟不属于当前前端已完成能力；
 - Mock 媒体、静态素材和视觉预览只能验证版式，不能作为真实生成、下载或原子写回的验收证据。
 
-独立的 `playwright.runtime.config.ts` 只启动真实模式入口，并使用合同级确定性网络桩覆盖首页、项目、新建上传、刷新恢复、Job REST/SSE 与项目概览；默认 `playwright.config.ts` 继续验证开发 Mock 视觉流程，两者由前端 CI 分别执行。
+独立的 `playwright.runtime.config.ts` 只启动真实模式入口，并使用合同级确定性网络桩覆盖首页、项目、新建上传、无教材创建、刷新恢复、Job REST/SSE、项目概览与课时工作台；默认 `playwright.config.ts` 继续验证开发 Mock 视觉流程，两者由前端 CI 分别执行。

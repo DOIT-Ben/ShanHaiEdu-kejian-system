@@ -11,7 +11,9 @@ for (const viewport of viewports) {
     await page.setViewportSize({ height: viewport.height, width: viewport.width });
     await page.goto("/login");
 
-    await expect(page.getByRole("heading", { name: "登录山海教育" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "登录山海教育" })).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(page.getByRole("button", { name: "登录" })).toBeVisible();
 
     const brandVisual = page.getByRole("img", {

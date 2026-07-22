@@ -20,7 +20,7 @@ export function RuntimeUnavailablePage({
         </span>
         <h2 className="mt-5 text-xl font-semibold text-[var(--sh-ink-strong)]">先从项目开始</h2>
         <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[var(--sh-ink-muted)]">
-          项目列表会展示服务端已经保存的课程。准备好后，你可以从那里继续课堂制作。
+          项目列表会展示已经保存的课程。准备好后，你可以从那里继续课堂制作。
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <Link className={buttonVariants()} to="/app/projects">
