@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from apps.api.artifact_quality.contracts import QualitySource
 from apps.api.artifacts.context_source_registry import resolve_artifact_source
 from apps.api.artifacts.execution_errors import ArtifactExecutionPortError
+from apps.api.artifacts.lesson_context_projection import project_artifact_context
 from apps.api.artifacts.models import Artifact, ArtifactVersion
 from apps.api.content_runtime.approval_port import ContentDefinitionApprovalReader
 from apps.api.identity.context import ActorContext
@@ -74,7 +75,11 @@ class SqlAlchemyArtifactQualitySourcePort:
             source_id=artifact.id,
             source_version_id=version.id,
             content_hash=version.content_hash,
-            content=version.content_json,
+            content=project_artifact_context(
+                source=contract_ref,
+                lesson_key=execution.lesson_key,
+                content=version.content_json,
+            ),
             schema=content_definition.schema,
         )
 

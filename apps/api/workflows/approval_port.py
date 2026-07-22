@@ -60,7 +60,12 @@ class WorkflowArtifactApprovalPort:
         except WorkflowRuntimeError as exc:
             raise self._invalid(str(exc)) from exc
 
-    def retire_if_present(self, command: ArtifactApprovalGateCommand) -> bool:
+    def retire_if_present(
+        self,
+        command: ArtifactApprovalGateCommand,
+        *,
+        review_completion: bool,
+    ) -> bool:
         gate = self._exact_gate(command, required=False)
         if gate is None:
             return False
@@ -69,7 +74,7 @@ class WorkflowArtifactApprovalPort:
         try:
             WorkflowRuntimeService(self._session, self._actor).retire_branch_node(
                 gate.id,
-                review_completion=True,
+                review_completion=review_completion,
             )
         except WorkflowRuntimeError as exc:
             raise self._invalid(str(exc)) from exc
@@ -126,6 +131,30 @@ class WorkflowApprovalReader:
         if workflow is None or workflow.status != "published":
             return None
         return dict(workflow.graph_json)
+
+    def fixed_release_for_node(
+        self,
+        node_run_id: UUID,
+        *,
+        organization_id: UUID,
+        project_id: UUID,
+    ) -> tuple[UUID, UUID] | None:
+        row = self._session.execute(
+            select(
+                WorkflowRun.content_release_id,
+                WorkflowRun.workflow_definition_version_id,
+            )
+            .join(NodeRun, NodeRun.workflow_run_id == WorkflowRun.id)
+            .where(
+                NodeRun.id == node_run_id,
+                NodeRun.organization_id == organization_id,
+                NodeRun.deleted_at.is_(None),
+                WorkflowRun.organization_id == organization_id,
+                WorkflowRun.project_id == project_id,
+                WorkflowRun.deleted_at.is_(None),
+            )
+        ).one_or_none()
+        return None if row is None else (row[0], row[1])
 
     def validate_node_fact(self, node_run_id: UUID) -> QualityValidateNodeFact | None:
         row = self._session.execute(

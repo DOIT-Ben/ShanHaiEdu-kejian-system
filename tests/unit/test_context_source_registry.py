@@ -30,7 +30,9 @@ def test_selected_video_clips_are_not_resolved_as_candidate_artifacts() -> None:
 
 def test_approved_artifact_sources_require_the_current_approval_pointer() -> None:
     approved = resolve_artifact_source("approval:lesson_division")
+    material_scope = resolve_artifact_source("approval:material_scope")
     submitted = resolve_artifact_source("artifact:lesson_plan")
 
     assert approved is not None and approved.requires_current_approval is True
+    assert material_scope is not None and material_scope.requires_current_approval is True
     assert submitted is not None and submitted.requires_current_approval is False

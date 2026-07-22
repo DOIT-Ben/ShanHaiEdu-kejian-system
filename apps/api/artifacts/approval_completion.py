@@ -149,6 +149,7 @@ def retire_declared_approval_gate(
     version: ArtifactVersion,
     *,
     fixed_release: tuple[UUID, UUID],
+    review_completion: bool,
 ) -> None:
     if artifact.lesson_unit_id is None:
         return
@@ -176,7 +177,10 @@ def retire_declared_approval_gate(
         branch_key=output.producer_branch_key,
         source_input_ref=output.approval_completion.source_input_ref,
     )
-    WorkflowArtifactApprovalPort(session, actor).retire_if_present(command)
+    WorkflowArtifactApprovalPort(session, actor).retire_if_present(
+        command,
+        review_completion=review_completion,
+    )
 
 
 def _complete_artifact_gate(

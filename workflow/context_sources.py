@@ -116,7 +116,12 @@ CONTEXT_SOURCE_REGISTRY = MappingProxyType(
 ARTIFACT_CONTRACT_REGISTRY = MappingProxyType(
     {
         "approval:material_scope": ContextSourceDefinition(
-            "artifact", "approval:material_scope", ("material_scope",), "project", "project"
+            "artifact",
+            "approval:material_scope",
+            ("material_scope",),
+            "project",
+            "project",
+            True,
         ),
         "artifact:material_scope": ContextSourceDefinition(
             "artifact", "artifact:material_scope", ("material_scope",), "project", "project"

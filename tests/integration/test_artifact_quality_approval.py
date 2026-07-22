@@ -333,6 +333,7 @@ def _seed_submitted_quality_artifact(
     outputs = build_golden_branch_source_outputs(case)
     lesson_plan_content = outputs["lesson_plan.generate"]
     division_content = outputs["lesson.division.generate"]
+    division_lesson_key = division_content["lesson_units"][0]["lesson_unit_key"]
     with factory() as session, session.begin():
         upstream = session.get(ArtifactVersion, runtime.upstream_version_id)
         upstream_artifact = session.get(
@@ -390,7 +391,7 @@ def _seed_submitted_quality_artifact(
             id=new_uuid7(),
             organization_id=runtime.actor.organization_id,
             project_id=runtime.project_id,
-            lesson_key="QUALITY-APPROVAL-LESSON",
+            lesson_key=division_lesson_key,
             position=1,
             title="Quality approval fixture",
             scope_summary="Exercise the generic artifact quality approval guard",

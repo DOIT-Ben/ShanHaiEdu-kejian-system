@@ -142,6 +142,15 @@ async def test_lesson_plan_three_node_chain_uses_exact_lesson_and_material_scope
             )
             == 3
         )
+        division_snapshot = session.scalar(
+            select(NodeInputSnapshot).where(
+                NodeInputSnapshot.node_run_id == validate_id,
+                NodeInputSnapshot.input_key == "approval:lesson_division",
+            )
+        )
+        assert division_snapshot is not None
+        assert division_snapshot.snapshot_json["lesson_unit"]["lesson_unit_key"] == "LESSON-001"
+        assert "lesson_units" not in division_snapshot.snapshot_json
 
     quality = ArtifactQualityService(
         SqlAlchemyArtifactQualityTransactionFactory(factory, prepared.actor),

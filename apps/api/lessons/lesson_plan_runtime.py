@@ -7,6 +7,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from apps.api.artifacts.lesson_context_projection import project_artifact_context
 from apps.api.artifacts.lesson_plan_port import (
     ArtifactLessonPlanReader,
     ReviewableLessonPlanFact,
@@ -49,6 +50,9 @@ class LessonPlanRuntimeService:
         output, scope = self._output_and_scope(fact)
         if output.quality_gate_node_key is None:
             raise self._invalid("The fixed lesson-plan approval gate is missing.")
+        if len(output.quality_report_refs) != 1:
+            raise self._invalid("The fixed lesson-plan quality report binding is invalid.")
+        report_ref = output.quality_report_refs[0]
         evidence = self._artifacts.require_quality_evidence(artifact_version_id)
         report_id = _uuid_value(evidence.get("report_id"))
         evidence_hash = evidence.get("evidence_hash")
@@ -59,7 +63,7 @@ class LessonPlanRuntimeService:
             output.quality_gate_node_key,
             source=self._source_snapshot(fact),
             report=LessonPlanInputSnapshot(
-                input_key="report:lesson_plan_quality",
+                input_key=report_ref,
                 source_type="quality_report",
                 source_id=report_id,
                 source_version_id=report_id,
@@ -110,7 +114,14 @@ class LessonPlanRuntimeService:
                 source_id=fact.division.source_id,
                 source_version_id=fact.division.source_version_id,
                 content_hash=fact.division.content_hash,
-                content=cast(dict[str, object], dict(fact.division.content)),
+                content=cast(
+                    dict[str, object],
+                    project_artifact_context(
+                        source="approval:lesson_division",
+                        lesson_key=fact.lesson_key,
+                        content=fact.division.content,
+                    ),
+                ),
             ),
             LessonPlanInputSnapshot(
                 input_key="content:material_evidence",

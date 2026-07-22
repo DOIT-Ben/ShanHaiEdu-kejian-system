@@ -208,6 +208,7 @@ class ArtifactApprovalService:
             artifact,
             version,
             fixed_release=(project.content_release_id, project.workflow_definition_version_id),
+            review_completion=True,
         )
         approval = self._record(
             version,

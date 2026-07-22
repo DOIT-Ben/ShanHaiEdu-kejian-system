@@ -7,7 +7,6 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from apps.api.artifacts.approval_completion import retire_declared_approval_gate
 from apps.api.artifacts.approval_service import ArtifactApprovalService
 from apps.api.artifacts.authoring_guard import ArtifactAuthoringGuard
 from apps.api.artifacts.domain import ApprovalAction, canonical_content_hash
@@ -19,6 +18,7 @@ from apps.api.artifacts.models import (
     ArtifactVersion,
 )
 from apps.api.artifacts.relation_service import ArtifactRelationService
+from apps.api.artifacts.replacement_service import ArtifactReplacementService
 from apps.api.artifacts.repository import ArtifactRepository
 from apps.api.artifacts.validation import ArtifactValidation
 from apps.api.content_runtime.models import ContentDefinitionVersion
@@ -134,28 +134,16 @@ class ArtifactService:
         render_summary: dict[str, Any] | None = None,
     ) -> ArtifactVersion:
         self._validation.validate_provenance(source_kind, source_node_run_id)
-        artifact = self._require_artifact(artifact_id, ProjectAction.EDIT, for_update=True)
+        replacement = ArtifactReplacementService(self._session, self._actor)
+        artifact = replacement.lock_artifact_mutation(
+            artifact_id,
+            action=ProjectAction.EDIT,
+        )
         draft = self._require_draft(artifact.id, draft_branch, expected_lock_version)
         content_hash, report = self._validated_submission(artifact, draft)
         existing = self._current_submitted(artifact)
         if existing is not None and existing.content_hash == content_hash:
             return existing
-        if existing is not None:
-            project = self._validation.require_project(
-                artifact.project_id,
-                ProjectAction.EDIT,
-                for_update=False,
-            )
-            retire_declared_approval_gate(
-                self._session,
-                self._actor,
-                artifact,
-                existing,
-                fixed_release=(
-                    project.content_release_id,
-                    project.workflow_definition_version_id,
-                ),
-            )
         self._validation.require_source_node(source_node_run_id)
         version = self._new_version(
             artifact,
@@ -170,6 +158,12 @@ class ArtifactService:
         )
         self._session.add(version)
         self._session.flush()
+        replacement.prepare_manual(
+            artifact,
+            existing.id if existing is not None else None,
+            draft.based_on_version_id,
+            version,
+        )
         self._complete_submission(artifact, draft, version, request_id)
         return version
 

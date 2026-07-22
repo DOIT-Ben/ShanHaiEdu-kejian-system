@@ -158,20 +158,23 @@ def _scope(context: QualityValidationContext) -> ApprovedLessonPlanScope:
 
 
 def _exact_lesson(division: Mapping[str, Any], lesson_key: str) -> Mapping[str, Any]:
-    raw_units = division.get("lesson_units")
-    if not isinstance(raw_units, Sequence) or isinstance(raw_units, (str, bytes, bytearray)):
-        raise LessonPlanSliceError("LESSON_SCOPE_INVALID: lesson division is invalid")
-    matches = [
-        cast(Mapping[str, Any], raw)
-        for raw in cast(Sequence[object], raw_units)
-        if isinstance(raw, Mapping)
-        and cast(Mapping[str, Any], raw).get("lesson_unit_key") == lesson_key
-    ]
-    if len(matches) != 1:
+    raw_unit = division.get("lesson_unit")
+    division_key = division.get("division_key")
+    if not isinstance(raw_unit, Mapping):
         raise LessonPlanSliceError(
             "LESSON_SCOPE_INVALID: approved division has no exact target lesson"
         )
-    return matches[0]
+    unit = cast(Mapping[str, Any], raw_unit)
+    if (
+        unit.get("lesson_unit_key") != lesson_key
+        or type(division_key) is not str
+        or not division_key.strip()
+        or "lesson_units" in division
+    ):
+        raise LessonPlanSliceError(
+            "LESSON_SCOPE_INVALID: approved division has no exact target lesson"
+        )
+    return unit
 
 
 def _material_evidence_keys(material: Mapping[str, Any]) -> set[str]:
