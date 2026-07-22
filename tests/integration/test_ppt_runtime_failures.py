@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Callable
-from pathlib import Path
 from typing import Literal
 from uuid import UUID
 
@@ -45,7 +45,10 @@ class _CancelAfterExportRenderer:
 
 
 class _FailOncePublishStorage(FakeObjectStorage):
-    def __init__(self, phase: Literal["staging_put", "final_copy"]) -> None:
+    def __init__(
+        self,
+        phase: Literal["staging_put", "final_copy", "staging_cleanup"],
+    ) -> None:
         super().__init__()
         self._phase = phase
         self._armed = False
@@ -91,32 +94,32 @@ class _FailOncePublishStorage(FakeObjectStorage):
             raise ObjectStorageError("injected final copy acknowledgement failure")
         return metadata
 
+    def delete(self, *, bucket: str, key: str) -> None:
+        if self._armed and self._phase == "staging_cleanup" and key.endswith("/staging.pptx"):
+            self._armed = False
+            raise ObjectStorageError("injected staging cleanup failure")
+        super().delete(bucket=bucket, key=key)
 
-class _FailOnceDownloadStorage(FakeObjectStorage):
-    def __init__(self) -> None:
-        super().__init__()
-        self._failed_key: tuple[str, str] | None = None
 
-    def fail_once(self, *, bucket: str, key: str) -> None:
-        self._failed_key = (bucket, key)
+class _FailOnePageOnceRenderer:
+    def __init__(self, target_page_key: str) -> None:
+        self._target_page_key = target_page_key
+        self._failed = False
+        self.assemble_calls: list[str] = []
 
-    def download_to_path(
-        self,
-        *,
-        bucket: str,
-        key: str,
-        destination: Path,
-        max_bytes: int,
-    ) -> ObjectMetadata:
-        if self._failed_key == (bucket, key):
-            self._failed_key = None
-            raise ObjectStorageError("injected single-page download failure")
-        return super().download_to_path(
-            bucket=bucket,
-            key=key,
-            destination=destination,
-            max_bytes=max_bytes,
-        )
+    def assemble_pages(self, request: AssemblyRequest) -> AssemblyManifest:
+        for page in request.pages:
+            self.assemble_calls.append(page.page_key)
+            if page.page_key == self._target_page_key and not self._failed:
+                self._failed = True
+                raise PptRuntimeError(
+                    "PPT_RUNTIME_PAGE_RENDER_FAILED",
+                    "injected single-page render failure",
+                )
+        return assemble_pages(request)
+
+    def export_pptx(self, request: AssemblyRequest) -> PptxFileFact:
+        return export_pptx(request)
 
 
 def test_pre_cancel_terminalizes_without_attempt_or_artifact(
@@ -236,10 +239,10 @@ def test_any_t2_fault_rolls_back_database_and_compensates_published_object(
     assert storage.object_count == 10
 
 
-@pytest.mark.parametrize("phase", ["staging_put", "final_copy"])
+@pytest.mark.parametrize("phase", ["staging_put", "final_copy", "staging_cleanup"])
 def test_upload_failure_cleans_staging_and_final_objects(
     migrated_database_url: str,
-    phase: Literal["staging_put", "final_copy"],
+    phase: Literal["staging_put", "final_copy", "staging_cleanup"],
 ) -> None:
     factory = build_session_factory(build_engine(migrated_database_url))
     storage = _FailOncePublishStorage(phase)
@@ -301,18 +304,19 @@ def test_failed_final_copy_recovers_once_without_orphan_object(
     assert storage.object_count == 11
 
 
-def test_single_page_download_failure_reuses_frozen_exact_backgrounds_on_retry(
+def test_single_page_failure_retries_only_target_page_and_preserves_completed_facts(
     migrated_database_url: str,
 ) -> None:
     factory = build_session_factory(build_engine(migrated_database_url))
-    storage = _FailOnceDownloadStorage()
+    storage = FakeObjectStorage()
     seeded = seed_ppt(factory, storage)
-    target_version_id = seeded.background_version_ids[4]
-    with factory() as session:
-        target = session.get(FileAssetVersion, target_version_id)
-        assert target is not None
-        storage.fail_once(bucket=target.storage_bucket, key=target.storage_key)
-    service = build_ppt_service(factory, seeded.actor, storage)
+    renderer = _FailOnePageOnceRenderer("PAGE-05")
+    service = PptRuntimeService(
+        SqlAlchemyPptRuntimeTransactionFactory(factory, seeded.actor),
+        storage,
+        storage_bucket="shanhaiedu",
+        renderer=renderer,
+    )
 
     with pytest.raises(PptRuntimeError):
         service.execute(seeded.assemble_node_id, request_id="issue-170-page-retry")
@@ -329,10 +333,38 @@ def test_single_page_download_failure_reuses_frozen_exact_backgrounds_on_retry(
         )
         assert version is not None
         assert [attempt.status for attempt in attempts] == ["failed", "succeeded"]
+        failure_details = attempts[0].error_details_json
+        assert failure_details["retryable"] is True
+        assert failure_details["completed_page_keys"] == [
+            "PAGE-01",
+            "PAGE-02",
+            "PAGE-03",
+            "PAGE-04",
+        ]
+        assert [page["page_key"] for page in failure_details["completed_pages"]] == [
+            "PAGE-01",
+            "PAGE-02",
+            "PAGE-03",
+            "PAGE-04",
+        ]
         assert {
             page["background_file_asset_version_id"] for page in version.content_json["pages"]
         } == {str(value) for value in seeded.background_version_ids}
         assert count_for_node(session, UsageRecord, seeded.assemble_node_id) == 2
+    assert Counter(renderer.assemble_calls) == Counter(
+        {
+            "PAGE-01": 1,
+            "PAGE-02": 1,
+            "PAGE-03": 1,
+            "PAGE-04": 1,
+            "PAGE-05": 2,
+            "PAGE-06": 1,
+            "PAGE-07": 1,
+            "PAGE-08": 1,
+            "PAGE-09": 1,
+            "PAGE-10": 1,
+        }
+    )
     assert storage.object_count == 10
 
 

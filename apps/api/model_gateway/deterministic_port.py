@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
@@ -23,6 +25,7 @@ from apps.api.model_gateway.execution_port import AttemptEvidence
 from apps.api.runtime_boundary.ports import WorkflowExecutionContext
 
 _LEASE_SECONDS = 300
+_MAX_FAILURE_DETAILS_BYTES = 1_000_000
 
 
 class DeterministicAttemptError(ValueError):
@@ -139,6 +142,7 @@ class SqlAlchemyDeterministicAttemptPort:
         code: str,
         cancelled: bool,
         latency_ms: int,
+        recovery_details: Mapping[str, object] | None = None,
     ) -> bool:
         attempt = self._owned_running(execution, lease)
         if attempt is None:
@@ -146,7 +150,7 @@ class SqlAlchemyDeterministicAttemptPort:
         attempt.status = "cancelled" if cancelled else "failed"
         attempt.finished_at = database_wall_clock(self._session)
         attempt.error_code = code[:160]
-        attempt.error_details_json = {"retryable": False}
+        attempt.error_details_json = _failure_details(recovery_details)
         attempt.latency_ms = max(0, latency_ms)
         attempt.lease_owner = None
         attempt.lease_expires_at = None
@@ -160,6 +164,29 @@ class SqlAlchemyDeterministicAttemptPort:
         )
         self._session.flush()
         return True
+
+    def recoverable_failure_details(
+        self,
+        execution: WorkflowExecutionContext,
+        *,
+        request_hash: str,
+    ) -> dict[str, object]:
+        attempt = self._session.scalar(
+            select(GenerationAttempt)
+            .where(
+                GenerationAttempt.organization_id == self._actor.organization_id,
+                GenerationAttempt.project_id == execution.project_id,
+                GenerationAttempt.node_run_id == execution.node_run_id,
+                GenerationAttempt.operation_kind == "deterministic_execute",
+                GenerationAttempt.status == "failed",
+                GenerationAttempt.request_hash == request_hash,
+            )
+            .order_by(GenerationAttempt.attempt_no.desc())
+            .limit(1)
+        )
+        if attempt is None or attempt.error_details_json.get("retryable") is not True:
+            return {}
+        return dict(attempt.error_details_json)
 
     def succeeded(self, execution: WorkflowExecutionContext) -> AttemptEvidence:
         attempt = self._session.scalar(
@@ -316,3 +343,21 @@ class SqlAlchemyDeterministicAttemptPort:
 
 def _error(code: str, message: str) -> DeterministicAttemptError:
     return DeterministicAttemptError(code, message)
+
+
+def _failure_details(recovery_details: Mapping[str, object] | None) -> dict[str, object]:
+    details = dict(recovery_details or {})
+    details["retryable"] = recovery_details is not None
+    try:
+        encoded = json.dumps(
+            details,
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError):
+        return {"retryable": False}
+    if len(encoded) > _MAX_FAILURE_DETAILS_BYTES:
+        return {"retryable": False}
+    return details

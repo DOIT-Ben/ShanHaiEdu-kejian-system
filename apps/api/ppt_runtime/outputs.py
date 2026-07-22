@@ -2,14 +2,45 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Any
 
 from apps.api.assets.ppt_runtime_contracts import PptxFileVersionFact, PublishedPptxObject
-from apps.api.ppt_rendering.models import AssemblyManifest
+from apps.api.ppt_rendering import (
+    IMPLEMENTATION_VERSION,
+    AssemblyManifest,
+    CanvasSpec,
+    ManifestPage,
+)
 
 from .contracts import PptRenderProduct, PreparedPptRuntime
 from .materials import ASSEMBLE_EXECUTOR, EXPORT_EXECUTOR, error
+
+
+def merge_page_manifests(
+    canvas: CanvasSpec,
+    pages: tuple[ManifestPage, ...],
+) -> AssemblyManifest:
+    payload = {
+        "implementation_version": IMPLEMENTATION_VERSION,
+        "canvas": canvas.model_dump(mode="json"),
+        "pages": [page.model_dump(mode="json") for page in pages],
+    }
+    content_hash = hashlib.sha256(
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    return AssemblyManifest(
+        implementation_version=IMPLEMENTATION_VERSION,
+        content_hash=content_hash,
+        canvas=canvas,
+        pages=pages,
+    )
 
 
 def require_render_product(

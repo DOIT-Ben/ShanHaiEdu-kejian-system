@@ -320,7 +320,7 @@ def test_live_size_baseline_is_exactly_three_files_and_twenty_four_functions(
     assert report.count("warning: long function:") == 24
 
 
-def test_live_orm_baseline_exactly_matches_detected_dependencies() -> None:
+def test_live_orm_baseline_exactly_matches_fifty_two_detected_dependencies() -> None:
     files = production_python_files(
         [*ROOT.joinpath("apps/api").rglob("*.py"), *ROOT.joinpath("workers").rglob("*.py")],
         ROOT,
@@ -336,5 +336,5 @@ def test_live_orm_baseline_exactly_matches_detected_dependencies() -> None:
     assert errors == []
     actual = {(item.source, item.target, item.names) for item in detected}
     expected = {(item.source, item.target, item.names) for item in baseline.model_imports}
-    assert len(actual) == 49
+    assert len(actual) == 52
     assert actual == expected

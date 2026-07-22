@@ -6,7 +6,6 @@ from collections.abc import Mapping, Sequence
 from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from apps.api.artifacts.models import ArtifactVersion
@@ -17,14 +16,12 @@ from apps.api.assets.ppt_runtime_contracts import (
     PptxFileVersionFact,
     PublishedPptxObject,
 )
+from apps.api.assets.pptx_writer import SqlAlchemyPptxWriter
+from apps.api.assets.project_models import AssetBinding, ProjectAssetSlot
 from apps.api.assets.project_repository import ProjectAssetRepository
-from apps.api.database import utc_now
 from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.permissions import ProjectAccessService
-from apps.api.ids import new_uuid7
 from apps.api.runtime_boundary.ports import WorkflowExecutionContext
-
-PPTX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
 
 class SqlAlchemyPptAssetPort:
@@ -91,113 +88,11 @@ class SqlAlchemyPptAssetPort:
         page_count: int,
         implementation_version: str,
     ) -> PptxFileVersionFact:
-        if (
-            execution.lesson_unit_id is None
-            or execution.lesson_key is None
-            or published.mime_type != PPTX_MEDIA_TYPE
-            or published.size_bytes <= 0
-            or not _is_sha256(published.sha256)
-            or not published.etag
-            or page_count <= 0
-        ):
-            raise _error(
-                "PPT_RUNTIME_PPTX_FACT_INVALID",
-                "the published PPTX object fact is invalid",
-            )
-        asset_key = f"pptx:{execution.project_id}:{execution.lesson_unit_id}"
-        asset = self._session.scalar(
-            select(FileAsset)
-            .where(
-                FileAsset.organization_id == self._actor.organization_id,
-                FileAsset.asset_key == asset_key,
-                FileAsset.deleted_at.is_(None),
-            )
-            .with_for_update()
-        )
-        if asset is None:
-            asset = FileAsset(
-                id=new_uuid7(),
-                organization_id=self._actor.organization_id,
-                asset_key=asset_key,
-                asset_kind="pptx",
-                current_version_id=None,
-                status="active",
-                retention_class="project_asset",
-                created_by=self._actor.principal_id,
-                updated_by=self._actor.principal_id,
-            )
-            self._session.add(asset)
-            self._session.flush()
-        elif asset.asset_kind != "pptx" or asset.status != "active":
-            raise _error(
-                "PPT_RUNTIME_PPTX_IDENTITY_CONFLICT",
-                "the stable PPTX file identity conflicts with an existing asset",
-            )
-        existing = self._session.scalar(
-            select(FileAssetVersion).where(
-                FileAssetVersion.organization_id == self._actor.organization_id,
-                FileAssetVersion.file_asset_id == asset.id,
-                FileAssetVersion.storage_bucket == published.bucket,
-                FileAssetVersion.storage_key == published.key,
-                FileAssetVersion.sha256 == published.sha256,
-            )
-        )
-        if existing is None:
-            version_no = (
-                int(
-                    self._session.scalar(
-                        select(func.coalesce(func.max(FileAssetVersion.version_no), 0)).where(
-                            FileAssetVersion.file_asset_id == asset.id
-                        )
-                    )
-                    or 0
-                )
-                + 1
-            )
-            existing = FileAssetVersion(
-                id=new_uuid7(),
-                organization_id=self._actor.organization_id,
-                file_asset_id=asset.id,
-                version_no=version_no,
-                storage_bucket=published.bucket,
-                storage_key=published.key,
-                mime_type=published.mime_type,
-                byte_size=published.size_bytes,
-                sha256=published.sha256,
-                etag=published.etag,
-                width=None,
-                height=None,
-                duration_ms=None,
-                page_count=page_count,
-                scan_status="clean",
-                metadata_json={
-                    "project_id": str(execution.project_id),
-                    "lesson_unit_id": str(execution.lesson_unit_id),
-                    "lesson_key": execution.lesson_key,
-                    "source_node_run_id": str(execution.node_run_id),
-                    "implementation_version": implementation_version,
-                },
-                derived_from_version_id=None,
-                created_at=utc_now(),
-                created_by=self._actor.principal_id,
-            )
-            self._session.add(existing)
-            self._session.flush()
-        asset.current_version_id = existing.id
-        asset.updated_at = utc_now()
-        asset.updated_by = self._actor.principal_id
-        asset.lock_version += 1
-        self._session.flush()
-        return PptxFileVersionFact(
-            file_asset_id=asset.id,
-            file_asset_version_id=existing.id,
-            bucket=existing.storage_bucket,
-            key=existing.storage_key,
-            etag=existing.etag,
-            mime_type=existing.mime_type,
-            size_bytes=existing.byte_size,
-            sha256=existing.sha256,
-            page_count=cast(int, existing.page_count),
+        return SqlAlchemyPptxWriter(self._session, self._actor).persist(
+            execution,
+            published,
+            page_count=page_count,
+            implementation_version=implementation_version,
         )
 
     def _background_for_page(
@@ -208,18 +103,56 @@ class SqlAlchemyPptAssetPort:
         page_spec_version_id: UUID,
         for_update: bool,
     ) -> PptBackgroundFact:
+        page_key, position, slot = self._required_background_slot(
+            execution,
+            page,
+            for_update=for_update,
+        )
+        binding = self._required_background_binding(
+            slot,
+            page_spec_version_id=page_spec_version_id,
+            for_update=for_update,
+        )
+        record = self._repository.get_file_version(binding.file_asset_version_id)
+        if record is None:
+            raise _background_invalid()
+        version, asset = record
+        if not _valid_background_file(asset, version):
+            raise _background_invalid()
+        return PptBackgroundFact(
+            page_key=page_key,
+            position=position,
+            slot_key=slot.slot_key,
+            binding_id=binding.id,
+            file_asset_id=asset.id,
+            file_asset_version_id=version.id,
+            storage_bucket=version.storage_bucket,
+            storage_key=version.storage_key,
+            mime_type=version.mime_type,
+            size_bytes=version.byte_size,
+            sha256=version.sha256,
+            width=cast(int, version.width),
+            height=cast(int, version.height),
+        )
+
+    def _required_background_slot(
+        self,
+        execution: WorkflowExecutionContext,
+        page: Mapping[str, Any],
+        *,
+        for_update: bool,
+    ) -> tuple[str, int, ProjectAssetSlot]:
         page_key = _text(page.get("page_key"))
         position = _positive_int(page.get("page_position"))
         requirements = page.get("page_asset_requirements")
         if not isinstance(requirements, Sequence) or isinstance(
-            requirements,
-            (str, bytes, bytearray),
+            requirements, (str, bytes, bytearray)
         ):
             raise _background_invalid()
-        typed_requirements = cast(Sequence[object], requirements)
-        if len(typed_requirements) != 1 or not isinstance(typed_requirements[0], Mapping):
+        values = cast(Sequence[object], requirements)
+        if len(values) != 1 or not isinstance(values[0], Mapping):
             raise _background_invalid()
-        slot_key = _text(cast(Mapping[str, Any], typed_requirements[0]).get("target_slot"))
+        slot_key = _text(cast(Mapping[str, Any], values[0]).get("target_slot"))
         slot = self._repository.get_slot_by_key(
             execution.project_id,
             slot_key,
@@ -235,6 +168,15 @@ class SqlAlchemyPptAssetPort:
             or slot.status != "satisfied"
         ):
             raise _background_invalid()
+        return page_key, position, slot
+
+    def _required_background_binding(
+        self,
+        slot: ProjectAssetSlot,
+        *,
+        page_spec_version_id: UUID,
+        for_update: bool,
+    ) -> AssetBinding:
         bindings = self._repository.list_active_bindings(slot.id, for_update=for_update)
         if len(bindings) != 1:
             raise _background_invalid()
@@ -244,38 +186,7 @@ class SqlAlchemyPptAssetPort:
             page_spec_version_id,
         ):
             raise _background_invalid()
-        record = self._repository.get_file_version(binding.file_asset_version_id)
-        if record is None:
-            raise _background_invalid()
-        version, asset = record
-        if (
-            asset.status != "active"
-            or asset.asset_kind != "image"
-            or version.scan_status != "clean"
-            or version.mime_type != "image/png"
-            or version.byte_size <= 0
-            or version.width is None
-            or version.height is None
-            or version.width <= 0
-            or version.height <= 0
-            or len(version.sha256) != 64
-        ):
-            raise _background_invalid()
-        return PptBackgroundFact(
-            page_key=page_key,
-            position=position,
-            slot_key=slot.slot_key,
-            binding_id=binding.id,
-            file_asset_id=asset.id,
-            file_asset_version_id=version.id,
-            storage_bucket=version.storage_bucket,
-            storage_key=version.storage_key,
-            mime_type=version.mime_type,
-            size_bytes=version.byte_size,
-            sha256=version.sha256,
-            width=version.width,
-            height=version.height,
-        )
+        return binding
 
     def _same_page_spec_lineage(
         self,
@@ -293,6 +204,21 @@ class SqlAlchemyPptAssetPort:
             and current.organization_id == self._actor.organization_id
             and source.artifact_id == current.artifact_id
         )
+
+
+def _valid_background_file(asset: FileAsset, version: FileAssetVersion) -> bool:
+    return (
+        asset.status == "active"
+        and asset.asset_kind == "image"
+        and version.scan_status == "clean"
+        and version.mime_type == "image/png"
+        and version.byte_size > 0
+        and version.width is not None
+        and version.height is not None
+        and version.width > 0
+        and version.height > 0
+        and _is_sha256(version.sha256)
+    )
 
 
 def _page_sources(content: Mapping[str, Any]) -> tuple[Mapping[str, Any], ...]:

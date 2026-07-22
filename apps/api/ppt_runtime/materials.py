@@ -8,6 +8,7 @@ from typing import Any, cast
 from apps.api.assets.ppt_runtime_contracts import PptBackgroundFact
 from apps.api.content_runtime.deterministic_port import DeterministicNodeDefinition
 from apps.api.model_gateway.deterministic_port import DeterministicAttemptLease
+from apps.api.ppt_rendering import ManifestPage
 from apps.api.runtime_boundary.ports import ArtifactContextVersion, WorkflowExecutionContext
 from workflow.node_state import NodeStatus
 
@@ -22,10 +23,12 @@ def build_prepared(
     definition: DeterministicNodeDefinition,
     execution: WorkflowExecutionContext,
     request_id: str,
+    request_hash: str,
     owner_token: str,
     attempt: DeterministicAttemptLease,
     inputs: Mapping[str, ArtifactContextVersion],
     backgrounds: tuple[PptBackgroundFact, ...],
+    recovered_pages: tuple[ManifestPage, ...] = (),
 ) -> PreparedPptRuntime:
     page_specs = required_input(inputs, "artifact:ppt_page_specs")
     assembly = inputs.get("artifact:ppt_page_previews")
@@ -33,12 +36,14 @@ def build_prepared(
         definition=definition,
         execution=execution,
         request_id=request_id,
+        request_hash=request_hash,
         owner_token=owner_token,
         attempt=attempt,
         upstream_artifacts=dict(inputs),
         page_spec_version_id=page_specs.artifact_version_id,
         page_spec_content=page_specs.content,
         backgrounds=backgrounds,
+        recovered_pages=recovered_pages,
         assembly_artifact_version_id=(assembly.artifact_version_id if assembly else None),
         assembly_content=(assembly.content if assembly else None),
     )

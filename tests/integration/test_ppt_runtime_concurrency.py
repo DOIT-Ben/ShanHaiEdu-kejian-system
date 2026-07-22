@@ -116,8 +116,9 @@ def test_lost_attempt_and_node_owners_cannot_commit_and_recover_once(
                 )
             )
             assert node_lease is not None and attempt is not None
-            node_lease.owner_token = "replacement-worker"
-            attempt.lease_owner = "replacement-worker"
+            replacement_identity = "replacement-worker"
+            node_lease.owner_token = replacement_identity
+            attempt.lease_owner = replacement_identity
 
     stale_service = PptRuntimeService(
         SqlAlchemyPptRuntimeTransactionFactory(factory, seeded.actor),

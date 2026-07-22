@@ -8,7 +8,7 @@ from typing import Any, Literal, cast
 from uuid import UUID
 
 from apps.api.assets.ppt_runtime_contracts import PptBackgroundFact
-from apps.api.ppt_rendering.models import (
+from apps.api.ppt_rendering import (
     AssemblyRequest,
     BackgroundImage,
     Box,

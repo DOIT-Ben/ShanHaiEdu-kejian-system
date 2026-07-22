@@ -7,7 +7,6 @@ from contextlib import contextmanager
 from typing import Any, cast
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.artifacts.deterministic_port import SqlAlchemyDeterministicArtifactPort
@@ -22,13 +21,12 @@ from apps.api.content_runtime.deterministic_port import (
     DeterministicNodeDefinition,
     SqlAlchemyDeterministicDefinitionReader,
 )
-from apps.api.identity.context import ActorContext, ProjectAction
-from apps.api.identity.permissions import ProjectAccessService
+from apps.api.identity.context import ActorContext
 from apps.api.model_gateway.deterministic_port import SqlAlchemyDeterministicAttemptPort
+from apps.api.ppt_rendering import ManifestPage
 from apps.api.runtime_boundary.ports import ArtifactContextVersion, WorkflowExecutionContext
 from apps.api.workflows.execution_port import SqlAlchemyWorkflowExecutionPort
 from apps.api.workflows.execution_values import execution_snapshot_hash
-from apps.api.workflows.models import NodeRun, WorkflowRun
 from workflow.node_state import NodeStatus
 
 from .contracts import (
@@ -38,6 +36,7 @@ from .contracts import (
     PptRuntimeTransactionFactory,
     PreparedPptRuntime,
 )
+from .failure import terminalize_prepare_failure
 from .materials import (
     ASSEMBLE_EXECUTOR,
     EXPORT_EXECUTOR,
@@ -53,6 +52,7 @@ from .materials import (
     sha256,
 )
 from .outputs import artifact_content, output_bytes, require_render_product
+from .page_recovery import build_page_recovery_details, parse_page_recovery_details
 
 
 class SqlAlchemyPptRuntimeTransactionFactory(PptRuntimeTransactionFactory):
@@ -109,16 +109,7 @@ class SqlAlchemyPptRuntimeTransaction(PptRuntimeTransaction):
         execution = self._workflow.require_context(node_run_id, for_update=True)
         committed = self._workflow.committed_artifact(node_run_id)
         if committed is not None:
-            self._workflow.require_execution_request(node_run_id, request_id)
-            artifact = self._artifacts.result_for_version(committed)
-            evidence = self._attempts.succeeded(execution)
-            return PptRuntimeResult(
-                node_run_id=node_run_id,
-                artifact_version_id=artifact.artifact_version_id,
-                file_asset_version_id=artifact.file_asset_version_id,
-                attempt_id=evidence.attempt_id,
-                usage_id=evidence.usage_id,
-            )
+            return self._committed_result(execution, committed, request_id)
         if execution.status == NodeStatus.CANCEL_REQUESTED.value:
             raise error(
                 "PPT_RUNTIME_CANCEL_REQUESTED",
@@ -126,35 +117,42 @@ class SqlAlchemyPptRuntimeTransaction(PptRuntimeTransaction):
             )
         definition = self._definitions.resolve(node_run_id)
         require_supported_definition(definition, execution)
-        frozen = self._workflow.find_frozen_execution_snapshot(node_run_id, request_id)
-        if frozen is None:
-            inputs, backgrounds = self._fresh_inputs(definition, execution)
-            frozen = execution_snapshot(definition, inputs, backgrounds)
-            self._workflow.freeze_execution(
-                execution,
-                request_id=request_id,
-                snapshot=frozen,
+        inputs, backgrounds, request_hash = self._frozen_inputs(
+            definition,
+            execution,
+            request_id,
+        )
+        recovered_pages = (
+            parse_page_recovery_details(
+                self._attempts.recoverable_failure_details(
+                    execution,
+                    request_hash=request_hash,
+                ),
+                backgrounds=backgrounds,
+                request_hash=request_hash,
             )
-            frozen = {**frozen, "request_id": request_id}
-        else:
-            inputs, backgrounds = self._load_frozen(definition, execution, frozen)
+            if definition.executor_ref == ASSEMBLE_EXECUTOR
+            else ()
+        )
         owner_token = str(uuid4())
         self._workflow.claim_execution_owner(node_run_id, owner_token)
         self._workflow.start(node_run_id)
         attempt = self._attempts.start(
             execution,
             owner_token=owner_token,
-            request_hash=execution_snapshot_hash(frozen),
+            request_hash=request_hash,
             capability=definition.executor_ref,
         )
         return build_prepared(
             definition,
             execution,
             request_id,
+            request_hash,
             owner_token,
             attempt,
             inputs,
             backgrounds,
+            recovered_pages,
         )
 
     def complete(
@@ -165,23 +163,7 @@ class SqlAlchemyPptRuntimeTransaction(PptRuntimeTransaction):
         *,
         latency_ms: int,
     ) -> PptRuntimeResult:
-        current = self._workflow.require_context(prepared.execution.node_run_id, for_update=True)
-        if current.status == NodeStatus.CANCEL_REQUESTED.value:
-            raise error(
-                "PPT_RUNTIME_CANCEL_REQUESTED",
-                "the deterministic PPT node was cancelled before commit",
-            )
-        require_commit_identity(prepared, current)
-        if not self._workflow.owns_execution_owner(current.node_run_id, prepared.owner_token):
-            raise error("PPT_RUNTIME_OWNER_LOST", "the PPT node execution lease was lost")
-        self._artifacts.verify_inputs(current, prepared.upstream_artifacts)
-        self._assets.verify_backgrounds(
-            current,
-            page_spec_version_id=prepared.page_spec_version_id,
-            page_spec_content=prepared.page_spec_content,
-            expected=prepared.backgrounds,
-        )
-        require_render_product(prepared, product, published)
+        current = self._require_completion_context(prepared, product, published)
         evidence = self._attempts.complete(
             current,
             prepared.attempt,
@@ -225,6 +207,72 @@ class SqlAlchemyPptRuntimeTransaction(PptRuntimeTransaction):
             usage_id=evidence.usage_id,
         )
 
+    def _committed_result(
+        self,
+        execution: WorkflowExecutionContext,
+        committed_version_id: UUID,
+        request_id: str,
+    ) -> PptRuntimeResult:
+        self._workflow.require_execution_request(execution.node_run_id, request_id)
+        artifact = self._artifacts.result_for_version(committed_version_id)
+        evidence = self._attempts.succeeded(execution)
+        return PptRuntimeResult(
+            node_run_id=execution.node_run_id,
+            artifact_version_id=artifact.artifact_version_id,
+            file_asset_version_id=artifact.file_asset_version_id,
+            attempt_id=evidence.attempt_id,
+            usage_id=evidence.usage_id,
+        )
+
+    def _frozen_inputs(
+        self,
+        definition: DeterministicNodeDefinition,
+        execution: WorkflowExecutionContext,
+        request_id: str,
+    ) -> tuple[
+        dict[str, ArtifactContextVersion],
+        tuple[PptBackgroundFact, ...],
+        str,
+    ]:
+        frozen = self._workflow.find_frozen_execution_snapshot(execution.node_run_id, request_id)
+        if frozen is not None:
+            inputs, backgrounds = self._load_frozen(definition, execution, frozen)
+            return inputs, backgrounds, execution_snapshot_hash(frozen)
+        inputs, backgrounds = self._fresh_inputs(definition, execution)
+        snapshot = execution_snapshot(definition, inputs, backgrounds)
+        self._workflow.freeze_execution(
+            execution,
+            request_id=request_id,
+            snapshot=snapshot,
+        )
+        frozen = {**snapshot, "request_id": request_id}
+        return inputs, backgrounds, execution_snapshot_hash(frozen)
+
+    def _require_completion_context(
+        self,
+        prepared: PreparedPptRuntime,
+        product: PptRenderProduct,
+        published: PublishedPptxObject | None,
+    ) -> WorkflowExecutionContext:
+        current = self._workflow.require_context(prepared.execution.node_run_id, for_update=True)
+        if current.status == NodeStatus.CANCEL_REQUESTED.value:
+            raise error(
+                "PPT_RUNTIME_CANCEL_REQUESTED",
+                "the deterministic PPT node was cancelled before commit",
+            )
+        require_commit_identity(prepared, current)
+        if not self._workflow.owns_execution_owner(current.node_run_id, prepared.owner_token):
+            raise error("PPT_RUNTIME_OWNER_LOST", "the PPT node execution lease was lost")
+        self._artifacts.verify_inputs(current, prepared.upstream_artifacts)
+        self._assets.verify_backgrounds(
+            current,
+            page_spec_version_id=prepared.page_spec_version_id,
+            page_spec_content=prepared.page_spec_content,
+            expected=prepared.backgrounds,
+        )
+        require_render_product(prepared, product, published)
+        return current
+
     def terminalize_failure(
         self,
         prepared: PreparedPptRuntime,
@@ -232,6 +280,7 @@ class SqlAlchemyPptRuntimeTransaction(PptRuntimeTransaction):
         code: str,
         cancelled: bool,
         latency_ms: int,
+        completed_pages: tuple[ManifestPage, ...],
     ) -> None:
         if not self._workflow.owns_execution_owner(
             prepared.execution.node_run_id,
@@ -244,6 +293,14 @@ class SqlAlchemyPptRuntimeTransaction(PptRuntimeTransaction):
             code=code,
             cancelled=cancelled,
             latency_ms=latency_ms,
+            recovery_details=(
+                build_page_recovery_details(
+                    completed_pages,
+                    request_hash=prepared.request_hash,
+                )
+                if completed_pages and not cancelled
+                else None
+            ),
         ):
             return
         self._workflow.release_execution_owner(
@@ -257,33 +314,13 @@ class SqlAlchemyPptRuntimeTransaction(PptRuntimeTransaction):
         )
 
     def fail_prepare(self, node_run_id: UUID, *, code: str) -> None:
-        row = self._session.execute(
-            select(NodeRun, WorkflowRun)
-            .join(WorkflowRun, WorkflowRun.id == NodeRun.workflow_run_id)
-            .where(
-                NodeRun.id == node_run_id,
-                NodeRun.organization_id == self._actor.organization_id,
-                NodeRun.deleted_at.is_(None),
-                WorkflowRun.organization_id == self._actor.organization_id,
-                WorkflowRun.deleted_at.is_(None),
-            )
-            .with_for_update(of=NodeRun)
-        ).one_or_none()
-        if row is None:
-            return
-        node, run = row
-        if not self._actor.is_system:
-            ProjectAccessService(self._session, self._actor).require(
-                run.project_id,
-                ProjectAction.GENERATE,
-            )
-        if node.status == NodeStatus.FAILED.value and node.last_error_code == code:
-            return
-        if node.status == NodeStatus.CANCEL_REQUESTED.value:
-            self._workflow.terminalize(node_run_id, code=code, cancelled=True)
-            return
-        self._workflow.start(node_run_id)
-        self._workflow.terminalize(node_run_id, code=code, cancelled=False)
+        terminalize_prepare_failure(
+            self._session,
+            self._actor,
+            self._workflow,
+            node_run_id,
+            code=code,
+        )
 
     def _fresh_inputs(
         self,

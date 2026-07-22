@@ -14,6 +14,7 @@ from apps.api.assets.models import FileAssetVersion
 from apps.api.database import build_engine, build_session_factory
 from apps.api.ids import new_uuid7
 from apps.api.model_gateway.audit_models import GenerationAttempt, UsageRecord
+from apps.api.node_execution.deterministic_router import build_deterministic_node_executor
 from apps.api.ppt_runtime.contracts import PptRuntimeError
 from apps.api.workflows.models import NodeRun
 from apps.api.workflows.service import WorkflowRuntimeService
@@ -26,6 +27,31 @@ from tests.integration.ppt_runtime_support import (
     validate_pptx,
 )
 from workflow.node_state import NodeStatus
+
+
+def test_published_executor_router_runs_ppt_assembly_from_fixed_binding(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    storage = FakeObjectStorage()
+    seeded = seed_ppt(factory, storage)
+    executor = build_deterministic_node_executor(
+        factory,
+        seeded.actor,
+        storage,
+        storage_bucket="shanhaiedu",
+    )
+
+    result = executor.execute(
+        seeded.assemble_node_id,
+        request_id="issue-170-published-executor-router",
+    )
+
+    with factory() as session:
+        version = session.get(ArtifactVersion, result.artifact_version_id)
+        node = session.get(NodeRun, seeded.assemble_node_id)
+        assert version is not None and version.content_json["page_count"] == 10
+        assert node is not None and node.status == NodeStatus.APPROVED.value
 
 
 def test_golden_ppt_runs_to_exact_file_quality_and_approval(

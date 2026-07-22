@@ -1,7 +1,7 @@
 """Allow audited deterministic executor attempts.
 
-Revision ID: j4e5f6a7b809
-Revises: i3d4e5f6a708
+Revision ID: k5f6a7b8c910
+Revises: j4e5f6a7b809
 Create Date: 2026-07-22
 """
 
@@ -11,8 +11,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "j4e5f6a7b809"
-down_revision: str | Sequence[str] | None = "i3d4e5f6a708"
+revision: str = "k5f6a7b8c910"
+down_revision: str | Sequence[str] | None = "j4e5f6a7b809"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

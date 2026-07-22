@@ -19,7 +19,8 @@ from apps.api.content_runtime.models import (
 from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.permissions import ProjectAccessService
 from apps.api.runtime_boundary.ports import WorkflowExecutionContext
-from workflow.registry import BUILTIN_WORKFLOW_REGISTRY
+from workflow.definition import WorkflowNodeDefinition, WorkflowOutputDefinitionBinding
+from workflow.registry import BUILTIN_WORKFLOW_REGISTRY, RegisteredWorkflow
 
 
 class DeterministicDefinitionError(ValueError):
@@ -74,6 +75,37 @@ class SqlAlchemyDeterministicDefinitionReader:
             execution.project_id,
             ProjectAction.GENERATE,
         )
+        release = self._published_release(execution)
+        registered = self._registered_workflow(execution)
+        node, executor_ref = self._deterministic_node(registered, execution)
+        output = self._output_binding(registered, execution)
+        definition = self._content_definition(release, output)
+        if (
+            output.generation_template_key is not None
+            or node.branch_key is None
+            or output.producer_branch_key != node.branch_key
+            or output.execution_scope != node.execution_scope
+        ):
+            raise _error(
+                "PPT_RUNTIME_OUTPUT_DEFINITION_INVALID",
+                "the deterministic output definition disagrees with its producer",
+            )
+        return DeterministicNodeDefinition(
+            content_release_id=release.id,
+            workflow_definition_version_id=execution.workflow_definition_version_id,
+            node_key=execution.node_key,
+            execution_scope=node.execution_scope,
+            branch_key=node.branch_key,
+            executor_ref=executor_ref,
+            input_contract_refs=tuple(node.input_contract_refs),
+            output_contract_refs=tuple(node.output_contract_refs),
+            node_binding=node.binding,
+            content_definition_version_id=definition.id,
+            content_definition_key=definition.definition_key,
+            output_schema=cast(Mapping[str, Any], definition.schema_json),
+        )
+
+    def _published_release(self, execution: WorkflowExecutionContext) -> ContentRelease:
         release = self._session.scalar(
             select(ContentRelease).where(
                 ContentRelease.id == execution.content_release_id,
@@ -85,6 +117,12 @@ class SqlAlchemyDeterministicDefinitionReader:
                 "PPT_RUNTIME_RELEASE_UNPUBLISHED",
                 "the fixed content release is not published",
             )
+        return release
+
+    def _registered_workflow(
+        self,
+        execution: WorkflowExecutionContext,
+    ) -> RegisteredWorkflow:
         graph = self._workflow.published_graph(execution.workflow_definition_version_id)
         try:
             registered = BUILTIN_WORKFLOW_REGISTRY.load(dict(graph))
@@ -94,6 +132,13 @@ class SqlAlchemyDeterministicDefinitionReader:
                 getattr(exc, "code", "PPT_RUNTIME_WORKFLOW_UNSUPPORTED"),
                 "the fixed workflow cannot drive deterministic output persistence",
             ) from exc
+        return registered
+
+    @staticmethod
+    def _deterministic_node(
+        registered: RegisteredWorkflow,
+        execution: WorkflowExecutionContext,
+    ) -> tuple[WorkflowNodeDefinition, str]:
         node = registered.node_by_key.get(execution.node_key)
         if node is None or node.execution_kind != "deterministic":
             raise _error(
@@ -106,6 +151,13 @@ class SqlAlchemyDeterministicDefinitionReader:
                 "PPT_RUNTIME_EXECUTOR_UNDECLARED",
                 "the deterministic node has no fixed executor",
             )
+        return node, executor_ref
+
+    @staticmethod
+    def _output_binding(
+        registered: RegisteredWorkflow,
+        execution: WorkflowExecutionContext,
+    ) -> WorkflowOutputDefinitionBinding:
         output_bindings = [
             value
             for value in registered.output_definition_index.values()
@@ -116,7 +168,13 @@ class SqlAlchemyDeterministicDefinitionReader:
                 "PPT_RUNTIME_OUTPUT_DEFINITION_INVALID",
                 "the deterministic node must resolve exactly one output definition",
             )
-        output = output_bindings[0]
+        return output_bindings[0]
+
+    def _content_definition(
+        self,
+        release: ContentRelease,
+        output: WorkflowOutputDefinitionBinding,
+    ) -> ContentDefinitionVersion:
         package_ids = tuple(
             self._session.scalars(
                 select(ContentReleaseItem.content_package_version_id)
@@ -143,31 +201,7 @@ class SqlAlchemyDeterministicDefinitionReader:
                 "PPT_RUNTIME_OUTPUT_DEFINITION_INVALID",
                 "the fixed deterministic output definition is missing or ambiguous",
             )
-        definition = definitions[0]
-        if (
-            output.generation_template_key is not None
-            or node.branch_key is None
-            or output.producer_branch_key != node.branch_key
-            or output.execution_scope != node.execution_scope
-        ):
-            raise _error(
-                "PPT_RUNTIME_OUTPUT_DEFINITION_INVALID",
-                "the deterministic output definition disagrees with its producer",
-            )
-        return DeterministicNodeDefinition(
-            content_release_id=release.id,
-            workflow_definition_version_id=execution.workflow_definition_version_id,
-            node_key=execution.node_key,
-            execution_scope=node.execution_scope,
-            branch_key=node.branch_key,
-            executor_ref=executor_ref,
-            input_contract_refs=tuple(node.input_contract_refs),
-            output_contract_refs=tuple(node.output_contract_refs),
-            node_binding=node.binding,
-            content_definition_version_id=definition.id,
-            content_definition_key=definition.definition_key,
-            output_schema=cast(Mapping[str, Any], definition.schema_json),
-        )
+        return definitions[0]
 
 
 def _error(code: str, message: str) -> DeterministicDefinitionError:

@@ -127,25 +127,61 @@ class ArtifactQualityApprovalGuard:
         content_release_id: UUID,
         workflow_definition_version_id: UUID,
     ) -> dict[str, str]:
+        gate = self._declared_gate(
+            artifact,
+            content_release_id=content_release_id,
+            workflow_definition_version_id=workflow_definition_version_id,
+        )
+        if gate is None:
+            return {}
+        source = self._approval_source(artifact, version, gate)
+        report = self._required_report(
+            artifact,
+            source,
+            workflow_definition_version_id=workflow_definition_version_id,
+            gate=gate,
+        )
+        self._require_exact_report(
+            report,
+            artifact=artifact,
+            version=version,
+            source=source,
+            content_release_id=content_release_id,
+            workflow_definition_version_id=workflow_definition_version_id,
+            gate=gate,
+        )
+        return _quality_evidence(report, source)
+
+    def _declared_gate(
+        self,
+        artifact: Artifact,
+        *,
+        content_release_id: UUID,
+        workflow_definition_version_id: UUID,
+    ) -> DeclaredArtifactQualityGate | None:
         definition_key = self._definitions.definition_key(
             definition_id=artifact.content_definition_version_id,
             content_release_id=content_release_id,
         )
         if definition_key is None:
             raise self._invalid_gate("the artifact content definition is outside its fixed release")
-        graph = self._workflows.published_graph(
-            workflow_definition_version_id,
-        )
+        graph = self._workflows.published_graph(workflow_definition_version_id)
         if graph is None:
             raise self._invalid_gate("the fixed workflow definition is unavailable")
         try:
             registered = BUILTIN_WORKFLOW_REGISTRY.load(graph)
-            gate = resolve_declared_quality_gate(registered, definition_key)
+            return resolve_declared_quality_gate(registered, definition_key)
         except (ArtifactQualityGateError, WorkflowDefinitionError, TypeError) as exc:
             raise self._invalid_gate(str(exc)) from exc
-        if gate is None:
-            return {}
-        source = self._approval_source(artifact, version, gate)
+
+    def _required_report(
+        self,
+        artifact: Artifact,
+        source: ApprovalQualitySource,
+        *,
+        workflow_definition_version_id: UUID,
+        gate: DeclaredArtifactQualityGate,
+    ) -> QualityApprovalEvidence:
         report = self._reports.find_exact(
             project_id=artifact.project_id,
             source_type=source.source_type,
@@ -165,26 +201,7 @@ class ArtifactQualityApprovalGuard:
                 code="ARTIFACT_QUALITY_FAILED",
                 message="The current submitted artifact version did not pass its quality gate.",
             )
-        self._require_exact_report(
-            report,
-            artifact=artifact,
-            version=version,
-            source=source,
-            content_release_id=content_release_id,
-            workflow_definition_version_id=workflow_definition_version_id,
-            gate=gate,
-        )
-        evidence = {
-            "report_id": str(report.report_id),
-            "evidence_hash": report.evidence_hash,
-        }
-        if source.source_type == "asset":
-            evidence.update(
-                source_type="asset",
-                source_file_asset_version_id=str(source.version_id),
-                source_content_hash=source.content_hash,
-            )
-        return evidence
+        return report
 
     def _require_exact_report(
         self,
@@ -264,6 +281,24 @@ class ArtifactQualityApprovalGuard:
             code="ARTIFACT_QUALITY_GATE_INVALID",
             message=f"The artifact quality gate is invalid: {message}.",
         )
+
+
+def _quality_evidence(
+    report: QualityApprovalEvidence,
+    source: ApprovalQualitySource,
+) -> dict[str, str]:
+    evidence = {
+        "report_id": str(report.report_id),
+        "evidence_hash": report.evidence_hash,
+    }
+    if source.source_type == "asset":
+        evidence.update(
+            source_type="asset",
+            source_file_asset_version_id=str(source.version_id),
+            source_content_hash=source.content_hash,
+        )
+    return evidence
+
 
 def _accepted_conclusions(
     registered: RegisteredWorkflow,

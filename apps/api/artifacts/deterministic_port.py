@@ -257,22 +257,11 @@ class SqlAlchemyDeterministicArtifactPort:
                 "PPT_RUNTIME_RESULT_CONFLICT",
                 "the deterministic node already owns another artifact result",
             )
-        version_no = (
-            int(
-                self._session.scalar(
-                    select(func.coalesce(func.max(ArtifactVersion.version_no), 0)).where(
-                        ArtifactVersion.artifact_id == artifact.id
-                    )
-                )
-                or 0
-            )
-            + 1
-        )
         version = ArtifactVersion(
             id=new_uuid7(),
             organization_id=self._actor.organization_id,
             artifact_id=artifact.id,
-            version_no=version_no,
+            version_no=self._next_version_no(artifact.id),
             content_json=content,
             content_hash=content_hash,
             render_summary_json={},
@@ -294,6 +283,14 @@ class SqlAlchemyDeterministicArtifactPort:
         )
         self._submit(artifact, version)
         return version
+
+    def _next_version_no(self, artifact_id: UUID) -> int:
+        latest = self._session.scalar(
+            select(func.coalesce(func.max(ArtifactVersion.version_no), 0)).where(
+                ArtifactVersion.artifact_id == artifact_id
+            )
+        )
+        return int(latest or 0) + 1
 
     def _submit(self, artifact: Artifact, version: ArtifactVersion) -> None:
         self._session.add(

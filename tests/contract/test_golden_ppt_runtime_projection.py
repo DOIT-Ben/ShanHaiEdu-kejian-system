@@ -22,8 +22,7 @@ def test_golden_runtime_projection_preserves_the_exact_ten_page_facts() -> None:
         page["asset_requirements"][0]["target_slot"] for page in case["ppt"]["page_specs"]
     ]
     assert all(
-        re.fullmatch(SEMANTIC_KEY_PATTERN, cast(str, page["background_slot"]))
-        for page in pages
+        re.fullmatch(SEMANTIC_KEY_PATTERN, cast(str, page["background_slot"])) for page in pages
     )
     assert [page["editable_elements"] for page in pages] == [
         page["editable_elements"] for page in case["ppt"]["page_specs"]
