@@ -13,7 +13,7 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "pnpm dev --host 127.0.0.1 --port 4176 --strictPort",
+    command: "corepack pnpm dev --host 127.0.0.1 --port 4176 --strictPort",
     env: {
       VITE_API_BASE_URL: "/api/v2",
       VITE_API_MODE: "real",
