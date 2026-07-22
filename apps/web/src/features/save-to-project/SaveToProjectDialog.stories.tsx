@@ -1,5 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { SaveToProjectDialog } from "@/features/save-to-project/SaveToProjectDialog";
+import {
+  SaveConflictNotice,
+  SaveToProjectDialog,
+} from "@/features/save-to-project/SaveToProjectDialog";
 
 const meta = {
   title: "业务组件/保存到项目",
@@ -25,4 +28,12 @@ export const LessonPresentationPage: Story = {
       type: "ppt_page",
     },
   },
+};
+
+export const SaveConflict: Story = {
+  render: () => (
+    <div className="mx-auto max-w-lg bg-[var(--sh-surface-elevated)] p-6">
+      <SaveConflictNotice canAppendToShared onModeChange={() => undefined} replaceMode="replace" />
+    </div>
+  ),
 };

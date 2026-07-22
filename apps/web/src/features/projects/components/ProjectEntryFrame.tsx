@@ -6,6 +6,7 @@ export type ProjectSourceMode = "textbook" | "anchor";
 type ProjectEntryFrameProps = {
   children: ReactNode;
   description?: string;
+  disabled?: boolean;
   eyebrow?: string;
   onSourceModeChange: (mode: ProjectSourceMode) => void;
   sourceMode: ProjectSourceMode;
@@ -24,6 +25,7 @@ const sourceOptions: ReadonlyArray<{
 export function ProjectEntryFrame({
   children,
   description = "先确定课程范围；有教材时上传 PDF，没有教材时可直接用课程锚点创建。",
+  disabled = false,
   eyebrow,
   onSourceModeChange,
   sourceMode,
@@ -32,14 +34,14 @@ export function ProjectEntryFrame({
   return (
     <div className="mx-auto max-w-[1120px] px-4 py-5 md:px-6 lg:px-8">
       <FocusPageHeader description={description} eyebrow={eyebrow} title={title} />
-      <fieldset className="mt-5">
+      <fieldset className="mt-5" disabled={disabled}>
         <legend className="text-sm font-semibold text-[var(--sh-ink-strong)]">课程内容来源</legend>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {sourceOptions.map((option) => {
             const selected = sourceMode === option.value;
             return (
               <label
-                className={`flex cursor-pointer items-start gap-3 rounded-[var(--sh-radius-md)] border px-4 py-3 transition-colors ${selected ? "border-[var(--sh-action-primary)] bg-[var(--sh-brand-50)]" : "border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)] hover:bg-[var(--sh-surface-soft)]"}`}
+                className={`flex cursor-pointer items-start gap-3 rounded-[var(--sh-radius-md)] border px-4 py-3 transition-colors disabled:cursor-not-allowed ${selected ? "border-[var(--sh-action-primary)] bg-[var(--sh-brand-50)]" : "border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)] hover:bg-[var(--sh-surface-soft)]"}`}
                 key={option.value}
               >
                 <input

@@ -38,7 +38,7 @@ export function WorkbenchStatusBoard({
 }: WorkbenchStatusBoardProps) {
   if (state === "loading") {
     return (
-      <div aria-label="正在读取节点状态" className="mt-3 grid gap-2" role="status">
+      <div aria-label="正在读取制作进度" className="mt-3 grid gap-2" role="status">
         <div className="h-11 animate-pulse rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-soft)] motion-reduce:animate-none" />
         <div className="h-11 animate-pulse rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-soft)] motion-reduce:animate-none" />
       </div>
@@ -47,7 +47,7 @@ export function WorkbenchStatusBoard({
   if (state === "error") {
     return (
       <p
-        aria-label="节点状态读取失败"
+        aria-label="制作进度读取失败"
         className="mt-3 flex items-center gap-2 rounded-[var(--sh-radius-sm)] bg-[var(--sh-danger-soft)] px-3 py-3 text-sm text-[var(--sh-danger-strong)]"
         role="alert"
       >
@@ -64,7 +64,7 @@ export function WorkbenchStatusBoard({
     );
   }
   return (
-    <ul className="mt-3 grid gap-2" aria-label="当前节点状态">
+    <ul className="mt-3 grid gap-2" aria-label="当前制作任务">
       {items.map((item) => (
         <li
           className="flex items-center justify-between gap-3 rounded-[var(--sh-radius-sm)] border border-[var(--sh-line-subtle)] px-3 py-3"

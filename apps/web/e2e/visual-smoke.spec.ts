@@ -348,7 +348,7 @@ test("390 核心页面优先展示下一步与可操作内容", async ({ page })
   expect(settingsDimensions.scrollWidth).toBeLessThanOrEqual(settingsDimensions.clientWidth + 1);
 
   await page.goto("/app/projects/new");
-  await waitForStablePage(page, "新建课堂项目", "项目信息");
+  await waitForStablePage(page, "新建课堂项目", "这节课讲什么");
   await expect(page.getByRole("combobox", { name: "年级" })).toHaveCount(1);
   await expect(page.getByRole("combobox", { name: "教材版本" })).toHaveCount(1);
   const nextStep = page.getByRole("button", { name: "下一步：上传教材" });

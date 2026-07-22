@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { WorkbenchStatusBoard } from "@/features/workbench/components/WorkbenchStatusBoard";
 
 const meta = {
-  title: "工作台/节点状态板",
+  title: "工作台/制作进度板",
   component: WorkbenchStatusBoard,
   args: {
     items: [

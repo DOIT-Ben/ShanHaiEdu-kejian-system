@@ -15,9 +15,10 @@ import { createProject } from "@/features/projects/api/projectsApi";
 import { projectKeys } from "@/features/projects/hooks/useProjectsQuery";
 import { ProjectEntryFrame } from "@/features/projects/components/ProjectEntryFrame";
 import {
-  RuntimeProjectEntryForm,
-  type ProjectEntryFormValues,
-} from "@/features/projects/components/RuntimeProjectEntryForm";
+  ProjectEntryForm,
+  type ProjectEntryField,
+  type ProjectEntryValues,
+} from "@/features/projects/components/ProjectEntryForm";
 import { isCsrfTokenAvailable } from "@/shared/api/client";
 import { Button } from "@/shared/ui/Button";
 import {
@@ -45,8 +46,21 @@ const projectSchema = z.object({
   title: z.string().min(2, "请输入项目名称"),
 });
 
-type ProjectForm = z.infer<typeof projectSchema> & ProjectEntryFormValues;
+type ProjectForm = z.infer<typeof projectSchema>;
 type SubmitStage = RuntimeNewProjectStage;
+
+const modeOptions = [
+  { detail: "每一步都由你确认", label: "边看边确认", value: "guided" },
+  { detail: "可随时暂停并回来检查", label: "自动推进", value: "automatic" },
+] as const;
+
+const stageLabels: Record<RuntimeNewProjectStage, string> = {
+  checking: "正在核对教材",
+  confirming: "正在建立课堂任务",
+  creating: "正在创建课程",
+  idle: "创建项目并上传教材",
+  uploading: "正在上传教材",
+};
 
 function normalizeForm(
   value: Partial<ProjectForm>,
@@ -108,11 +122,9 @@ export function RuntimeNewProjectPage() {
   );
 
   const {
-    control,
     formState: { errors },
     getValues,
     handleSubmit,
-    register,
     reset,
     setValue,
     watch,
@@ -326,11 +338,26 @@ export function RuntimeNewProjectPage() {
   const canContinueJob = Boolean(recovery.projectId && recovery.jobId);
   const writeReady = isCsrfTokenAvailable();
   const submitting = stage !== "idle";
-  const sourceMode = watch("sourceMode");
-  const anchorSummary = `${watch("grade")} · ${watch("textbookEdition")} · ${watch("knowledgePoint") || "待填写知识点"}`;
+  const formValues = watch();
+  const sourceMode = formValues.sourceMode;
+  const anchorSummary = `${formValues.grade} · ${formValues.textbookEdition} · ${formValues.knowledgePoint || "待填写知识点"}`;
+  const setField = (field: ProjectEntryField, value: string) => {
+    setValue(field, value, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  };
+  const entryValues: ProjectEntryValues = {
+    executionMode: formValues.executionMode,
+    grade: formValues.grade,
+    knowledgePoint: formValues.knowledgePoint,
+    textbookEdition: formValues.textbookEdition,
+    title: formValues.title,
+  };
 
   return (
     <ProjectEntryFrame
+      disabled={submitting}
       onSourceModeChange={(mode) =>
         setValue("sourceMode", mode, { shouldDirty: true, shouldValidate: true })
       }
@@ -372,20 +399,26 @@ export function RuntimeNewProjectPage() {
         </p>
       ) : null}
 
-      <RuntimeProjectEntryForm
+      <ProjectEntryForm
         anchorSummary={anchorSummary}
-        control={control}
-        errors={errors}
+        busy={submitting}
+        errors={{
+          knowledgePoint: errors.knowledgePoint?.message,
+          title: errors.title?.message,
+        }}
         file={file}
-        message={message}
+        message={message || (!writeReady ? "暂时无法保存，请刷新页面后重试。" : "")}
+        modeOptions={modeOptions}
+        onFieldChange={setField}
         onFileChange={selectFile}
         onSubmit={(event) => void submit(event)}
         recoveredFileName={recovery.file?.name}
-        register={register}
         sourceMode={sourceMode}
-        stage={stage}
-        submitting={submitting}
-        writeReady={writeReady}
+        submitDisabled={!writeReady || (sourceMode === "textbook" && !file)}
+        submitLabel={
+          stage === "idle" && sourceMode === "anchor" ? "创建课程项目" : stageLabels[stage]
+        }
+        values={entryValues}
       />
     </ProjectEntryFrame>
   );

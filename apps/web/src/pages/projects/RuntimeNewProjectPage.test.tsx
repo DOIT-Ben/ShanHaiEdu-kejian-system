@@ -143,10 +143,12 @@ describe("RuntimeNewProjectPage recovery", () => {
     expect(await screen.findByRole("button", { name: "正在上传教材" })).toBeDisabled();
     expect(screen.getByLabelText("项目名称")).toBeDisabled();
     expect(screen.getByLabelText("知识点")).toBeDisabled();
-    expect(screen.getByRole("combobox", { name: "选择年级" })).toBeDisabled();
-    expect(screen.getByRole("combobox", { name: "选择教材版本" })).toBeDisabled();
-    expect(screen.getByRole("combobox", { name: "选择制作方式" })).toBeDisabled();
-    expect(fileInput).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "年级" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "教材版本" })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: /边看边确认/ })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: /自动推进/ })).toBeDisabled();
+    expect(fileInput).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "移除教材文件" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "重新开始" })).toBeDisabled();
   });
 

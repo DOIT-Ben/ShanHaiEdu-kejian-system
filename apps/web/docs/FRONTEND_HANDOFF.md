@@ -21,7 +21,7 @@
 - 基础控件：`Button`、`IconButton`、`Select`、`StatusBadge`、`EmptyState`。
 - 全局布局：`AppShell` 是产品壳；`GlobalAppShell` 与 `RuntimeAppShell` 只负责账号、搜索和通知 adapter。
 - 工作台：`LessonWorkbenchSummary`、`ProjectStepNavigation`、`WorkbenchStatusBoard`、`TaskStatusBar`、`ContextDrawer`。
-- 项目：`ProjectEntryFrame`、`ProjectRow`、`ProjectLessonGrid` 是数据源无关展示组件；页面只负责表单、查询和事件映射。
+- 项目：`ProjectEntryFrame`、`ProjectEntryForm`、`ProjectRow`、`ProjectLessonGrid` 是数据源无关展示组件；页面只负责查询、提交、恢复和字段事件映射。
 - 项目与成果：素材、结果和交付页面位于对应 feature/page 目录。
 - 创作台：`CreationComposer`、`CreationResultsPanel`、`ProjectAssetDrawer` 和 `CreationParameterBar`。
 - 内容渲染：`ContentDefinitionRenderer`、`MarkdownDocument`、`artifactPreviewRegistry`。
@@ -30,7 +30,7 @@
 
 `src/app/App.tsx` 是唯一分流点。只有开发环境且 `VITE_API_MODE=mock` 时才加载 `MockApp`；生产构建和 `VITE_API_MODE=real` 只加载 `RuntimeApp`。MockRuntime、MSW、演示凭据、确定性任务计时器和本地保存冲突不得进入真实页面，也不能被描述成后端能力。
 
-Runtime 页面只消费 `features/*/api` 的类型化客户端和 TanStack Query。`ProjectEntryFrame`、`ProjectLessonGrid`、`ProjectRow`、`LessonWorkbenchSummary` 和 `WorkbenchStatusBoard` 不读取 API 或 MockRuntime；Storybook、MSW 页面与 Runtime adapter 都通过 props 和用户意图回调驱动它们。Mock 与 Runtime 不共享 Mock 状态写入函数，颜色、图标和语义文案只在共用组件中维护。
+Runtime 页面只消费 `features/*/api` 的类型化客户端和 TanStack Query。`ProjectEntryFrame`、`ProjectEntryForm`、`ProjectLessonGrid`、`ProjectRow`、`LessonWorkbenchSummary` 和 `WorkbenchStatusBoard` 不读取 API 或 MockRuntime；Storybook、MSW 页面与 Runtime adapter 都通过 props 和用户意图回调驱动它们。Mock 与 Runtime 不共享 Mock 状态写入函数，颜色、图标和语义文案只在共用组件中维护。
 
 ## 前端状态模型
 

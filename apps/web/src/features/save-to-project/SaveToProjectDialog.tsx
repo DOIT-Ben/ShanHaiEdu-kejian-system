@@ -56,6 +56,48 @@ const slots: SaveSlot[] = [
   { accepts: ["document"], key: "project.documents", label: "项目文档" },
 ];
 
+export function SaveConflictNotice({
+  canAppendToShared,
+  onModeChange,
+  replaceMode,
+}: {
+  canAppendToShared: boolean;
+  onModeChange: (mode: "replace" | "append") => void;
+  replaceMode: "replace" | "append";
+}) {
+  return (
+    <div className="rounded-[var(--sh-radius-sm)] border border-[var(--sh-warning)]/30 bg-[var(--sh-warning-soft)] p-4">
+      <p className="flex items-center gap-2 text-sm font-semibold text-[var(--sh-ink-strong)]">
+        <AlertTriangle aria-hidden="true" className="size-4 text-[var(--sh-warning)]" />
+        该位置已有当前作品
+      </p>
+      <p className="mt-2 text-sm text-[var(--sh-ink-muted)]">
+        替换会保留原版本，并提示受影响的 PPTX 重新导出。
+      </p>
+      <div className="mt-3 grid gap-2">
+        <label className="flex cursor-pointer items-center gap-2 rounded-md bg-[var(--sh-surface-elevated)] p-3 text-sm">
+          <input
+            checked={replaceMode === "replace"}
+            onChange={() => onModeChange("replace")}
+            type="radio"
+          />
+          替换当前版本，保留历史
+        </label>
+        {canAppendToShared ? (
+          <label className="flex cursor-pointer items-center gap-2 rounded-md bg-[var(--sh-surface-elevated)] p-3 text-sm">
+            <input
+              checked={replaceMode === "append"}
+              onChange={() => onModeChange("append")}
+              type="radio"
+            />
+            另存为项目通用素材
+          </label>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function SaveToProjectDialog({
   allowedSlotKeys,
   customSlots,
@@ -216,35 +258,11 @@ export function SaveToProjectDialog({
               />
             </label>
             {conflict ? (
-              <div className="rounded-[var(--sh-radius-sm)] border border-[var(--sh-warning)]/30 bg-[var(--sh-warning-soft)] p-4">
-                <p className="flex items-center gap-2 text-sm font-semibold text-[var(--sh-ink-strong)]">
-                  <AlertTriangle aria-hidden="true" className="size-4 text-[var(--sh-warning)]" />
-                  该位置已有当前作品
-                </p>
-                <p className="mt-2 text-sm text-[var(--sh-ink-muted)]">
-                  替换会保留原版本，并提示受影响的 PPTX 重新导出。
-                </p>
-                <div className="mt-3 grid gap-2">
-                  <label className="flex cursor-pointer items-center gap-2 rounded-md bg-[var(--sh-surface-elevated)] p-3 text-sm">
-                    <input
-                      checked={replaceMode === "replace"}
-                      onChange={() => setReplaceMode("replace")}
-                      type="radio"
-                    />
-                    替换当前版本，保留历史
-                  </label>
-                  {canAppendToShared ? (
-                    <label className="flex cursor-pointer items-center gap-2 rounded-md bg-[var(--sh-surface-elevated)] p-3 text-sm">
-                      <input
-                        checked={replaceMode === "append"}
-                        onChange={() => setReplaceMode("append")}
-                        type="radio"
-                      />
-                      另存为项目通用素材
-                    </label>
-                  ) : null}
-                </div>
-              </div>
+              <SaveConflictNotice
+                canAppendToShared={canAppendToShared}
+                onModeChange={setReplaceMode}
+                replaceMode={replaceMode}
+              />
             ) : null}
           </div>
           <div className="mt-7 flex justify-end gap-2">

@@ -1,17 +1,19 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, FileText, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { createProject } from "@/features/projects/api/projectsApi";
+import {
+  ProjectEntryForm,
+  type ProjectEntryField,
+} from "@/features/projects/components/ProjectEntryForm";
 import { ProjectEntryFrame } from "@/features/projects/components/ProjectEntryFrame";
 import { projectKeys } from "@/features/projects/hooks/useProjectsQuery";
 import { apiConfig } from "@/shared/api/config";
 import { addMockTextbookFile } from "@/shared/api/mocks/runtime";
 import { Button } from "@/shared/ui/Button";
-import { Select } from "@/shared/ui/Select";
 
 const projectSchema = z.object({
   title: z.string().min(2, "请输入项目名称"),
@@ -24,6 +26,12 @@ const projectSchema = z.object({
 
 type ProjectForm = z.infer<typeof projectSchema>;
 
+const modeOptions = [
+  { detail: "每一步都由你开始", label: "每步确认", value: "manual" },
+  { detail: "系统准备，你来确认", label: "系统先准备", value: "assisted" },
+  { detail: "可随时暂停并回来检查", label: "自动推进", value: "automatic" },
+] as const;
+
 export function NewProjectPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -35,10 +43,8 @@ export function NewProjectPage() {
   const createIntentFingerprint = useRef("");
   const createProjectMutation = useMutation({ mutationFn: createProject });
   const {
-    control,
     formState: { errors, isSubmitting },
     handleSubmit,
-    register,
     setValue,
     watch,
   } = useForm<ProjectForm>({
@@ -46,8 +52,10 @@ export function NewProjectPage() {
     defaultValues: {
       automationMode: "assisted",
       grade: "六年级",
+      knowledgePoint: "",
       sourceMode: "textbook",
       textbookEdition: "人教版",
+      title: "",
     },
   });
 
@@ -71,11 +79,11 @@ export function NewProjectPage() {
       return;
     }
     const input = {
-      title: values.title,
-      knowledge_point: values.knowledgePoint,
-      grade: values.grade,
-      textbook_edition: values.textbookEdition,
       automation_mode: values.automationMode,
+      grade: values.grade,
+      knowledge_point: values.knowledgePoint,
+      textbook_edition: values.textbookEdition,
+      title: values.title,
     };
     const fingerprint = JSON.stringify({
       file: file ? [file.name, file.size, file.lastModified] : null,
@@ -98,10 +106,10 @@ export function NewProjectPage() {
     createIntentKey.current = crypto.randomUUID();
     if (file && values.sourceMode === "textbook") {
       addMockTextbookFile(project.id, {
+        lastModified: file.lastModified,
         name: file.name,
         size: file.size,
         type: file.type,
-        lastModified: file.lastModified,
       });
     }
     await queryClient.invalidateQueries({ queryKey: projectKeys.all });
@@ -132,250 +140,67 @@ export function NewProjectPage() {
     setFileError("");
   };
 
-  const sourceMode = watch("sourceMode");
+  const values = watch();
+  const busy = isSubmitting || createProjectMutation.isPending;
+  const setField = (field: ProjectEntryField, value: string) => {
+    switch (field) {
+      case "executionMode":
+        setValue("automationMode", value as ProjectForm["automationMode"], {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+        break;
+      case "grade":
+      case "knowledgePoint":
+      case "textbookEdition":
+      case "title":
+        setValue(field, value, { shouldDirty: true, shouldValidate: true });
+        break;
+    }
+  };
 
   return (
     <ProjectEntryFrame
+      disabled={busy}
       eyebrow="新项目"
       onSourceModeChange={(mode) => {
         setValue("sourceMode", mode, { shouldDirty: true, shouldValidate: true });
         if (mode === "anchor") setFileError("");
       }}
-      sourceMode={sourceMode}
+      sourceMode={values.sourceMode}
     >
       {createProjectMutation.isError ? (
-        <div className="mt-6 rounded-[var(--sh-radius-sm)] bg-[var(--sh-danger-soft)] p-4 text-sm text-[var(--sh-danger)]">
+        <div className="mt-5 rounded-[var(--sh-radius-sm)] bg-[var(--sh-danger-soft)] p-4 text-sm text-[var(--sh-danger)]">
           项目暂时无法创建，已保留你填写的内容。请检查网络后重试。
         </div>
       ) : null}
-
-      <form
-        className="mt-6 grid gap-5 lg:grid-cols-[1.15fr_0.85fr]"
-        onSubmit={(event) => {
-          void submit(event);
+      <ProjectEntryForm
+        anchorSummary={`${values.grade} · ${values.textbookEdition} · ${values.knowledgePoint || "待填写知识点"}`}
+        busy={busy}
+        disabled={apiConfig.mode !== "mock"}
+        errors={{
+          knowledgePoint: errors.knowledgePoint?.message,
+          title: errors.title?.message,
         }}
-      >
-        <section className="space-y-5 rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-5 md:p-6">
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--sh-ink-strong)]">项目信息</h2>
-            <p className="mt-1 text-sm text-[var(--sh-ink-muted)]">
-              先说明要讲什么，稍后仍可修改。
-            </p>
-          </div>
-
-          <label className="block">
-            <span className="text-sm font-semibold text-[var(--sh-ink-strong)]">项目名称</span>
-            <input
-              aria-invalid={Boolean(errors.title)}
-              className="mt-2 min-h-10 w-full rounded-[var(--sh-radius-sm)] border border-[var(--sh-line-default)] px-3 outline-none focus:border-[var(--sh-brand-500)]"
-              placeholder="例如：认识百分数"
-              {...register("title")}
-            />
-            {errors.title ? (
-              <span className="mt-1 block text-sm text-[var(--sh-danger)]">
-                {errors.title.message}
-              </span>
-            ) : null}
-          </label>
-
-          <label className="block">
-            <span className="text-sm font-semibold text-[var(--sh-ink-strong)]">知识点</span>
-            <input
-              aria-invalid={Boolean(errors.knowledgePoint)}
-              className="mt-2 min-h-10 w-full rounded-[var(--sh-radius-sm)] border border-[var(--sh-line-default)] px-3 outline-none focus:border-[var(--sh-brand-500)]"
-              placeholder="这份教材主要讲什么？"
-              {...register("knowledgePoint")}
-            />
-            {errors.knowledgePoint ? (
-              <span className="mt-1 block text-sm text-[var(--sh-danger)]">
-                {errors.knowledgePoint.message}
-              </span>
-            ) : null}
-          </label>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className="text-sm font-semibold text-[var(--sh-ink-strong)]">年级</span>
-              <Controller
-                control={control}
-                name="grade"
-                render={({ field }) => (
-                  <Select
-                    ariaLabel="年级"
-                    className="mt-2 w-full"
-                    onBlur={field.onBlur}
-                    onValueChange={field.onChange}
-                    options={["一年级", "二年级", "三年级", "四年级", "五年级", "六年级"].map(
-                      (grade) => ({ label: grade, value: grade }),
-                    )}
-                    value={field.value}
-                  />
-                )}
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm font-semibold text-[var(--sh-ink-strong)]">教材版本</span>
-              <Controller
-                control={control}
-                name="textbookEdition"
-                render={({ field }) => (
-                  <Select
-                    ariaLabel="教材版本"
-                    className="mt-2 w-full"
-                    onBlur={field.onBlur}
-                    onValueChange={field.onChange}
-                    options={["人教版", "北师大版", "苏教版", "冀教版"].map((edition) => ({
-                      label: edition,
-                      value: edition,
-                    }))}
-                    value={field.value}
-                  />
-                )}
-              />
-            </label>
-          </div>
-
-          <fieldset>
-            <legend className="text-sm font-semibold text-[var(--sh-ink-strong)]">
-              我想怎么推进
-            </legend>
-            <div className="mt-2 grid gap-2 sm:grid-cols-3">
-              {[
-                ["manual", "每步确认", "每一步都由你开始"],
-                ["assisted", "系统先准备", "推荐：系统准备，你来确认"],
-                ["automatic", "自动推进", "可随时暂停并回来检查"],
-              ].map(([value, label, detail]) => (
-                <label
-                  className="cursor-pointer rounded-[var(--sh-radius-sm)] border border-[var(--sh-line-default)] p-2.5 has-[:checked]:border-[var(--sh-brand-500)] has-[:checked]:bg-[var(--sh-brand-50)]"
-                  key={value}
-                >
-                  <input
-                    className="sr-only"
-                    type="radio"
-                    value={value}
-                    {...register("automationMode")}
-                  />
-                  <span className="block text-sm font-semibold text-[var(--sh-ink-strong)]">
-                    {label}
-                  </span>
-                  <span className="mt-1 block text-xs text-[var(--sh-ink-muted)]">{detail}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        </section>
-
-        <section
-          className="rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-5 md:p-6"
-          id="textbook-upload-step"
-          ref={uploadStepRef}
-        >
-          <h2 className="text-lg font-semibold text-[var(--sh-ink-strong)]">
-            {sourceMode === "textbook" ? "教材文件" : "课程范围"}
-          </h2>
-          <p className="mt-1 text-sm text-[var(--sh-ink-muted)]">
-            {sourceMode === "textbook"
-              ? "支持 PDF，建议只包含当前知识点的相关页。"
-              : "不上传教材，直接使用左侧填写的年级、版本和知识点。"}
-          </p>
-
-          {sourceMode === "anchor" ? (
-            <div className="mt-5 rounded-[var(--sh-radius-sm)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-soft)] p-4 text-sm leading-6 text-[var(--sh-ink-muted)]">
-              创建后将直接进入项目；不会显示教材上传或解析进度。
-            </div>
-          ) : file ? (
-            <div className="mt-6 rounded-[var(--sh-radius-sm)] border border-[var(--sh-success)] bg-[var(--sh-success-soft)] p-4">
-              <div className="flex items-center gap-3">
-                <span className="grid size-10 place-items-center rounded-md bg-[var(--sh-surface-elevated)] text-[var(--sh-success)]">
-                  <FileText aria-hidden="true" className="size-5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-[var(--sh-ink-strong)]">
-                    {file.name}
-                  </p>
-                  <p className="text-xs text-[var(--sh-ink-muted)]">
-                    {(file.size / 1024 / 1024).toFixed(1)} MB
-                  </p>
-                </div>
-                <button
-                  aria-label="移除教材文件"
-                  className="grid size-9 place-items-center rounded-md hover:bg-[var(--sh-surface-elevated)]"
-                  onClick={() => selectFile(null)}
-                  type="button"
-                >
-                  <X aria-hidden="true" className="size-4" />
-                </button>
-              </div>
-              <p className="mt-4 flex items-center gap-2 text-xs text-[var(--sh-success)]">
-                <CheckCircle2 aria-hidden="true" className="size-4" />
-                文件将在创建项目后上传并检查
-              </p>
-            </div>
-          ) : (
-            <label
-              className="mt-5 flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-[var(--sh-radius-sm)] border border-dashed border-[var(--sh-line-strong)] bg-[var(--sh-surface-soft)] px-6 text-center hover:border-[var(--sh-brand-300)] hover:bg-[var(--sh-brand-50)]"
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault();
-                selectFile(event.dataTransfer.files[0] ?? null);
-              }}
-            >
-              <span className="grid size-12 place-items-center rounded-full bg-[var(--sh-surface-elevated)] text-[var(--sh-brand-600)] shadow-sm">
-                <Upload aria-hidden="true" className="size-5" />
-              </span>
-              <strong className="mt-4 text-sm text-[var(--sh-ink-strong)]">
-                拖入或选择教材 PDF
-              </strong>
-              <span className="mt-1 text-xs text-[var(--sh-ink-muted)]">单个文件不超过 100 MB</span>
-              <input
-                aria-describedby={fileError ? "textbook-file-error" : undefined}
-                accept="application/pdf"
-                className="sr-only"
-                onChange={(event) => selectFile(event.target.files?.[0] ?? null)}
-                type="file"
-              />
-            </label>
-          )}
-
-          {fileError ? (
-            <p
-              className="mt-3 text-sm font-medium text-[var(--sh-danger)]"
-              id="textbook-file-error"
-              role="alert"
-            >
-              {fileError}
-            </p>
-          ) : null}
-
-          <Button
-            className="mt-6 w-full"
-            disabled={
-              apiConfig.mode !== "mock" ||
-              (sourceMode === "textbook" && !file) ||
-              isSubmitting ||
-              createProjectMutation.isPending
-            }
-            size="lg"
-            type="submit"
-          >
-            {apiConfig.mode !== "mock"
-              ? "教材上传暂时不可用"
-              : isSubmitting || createProjectMutation.isPending
-                ? "正在创建项目"
-                : sourceMode === "textbook"
-                  ? "创建项目并检查教材"
-                  : "创建课程项目"}
-          </Button>
-          <p className="mt-3 text-center text-xs text-[var(--sh-ink-faint)]">
-            {sourceMode === "anchor"
-              ? "课程范围会随项目保存；当前项目暂不能追加教材。"
-              : !file
-                ? "请先选择教材 PDF；创建后仍可确认教材范围和课时。"
-                : "创建后不会立即生成教案，你可以先确认教材范围和课时。"}
-          </p>
-        </section>
-      </form>
-      {sourceMode === "textbook" && !uploadStepVisible ? (
+        file={file}
+        fileError={fileError}
+        modeOptions={modeOptions}
+        onFieldChange={setField}
+        onFileChange={selectFile}
+        onSubmit={(event) => void submit(event)}
+        sourceMode={values.sourceMode}
+        submitDisabled={values.sourceMode === "textbook" && !file}
+        submitLabel={values.sourceMode === "textbook" ? "创建项目并检查教材" : "创建课程项目"}
+        uploadSectionRef={uploadStepRef}
+        values={{
+          executionMode: values.automationMode,
+          grade: values.grade,
+          knowledgePoint: values.knowledgePoint,
+          textbookEdition: values.textbookEdition,
+          title: values.title,
+        }}
+      />
+      {values.sourceMode === "textbook" && !uploadStepVisible ? (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--sh-line-default)] bg-[var(--sh-surface-canvas)]/95 px-3 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 shadow-[var(--sh-shadow-floating)] backdrop-blur-lg lg:hidden">
           <Button
             className="mx-auto flex w-full max-w-sm"
