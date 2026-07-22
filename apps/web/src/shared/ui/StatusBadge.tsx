@@ -98,7 +98,7 @@ const statusMeta: Record<
   },
 };
 
-export function StatusBadge({ status }: { status: WorkflowStatus }) {
+export function StatusBadge({ status, label }: { status: WorkflowStatus; label?: string }) {
   const meta = Object.hasOwn(statusMeta, status) ? statusMeta[status] : statusMeta.unknown;
   const Icon = meta.icon;
   return (
@@ -115,7 +115,7 @@ export function StatusBadge({ status }: { status: WorkflowStatus }) {
           meta.icon === LoaderCircle && "animate-spin motion-reduce:animate-none",
         )}
       />
-      {meta.label}
+      {label ?? meta.label}
     </span>
   );
 }

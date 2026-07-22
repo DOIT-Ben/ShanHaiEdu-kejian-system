@@ -15,6 +15,9 @@ type Story = StoryObj<typeof meta>;
 export const WaitingForTeacher: Story = {};
 export const Stale: Story = { args: { status: "stale" } };
 export const Unknown: Story = { args: { status: "unknown" } };
+export const RuntimeLabelOverride: Story = {
+  args: { label: "服务端已完成", status: "approved" },
+};
 export const AllStatuses: Story = {
   render: () => (
     <div className="flex max-w-2xl flex-wrap gap-3">

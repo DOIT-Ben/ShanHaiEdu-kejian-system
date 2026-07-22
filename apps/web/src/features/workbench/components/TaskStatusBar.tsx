@@ -1,6 +1,6 @@
-import { CircleAlert, LoaderCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useMockRuntime } from "@/shared/api/mocks/runtime";
+import { StatusBadge } from "@/shared/ui/StatusBadge";
 
 export function TaskStatusBar({ projectId }: { projectId: string }) {
   const tasks = useMockRuntime((state) => state.tasks);
@@ -23,19 +23,16 @@ export function TaskStatusBar({ projectId }: { projectId: string }) {
           className="flex items-center gap-1.5 font-medium text-[var(--sh-brand-700)] hover:underline"
           to={`/app/projects/${projectId}/tasks`}
         >
-          <LoaderCircle
-            aria-hidden="true"
-            className="size-3.5 animate-spin text-[var(--sh-brand-500)] motion-reduce:animate-none"
-          />
-          {activeCount} 项作品正在制作 · 查看任务
+          <StatusBadge label={`${String(activeCount)} 项作品制作中`} status="running" />
+          <span>查看任务</span>
         </Link>
       ) : actionCount > 0 ? (
         <Link
           className="flex items-center gap-1.5 font-medium text-[var(--sh-brand-700)] hover:underline"
           to={`/app/projects/${projectId}/tasks`}
         >
-          <CircleAlert aria-hidden="true" className="size-3.5 text-[var(--sh-warning)]" />
-          {actionCount} 项需要你处理 · 查看任务
+          <StatusBadge label={`${String(actionCount)} 项需要处理`} status="review_required" />
+          <span>查看任务</span>
         </Link>
       ) : null}
     </div>

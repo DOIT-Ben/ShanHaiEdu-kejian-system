@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, CircleDashed, Clock3, TriangleAlert } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { getLesson } from "@/features/lessons/api/lessonsApi";
 import { getProject } from "@/features/projects/api/projectsApi";
@@ -8,6 +8,7 @@ import { getProjectWorkflow } from "@/features/workflow/api/workflowApi";
 import { useProjectEvents } from "@/shared/api/useProjectEvents";
 import { buttonVariants } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
+import { WorkbenchStatusBoard } from "@/features/workbench/components/WorkbenchStatusBoard";
 
 const stepLabels: Record<string, string> = {
   lesson_plan: "教案",
@@ -15,39 +16,6 @@ const stepLabels: Record<string, string> = {
   ppt: "课堂 PPT",
   video: "课堂视频",
 };
-
-const nodeStatusLabels: Record<string, string> = {
-  not_started: "未开始",
-  ready: "待开始",
-  queued: "等待处理",
-  running: "正在处理",
-  succeeded: "已完成",
-  failed: "处理失败",
-  cancelled: "已取消",
-  paused: "已暂停",
-  stale: "内容已变化",
-};
-
-function nodeStatusIcon(status: string) {
-  if (status === "succeeded") return <CheckCircle2 aria-hidden="true" className="size-4" />;
-  if (["failed", "stale"].includes(status)) {
-    return <TriangleAlert aria-hidden="true" className="size-4" />;
-  }
-  if (["running", "queued", "paused"].includes(status)) {
-    return <Clock3 aria-hidden="true" className="size-4" />;
-  }
-  return <CircleDashed aria-hidden="true" className="size-4" />;
-}
-
-function nodeStatusClass(status: string) {
-  if (status === "succeeded") return "text-[var(--sh-success)] bg-[var(--sh-success-soft)]";
-  if (["failed", "stale"].includes(status))
-    return "text-[var(--sh-danger)] bg-[var(--sh-danger-soft)]";
-  if (["running", "queued", "paused"].includes(status)) {
-    return "text-[var(--sh-action-primary)] bg-[var(--sh-brand-50)]";
-  }
-  return "text-[var(--sh-ink-muted)] bg-[var(--sh-surface-soft)]";
-}
 
 export function RuntimeLessonWorkbenchPage() {
   const { lessonId, projectId, stepKey = "lesson_plan" } = useParams();
@@ -150,30 +118,13 @@ export function RuntimeLessonWorkbenchPage() {
 
             <div className="mt-6 border-t border-[var(--sh-line-subtle)] pt-5">
               <h3 className="text-sm font-semibold text-[var(--sh-ink-strong)]">服务端当前状态</h3>
-              {nodeRuns.length ? (
-                <ul className="mt-3 grid gap-2" aria-label="当前节点状态">
-                  {nodeRuns.map((node) => (
-                    <li
-                      className="flex items-center justify-between gap-3 rounded-[var(--sh-radius-sm)] border border-[var(--sh-line-subtle)] px-3 py-3"
-                      key={node.id}
-                    >
-                      <span className="min-w-0 truncate text-sm text-[var(--sh-ink-strong)]">
-                        {node.title || node.node_key}
-                      </span>
-                      <span
-                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ${nodeStatusClass(node.status)}`}
-                      >
-                        {nodeStatusIcon(node.status)}
-                        {nodeStatusLabels[node.status] ?? node.status}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-3 rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-soft)] px-3 py-3 text-sm leading-6 text-[var(--sh-ink-muted)]">
-                  这一步还没有服务端节点记录。先完成上游确认，系统才会创建可执行的制作任务。
-                </p>
-              )}
+              <WorkbenchStatusBoard
+                items={nodeRuns.map((node) => ({
+                  id: node.id,
+                  status: node.status,
+                  title: node.title || node.node_key,
+                }))}
+              />
             </div>
           </div>
         </section>
