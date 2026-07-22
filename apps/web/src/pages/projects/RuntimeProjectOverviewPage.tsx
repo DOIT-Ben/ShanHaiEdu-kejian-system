@@ -150,6 +150,19 @@ export function RuntimeProjectOverviewPage() {
                         </span>
                       ))}
                   </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {lesson.branches
+                      .filter((branch) => branch.enabled)
+                      .map((branch) => (
+                        <Link
+                          className={buttonVariants({ size: "sm", variant: "secondary" })}
+                          key={branch.branch_key}
+                          to={`/app/projects/${projectId}/lessons/${lesson.id}/work/${branch.branch_key}`}
+                        >
+                          查看{branchLabels[branch.branch_key]}
+                        </Link>
+                      ))}
+                  </div>
                 </article>
               ))}
             </div>

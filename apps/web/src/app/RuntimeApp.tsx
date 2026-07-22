@@ -24,6 +24,11 @@ const RuntimeProjectOverviewPage = lazy(() =>
     default: module.RuntimeProjectOverviewPage,
   })),
 );
+const RuntimeLessonWorkbenchPage = lazy(() =>
+  import("@/pages/projects/RuntimeLessonWorkbenchPage").then((module) => ({
+    default: module.RuntimeLessonWorkbenchPage,
+  })),
+);
 const RuntimeLoginPage = lazy(() =>
   import("@/pages/runtime/RuntimeLoginPage").then((module) => ({
     default: module.RuntimeLoginPage,
@@ -59,6 +64,10 @@ export function RuntimeApp() {
               <Route element={<RuntimeNewProjectPage />} path="projects/new" />
               <Route element={<RuntimeProjectSetupPage />} path="projects/:projectId/setup" />
               <Route element={<RuntimeProjectOverviewPage />} path="projects/:projectId" />
+              <Route
+                element={<RuntimeLessonWorkbenchPage />}
+                path="projects/:projectId/lessons/:lessonId/work/:stepKey"
+              />
               <Route element={<RuntimeUnavailablePage />} path="projects/:projectId/*" />
               <Route element={<RuntimeUnavailablePage />} path="creation/*" />
               <Route element={<RuntimeUnavailablePage />} path="tasks" />
