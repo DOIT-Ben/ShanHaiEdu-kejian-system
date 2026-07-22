@@ -662,10 +662,7 @@ def test_intro_approval_is_independent_from_selection() -> None:
         "accepted_conclusions": ["passed"],
     }
     assert approve["approval_policy"]["mode"] == "policy_allowed"
-    assert select["input_contract_refs"] == [
-        "artifact:intro_option_set",
-        "approval:intro_option_set",
-    ]
+    assert select["input_contract_refs"] == ["approval:intro_option_set"]
     assert select["output_contract_refs"] == ["selection:intro"]
     assert select["dependencies"] == ["intro.approve"]
     assert select["quality_requirement"] == {"mode": "none"}
@@ -727,7 +724,7 @@ def test_catalog_hash_is_deterministic_for_semantically_identical_objects() -> N
     assert first_validated.canonical_json == second_validated.canonical_json
     assert first_validated.content_hash == second_validated.content_hash
     assert first_validated.content_hash == (
-        "79610697638fcc78ae1d0db0ac8a98a5007ae50942af9f17a99ca1f8168dc105"
+        "8249b49fc0d5ee03d9a598851a15f8effec9ed89a2fb66b7abd863483529e623"
     )
 
 

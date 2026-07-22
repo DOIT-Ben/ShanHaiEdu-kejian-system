@@ -1128,7 +1128,6 @@
       "phase": "intro",
       "execution_kind": "human_gate",
       "input_contract_refs": [
-        "artifact:intro_option_set",
         "approval:intro_option_set"
       ],
       "output_contract_refs": [

@@ -206,6 +206,37 @@ def test_duplicate_logical_field_key_is_rejected(tmp_path: Path) -> None:
     assert_rejected(package_root, "PACKAGE_DUPLICATE_LOGICAL_KEY")
 
 
+@pytest.mark.parametrize("mutation", ["condition", "target", "overlap", "cross_overlap"])
+def test_invalid_conditional_input_requirement_is_rejected(tmp_path: Path, mutation: str) -> None:
+    package_root = copy_example(tmp_path)
+
+    def mutate(item: dict[str, Any]) -> None:
+        field_keys = [field["field_key"] for field in item["spec"]["fields"]]
+        condition_key, target_key = field_keys[:2]
+        requirement = {
+            "when": {"field_key": condition_key, "equals": "enabled"},
+            "required_fields": [target_key],
+        }
+        requirements = [requirement]
+        if mutation == "condition":
+            requirement["when"]["field_key"] = "missing.condition"
+        elif mutation == "target":
+            requirement["required_fields"] = ["missing.target"]
+        elif mutation == "overlap":
+            requirement["forbidden_fields"] = [target_key]
+        else:
+            requirements.append(
+                {
+                    "when": {"field_key": condition_key, "equals": "enabled"},
+                    "forbidden_fields": [target_key],
+                }
+            )
+        item["spec"]["conditional_requirements"] = requirements
+
+    update_item(package_root, "image_prompt.input", mutate)
+    assert_rejected(package_root, "PACKAGE_INPUT_CONDITION_INVALID")
+
+
 def test_projection_template_cannot_use_undeclared_variable(tmp_path: Path) -> None:
     package_root = copy_example(tmp_path)
 

@@ -277,7 +277,9 @@ def _validate_logical_keys(entries: Mapping[str, dict[str, Any]]) -> None:
         kind = cast(str, item["kind"])
         spec = cast(dict[str, Any], item["spec"])
         if kind == "input_definition":
-            _require_unique_values(item_key, spec["fields"], "field_key")
+            fields = cast(list[dict[str, Any]], spec["fields"])
+            _require_unique_values(item_key, fields, "field_key")
+            _validate_conditional_requirements(item_key, spec, fields)
         elif kind == "content_definition":
             fields = cast(list[dict[str, Any]], spec["fields"])
             _require_unique_strings(
@@ -290,6 +292,31 @@ def _validate_logical_keys(entries: Mapping[str, dict[str, Any]]) -> None:
             _require_unique_values(item_key, spec["context_bindings"], "binding_key")
         elif kind == "generation_template":
             _require_unique_values(item_key, spec["projection_refs"], "role")
+
+
+def _validate_conditional_requirements(
+    item_key: str,
+    spec: dict[str, Any],
+    fields: list[dict[str, Any]],
+) -> None:
+    field_keys = {cast(str, field["field_key"]) for field in fields}
+    conditions: dict[tuple[str, str], tuple[set[str], set[str]]] = {}
+    for requirement in cast(list[dict[str, Any]], spec.get("conditional_requirements", [])):
+        when = cast(dict[str, Any], requirement["when"])
+        condition = (cast(str, when["field_key"]), cast(str, when["equals"]))
+        required = set(cast(list[str], requirement.get("required_fields", [])))
+        forbidden = set(cast(list[str], requirement.get("forbidden_fields", [])))
+        referenced = {condition[0]} | required | forbidden
+        prior_required, prior_forbidden = conditions.setdefault(condition, (set(), set()))
+        if not referenced <= field_keys or (prior_required | required) & (
+            prior_forbidden | forbidden
+        ):
+            raise ContentPackageValidationError(
+                "PACKAGE_INPUT_CONDITION_INVALID",
+                f"{item_key} has an unresolved or contradictory conditional requirement",
+            )
+        prior_required.update(required)
+        prior_forbidden.update(forbidden)
 
 
 def _validate_projection_variables(entries: Mapping[str, dict[str, Any]]) -> None:
