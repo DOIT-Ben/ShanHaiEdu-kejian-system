@@ -117,6 +117,40 @@ def test_cross_tendency_and_child_safety_fail_closed() -> None:
     assert "INTRO_CHILD_SAFETY_INVALID" in codes
 
 
+def test_course_anchor_rejects_wrong_frozen_teaching_focus() -> None:
+    content = _content("default_nine")
+    options = cast(list[dict[str, Any]], content["options"])
+    content["source_knowledge_point"] = "比较大小"
+    for option in options:
+        option["knowledge_point"] = "比较大小"
+
+    _assert_anchor_finding(content, "INTRO_COURSE_ANCHOR_INVALID")
+
+
+def test_course_anchor_rejects_missing_frozen_preteach_boundary() -> None:
+    content = _content("default_nine")
+    options = cast(list[dict[str, Any]], content["options"])
+    for option in options:
+        option["must_not_preteach"] = ["无"]
+
+    _assert_anchor_finding(content, "INTRO_PRETEACH_BOUNDARY_INVALID")
+
+
+def test_course_anchor_rejects_frozen_later_topic_in_intro_content() -> None:
+    content = _content("default_nine")
+    options = cast(list[dict[str, Any]], content["options"])
+    options[0]["creative_concept"] = "观察两组信号并比较大小"
+
+    _assert_anchor_finding(content, "INTRO_PRETEACH_VIOLATION")
+
+
+def _assert_anchor_finding(content: dict[str, Any], code: str) -> None:
+    outcome = IntroSingleAnchorQualityValidator().validate(_context(content))
+
+    assert outcome.passed is False
+    assert code in {str(item["code"]) for item in outcome.findings}
+
+
 def _content(mode: str) -> dict[str, Any]:
     case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
     content = build_golden_branch_source_outputs(case)["intro.generate_options"]

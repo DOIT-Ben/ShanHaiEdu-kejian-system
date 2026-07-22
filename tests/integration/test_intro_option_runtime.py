@@ -218,6 +218,41 @@ async def test_cross_tenant_source_is_rejected_before_provider_and_usage(
         assert session.scalar(select(func.count()).select_from(UsageRecord)) == usage_count
 
 
+async def test_wrong_singleton_source_is_rejected_before_provider_and_usage(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    source = await _generate_default_nine(factory)
+    _validate(factory, source.actor, source.version_id)
+    _open_gate(factory, source.actor, source.version_id)
+    with factory() as session, session.begin():
+        ArtifactService(session, source.actor).review(
+            source.version_id,
+            action="approve",
+            comment="Approve source before singleton identity drift.",
+            request_id="issue-127-approve-wrong-singleton-source",
+        )
+        artifact = session.get(Artifact, source.artifact_id)
+        assert artifact is not None
+        artifact.artifact_key = "intro-options-shadow:LESSON-001"
+
+    with factory() as session:
+        attempt_count = session.scalar(select(func.count()).select_from(GenerationAttempt))
+        usage_count = session.scalar(select(func.count()).select_from(UsageRecord))
+    with factory() as session:
+        with pytest.raises(ApiError):
+            with session.begin():
+                IntroOptionRuntimeService(session, source.actor).stage_generation(
+                    project_id=source.project_id,
+                    lesson_unit_id=source.lesson_unit_id,
+                    generation_mode="refine_existing",
+                    source_artifact_version_id=source.version_id,
+                )
+    with factory() as session:
+        assert session.scalar(select(func.count()).select_from(GenerationAttempt)) == attempt_count
+        assert session.scalar(select(func.count()).select_from(UsageRecord)) == usage_count
+
+
 async def test_teacher_edit_creates_new_immutable_version_and_reapproval(
     migrated_database_url: str,
 ) -> None:

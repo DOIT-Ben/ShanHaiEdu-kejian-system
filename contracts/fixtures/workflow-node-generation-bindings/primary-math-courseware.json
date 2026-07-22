@@ -1001,8 +1001,8 @@
         },
         {
           "key": "validator.intro.single_anchor",
-          "semantic_version": "1.0.0",
-          "implementation_digest": "c32be2ad3444760ff6d7454d7bc3e7a9a3518e223931d2792fabf2980e8a36dd"
+          "semantic_version": "1.1.0",
+          "implementation_digest": "f37001db813669d7148ac43d25045472c0c4b84427df414e303f4a99e5b40220"
         },
         {
           "key": "validator.intro.unique_recommendation",
@@ -1038,8 +1038,8 @@
           },
           {
             "key": "validator.intro.single_anchor",
-            "semantic_version": "1.0.0",
-            "implementation_digest": "c32be2ad3444760ff6d7454d7bc3e7a9a3518e223931d2792fabf2980e8a36dd"
+            "semantic_version": "1.1.0",
+            "implementation_digest": "f37001db813669d7148ac43d25045472c0c4b84427df414e303f4a99e5b40220"
           },
           {
             "key": "validator.intro.unique_recommendation",
@@ -5060,8 +5060,8 @@
     },
     {
       "key": "validator.intro.single_anchor",
-      "semantic_version": "1.0.0",
-      "implementation_digest": "c32be2ad3444760ff6d7454d7bc3e7a9a3518e223931d2792fabf2980e8a36dd",
+      "semantic_version": "1.1.0",
+      "implementation_digest": "f37001db813669d7148ac43d25045472c0c4b84427df414e303f4a99e5b40220",
       "implementation_status": "contract_only"
     },
     {

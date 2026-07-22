@@ -22,8 +22,8 @@ INTRO_OPTION_SCHEMA_REF = ValidatorRef(
 )
 INTRO_SINGLE_ANCHOR_REF = ValidatorRef(
     key="validator.intro.single_anchor",
-    semantic_version="1.0.0",
-    implementation_digest="c32be2ad3444760ff6d7454d7bc3e7a9a3518e223931d2792fabf2980e8a36dd",
+    semantic_version="1.1.0",
+    implementation_digest="f37001db813669d7148ac43d25045472c0c4b84427df414e303f4a99e5b40220",
 )
 INTRO_UNIQUE_RECOMMENDATION_REF = ValidatorRef(
     key="validator.intro.unique_recommendation",
@@ -100,16 +100,14 @@ class IntroSingleAnchorQualityValidator:
         raw_unit = division.get("lesson_unit") if isinstance(division, Mapping) else None
         unit = cast(Mapping[str, Any], raw_unit) if isinstance(raw_unit, Mapping) else None
         knowledge = content.get("source_knowledge_point")
-        if (
-            unit is None
-            or unit.get("lesson_unit_key") != lesson_key
-            or type(knowledge) is not str
-            or not knowledge.strip()
-            or any(option.get("knowledge_point") != knowledge for option in options)
-        ):
-            findings.append(
-                _finding("INTRO_COURSE_ANCHOR_INVALID", "course anchor is inconsistent")
+        findings.extend(
+            _lesson_boundary_findings(
+                unit=unit,
+                lesson_key=lesson_key,
+                knowledge=knowledge,
+                options=options,
             )
+        )
         declared_evidence = set(_string_sequence(content.get("source_material_evidence_keys")))
         available_evidence = _material_evidence_keys(material)
         lesson_evidence: set[str] = (
@@ -217,11 +215,68 @@ def _material_evidence_keys(material: Mapping[str, Any] | None) -> set[str]:
     return values
 
 
+def _lesson_boundary_findings(
+    *,
+    unit: Mapping[str, Any] | None,
+    lesson_key: str | None,
+    knowledge: object,
+    options: list[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    teaching_focus = unit.get("teaching_focus") if unit is not None else None
+    if (
+        unit is None
+        or unit.get("lesson_unit_key") != lesson_key
+        or type(knowledge) is not str
+        or not knowledge.strip()
+        or knowledge != teaching_focus
+        or any(option.get("knowledge_point") != knowledge for option in options)
+    ):
+        findings.append(_finding("INTRO_COURSE_ANCHOR_INVALID", "course anchor is inconsistent"))
+    preteach_boundary = _string_sequence(unit.get("must_not_preteach")) if unit is not None else ()
+    if not preteach_boundary or any(
+        _string_sequence(option.get("must_not_preteach")) != preteach_boundary for option in options
+    ):
+        findings.append(
+            _finding(
+                "INTRO_PRETEACH_BOUNDARY_INVALID",
+                "options must preserve the frozen lesson preteach boundary",
+            )
+        )
+    if preteach_boundary and any(
+        _contains_forbidden_topic(option, preteach_boundary) for option in options
+    ):
+        findings.append(
+            _finding("INTRO_PRETEACH_VIOLATION", "option preteaches a frozen later topic")
+        )
+    return findings
+
+
 def _contains_preteach(value: object) -> bool:
     if type(value) is not str:
         return False
     normalized = value.replace(" ", "")
     return any(marker in normalized for marker in ("直接讲出", "提前讲出", "直接给出答案"))
+
+
+def _contains_forbidden_topic(option: Mapping[str, Any], topics: tuple[str, ...]) -> bool:
+    content_fields = (
+        "title",
+        "creative_concept",
+        "hook",
+        "viewer_value",
+        "course_anchor",
+        "classroom_first_question",
+        "handoff_moment",
+        "fit_reason",
+    )
+    values = (
+        cast(str, option[field]).replace(" ", "")
+        for field in content_fields
+        if type(option.get(field)) is str
+    )
+    normalized_topics = tuple(topic.replace(" ", "") for topic in topics)
+    return any(topic in value for value in values for topic in normalized_topics)
 
 
 def _contains_unsafe_content(value: object) -> bool:

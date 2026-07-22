@@ -68,6 +68,8 @@ class IntroOptionRuntimeService:
             self._artifacts.require_exact_source(
                 project_id=project_id,
                 lesson_unit_id=lesson_unit_id,
+                lesson_key=lesson.lesson_key,
+                content_release_id=scope.content_release_id,
                 version_id=source_artifact_version_id,
             )
             selected = {SOURCE_INPUT_REF: source_artifact_version_id}

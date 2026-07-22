@@ -56,6 +56,8 @@ class IntroOptionArtifactReader:
         *,
         project_id: UUID,
         lesson_unit_id: UUID,
+        lesson_key: str,
+        content_release_id: UUID,
         version_id: UUID,
     ) -> None:
         row = self._session.execute(
@@ -67,6 +69,7 @@ class IntroOptionArtifactReader:
                 Artifact.organization_id == self._actor.organization_id,
                 Artifact.project_id == project_id,
                 Artifact.lesson_unit_id == lesson_unit_id,
+                Artifact.artifact_key == f"intro-options:{lesson_key}",
                 Artifact.artifact_type == "intro_option_set",
                 Artifact.branch_key == "intro_options",
                 Artifact.status == "approved",
@@ -77,6 +80,13 @@ class IntroOptionArtifactReader:
         ).one_or_none()
         if row is None:
             raise _invalid("The exact Intro source is not the current approved version.")
+        _, artifact = row
+        definition_key = ContentDefinitionApprovalReader(self._session).definition_key(
+            definition_id=artifact.content_definition_version_id,
+            content_release_id=content_release_id,
+        )
+        if definition_key != CONTENT_DEFINITION_KEY:
+            raise _invalid("The exact Intro source uses another content definition.")
 
     def require_reviewable(self, artifact_version_id: UUID) -> ReviewableIntroOptionFact:
         record = ArtifactRepository(self._session, self._actor).get_version(artifact_version_id)
