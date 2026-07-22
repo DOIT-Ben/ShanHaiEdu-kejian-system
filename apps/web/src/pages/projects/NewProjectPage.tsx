@@ -11,6 +11,7 @@ import {
 } from "@/features/projects/components/ProjectEntryForm";
 import { ProjectEntryFrame } from "@/features/projects/components/ProjectEntryFrame";
 import { projectKeys } from "@/features/projects/hooks/useProjectsQuery";
+import { validateTextbookFile } from "@/features/projects/lib/validateTextbookFile";
 import { apiConfig } from "@/shared/api/config";
 import { addMockTextbookFile } from "@/shared/api/mockClient";
 import { Button } from "@/shared/ui/Button";
@@ -109,7 +110,7 @@ export function NewProjectPage() {
         lastModified: file.lastModified,
         name: file.name,
         size: file.size,
-        type: file.type,
+        type: file.type || "application/pdf",
       });
     }
     await queryClient.invalidateQueries({ queryKey: projectKeys.all });
@@ -126,14 +127,10 @@ export function NewProjectPage() {
       setFileError("");
       return;
     }
-    if (nextFile.type !== "application/pdf" || !nextFile.name.toLowerCase().endsWith(".pdf")) {
+    const validationError = validateTextbookFile(nextFile);
+    if (validationError) {
       setFile(null);
-      setFileError("只支持 PDF 教材文件");
-      return;
-    }
-    if (nextFile.size > 100 * 1024 * 1024) {
-      setFile(null);
-      setFileError("教材文件不能超过 100 MB");
+      setFileError(validationError);
       return;
     }
     setFile(nextFile);

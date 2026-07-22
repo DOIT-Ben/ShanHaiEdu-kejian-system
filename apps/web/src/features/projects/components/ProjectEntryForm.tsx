@@ -199,7 +199,7 @@ export function ProjectEntryForm({
               }}
             >
               <input
-                accept="application/pdf"
+                accept="application/pdf,.pdf"
                 className="sr-only"
                 disabled={unavailable}
                 onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}

@@ -1,8 +1,8 @@
 # 前端交接与状态模型
 
-责任人：前端承接方  
-读者：前端、联调、测试与产品  
-规范路径：`apps/web/docs/FRONTEND_HANDOFF.md`  
+责任人：前端承接方
+读者：前端、联调、测试与产品
+规范路径：`apps/web/docs/FRONTEND_HANDOFF.md`
 替换规则：路由、组件边界或状态合同变化时原位更新，不新增版本副本。
 
 ## 页面清单
@@ -34,13 +34,13 @@ Runtime 页面只消费 `features/*/api` 的类型化客户端和 TanStack Query
 
 ## 前端状态模型
 
-| 状态层     | 责任                                                          | 持久化                                 |
-| ---------- | ------------------------------------------------------------- | -------------------------------------- |
-| 服务端资源 | 项目、课时、workflow、任务、素材和产物的事实状态              | PostgreSQL，经 REST/SSE 返回           |
-| 查询缓存   | 请求状态、失效、重试和页面读取                                | TanStack Query，标签页内存             |
-| UI 状态    | 抽屉、主题、侧栏、当前筛选、焦点                              | Zustand/React state                    |
-| 编辑恢复   | 新建项目表单、PDF 元数据、SHA-256、幂等意图、上传会话、Job ID | `sessionStorage`，不保存或伪造 `File`  |
-| Mock 状态  | 仅开发演示的项目、节点、任务和草稿                            | MockRuntime 本地存储，禁止作为生产证据 |
+| 状态层     | 责任                                                           | 持久化                                 |
+| ---------- | -------------------------------------------------------------- | -------------------------------------- |
+| 服务端资源 | 项目、课时、workflow、任务、素材和产物的事实状态               | PostgreSQL，经 REST/SSE 返回           |
+| 查询缓存   | 请求状态、失效、重试和页面读取                                 | TanStack Query，标签页内存             |
+| UI 状态    | 抽屉、主题、侧栏、当前筛选、焦点                               | Zustand/React state                    |
+| 编辑恢复   | 新建项目表单、PDF 元数据、SHA-256、幂等意图、上传会话、Job ID  | `sessionStorage`，不保存或伪造 `File`  |
+| Mock 状态  | 仅开发演示的项目、节点、任务和草稿；创作队列状态统一由任务派生 | MockRuntime 本地存储，禁止作为生产证据 |
 
 状态显示必须区分 `loading`、`empty`、`error`、`queued`、`running`、`review_required`、`partially_completed`、`approved` 和 `failed`。成功与失败不能只依赖颜色，必须同时显示图标和文字；加载时禁止重复提交，并支持 `prefers-reduced-motion`。
 
@@ -51,7 +51,7 @@ Storybook 覆盖基础控件、`AppShell`、项目来源入口、项目行、课
 ## 测试与联调计划
 
 1. 单元与组件：`pnpm --dir apps/web test`，变更文件先用 Vitest 定向运行。
-2. 静态门禁：format、lint、typecheck、生产构建和 Storybook build。
+2. 静态门禁：format、lint、typecheck、生产构建、Storybook build 和 `test:storybook:a11y`。
 3. Mock 浏览器：核心流、创建台、滚动可访问性、主题和视觉回归。
 4. Runtime 浏览器：项目读取、教材上传恢复、无教材课程锚点、Job 状态、项目概览和课时工作台；真实认证缺口必须显式失败，不能回退 Mock。
 5. 发布前检查构建产物不得包含 MSW Worker、MockRuntime、演示凭据或合同测试入口。

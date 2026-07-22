@@ -5,6 +5,7 @@ import {
   PauseCircle,
   RefreshCw,
   RotateCcw,
+  XCircle,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
@@ -238,17 +239,49 @@ export function TasksPage({ projectOnly = false }: { projectOnly?: boolean }) {
                     重新处理未完成内容
                   </Button>
                 ) : task.status === "running" || task.status === "paused" ? (
+                  <>
+                    <Button
+                      onClick={() =>
+                        updateMockTask(task.id, {
+                          status: task.status === "paused" ? "running" : "paused",
+                        })
+                      }
+                      size="sm"
+                      variant="quiet"
+                    >
+                      <PauseCircle aria-hidden="true" />
+                      {task.status === "paused" ? "继续" : "暂停"}
+                    </Button>
+                    <Button
+                      onClick={() =>
+                        updateMockTask(task.id, {
+                          progress: 0,
+                          stage: "已取消",
+                          status: "cancelled",
+                        })
+                      }
+                      size="sm"
+                      variant="quiet"
+                    >
+                      <XCircle aria-hidden="true" />
+                      取消
+                    </Button>
+                  </>
+                ) : task.status === "failed" || task.status === "cancelled" ? (
                   <Button
                     onClick={() =>
                       updateMockTask(task.id, {
-                        status: task.status === "paused" ? "running" : "paused",
+                        progress: 0,
+                        retry_count: task.retry_count + 1,
+                        stage: "等待重新处理",
+                        status: "queued",
                       })
                     }
                     size="sm"
-                    variant="quiet"
+                    variant="secondary"
                   >
-                    <PauseCircle aria-hidden="true" />
-                    {task.status === "paused" ? "继续" : "暂停"}
+                    <RotateCcw aria-hidden="true" />
+                    重试
                   </Button>
                 ) : task.status === "review_required" && task.project_id ? (
                   <Button asChild size="sm">

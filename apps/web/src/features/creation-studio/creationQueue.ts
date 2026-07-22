@@ -5,6 +5,7 @@ export type CreationQueueState = Record<
   {
     attempts: number;
     status: CreationQueueStatus;
+    taskId?: string;
   }
 >;
 
@@ -24,6 +25,7 @@ export function enqueueCreationTask(queue: CreationQueueState, id: string): Crea
     [id]: {
       attempts: (queue[id]?.attempts ?? 0) + 1,
       status: running ? ("queued" as const) : ("running" as const),
+      ...(queue[id]?.taskId ? { taskId: queue[id].taskId } : {}),
     },
   };
 }
@@ -42,7 +44,14 @@ export function cancelCreationTask(queue: CreationQueueState, id: string): Creat
 
 export function retryCreationTask(queue: CreationQueueState, id: string): CreationQueueState {
   return enqueueCreationTask(
-    { ...queue, [id]: { attempts: queue[id]?.attempts ?? 0, status: "idle" } },
+    {
+      ...queue,
+      [id]: {
+        attempts: queue[id]?.attempts ?? 0,
+        status: "idle",
+        ...(queue[id]?.taskId ? { taskId: queue[id].taskId } : {}),
+      },
+    },
     id,
   );
 }

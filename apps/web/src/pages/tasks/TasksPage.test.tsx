@@ -1,8 +1,15 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TasksPage } from "@/pages/tasks/TasksPage";
-import { resetMockRuntime } from "@/shared/api/mocks/runtime";
+import {
+  readCreationQueue,
+  saveCreationQueue,
+} from "@/features/creation-studio/creationRuntimeAdapter";
+import { getMockRuntimeState, resetMockRuntime } from "@/shared/api/mocks/runtime";
+
+const creationQueueKey =
+  "creation:image:project:project-a:lesson:lesson-a:package:video-assets:queue";
 
 describe("TasksPage status feedback", () => {
   beforeEach(() => {
@@ -61,5 +68,30 @@ describe("TasksPage status feedback", () => {
     const rows = screen.getAllByRole("article");
     expect(rows.length).toBeGreaterThan(1);
     rows.forEach((row) => expect(row).toHaveAttribute("data-density", "compact"));
+  });
+
+  it("创作台任务在任务中心可见且取消、重试保持一致", () => {
+    saveCreationQueue(
+      creationQueueKey,
+      { assetA: { attempts: 1, status: "running" } },
+      { lessonId: "lesson-a", projectId: "project-a" },
+    );
+    render(
+      <MemoryRouter>
+        <TasksPage />
+      </MemoryRouter>,
+    );
+
+    const taskRow = screen.getByRole("heading", { name: "生成课堂素材" }).closest("article");
+    expect(taskRow).not.toBeNull();
+    fireEvent.click(within(taskRow as HTMLElement).getByRole("button", { name: "取消" }));
+    expect(readCreationQueue(getMockRuntimeState(), creationQueueKey).assetA?.status).toBe(
+      "cancelled",
+    );
+
+    fireEvent.click(within(taskRow as HTMLElement).getByRole("button", { name: "重试" }));
+    expect(readCreationQueue(getMockRuntimeState(), creationQueueKey).assetA?.status).toBe(
+      "queued",
+    );
   });
 });

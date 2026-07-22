@@ -67,6 +67,14 @@ async function expectNoA11yViolations(page: Page) {
   expect(violations).toEqual([]);
 }
 
+test("创作台生成任务会进入任务中心并保持刷新恢复", async ({ page }) => {
+  await openReadyImageStudio(page);
+  await page.goto("/app/tasks");
+  await expect(page.getByRole("heading", { name: "生成课堂素材" })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "生成课堂素材" })).toBeVisible();
+});
+
 test("新老师可按首页引导进入并在需要时调整创作设置", async ({ page }) => {
   await loginAsTeacher(page);
   await page.goto("/app/creation");

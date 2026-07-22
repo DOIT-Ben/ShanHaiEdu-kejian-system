@@ -24,6 +24,7 @@ import { demoProjectId, lessons } from "@/shared/data/mockData";
 import { markLessonDivisionDependentsStaleForLessons } from "@/features/workbench/lib/invalidateDependents";
 import { getChangedLessonIds, readLessonList } from "@/features/workbench/lib/projectLessons";
 import { hasReadyTextbook } from "@/features/workbench/lib/stepAccess";
+import { validateTextbookFile } from "@/features/projects/lib/validateTextbookFile";
 import { reorderItem } from "@/shared/lib/reorderItem";
 import { Button } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
@@ -157,22 +158,16 @@ export function ProjectMaterialsPage() {
                     onChange={(event) => {
                       const file = event.target.files?.[0];
                       if (!file) return;
-                      if (
-                        file.type !== "application/pdf" ||
-                        !file.name.toLowerCase().endsWith(".pdf")
-                      ) {
-                        setUploadError("请选择 PDF 教材文件");
-                        return;
-                      }
-                      if (file.size > 100 * 1024 * 1024) {
-                        setUploadError("教材文件不能超过 100 MB");
+                      const validationError = validateTextbookFile(file);
+                      if (validationError) {
+                        setUploadError(validationError);
                         return;
                       }
                       addMockTextbookFile(projectId, {
                         lastModified: file.lastModified,
                         name: file.name,
                         size: file.size,
-                        type: file.type,
+                        type: file.type || "application/pdf",
                       });
                       setUploadError("");
                       event.currentTarget.value = "";

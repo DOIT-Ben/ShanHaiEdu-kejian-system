@@ -13,6 +13,7 @@ import {
 } from "@/features/materials/api/materialsApi";
 import { createProject } from "@/features/projects/api/projectsApi";
 import { projectKeys } from "@/features/projects/hooks/useProjectsQuery";
+import { validateTextbookFile } from "@/features/projects/lib/validateTextbookFile";
 import { ProjectEntryFrame } from "@/features/projects/components/ProjectEntryFrame";
 import {
   ProjectEntryForm,
@@ -169,6 +170,12 @@ export function RuntimeNewProjectPage() {
       setFile(nextFile);
       setMessage("");
       if (!nextFile) return;
+      const validationError = validateTextbookFile(nextFile);
+      if (validationError) {
+        setFile(null);
+        setMessage(validationError);
+        return;
+      }
 
       const snapshot = fileSnapshot(nextFile);
       const current = recoveryRef.current;
@@ -235,8 +242,9 @@ export function RuntimeNewProjectPage() {
       setMessage("请选择一份 PDF 教材");
       return;
     }
-    if (file.type !== "application/pdf") {
-      setMessage("目前只支持 PDF 教材");
+    const validationError = validateTextbookFile(file);
+    if (validationError) {
+      setMessage(validationError);
       return;
     }
 
@@ -293,7 +301,7 @@ export function RuntimeNewProjectPage() {
           idempotencyKey: current.intent.upload,
           input: {
             filename: file.name,
-            media_type: file.type,
+            media_type: file.type || "application/pdf",
             sha256,
             size_bytes: file.size,
           },

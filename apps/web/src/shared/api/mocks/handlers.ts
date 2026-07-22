@@ -6,9 +6,12 @@ import {
   mockNow as now,
 } from "@/shared/api/mocks/fixtures";
 import {
+  createMockTask,
   createMockProject,
   getMockProject,
   getMockRuntimeState,
+  saveMockDraft,
+  updateMockTask,
   updateMockProject,
 } from "@/shared/api/mocks/runtime";
 import {
@@ -17,36 +20,62 @@ import {
 } from "@/features/workbench/lib/projectLessons";
 
 const introOptionSetVersionId = "01960000-0000-7000-8000-000000000301";
-const creationPackages = new Map<
-  string,
-  {
-    lessonId: string;
-    nodeRevision: number;
-    nodeRunId: string;
-    packageType: string;
-    projectId: string;
-    replaceMode: string;
-    targetSlotKey: string;
-  }
->();
-const creationBatches = new Map<
-  string,
-  {
-    itemIds: string[];
-    packageId?: string;
-    studioType: string;
-    projectId?: string;
-    lessonId?: string;
-  }
->();
-const generationResults = new Map<
-  string,
-  { batchId: string; packageId?: string; projectId?: string; lessonId?: string }
->();
-const generationJobs = new Map<
-  string,
-  { batchId: string; projectId?: string; resultIds: string[] }
->();
+type CreationPackageRecord = {
+  lessonId: string;
+  nodeRevision: number;
+  nodeRunId: string;
+  packageType: string;
+  projectId: string;
+  replaceMode: string;
+  targetSlotKey: string;
+};
+
+type CreationBatchRecord = {
+  itemIds: string[];
+  packageId?: string;
+  studioType: string;
+  projectId?: string;
+  lessonId?: string;
+};
+
+type GenerationResultRecord = {
+  batchId: string;
+  packageId?: string;
+  projectId?: string;
+  lessonId?: string;
+};
+
+type GenerationJobRecord = {
+  batchId: string;
+  projectId?: string;
+  resultIds: string[];
+};
+
+type CreationContractState = {
+  batches: Record<string, CreationBatchRecord>;
+  jobs: Record<string, GenerationJobRecord>;
+  packages: Record<string, CreationPackageRecord>;
+  results: Record<string, GenerationResultRecord>;
+};
+
+const creationContractStateKey = "mock:creation-contract-state";
+
+function readCreationContractState(): CreationContractState {
+  const value = getMockRuntimeState().drafts[creationContractStateKey]?.value as
+    Partial<CreationContractState> | undefined;
+  return {
+    batches: value?.batches ?? {},
+    jobs: value?.jobs ?? {},
+    packages: value?.packages ?? {},
+    results: value?.results ?? {},
+  };
+}
+
+function updateCreationContractState(
+  updater: (state: CreationContractState) => CreationContractState,
+) {
+  return saveMockDraft(creationContractStateKey, updater(readCreationContractState()));
+}
 
 function errorResponse(
   code: string,
@@ -67,9 +96,7 @@ function findNodeRun(nodeRunId: string) {
   return Object.values(getMockRuntimeState().nodeStates).find((node) => node.id === nodeRunId);
 }
 
-function packageSourceIsCurrent(
-  packageRecord: typeof creationPackages extends Map<string, infer T> ? T : never,
-) {
+function packageSourceIsCurrent(packageRecord: CreationPackageRecord) {
   const node = findNodeRun(packageRecord.nodeRunId);
   return (
     node?.project_id === packageRecord.projectId &&
@@ -363,15 +390,22 @@ export const handlers = [
     }
     const project = getMockProject(node.project_id);
     const packageId = crypto.randomUUID();
-    creationPackages.set(packageId, {
-      lessonId: node.lesson_id,
-      nodeRevision: node.revision,
-      nodeRunId,
-      packageType: "image",
-      projectId: node.project_id,
-      replaceMode: "reject_if_occupied",
-      targetSlotKey: "video.asset.primary",
-    });
+    const lessonId = node.lesson_id;
+    updateCreationContractState((state) => ({
+      ...state,
+      packages: {
+        ...state.packages,
+        [packageId]: {
+          lessonId,
+          nodeRevision: node.revision,
+          nodeRunId,
+          packageType: "image",
+          projectId: node.project_id,
+          replaceMode: "reject_if_occupied",
+          targetSlotKey: "video.asset.primary",
+        },
+      },
+    }));
     return HttpResponse.json(
       envelope(
         {
@@ -424,7 +458,7 @@ export const handlers = [
       );
     }
     const packageRecord = body.creation_package_id
-      ? creationPackages.get(body.creation_package_id)
+      ? readCreationContractState().packages[body.creation_package_id]
       : undefined;
     if (body.creation_package_id && !packageRecord) {
       return errorResponse(
@@ -451,13 +485,20 @@ export const handlers = [
     }
     const batchId = crypto.randomUUID();
     const itemId = crypto.randomUUID();
-    creationBatches.set(batchId, {
-      itemIds: [itemId],
-      packageId: body.creation_package_id ?? undefined,
-      studioType: body.studio_type,
-      projectId: packageRecord?.projectId,
-      lessonId: packageRecord?.lessonId,
-    });
+    const studioType = body.studio_type;
+    updateCreationContractState((state) => ({
+      ...state,
+      batches: {
+        ...state.batches,
+        [batchId]: {
+          itemIds: [itemId],
+          packageId: body.creation_package_id ?? undefined,
+          studioType,
+          projectId: packageRecord?.projectId,
+          lessonId: packageRecord?.lessonId,
+        },
+      },
+    }));
     return HttpResponse.json(
       envelope(
         {
@@ -476,7 +517,8 @@ export const handlers = [
     `${apiConfig.baseUrl}/creation-batches/:batchId/generate`,
     async ({ params, request }) => {
       const batchId = String(params.batchId);
-      const batch = creationBatches.get(batchId);
+      const contractState = readCreationContractState();
+      const batch = contractState.batches[batchId];
       if (!batch) {
         return errorResponse(
           "CREATION_BATCH_NOT_FOUND",
@@ -484,7 +526,7 @@ export const handlers = [
           "req_mock_generate_batch_not_found",
         );
       }
-      const packageRecord = batch.packageId ? creationPackages.get(batch.packageId) : undefined;
+      const packageRecord = batch.packageId ? contractState.packages[batch.packageId] : undefined;
       if (batch.packageId && (!packageRecord || !packageSourceIsCurrent(packageRecord))) {
         return errorResponse(
           "STALE_CREATION_PACKAGE",
@@ -506,17 +548,34 @@ export const handlers = [
           422,
         );
       }
-      const jobId = crypto.randomUUID();
       const resultIds = body.item_ids.map(() => crypto.randomUUID());
-      for (const resultId of resultIds) {
-        generationResults.set(resultId, {
-          batchId,
-          packageId: batch.packageId,
-          projectId: batch.projectId,
-          lessonId: batch.lessonId,
-        });
-      }
-      generationJobs.set(jobId, { batchId, projectId: batch.projectId, resultIds });
+      const job = createMockTask({
+        detail: "创作台生成任务",
+        progress: 0,
+        project_id: batch.projectId ?? null,
+        stage: "等待生成",
+        status: "queued",
+        title: "生成课堂素材",
+      });
+      const jobId = job.id;
+      updateCreationContractState((state) => ({
+        ...state,
+        jobs: { ...state.jobs, [jobId]: { batchId, projectId: batch.projectId, resultIds } },
+        results: {
+          ...state.results,
+          ...Object.fromEntries(
+            resultIds.map((resultId) => [
+              resultId,
+              {
+                batchId,
+                packageId: batch.packageId,
+                projectId: batch.projectId,
+                lessonId: batch.lessonId,
+              },
+            ]),
+          ),
+        },
+      }));
       return HttpResponse.json(
         envelope(
           {
@@ -534,8 +593,9 @@ export const handlers = [
     `${apiConfig.baseUrl}/generation-results/:resultId/save-to-project`,
     async ({ params, request }) => {
       const resultId = String(params.resultId);
-      const result = generationResults.get(resultId);
-      const batch = result ? creationBatches.get(result.batchId) : undefined;
+      const contractState = readCreationContractState();
+      const result = contractState.results[resultId];
+      const batch = result ? contractState.batches[result.batchId] : undefined;
       if (!result || !batch) {
         return errorResponse(
           "GENERATION_RESULT_NOT_FOUND",
@@ -563,7 +623,7 @@ export const handlers = [
           409,
         );
       }
-      const packageRecord = result.packageId ? creationPackages.get(result.packageId) : undefined;
+      const packageRecord = result.packageId ? contractState.packages[result.packageId] : undefined;
       if (result.packageId && (!packageRecord || !packageSourceIsCurrent(packageRecord))) {
         return errorResponse(
           "STALE_CREATION_PACKAGE",
@@ -636,14 +696,21 @@ export const handlers = [
   }),
   http.get(`${apiConfig.baseUrl}/generation-jobs/:jobId/events/stream`, ({ params }) => {
     const jobId = String(params.jobId);
-    const job = generationJobs.get(jobId);
-    if (!job) {
+    const contractState = readCreationContractState();
+    const job = contractState.jobs[jobId];
+    const task = getMockRuntimeState().tasks.find((candidate) => candidate.id === jobId);
+    if (!job || !task) {
       return errorResponse(
         "GENERATION_JOB_NOT_FOUND",
         "生成任务不存在",
         "req_mock_generation_events_not_found",
       );
     }
+    updateMockTask(jobId, {
+      progress: 100,
+      stage: "等待确认",
+      status: "review_required",
+    });
     return sseResponse(
       "generation.job.progress",
       { id: jobId, type: "generation_job" },

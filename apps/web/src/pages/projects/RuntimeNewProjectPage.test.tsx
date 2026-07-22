@@ -183,4 +183,21 @@ describe("RuntimeNewProjectPage recovery", () => {
     );
     expect(createUpload).not.toHaveBeenCalled();
   });
+
+  it("applies the shared PDF extension and size rules before hashing", async () => {
+    const user = userEvent.setup({ applyAccept: false });
+    const sha256 = vi.spyOn(materialsApi, "sha256File");
+    renderPage();
+    const fileInput = screen.getByLabelText(/选择 PDF 教材/);
+    const oversized = new File(["pdf"], "教材.pdf", { type: "application/pdf" });
+    Object.defineProperty(oversized, "size", { value: 100 * 1024 * 1024 + 1 });
+
+    await user.upload(fileInput, oversized);
+    expect(screen.getByText("教材文件不能超过 100 MB")).toBeVisible();
+    expect(sha256).not.toHaveBeenCalled();
+
+    await user.upload(fileInput, new File(["pdf"], "教材.pdf", { type: "" }));
+    expect(screen.getByRole("button", { name: "移除教材文件" })).toBeVisible();
+    expect(screen.queryByText("目前只支持 PDF 教材")).not.toBeInTheDocument();
+  });
 });
