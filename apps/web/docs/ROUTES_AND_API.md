@@ -22,7 +22,7 @@
 | `/login`                                   | `RuntimeLoginPage`             | 认证说明页；无登录提交接口                       |
 | `/app`                                     | `RuntimeAppShell` + `HomePage` | 品牌首页、真实项目摘要；创作入口禁用             |
 | `/app/projects`                            | `ProjectsPage`                 | 分页查询项目、前端搜索、新建入口                 |
-| `/app/projects/new`                        | `RuntimeNewProjectPage`        | 创建项目和教材三段式上传                         |
+| `/app/projects/new`                        | `RuntimeNewProjectPage`        | 教材 PDF 三段式上传或无教材课程锚点创建          |
 | `/app/projects/:projectId/setup?jobId=...` | `RuntimeProjectSetupPage`      | Job 查询/取消、Job SSE、轮询恢复、成功后读取课时 |
 | `/app/projects/:projectId`                 | `RuntimeProjectOverviewPage`   | 项目、课时、AutomationPolicy 和项目 SSE          |
 | `/app/projects/:projectId/*`               | `RuntimeUnavailablePage`       | 后续项目页面的安全不可用态                       |
@@ -85,6 +85,11 @@
 ## 教材上传纵向链
 
 `RuntimeNewProjectPage` 与 `RuntimeProjectSetupPage` 当前按以下顺序调用真实合同，不使用前端计时器伪造进度：
+
+创建入口有两种互斥模式：
+
+- 教材模式：创建项目后建立上传会话、计算 SHA-256、直传 PDF、确认教材并进入解析 Job；
+- 无教材模式：仅用年级、教材版本、知识点和标题调用 `POST /projects`，创建成功后进入项目概览，不建立上传会话，也不显示虚假的解析进度。
 
 1. 校验 PDF，并在浏览器计算文件 SHA-256；
 2. `POST /projects` 创建项目；
