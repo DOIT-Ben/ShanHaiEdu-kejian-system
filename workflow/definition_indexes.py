@@ -251,7 +251,16 @@ def _quality_source_binding(node: WorkflowNodeDefinition) -> str | None:
     binding = as_mapping(node.binding)
     persistence = as_mapping(binding.get("output_persistence")) if binding is not None else None
     value = persistence.get("quality_source_binding") if persistence is not None else None
-    return require_text_value(value, "quality_source_binding") if value is not None else None
+    if value is not None:
+        return require_text_value(value, "quality_source_binding")
+    completion = persistence.get("approval_completion") if persistence is not None else None
+    if (
+        completion is not None
+        and any(ref.startswith("artifact:") for ref in node.output_contract_refs)
+        and not any(ref.startswith("asset:") for ref in node.output_contract_refs)
+    ):
+        return "artifact"
+    return None
 
 
 def _approval_completion(

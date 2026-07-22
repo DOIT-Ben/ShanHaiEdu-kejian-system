@@ -19,9 +19,16 @@ DETERMINISTIC_OUTPUT_EXECUTORS = frozenset(
 )
 
 
-def validate_node(node: dict[str, Any]) -> None:
+def validate_node(
+    node: dict[str, Any],
+    *,
+    require_explicit_quality_source: bool,
+) -> None:
     validate_execution_kind_declaration(node)
-    _validate_deterministic_output(node)
+    _validate_deterministic_output(
+        node,
+        require_output=require_explicit_quality_source,
+    )
     _validate_prompt_exposure(node)
     validate_unique_strings(node, "input_contract_refs", "NODE_BINDING_CONTRACT_REF_DUPLICATE")
     if "optional_input_contract_refs" in node:
@@ -37,7 +44,10 @@ def validate_node(node: dict[str, Any]) -> None:
     _validate_context_policy(cast(dict[str, Any], node["context_policy"]))
     _validate_reference_asset_policy(cast(dict[str, Any], node["reference_asset_policy"]))
     validate_projection_declarations(node)
-    _validate_quality_source_binding(node)
+    _validate_quality_source_binding(
+        node,
+        require_explicit=require_explicit_quality_source,
+    )
     if node["execution_kind"] == "model_generation":
         validate_model_capability(cast(str, node["model_capability"]))
         if not node["validator_refs"]:
@@ -106,19 +116,29 @@ def validate_execution_kind_declaration(node: dict[str, Any]) -> None:
         )
 
 
-def _validate_deterministic_output(node: dict[str, Any]) -> None:
+def _validate_deterministic_output(
+    node: dict[str, Any],
+    *,
+    require_output: bool,
+) -> None:
     if node.get("execution_kind") != "deterministic":
         return
     supports_output = node.get("executor_ref") in DETERMINISTIC_OUTPUT_EXECUTORS
     declares_output = "output_persistence" in node
-    if supports_output != declares_output:
+    if (declares_output and not supports_output) or (
+        require_output and supports_output != declares_output
+    ):
         raise NodeGenerationBindingError(
             "NODE_BINDING_DETERMINISTIC_OUTPUT_INVALID",
             f"deterministic output persistence is not allowed for {node['node_key']}",
         )
 
 
-def _validate_quality_source_binding(node: dict[str, Any]) -> None:
+def _validate_quality_source_binding(
+    node: dict[str, Any],
+    *,
+    require_explicit: bool,
+) -> None:
     persistence = node.get("output_persistence")
     if not isinstance(persistence, dict):
         return
@@ -133,6 +153,13 @@ def _validate_quality_source_binding(node: dict[str, Any]) -> None:
             )
         return
     outputs = cast(list[str], node["output_contract_refs"])
+    if (
+        source is None
+        and not require_explicit
+        and any(ref.startswith("artifact:") for ref in outputs)
+        and not any(ref.startswith("asset:") for ref in outputs)
+    ):
+        return
     valid = source == "artifact" and any(ref.startswith("artifact:") for ref in outputs)
     valid = valid or (
         source == "linked_file_asset" and any(ref.startswith("asset:") for ref in outputs)

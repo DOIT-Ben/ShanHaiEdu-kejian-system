@@ -98,6 +98,27 @@ def test_registry_loads_the_published_catalog_with_one_deterministic_order() -> 
     assert registered.require_output_projection() is None
 
 
+def test_registry_preserves_pre_1_3_artifact_quality_source_semantics() -> None:
+    catalog = load_catalog()
+    catalog["semantic_version"] = "1.2.0"
+    gated_artifacts = (
+        "lesson.division.generate",
+        "lesson_plan.generate",
+        "intro.generate_options",
+    )
+    for node_key in gated_artifacts:
+        node = next(node for node in catalog["nodes"] if node["node_key"] == node_key)
+        node["output_persistence"].pop("quality_source_binding")
+
+    registered = BUILTIN_WORKFLOW_REGISTRY.load(catalog)
+
+    assert all(
+        output.quality_source_binding == "artifact"
+        for output in registered.output_definition_index.values()
+        if output.producer_node_key in gated_artifacts
+    )
+
+
 def test_registry_rejects_optional_inputs_outside_declared_inputs() -> None:
     catalog = load_catalog()
     intro = next(node for node in catalog["nodes"] if node["node_key"] == "intro.generate_options")

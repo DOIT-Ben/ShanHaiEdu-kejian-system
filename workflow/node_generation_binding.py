@@ -106,11 +106,26 @@ def validate_workflow_node_catalog_semantics(catalog: dict[str, Any]) -> Workflo
     validate_validator_descriptors(catalog, nodes)
     validate_topology(nodes)
     validate_contract_refs(catalog, nodes)
+    require_explicit_quality_source = not _uses_legacy_artifact_quality_source(catalog)
     for node in nodes:
-        validate_node(node)
+        validate_node(
+            node,
+            require_explicit_quality_source=require_explicit_quality_source,
+        )
     validate_model_artifact_relations(nodes)
     validate_quality_contracts(nodes)
     return _build_catalog_indexes(nodes)
+
+
+def _uses_legacy_artifact_quality_source(catalog: Mapping[str, object]) -> bool:
+    value = catalog.get("semantic_version")
+    if type(value) is not str:
+        return False
+    core = value.split("-", 1)[0].split("+", 1)[0]
+    parts = core.split(".")
+    if len(parts) != 3 or not all(part.isdigit() for part in parts):
+        return False
+    return tuple(int(part) for part in parts) < (1, 3, 0)
 
 
 def _build_catalog_indexes(nodes: list[dict[str, Any]]) -> WorkflowIndexes:
