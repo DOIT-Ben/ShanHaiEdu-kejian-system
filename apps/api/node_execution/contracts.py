@@ -65,7 +65,12 @@ class CommittedNodeExecution:
 
 
 class NodeExecutionTransaction(Protocol):
-    def prepare(self, node_run_id: UUID, request_id: str) -> PreparedNodeExecution: ...
+    def prepare(
+        self,
+        node_run_id: UUID,
+        request_id: str,
+        user_revision: str | None = None,
+    ) -> PreparedNodeExecution: ...
 
     def checkpoint(
         self,

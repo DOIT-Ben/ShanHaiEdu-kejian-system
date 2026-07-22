@@ -75,7 +75,7 @@ def test_schema_and_complete_primary_math_catalog_are_valid() -> None:
 
     node_keys = {node["node_key"] for node in catalog["nodes"]}
     assert catalog["api_version"] == "shanhai.workflow-node-generation-binding/v2"
-    assert catalog["semantic_version"] == "1.3.0"
+    assert catalog["semantic_version"] == "1.4.0"
     assert len(node_keys) == 48
     assert {
         "project": 7,
@@ -96,13 +96,14 @@ def test_schema_and_complete_primary_math_catalog_are_valid() -> None:
         {"execution_scope", "branch_key", "entrypoint", "dependencies"} <= node.keys()
         for node in catalog["nodes"]
     )
-    assert sum("output_persistence" in node for node in catalog["nodes"]) == 24
+    assert sum("output_persistence" in node for node in catalog["nodes"]) == 25
     assert all(
         ("output_persistence" in node)
         == (
             node["execution_kind"] == "model_generation"
             or node.get("executor_ref")
             in {"executor.ppt.pages_assemble", "executor.ppt.pptx_export"}
+            or node["node_key"] == "material.scope_review"
         )
         for node in catalog["nodes"]
     )
@@ -124,7 +125,7 @@ def test_schema_and_complete_primary_math_catalog_are_valid() -> None:
     }.issubset(node_keys)
     assert validated.catalog == catalog
     assert len(validated.content_hash) == 64
-    assert len(validated.indexes.output_definition_index) == 24
+    assert len(validated.indexes.output_definition_index) == 25
     lesson_plan_index = validated.indexes.output_definition_index["lesson_plan.generate.output"]
     assert lesson_plan_index.producer_node_key == "lesson_plan.generate"
     assert lesson_plan_index.quality_validate_node_key == "lesson_plan.validate"
@@ -768,7 +769,7 @@ def test_catalog_hash_is_deterministic_for_semantically_identical_objects() -> N
     assert first_validated.canonical_json == second_validated.canonical_json
     assert first_validated.content_hash == second_validated.content_hash
     assert first_validated.content_hash == (
-        "f3cd43a907eaf5d3b11c3d16352cbeae542a46a7ea2c9706c96f74cfbc576cc6"
+        "ffbc093cd188b45aee2d8c49481f2ddec71a77da6e40fe4e7b5ef63d10a36d0f"
     )
 
 

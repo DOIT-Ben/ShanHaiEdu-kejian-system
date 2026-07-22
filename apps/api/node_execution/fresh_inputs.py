@@ -47,6 +47,7 @@ def compile_fresh_inputs(
     node_run_id: UUID,
     model_request_id: str,
     user_id: UUID | None,
+    user_revision: str | None = None,
     artifact_selection: dict[str, UUID] | None = None,
 ) -> FreshNodeInputs:
     materials = definitions.resolve_materials(node_run_id)
@@ -72,6 +73,7 @@ def compile_fresh_inputs(
         context_items=context_items,
         request_id=model_request_id,
         user_id=user_id,
+        user_revision=user_revision,
     )
     frozen_snapshots = snapshots.freeze(
         node_run_id,

@@ -1,0 +1,188 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "material.scope_review.output",
+    "name": "教材范围确认",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "material.scope_review.output",
+    "title": "教材范围确认",
+    "description": "教师确认的exact教材页段、证据键、知识边界与课时划分约束。",
+    "definition_role": "artifact",
+    "fields": [
+      {
+        "field_key": "source_material_id",
+        "label": "教材身份",
+        "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "visibility": "hidden"
+      },
+      {
+        "field_key": "material_parse_version_id",
+        "label": "教材解析版本",
+        "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "visibility": "hidden"
+      },
+      {
+        "field_key": "knowledge_point",
+        "label": "知识点",
+        "type": "text",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "visibility": "primary",
+        "validation_rules": [
+          {
+            "min_length": 1
+          },
+          {
+            "max_length": 255
+          }
+        ]
+      },
+      {
+        "field_key": "knowledge_boundary",
+        "label": "知识边界",
+        "type": "object",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "visibility": "primary",
+        "children": [
+          {
+            "field_key": "allowed",
+            "label": "允许内容",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "min_items": 1
+          },
+          {
+            "field_key": "forbidden",
+            "label": "禁止超前内容",
+            "type": "list",
+            "required": true,
+            "editable": true,
+            "deletable": false,
+            "min_items": 1
+          }
+        ]
+      },
+      {
+        "field_key": "approved_evidence_keys",
+        "label": "批准证据键",
+        "type": "list",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "min_items": 1
+      },
+      {
+        "field_key": "page_start",
+        "label": "起始物理页",
+        "type": "number",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "validation_rules": [
+          {
+            "minimum": 1
+          }
+        ]
+      },
+      {
+        "field_key": "page_end",
+        "label": "结束物理页",
+        "type": "number",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "validation_rules": [
+          {
+            "minimum": 1
+          }
+        ]
+      },
+      {
+        "field_key": "duration_minutes",
+        "label": "每课时分钟数",
+        "type": "number",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "validation_rules": [
+          {
+            "minimum": 30
+          },
+          {
+            "maximum": 60
+          }
+        ]
+      },
+      {
+        "field_key": "lesson_count_mode",
+        "label": "课时数量模式",
+        "type": "enum",
+        "required": true,
+        "editable": true,
+        "deletable": false,
+        "options": [
+          {
+            "value": "auto",
+            "label": "自动划分"
+          },
+          {
+            "value": "specified",
+            "label": "指定数量"
+          }
+        ]
+      },
+      {
+        "field_key": "requested_lesson_count",
+        "label": "指定课时数",
+        "type": "number",
+        "required": false,
+        "editable": true,
+        "deletable": false,
+        "validation_rules": [
+          {
+            "minimum": 1
+          },
+          {
+            "maximum": 20
+          }
+        ]
+      },
+      {
+        "field_key": "lesson_type_preferences",
+        "label": "课型偏好",
+        "type": "list",
+        "required": false,
+        "editable": true,
+        "deletable": false
+      },
+      {
+        "field_key": "special_requirements",
+        "label": "特殊要求",
+        "type": "rich_text",
+        "required": false,
+        "editable": true,
+        "deletable": false,
+        "validation_rules": [
+          {
+            "max_length": 4000
+          }
+        ]
+      }
+    ]
+  }
+}

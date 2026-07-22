@@ -110,12 +110,22 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
             fault_injector,
         )
 
-    def prepare(self, node_run_id: UUID, request_id: str) -> PreparedNodeExecution:
+    def prepare(
+        self,
+        node_run_id: UUID,
+        request_id: str,
+        user_revision: str | None = None,
+    ) -> PreparedNodeExecution:
         execution = self._workflow.require_context(node_run_id, for_update=True)
         if execution.status == NodeStatus.CANCEL_REQUESTED.value:
             return prepare_cancel_requested_execution(execution, request_id, self._actor.user_id)
         committed_version_id = self._workflow.committed_artifact(node_run_id)
         if committed_version_id is not None:
+            if user_revision is not None:
+                raise NodeExecutionError(
+                    "NODE_EXECUTION_PROMPT_ALREADY_COMMITTED",
+                    "the committed node cannot accept a new teacher prompt revision",
+                )
             self._workflow.require_execution_request(node_run_id, request_id)
             return prepare_committed_execution(
                 execution=execution,
@@ -126,13 +136,14 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
                 attempts=self._attempts,
                 packages=self._packages,
             )
-        return self._prepare_new(execution, node_run_id, request_id)
+        return self._prepare_new(execution, node_run_id, request_id, user_revision)
 
     def _prepare_new(
         self,
         execution: WorkflowExecutionContext,
         node_run_id: UUID,
         request_id: str,
+        user_revision: str | None,
     ) -> PreparedNodeExecution:
         succeeded = self._attempts.succeeded_attempt(
             node_run_id=node_run_id,
@@ -140,16 +151,22 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
         )
         frozen = self._workflow.find_frozen_execution_snapshot(node_run_id, request_id)
         if frozen is not None:
+            if user_revision is not None:
+                raise NodeExecutionError(
+                    "NODE_EXECUTION_PROMPT_ALREADY_FROZEN",
+                    "the frozen node cannot accept a new teacher prompt revision",
+                )
             if succeeded is not None:
                 return self._prepare_recovery(execution, node_run_id, frozen, succeeded)
             return self._prepare_frozen_invocation(execution, node_run_id, frozen)
-        return self._prepare_fresh(execution, node_run_id, request_id)
+        return self._prepare_fresh(execution, node_run_id, request_id, user_revision)
 
     def _prepare_fresh(
         self,
         execution: WorkflowExecutionContext,
         node_run_id: UUID,
         request_id: str,
+        user_revision: str | None,
     ) -> PreparedNodeExecution:
         inputs = compile_fresh_inputs(
             definitions=self._definitions,
@@ -160,6 +177,7 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
             node_run_id=node_run_id,
             model_request_id=self._attempts.next_model_request_id(node_run_id),
             user_id=self._actor.user_id,
+            user_revision=user_revision,
             artifact_selection=ArtifactInputSelectionReader(
                 self._session,
                 self._actor,

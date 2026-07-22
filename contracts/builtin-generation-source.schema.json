@@ -4,7 +4,14 @@
   "title": "BuiltinGenerationSource",
   "type": "object",
   "additionalProperties": false,
-  "required": ["source_version", "package", "styles", "nodes"],
+  "required": [
+    "source_version",
+    "package",
+    "styles",
+    "deterministic_outputs",
+    "artifacts",
+    "nodes"
+  ],
   "properties": {
     "source_version": {"const": "shanhai.builtin-generation-source/v1"},
     "package": {"$ref": "#/$defs/package"},
@@ -16,6 +23,10 @@
       "type": "array",
       "uniqueItems": true,
       "items": {"$ref": "#/$defs/deterministicOutput"}
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/artifact"}
     },
     "nodes": {
       "type": "array",
@@ -224,6 +235,17 @@
           "minItems": 1,
           "items": {"$ref": "#/$defs/contentField"}
         }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["definition_key", "title", "description", "fields"],
+      "properties": {
+        "definition_key": {"$ref": "#/$defs/key"},
+        "title": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "fields": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/contentField"}}
       }
     },
     "prompt": {
