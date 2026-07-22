@@ -556,14 +556,27 @@
       }
     },
     "approvalCompletion": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["kind", "collection_pointer", "stable_key_field"],
-      "properties": {
-        "kind": {"const": "lesson_unit_sync"},
-        "collection_pointer": {"const": "/lesson_units"},
-        "stable_key_field": {"const": "lesson_unit_key"}
-      }
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "collection_pointer", "stable_key_field"],
+          "properties": {
+            "kind": {"const": "lesson_unit_sync"},
+            "collection_pointer": {"const": "/lesson_units"},
+            "stable_key_field": {"const": "lesson_unit_key"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "source_input_ref"],
+          "properties": {
+            "kind": {"const": "workflow_gate"},
+            "source_input_ref": {"$ref": "#/$defs/contractRef"}
+          }
+        }
+      ]
     },
     "outputPersistence": {
       "type": "object",

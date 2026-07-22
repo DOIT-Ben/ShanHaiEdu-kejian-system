@@ -39,7 +39,7 @@
 
 | 上游快照 | 是否必须 | 注入范围 |
 | --- | --- | --- |
-| `lesson_division.approved_version` | 是 | 完整快照 |
+| `lesson_division.approved_version` | 是 | 仅目标课时投影（`division_key` + `lesson_unit`） |
 | `material.approved_parse` | 是 | 摘要 |
 
 ### 实际提示词

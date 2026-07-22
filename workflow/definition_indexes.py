@@ -95,6 +95,7 @@ def _build_output_definition_index(
             content_key,
             generation_key,
             quality,
+            nodes,
         )
     return output_entries
 
@@ -216,8 +217,10 @@ def _output_binding(
     content_key: str,
     generation_key: str,
     quality: QualityBinding,
+    nodes: tuple[WorkflowNodeDefinition, ...],
 ) -> WorkflowOutputDefinitionBinding:
     completion = _approval_completion(node)
+    _validate_workflow_gate_completion(node, completion, quality, nodes)
     return WorkflowOutputDefinitionBinding(
         content_definition_key=content_key,
         generation_template_key=generation_key,
@@ -246,11 +249,46 @@ def _approval_completion(
     )
     if completion is None:
         return None
+    kind = require_text(completion, "kind")
+    if kind == "workflow_gate":
+        return WorkflowApprovalCompletionBinding(
+            kind=kind,
+            collection_pointer=None,
+            stable_key_field=None,
+            source_input_ref=require_text(completion, "source_input_ref"),
+        )
+    if kind != "lesson_unit_sync":
+        raise WorkflowDefinitionError(
+            f"workflow node {node.node_key} has an unsupported approval completion",
+            code="WORKFLOW_OUTPUT_APPROVAL_COMPLETION_INVALID",
+        )
     return WorkflowApprovalCompletionBinding(
-        kind=require_text(completion, "kind"),
+        kind=kind,
         collection_pointer=require_text(completion, "collection_pointer"),
         stable_key_field=require_text(completion, "stable_key_field"),
+        source_input_ref=None,
     )
+
+
+def _validate_workflow_gate_completion(
+    node: WorkflowNodeDefinition,
+    completion: WorkflowApprovalCompletionBinding | None,
+    quality: QualityBinding,
+    nodes: tuple[WorkflowNodeDefinition, ...],
+) -> None:
+    if completion is None or completion.kind != "workflow_gate":
+        return
+    gate_key = quality[3]
+    gate = next((candidate for candidate in nodes if candidate.node_key == gate_key), None)
+    if (
+        node.execution_scope != "lesson_unit"
+        or gate is None
+        or completion.source_input_ref not in gate.input_contract_refs
+    ):
+        raise WorkflowDefinitionError(
+            f"workflow node {node.node_key} has an invalid approval gate completion",
+            code="WORKFLOW_OUTPUT_APPROVAL_COMPLETION_INVALID",
+        )
 
 
 def _freeze_indexes(

@@ -16,6 +16,14 @@ def _empty_supporting_inputs() -> Mapping[str, Mapping[str, Any]]:
     return {}
 
 
+def _empty_supporting_versions() -> Mapping[str, UUID]:
+    return {}
+
+
+def _empty_source_schema() -> Mapping[str, Any]:
+    return {}
+
+
 @dataclass(frozen=True, slots=True)
 class ValidatorRef:
     key: str
@@ -38,8 +46,13 @@ class QualityValidationContext:
     source_content: Mapping[str, Any]
     validator_refs: tuple[ValidatorRef, ...]
     validator_set_hash: str
+    source_schema: Mapping[str, Any] = field(default_factory=_empty_source_schema)
+    lesson_key: str | None = None
     supporting_inputs: Mapping[str, Mapping[str, Any]] = field(
         default_factory=_empty_supporting_inputs
+    )
+    supporting_input_versions: Mapping[str, UUID] = field(
+        default_factory=_empty_supporting_versions
     )
     existing_result: ArtifactQualityReportResult | None = None
 
@@ -90,6 +103,7 @@ class QualitySource:
     source_version_id: UUID
     content_hash: str
     content: Mapping[str, Any]
+    schema: Mapping[str, Any] | None = None
 
 
 class ArtifactQualityTransactionFactory(Protocol):

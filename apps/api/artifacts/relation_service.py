@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session, aliased
 
 from apps.api.artifacts.domain import (
@@ -23,6 +23,7 @@ from apps.api.artifacts.relation_carry_forward import (
     build_stale_reason,
     stale_reason_code,
 )
+from apps.api.artifacts.relation_lock import lock_relation_graph
 from apps.api.artifacts.repository import ArtifactRepository
 from apps.api.database import utc_now
 from apps.api.errors import ApiError
@@ -39,6 +40,10 @@ class ArtifactRelationService:
         self._actor = actor
         self._repository = ArtifactRepository(session, actor)
 
+    def lock_project_mutation(self, project_id: UUID, *, action: ProjectAction) -> Project:
+        lock_relation_graph(self._session, self._actor.organization_id)
+        return self._require_project(project_id, action=action, for_update=True)
+
     def lock_review_target(
         self,
         *,
@@ -48,7 +53,7 @@ class ArtifactRelationService:
         require_owner: bool = False,
     ) -> tuple[ArtifactVersion, Artifact]:
         """Acquire the shared write order before approval mutates an artifact."""
-        self._lock_relation_graph()
+        lock_relation_graph(self._session, self._actor.organization_id)
         self._require_project(project_id, action=action, for_update=True)
         if require_owner and not self._actor.is_system:
             ProjectAccessService(self._session, self._actor).require_owner(project_id)
@@ -86,7 +91,7 @@ class ArtifactRelationService:
             raise self._invalid("Artifact relations cannot cross project boundaries.")
 
         # All mutating graph paths acquire the organization lock before row locks.
-        self._lock_relation_graph()
+        lock_relation_graph(self._session, self._actor.organization_id)
         self._require_project(
             source_artifact.project_id, action=ProjectAction.EDIT, for_update=True
         )
@@ -163,7 +168,7 @@ class ArtifactRelationService:
     ) -> tuple[list[UUID], list[UUID]]:
         if previous_version_id is None or previous_version_id == replacement_version_id:
             return [], []
-        self._lock_relation_graph()
+        lock_relation_graph(self._session, self._actor.organization_id)
         source_record = self._session.execute(
             select(ArtifactVersion, Artifact)
             .join(Artifact, Artifact.id == ArtifactVersion.artifact_id)
@@ -340,12 +345,6 @@ class ArtifactRelationService:
                 code="INVALID_ARTIFACT_RELATION_SCOPE",
                 message=str(exc),
             ) from exc
-
-    def _lock_relation_graph(self) -> None:
-        lock_id = int.from_bytes(
-            self._actor.organization_id.bytes[:8], byteorder="big", signed=True
-        )
-        self._session.execute(select(func.pg_advisory_xact_lock(lock_id)))
 
     def _require_project(
         self,

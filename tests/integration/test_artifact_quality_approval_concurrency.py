@@ -14,6 +14,7 @@ from apps.api.artifacts.repository import ArtifactRepository
 from apps.api.artifacts.service import ArtifactService
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import ApiError
+from apps.api.workflows.models import NodeInputSnapshot, NodeRun
 from tests.integration.test_artifact_quality_approval import (
     ApprovalSeed,
     _approval_count,  # pyright: ignore[reportPrivateUsage]
@@ -100,15 +101,52 @@ def test_new_submit_and_approve_race_serializes_on_current_pointer(
         assert artifact.current_submitted_version_id == replacement_id
         assert _approval_count(session, replacement_id, "submit") == 1
         assert _approval_count(session, replacement_id, "approve") == 0
+        gate = session.scalar(
+            select(NodeRun)
+            .join(NodeInputSnapshot, NodeInputSnapshot.node_run_id == NodeRun.id)
+            .where(
+                NodeRun.node_key == "lesson_plan.approve",
+                NodeInputSnapshot.input_key == "artifact:lesson_plan",
+                NodeInputSnapshot.source_version_id == seeded.version_id,
+            )
+        )
+        assert gate is not None
         if approval_result[0] == "approved":
             assert artifact.current_approved_version_id == seeded.version_id
             assert _approval_count(session, seeded.version_id, "approve") == 1
             assert approval_result[2]["report_id"] == str(report_id)
+            assert gate.status == "approved"
         else:
             assert approval_result[1] == "ARTIFACT_STATE_CONFLICT"
             assert artifact.current_approved_version_id == seeded.prior_approved_version_id
             assert _approval_count(session, seeded.version_id, "approve") == 0
+            assert gate.status == "skipped"
         assert _total_approvals(session, "approve") == 1 + int(approval_result[0] == "approved")
+
+
+def test_replacement_submission_retires_the_previous_exact_gate(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    seeded = _seed_submitted_quality_artifact(factory)
+    _execute_report(factory, seeded, passed=True)
+
+    replacement_id = _submit_replacement(factory, seeded, Barrier(1))
+
+    with factory() as session:
+        artifact = session.get(Artifact, seeded.artifact_id)
+        gate = session.scalar(
+            select(NodeRun)
+            .join(NodeInputSnapshot, NodeInputSnapshot.node_run_id == NodeRun.id)
+            .where(
+                NodeRun.node_key == "lesson_plan.approve",
+                NodeInputSnapshot.input_key == "artifact:lesson_plan",
+                NodeInputSnapshot.source_version_id == seeded.version_id,
+            )
+        )
+        assert artifact is not None and gate is not None
+        assert artifact.current_submitted_version_id == replacement_id
+        assert gate.status == "skipped"
 
 
 def _submit_replacement(

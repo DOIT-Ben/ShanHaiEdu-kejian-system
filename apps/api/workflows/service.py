@@ -16,6 +16,7 @@ from apps.api.ids import new_uuid7
 from apps.api.projects.policy_service import AutomationPolicyService
 from apps.api.reliability.events import EventResource, EventWriter
 from apps.api.workflows.models import (
+    BranchRun,
     NodeInputSnapshot,
     NodeRun,
     WorkflowDefinitionVersion,
@@ -108,6 +109,55 @@ class WorkflowRuntimeService:
             branch_run_id=None,
             node_key=node_key,
             run_no=self._repository.next_node_run_no(run.id, None, node_key),
+            status=status.value,
+            trigger_type="manual",
+            automation_policy_snapshot_json=run.automation_policy_snapshot_json,
+            created_by=self._actor.principal_id,
+            updated_by=self._actor.principal_id,
+        )
+        self._session.add(node)
+        self._session.flush()
+        return node
+
+    def create_branch_node_run(
+        self,
+        workflow_run_id: UUID,
+        branch_run_id: UUID,
+        *,
+        node_key: str,
+        status: NodeStatus,
+    ) -> NodeRun:
+        run = self._require_run(workflow_run_id)
+        ProjectAccessService(self._session, self._actor).require(
+            run.project_id,
+            ProjectAction.EDIT,
+        )
+        branch = self._session.scalar(
+            select(BranchRun).where(
+                BranchRun.id == branch_run_id,
+                BranchRun.workflow_run_id == run.id,
+                BranchRun.status == "active",
+                BranchRun.deleted_at.is_(None),
+            )
+        )
+        registered = self._load_registered_workflow(run.workflow_definition_version_id)
+        definition = registered.node_by_key.get(node_key)
+        if (
+            branch is None
+            or definition is None
+            or definition.execution_scope != "lesson_unit"
+            or definition.branch_key != branch.branch_key
+        ):
+            raise WorkflowRuntimeError("node_key is outside the active lesson branch")
+        if status not in {NodeStatus.DISABLED, NodeStatus.NOT_READY, NodeStatus.READY}:
+            raise WorkflowRuntimeError("node run initial status is invalid")
+        node = NodeRun(
+            id=new_uuid7(),
+            organization_id=self._actor.organization_id,
+            workflow_run_id=run.id,
+            branch_run_id=branch.id,
+            node_key=node_key,
+            run_no=self._repository.next_node_run_no(run.id, branch.id, node_key),
             status=status.value,
             trigger_type="manual",
             automation_policy_snapshot_json=run.automation_policy_snapshot_json,

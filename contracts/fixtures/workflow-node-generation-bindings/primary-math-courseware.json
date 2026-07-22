@@ -482,8 +482,7 @@
       },
       "input_contract_refs": [
         "approval:lesson_division",
-        "content:material_evidence",
-        "content:lesson_plan"
+        "content:material_evidence"
       ],
       "output_contract_refs": [
         "artifact:lesson_plan"
@@ -520,6 +519,7 @@
         "allowed_sources": [
           "lesson_division.approved_version",
           "material.approved_parse",
+          "material_scope.approved_version",
           "project.teacher_preferences"
         ],
         "forbidden_sources": []
@@ -592,6 +592,10 @@
               }
             }
           ]
+        },
+        "approval_completion": {
+          "kind": "workflow_gate",
+          "source_input_ref": "artifact:lesson_plan"
         }
       }
     },
@@ -603,6 +607,7 @@
       "executor_ref": "executor.lesson_plan.validate",
       "input_contract_refs": [
         "artifact:lesson_plan",
+        "approval:lesson_division",
         "content:material_evidence"
       ],
       "output_contract_refs": [
@@ -669,6 +674,10 @@
       "entrypoint": false,
       "quality_report_persistence": {
         "source_input_ref": "artifact:lesson_plan",
+        "supporting_input_refs": [
+          "approval:lesson_division",
+          "content:material_evidence"
+        ],
         "report_ref": "report:lesson_plan_quality",
         "validator_refs": [
           {

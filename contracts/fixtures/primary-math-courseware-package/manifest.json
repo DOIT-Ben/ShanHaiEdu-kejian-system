@@ -68,7 +68,7 @@
       "kind": "prompt_template",
       "path": "items/lesson-plan-generate-prompt.json",
       "schema_id": "https://shanhaiedu.local/contracts/prompt-template.schema.json",
-      "sha256": "24cbb0b6352d5178f95a31aca544c706831d079e828001433a313d893ed58aa5"
+      "sha256": "749b1baad411fb74272e0e253147f551186523494c8e5ce59ac5029cf3d05e8b"
     },
     {
       "item_key": "lesson_plan.generate.projection",

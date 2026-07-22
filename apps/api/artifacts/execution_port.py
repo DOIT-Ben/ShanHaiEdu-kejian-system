@@ -15,9 +15,10 @@ from apps.api.artifacts.context_source_registry import (
 from apps.api.artifacts.domain import canonical_content_hash
 from apps.api.artifacts.execution_errors import ArtifactExecutionPortError
 from apps.api.artifacts.generated_write_guard import GeneratedArtifactWriteGuard
-from apps.api.artifacts.models import Approval, Artifact, ArtifactVersion
+from apps.api.artifacts.lesson_context_projection import project_artifact_context
+from apps.api.artifacts.models import Artifact, ArtifactVersion
 from apps.api.artifacts.relation_service import ArtifactRelationService
-from apps.api.database import utc_now
+from apps.api.artifacts.replacement_service import ArtifactReplacementService
 from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.permissions import ProjectAccessService
 from apps.api.ids import new_uuid7
@@ -81,7 +82,11 @@ class SqlAlchemyArtifactPort:
                 artifact_version_id=version.id,
                 contract_ref=source,
                 artifact_type=artifact.artifact_type,
-                content=version.content_json,
+                content=project_artifact_context(
+                    source=source,
+                    lesson_key=execution.lesson_key,
+                    content=version.content_json,
+                ),
                 content_hash=version.content_hash,
             )
             for version, artifact in rows
@@ -170,10 +175,10 @@ class SqlAlchemyArtifactPort:
 
     def persist_generated(self, write: GeneratedArtifactWrite) -> ArtifactWriteResult:
         GeneratedArtifactWriteGuard(self._session, self._actor).require(write)
-        ProjectAccessService(self._session, self._actor).require(
+        replacement = ArtifactReplacementService(self._session, self._actor)
+        replacement.lock_project_mutation(
             write.project_id,
-            ProjectAction.GENERATE,
-            for_update=True,
+            action=ProjectAction.GENERATE,
         )
         content = plain_json_value(write.content)
         if not isinstance(content, dict):
@@ -184,7 +189,13 @@ class SqlAlchemyArtifactPort:
         typed_content = cast(dict[str, Any], content)
         content_hash = canonical_content_hash(typed_content)
         artifact = self._get_or_create_artifact(write)
-        existing = self._get_or_create_version(artifact, write, typed_content, content_hash)
+        existing = self._get_or_create_version(
+            artifact,
+            write,
+            typed_content,
+            content_hash,
+            replacement,
+        )
         self._write_relations(write, existing.id)
         return ArtifactWriteResult(
             artifact_id=artifact.id,
@@ -247,6 +258,7 @@ class SqlAlchemyArtifactPort:
         write: GeneratedArtifactWrite,
         content: dict[str, Any],
         content_hash: str,
+        replacement: ArtifactReplacementService,
     ) -> ArtifactVersion:
         existing = self._session.scalar(
             select(ArtifactVersion)
@@ -262,6 +274,7 @@ class SqlAlchemyArtifactPort:
         )
         if existing is not None:
             return existing
+        previous_version_id = artifact.current_submitted_version_id
         version_no = (
             int(
                 self._session.scalar(
@@ -290,37 +303,14 @@ class SqlAlchemyArtifactPort:
         )
         self._session.add(version)
         self._session.flush()
-        self._submit_version(artifact, version, write)
-        return version
-
-    def _submit_version(
-        self,
-        artifact: Artifact,
-        version: ArtifactVersion,
-        write: GeneratedArtifactWrite,
-    ) -> None:
-        self._session.add(
-            Approval(
-                id=new_uuid7(),
-                organization_id=self._actor.organization_id,
-                artifact_version_id=version.id,
-                node_run_id=write.node_run_id,
-                action="submit",
-                actor_type=self._actor.actor_type,
-                actor_user_id=self._actor.user_id,
-                comment=None,
-                quality_evidence_json={"status": "validated"},
-                policy_snapshot_json={},
-                created_by=self._actor.principal_id,
-            )
+        replacement.prepare_generated(
+            artifact,
+            previous_version_id,
+            version,
+            node_run_id=write.node_run_id,
         )
-        artifact.current_submitted_version_id = version.id
-        artifact.status = "in_review"
-        artifact.stale_reason_json = None
-        artifact.updated_at = utc_now()
-        artifact.updated_by = self._actor.principal_id
-        artifact.lock_version += 1
-        self._session.flush()
+        replacement.submit_generated(artifact, version, write)
+        return version
 
     def _write_relations(self, write: GeneratedArtifactWrite, target_version_id: UUID) -> None:
         service = ArtifactRelationService(self._session, self._actor)

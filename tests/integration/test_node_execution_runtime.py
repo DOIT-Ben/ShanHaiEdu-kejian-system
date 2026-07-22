@@ -1089,6 +1089,16 @@ async def test_lesson_scoped_context_and_relations_stay_with_current_lesson(
             artifact_type="lesson_division",
             branch_key="project",
             lesson_unit_id=None,
+            content={
+                "division_key": "DIVISION-CONTEXT-TEST",
+                "lesson_units": [
+                    {
+                        "lesson_unit_key": lesson.lesson_key,
+                        "title": lesson.title,
+                    }
+                    for lesson in lessons
+                ],
+            },
         )
 
         base = dict(
@@ -1116,6 +1126,13 @@ async def test_lesson_scoped_context_and_relations_stay_with_current_lesson(
             "lesson_division.approved_version",
         )
         assert [value.artifact_version_id for value in project_values] == [project_division.id]
+        assert project_values[0].content == {
+            "division_key": "DIVISION-CONTEXT-TEST",
+            "lesson_unit": {
+                "lesson_unit_key": lessons[0].lesson_key,
+                "title": lessons[0].title,
+            },
+        }
         with pytest.raises(ArtifactExecutionPortError) as caught:
             port.list_context_versions(context, "approval:undeclared")
         assert caught.value.code == "NODE_EXECUTION_CONTEXT_SOURCE_UNKNOWN"

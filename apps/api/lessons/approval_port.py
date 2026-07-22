@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from apps.api.artifacts.domain import (
@@ -19,6 +20,7 @@ from apps.api.lessons.division_runtime import (
     build_approved_lesson_division,
     diff_lesson_divisions,
 )
+from apps.api.lessons.models import LessonUnit
 from apps.api.lessons.repository import LessonRepository
 from apps.api.lessons.service import LessonService
 from apps.api.workflows.lesson_division_port import LessonDivisionWorkflowPort
@@ -47,6 +49,42 @@ class LessonApprovalCompletionResult:
     stale_selection: StaleImpactSelection
     retained_selection: StaleImpactSelection
     lesson_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class ApprovedLessonUnitFact:
+    id: UUID
+    lesson_key: str
+    source_division_version_id: UUID
+
+
+class LessonApprovalReader:
+    def __init__(self, session: Session, actor: ActorContext) -> None:
+        self._session = session
+        self._actor = actor
+
+    def current_lesson(
+        self,
+        *,
+        project_id: UUID,
+        lesson_unit_id: UUID,
+    ) -> ApprovedLessonUnitFact | None:
+        lesson = self._session.scalar(
+            select(LessonUnit).where(
+                LessonUnit.id == lesson_unit_id,
+                LessonUnit.organization_id == self._actor.organization_id,
+                LessonUnit.project_id == project_id,
+                LessonUnit.status == "active",
+                LessonUnit.deleted_at.is_(None),
+            )
+        )
+        if lesson is None:
+            return None
+        return ApprovedLessonUnitFact(
+            id=lesson.id,
+            lesson_key=lesson.lesson_key,
+            source_division_version_id=lesson.source_division_version_id,
+        )
 
 
 class LessonDivisionApprovalPort:
