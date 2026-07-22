@@ -164,7 +164,15 @@ def _validate_artifact_relations(node: dict[str, Any], artifact: dict[str, Any])
                 f"duplicate relation binding: {identity_key[1]}",
             )
         relation_keys.add(identity_key)
-        _validate_impact_scope(node, cast(dict[str, Any], relation["impact_scope"]))
+        impact_scope = cast(dict[str, Any], relation["impact_scope"])
+        if relation["relation_type"] == "supersedes" and (
+            source_binding not in optional_inputs or impact_scope != {"mode": "all"}
+        ):
+            raise NodeGenerationBindingError(
+                "NODE_BINDING_SUPERSEDES_DECLARATION_INVALID",
+                "generated supersedes requires an optional exact source and all impact",
+            )
+        _validate_impact_scope(node, impact_scope)
 
 
 def _validate_impact_scope(node: dict[str, Any], impact_scope: dict[str, Any]) -> None:
