@@ -17,6 +17,7 @@ function generationLabel(type: StudioType, stage: CreationStage, primaryLabel: s
   if (stage === "draft") return primaryLabel;
   if (stage === "queued") return "等待创作";
   if (stage === "running") return "正在创作";
+  if (stage === "paused") return "继续创作";
   return type === "image" ? "按新要求再画一组" : "按新要求再做一组";
 }
 

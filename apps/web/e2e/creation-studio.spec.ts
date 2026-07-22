@@ -75,6 +75,34 @@ test("创作台生成任务会进入任务中心并保持刷新恢复", async ({
   await expect(page.getByRole("heading", { name: "生成课堂素材" })).toBeVisible();
 });
 
+test("任务中心暂停或取消后创作台不会被旧计时器改回完成", async ({ page }) => {
+  await loginAsTeacher(page);
+  await page.goto("/app/creation/images");
+  await page.getByRole("button", { name: "开始创作图片" }).click();
+  await page.goto("/app/tasks");
+
+  const taskRow = page
+    .getByRole("article")
+    .filter({ has: page.getByRole("heading", { name: "生成课堂素材" }) });
+  await taskRow.getByRole("button", { name: "暂停" }).click();
+  await page.waitForTimeout(1_600);
+
+  await page.goto("/app/creation/images");
+  await expect(page.getByRole("button", { name: "继续创作" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "就用这张" })).toHaveCount(0);
+
+  await page.goto("/app/tasks");
+  const pausedTaskRow = page
+    .getByRole("article")
+    .filter({ has: page.getByRole("heading", { name: "生成课堂素材" }) });
+  await pausedTaskRow.getByRole("button", { name: "取消" }).click();
+  await page.waitForTimeout(1_600);
+
+  await page.goto("/app/creation/images");
+  await expect(page.getByRole("button", { name: "就用这张" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "按新要求再画一组" })).toBeVisible();
+});
+
 test("新老师可按首页引导进入并在需要时调整创作设置", async ({ page }) => {
   await loginAsTeacher(page);
   await page.goto("/app/creation");

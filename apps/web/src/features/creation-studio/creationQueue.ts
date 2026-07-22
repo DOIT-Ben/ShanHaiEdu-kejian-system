@@ -1,4 +1,5 @@
-export type CreationQueueStatus = "cancelled" | "failed" | "idle" | "queued" | "ready" | "running";
+export type CreationQueueStatus =
+  "cancelled" | "failed" | "idle" | "paused" | "queued" | "ready" | "running";
 
 export type CreationQueueState = Record<
   string,
@@ -10,7 +11,9 @@ export type CreationQueueState = Record<
 >;
 
 function promoteNext(queue: CreationQueueState): CreationQueueState {
-  if (Object.values(queue).some((task) => task.status === "running")) return queue;
+  if (Object.values(queue).some((task) => task.status === "running" || task.status === "paused")) {
+    return queue;
+  }
   const nextId = Object.keys(queue).find((id) => queue[id]?.status === "queued");
   if (!nextId) return queue;
   const nextTask = queue[nextId];
@@ -19,12 +22,14 @@ function promoteNext(queue: CreationQueueState): CreationQueueState {
 }
 
 export function enqueueCreationTask(queue: CreationQueueState, id: string): CreationQueueState {
-  const running = Object.values(queue).some((task) => task.status === "running");
+  const occupied = Object.entries(queue).some(
+    ([itemId, task]) => itemId !== id && (task.status === "running" || task.status === "paused"),
+  );
   return {
     ...queue,
     [id]: {
       attempts: (queue[id]?.attempts ?? 0) + 1,
-      status: running ? ("queued" as const) : ("running" as const),
+      status: occupied ? ("queued" as const) : ("running" as const),
       ...(queue[id]?.taskId ? { taskId: queue[id].taskId } : {}),
     },
   };

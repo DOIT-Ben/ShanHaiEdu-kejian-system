@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { retryCreationTask } from "@/features/creation-studio/creationQueue";
 import {
+  applyCreationTaskAction,
+  finishRunningCreationTask,
   readCreationQueue,
+  resolveCreationStage,
   saveCreationQueue,
 } from "@/features/creation-studio/creationRuntimeAdapter";
 import {
@@ -37,6 +40,42 @@ describe("creation runtime adapter", () => {
     const retriedTask = getMockRuntimeState().tasks.find((task) => task.id === taskId);
     expect(retriedTask?.status).toBe("running");
     expect(retriedTask?.retry_count).toBe(1);
+  });
+
+  it("keeps pause, cancel, resume, and retry synchronized with the bound task", () => {
+    const queue = saveCreationQueue(
+      queueKey,
+      { assetA: { attempts: 1, status: "running" } },
+      { lessonId: "lesson-a", projectId: "project-a" },
+    );
+    const taskId = queue.assetA?.taskId ?? "";
+
+    expect(applyCreationTaskAction(taskId, "pause")).toBe(true);
+    expect(readCreationQueue(getMockRuntimeState(), queueKey).assetA?.status).toBe("paused");
+    expect(applyCreationTaskAction(taskId, "resume")).toBe(true);
+    expect(readCreationQueue(getMockRuntimeState(), queueKey).assetA?.status).toBe("running");
+    expect(applyCreationTaskAction(taskId, "cancel")).toBe(true);
+    expect(readCreationQueue(getMockRuntimeState(), queueKey).assetA?.status).toBe("cancelled");
+    expect(applyCreationTaskAction(taskId, "retry")).toBe(true);
+    expect(readCreationQueue(getMockRuntimeState(), queueKey).assetA?.status).toBe("running");
+  });
+
+  it("does not complete a task after the task center has paused or cancelled it", () => {
+    const queue = saveCreationQueue(
+      queueKey,
+      { assetA: { attempts: 1, status: "running" } },
+      { lessonId: "lesson-a", projectId: "project-a" },
+    );
+    const taskId = queue.assetA?.taskId ?? "";
+
+    applyCreationTaskAction(taskId, "pause");
+    expect(finishRunningCreationTask(queueKey, "assetA")).toBeUndefined();
+    expect(resolveCreationStage("draft", "paused")).toBe("paused");
+
+    applyCreationTaskAction(taskId, "resume");
+    applyCreationTaskAction(taskId, "cancel");
+    expect(finishRunningCreationTask(queueKey, "assetA")).toBeUndefined();
+    expect(resolveCreationStage("running", "cancelled")).toBe("cancelled");
   });
 
   it("restores queue bindings from persisted runtime state", () => {

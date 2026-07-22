@@ -70,7 +70,7 @@ describe("TasksPage status feedback", () => {
     rows.forEach((row) => expect(row).toHaveAttribute("data-density", "compact"));
   });
 
-  it("创作台任务在任务中心可见且取消、重试保持一致", () => {
+  it("创作台任务在任务中心可见且暂停、取消、重试保持一致", () => {
     saveCreationQueue(
       creationQueueKey,
       { assetA: { attempts: 1, status: "running" } },
@@ -84,6 +84,16 @@ describe("TasksPage status feedback", () => {
 
     const taskRow = screen.getByRole("heading", { name: "生成课堂素材" }).closest("article");
     expect(taskRow).not.toBeNull();
+    fireEvent.click(within(taskRow as HTMLElement).getByRole("button", { name: "暂停" }));
+    expect(readCreationQueue(getMockRuntimeState(), creationQueueKey).assetA?.status).toBe(
+      "paused",
+    );
+
+    fireEvent.click(within(taskRow as HTMLElement).getByRole("button", { name: "继续" }));
+    expect(readCreationQueue(getMockRuntimeState(), creationQueueKey).assetA?.status).toBe(
+      "running",
+    );
+
     fireEvent.click(within(taskRow as HTMLElement).getByRole("button", { name: "取消" }));
     expect(readCreationQueue(getMockRuntimeState(), creationQueueKey).assetA?.status).toBe(
       "cancelled",
@@ -91,7 +101,7 @@ describe("TasksPage status feedback", () => {
 
     fireEvent.click(within(taskRow as HTMLElement).getByRole("button", { name: "重试" }));
     expect(readCreationQueue(getMockRuntimeState(), creationQueueKey).assetA?.status).toBe(
-      "queued",
+      "running",
     );
   });
 });

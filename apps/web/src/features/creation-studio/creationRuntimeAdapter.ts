@@ -6,10 +6,14 @@ import {
   updateMockNodeState,
   type MockRuntimeState,
 } from "@/shared/api/mockClient";
-import type {
-  CreationQueueState,
-  CreationQueueStatus,
+import {
+  cancelCreationTask,
+  completeCreationTask,
+  retryCreationTask,
+  type CreationQueueState,
+  type CreationQueueStatus,
 } from "@/features/creation-studio/creationQueue";
+import type { CreationStage } from "@/features/creation-studio/model";
 
 export function readCreationDraft<T>(runtime: MockRuntimeState, key: string, fallback?: T) {
   const value = runtime.drafts[key]?.value;
@@ -51,7 +55,7 @@ export function readCreationQueue(runtime: MockRuntimeState, key: string): Creat
           : task?.status === "draft"
             ? "idle"
             : task?.status === "paused"
-              ? "running"
+              ? "paused"
               : task?.status === "cancel_requested"
                 ? "cancelled"
                 : task?.status === "queued" ||
@@ -109,6 +113,64 @@ export function saveCreationQueue(
     options,
   );
   return nextQueue;
+}
+
+export function resolveCreationStage(
+  storedStage: CreationStage,
+  taskStatus?: CreationQueueStatus,
+): CreationStage {
+  if (!taskStatus || taskStatus === "idle") return storedStage;
+  if (taskStatus === "ready" && (storedStage === "adopted" || storedStage === "saved")) {
+    return storedStage;
+  }
+  return taskStatus;
+}
+
+export function finishRunningCreationTask(
+  key: string,
+  itemId: string,
+  options?: Parameters<typeof saveMockDraft>[2],
+) {
+  const queue = readCreationQueue(getMockRuntimeState(), key);
+  if (queue[itemId]?.status !== "running") return undefined;
+  return saveCreationQueue(key, completeCreationTask(queue, itemId), options);
+}
+
+type CreationTaskAction = "cancel" | "pause" | "resume" | "retry";
+
+function findCreationTaskBinding(runtime: MockRuntimeState, taskId: string) {
+  for (const [key, draft] of Object.entries(runtime.drafts)) {
+    if (!key.startsWith("creation:") || !key.endsWith(":queue")) continue;
+    if (!draft.value || typeof draft.value !== "object") continue;
+    const itemId = Object.entries(
+      draft.value as Record<string, { attempts?: number; taskId?: string }>,
+    ).find(([, entry]) => entry.taskId === taskId)?.[0];
+    if (itemId) return { draft, itemId, key };
+  }
+  return undefined;
+}
+
+export function applyCreationTaskAction(taskId: string, action: CreationTaskAction) {
+  const runtime = getMockRuntimeState();
+  const binding = findCreationTaskBinding(runtime, taskId);
+  if (!binding) return false;
+  if (action === "pause" || action === "resume") {
+    updateMockTask(taskId, {
+      stage: action === "pause" ? "已暂停" : "创作台生成",
+      status: action === "pause" ? "paused" : "running",
+    });
+    return true;
+  }
+  const queue = readCreationQueue(runtime, binding.key);
+  const nextQueue =
+    action === "cancel"
+      ? cancelCreationTask(queue, binding.itemId)
+      : retryCreationTask(queue, binding.itemId);
+  saveCreationQueue(binding.key, nextQueue, {
+    lessonId: binding.draft.lesson_id ?? undefined,
+    projectId: binding.draft.project_id ?? undefined,
+  });
+  return true;
 }
 
 export function readLatestCreationRuntime() {

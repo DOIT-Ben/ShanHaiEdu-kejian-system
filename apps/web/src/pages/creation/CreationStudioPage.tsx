@@ -6,7 +6,6 @@ import type { CreationAdvancedSettings } from "@/features/creation-studio/Creati
 import { CreationComposer } from "@/features/creation-studio/CreationComposer";
 import {
   cancelCreationTask,
-  completeCreationTask,
   enqueueCreationTask,
   retryCreationTask,
   type CreationQueueStatus,
@@ -39,9 +38,11 @@ import {
 import { useMockRuntime } from "@/shared/api/mockClient";
 import {
   commitCreationNode,
+  finishRunningCreationTask,
   readCreationDraft,
   readCreationQueue,
   readLatestCreationRuntime,
+  resolveCreationStage,
   saveCreationDraft,
   saveCreationQueue,
 } from "@/features/creation-studio/creationRuntimeAdapter";
@@ -55,6 +56,7 @@ const creationStages: CreationStage[] = [
   "cancelled",
   "draft",
   "failed",
+  "paused",
   "queued",
   "ready",
   "running",
@@ -126,9 +128,11 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
   const packageQueue = readCreationQueue(runtime, queueKey);
   const stored = readCreationDraft<Partial<SavedCreation>>(runtime, stateKey);
   const fallbackDescription = packageItem?.prompt ?? getCreationDescription(type);
-  const stage = creationStages.includes(stored?.stage as CreationStage)
+  const storedStage = creationStages.includes(stored?.stage as CreationStage)
     ? (stored?.stage as CreationStage)
     : "draft";
+  const activeQueueStatus = packageQueue[queueItemId]?.status;
+  const stage = resolveCreationStage(storedStage, activeQueueStatus);
   const candidateCount = stored?.settings?.candidateCount ?? "3";
   const candidate = clampCreationCandidate(
     typeof stored?.candidate === "number" ? stored.candidate : 0,
@@ -200,7 +204,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
       history,
       ...(projectId ? { projectId } : {}),
       settings,
-      stage,
+      stage: storedStage,
       ...patch,
     });
   };
@@ -215,10 +219,12 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
         };
 
   useEffect(() => {
-    if (packageMode || stage !== "running") return;
+    if (packageMode || activeQueueStatus !== "running") return;
     const timer = window.setTimeout(() => {
-      const latestRuntime = readLatestCreationRuntime();
-      const latestQueue = readCreationQueue(latestRuntime, queueKey);
+      const nextQueue = finishRunningCreationTask(queueKey, queueItemId, {
+        ...(projectId ? { projectId } : {}),
+      });
+      if (!nextQueue) return;
       saveCreationDraft(stateKey, {
         advancedSettings,
         candidate: 0,
@@ -229,9 +235,6 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
         ...(projectId ? { projectId } : {}),
         settings,
         stage: "ready",
-      });
-      saveCreationQueue(queueKey, completeCreationTask(latestQueue, queueItemId), {
-        ...(projectId ? { projectId } : {}),
       });
     }, 1450);
     return () => window.clearTimeout(timer);
@@ -244,7 +247,7 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
     packageMode,
     projectId,
     settings,
-    stage,
+    activeQueueStatus,
     stateKey,
     queueItemId,
     queueKey,
@@ -261,26 +264,16 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
       const runningStateKey = `${packageStatePrefix}:item:${runningPackageItemId}`;
       const runningStored = latestRuntime.drafts[runningStateKey]?.value as
         Partial<SavedCreation> | undefined;
-      const latestQueue = readCreationQueue(latestRuntime, queueKey);
-      const nextQueue = completeCreationTask(latestQueue, runningPackageItemId);
+      const nextQueue = finishRunningCreationTask(queueKey, runningPackageItemId, {
+        ...(requestedLessonId ? { lessonId: requestedLessonId } : {}),
+        ...(projectId ? { projectId } : {}),
+      });
+      if (!nextQueue) return;
       saveCreationDraft(runningStateKey, {
         ...runningStored,
         candidate: 0,
         hasUnappliedChanges: false,
         stage: "ready",
-      });
-      const nextRunningId = Object.keys(nextQueue).find(
-        (itemId) => nextQueue[itemId]?.status === "running",
-      );
-      if (nextRunningId) {
-        const nextStateKey = `${packageStatePrefix}:item:${nextRunningId}`;
-        const nextStored = latestRuntime.drafts[nextStateKey]?.value as
-          Partial<SavedCreation> | undefined;
-        saveCreationDraft(nextStateKey, { ...nextStored, stage: "running" });
-      }
-      saveCreationQueue(queueKey, nextQueue, {
-        ...(requestedLessonId ? { lessonId: requestedLessonId } : {}),
-        ...(projectId ? { projectId } : {}),
       });
     }, 1450);
     return () => window.clearTimeout(timer);
@@ -292,7 +285,6 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
     setAdvancedOpen(false);
     setPromptOpen(false);
     const nextQueue = enqueueCreationTask(packageQueue, queueItemId);
-    const nextPackageStage = nextQueue[queueItemId]?.status === "running" ? "running" : "queued";
     const nextHistory =
       generation > 0 && ["ready", "adopted", "saved"].includes(stage)
         ? [...history, { candidate, generation, prompt: description, ratio: settings.ratio }]
@@ -303,7 +295,10 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
       hasUnappliedChanges: false,
       history: nextHistory,
       savedTarget: undefined,
-      stage: nextPackageStage,
+      stage:
+        storedStage === "ready" || storedStage === "adopted" || storedStage === "saved"
+          ? "ready"
+          : "draft",
     });
     saveCreationQueue(queueKey, nextQueue, {
       ...(requestedLessonId ? { lessonId: requestedLessonId } : {}),
@@ -382,7 +377,12 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
           referenceName: item.referenceNames?.join("、") ?? "",
           style: item.style,
         },
-        stage: nextQueue[item.id]?.status === "running" ? "running" : "queued",
+        stage:
+          existing?.stage === "ready" ||
+          existing?.stage === "adopted" ||
+          existing?.stage === "saved"
+            ? "ready"
+            : "draft",
       });
     }
     saveCreationQueue(queueKey, nextQueue, {
@@ -394,17 +394,6 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
   const cancelPackageTask = (itemId: string) => {
     if (!packageStatePrefix) return;
     const nextQueue = cancelCreationTask(packageQueue, itemId);
-    const itemKey = `${packageStatePrefix}:item:${itemId}`;
-    const itemStored = readCreationDraft<Partial<SavedCreation>>(runtime, itemKey);
-    saveCreationDraft(itemKey, { ...itemStored, stage: "cancelled" });
-    const nextRunningId = Object.keys(nextQueue).find(
-      (candidateId) => nextQueue[candidateId]?.status === "running",
-    );
-    if (nextRunningId) {
-      const nextKey = `${packageStatePrefix}:item:${nextRunningId}`;
-      const nextStored = readCreationDraft<Partial<SavedCreation>>(runtime, nextKey);
-      saveCreationDraft(nextKey, { ...nextStored, stage: "running" });
-    }
     saveCreationQueue(queueKey, nextQueue, {
       ...(requestedLessonId ? { lessonId: requestedLessonId } : {}),
       ...(projectId ? { projectId } : {}),
@@ -419,7 +408,12 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
     saveCreationDraft(itemKey, {
       ...itemStored,
       generation: (itemStored?.generation ?? 0) + 1,
-      stage: nextQueue[itemId]?.status === "running" ? "running" : "queued",
+      stage:
+        itemStored?.stage === "ready" ||
+        itemStored?.stage === "adopted" ||
+        itemStored?.stage === "saved"
+          ? "ready"
+          : "draft",
     });
     saveCreationQueue(queueKey, nextQueue, {
       ...(requestedLessonId ? { lessonId: requestedLessonId } : {}),

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { applyCreationTaskAction } from "@/features/creation-studio/creationRuntimeAdapter";
 import { getApprovedProjectLessons } from "@/features/workbench/lib/projectLessons";
 import { saveMockDraft, updateMockTask, useMockRuntime } from "@/shared/api/mockClient";
 import { apiConfig } from "@/shared/api/config";
@@ -241,11 +242,14 @@ export function TasksPage({ projectOnly = false }: { projectOnly?: boolean }) {
                 ) : task.status === "running" || task.status === "paused" ? (
                   <>
                     <Button
-                      onClick={() =>
-                        updateMockTask(task.id, {
-                          status: task.status === "paused" ? "running" : "paused",
-                        })
-                      }
+                      onClick={() => {
+                        const action = task.status === "paused" ? "resume" : "pause";
+                        if (!applyCreationTaskAction(task.id, action)) {
+                          updateMockTask(task.id, {
+                            status: task.status === "paused" ? "running" : "paused",
+                          });
+                        }
+                      }}
                       size="sm"
                       variant="quiet"
                     >
@@ -253,13 +257,15 @@ export function TasksPage({ projectOnly = false }: { projectOnly?: boolean }) {
                       {task.status === "paused" ? "继续" : "暂停"}
                     </Button>
                     <Button
-                      onClick={() =>
-                        updateMockTask(task.id, {
-                          progress: 0,
-                          stage: "已取消",
-                          status: "cancelled",
-                        })
-                      }
+                      onClick={() => {
+                        if (!applyCreationTaskAction(task.id, "cancel")) {
+                          updateMockTask(task.id, {
+                            progress: 0,
+                            stage: "已取消",
+                            status: "cancelled",
+                          });
+                        }
+                      }}
                       size="sm"
                       variant="quiet"
                     >
@@ -269,14 +275,16 @@ export function TasksPage({ projectOnly = false }: { projectOnly?: boolean }) {
                   </>
                 ) : task.status === "failed" || task.status === "cancelled" ? (
                   <Button
-                    onClick={() =>
-                      updateMockTask(task.id, {
-                        progress: 0,
-                        retry_count: task.retry_count + 1,
-                        stage: "等待重新处理",
-                        status: "queued",
-                      })
-                    }
+                    onClick={() => {
+                      if (!applyCreationTaskAction(task.id, "retry")) {
+                        updateMockTask(task.id, {
+                          progress: 0,
+                          retry_count: task.retry_count + 1,
+                          stage: "等待重新处理",
+                          status: "queued",
+                        });
+                      }
+                    }}
                     size="sm"
                     variant="secondary"
                   >

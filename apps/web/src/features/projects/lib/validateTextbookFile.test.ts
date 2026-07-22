@@ -19,4 +19,10 @@ describe("validateTextbookFile", () => {
     Object.defineProperty(oversized, "size", { value: MAX_TEXTBOOK_PDF_BYTES + 1 });
     expect(validateTextbookFile(oversized)).toBe("教材文件不能超过 100 MB");
   });
+
+  it("accepts a PDF at the exact 100 MB boundary", () => {
+    const boundaryFile = new File(["pdf"], "教材.pdf", { type: "application/pdf" });
+    Object.defineProperty(boundaryFile, "size", { value: MAX_TEXTBOOK_PDF_BYTES });
+    expect(validateTextbookFile(boundaryFile)).toBeNull();
+  });
 });

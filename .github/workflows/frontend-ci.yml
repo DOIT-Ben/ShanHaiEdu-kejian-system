@@ -76,6 +76,12 @@ jobs:
       - name: Build Storybook
         run: pnpm --filter @shanhaiedu/web build:storybook
 
+      - name: Install Chromium for accessibility checks
+        run: pnpm --filter @shanhaiedu/web exec playwright install --with-deps chromium
+
+      - name: Test Storybook accessibility
+        run: pnpm --filter @shanhaiedu/web test:storybook:a11y
+
       - name: Build production bundle
         run: pnpm --filter @shanhaiedu/web build
 

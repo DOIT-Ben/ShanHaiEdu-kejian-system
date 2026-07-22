@@ -40,4 +40,16 @@ describe("creation queue", () => {
 
     expect(queue["shot-1"]).toEqual({ attempts: 2, status: "running" });
   });
+
+  it("暂停任务保留队列占用并可从原任务继续", () => {
+    let queue: CreationQueueState = {
+      "shot-1": { attempts: 1, status: "paused" },
+    };
+    queue = enqueueCreationTask(queue, "shot-2");
+    expect(queue["shot-2"]?.status).toBe("queued");
+
+    queue = enqueueCreationTask(queue, "shot-1");
+    expect(queue["shot-1"]?.status).toBe("running");
+    expect(queue["shot-2"]?.status).toBe("queued");
+  });
 });
