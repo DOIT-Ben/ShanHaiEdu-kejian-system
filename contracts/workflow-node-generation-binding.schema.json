@@ -586,7 +586,8 @@
       "properties": {
         "artifact": {"$ref": "#/$defs/artifactPersistence"},
         "creation_package": {"$ref": "#/$defs/creationPackagePersistence"},
-        "approval_completion": {"$ref": "#/$defs/approvalCompletion"}
+        "approval_completion": {"$ref": "#/$defs/approvalCompletion"},
+        "quality_source_binding": {"enum": ["artifact", "linked_file_asset"]}
       }
     },
     "qualityReportPersistence": {
@@ -798,7 +799,6 @@
               "anyOf": [
                 {"required": ["model_capability"]},
                 {"required": ["generation_template_ref"]},
-                {"required": ["output_persistence"]},
                 {"required": ["quality_requirement"]}
               ]
             },

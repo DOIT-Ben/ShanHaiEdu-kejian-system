@@ -26,6 +26,7 @@ from workflow.node_state import NodeStatus
 class QualityValidateNodeFact:
     organization_id: UUID
     project_id: UUID
+    lesson_unit_id: UUID | None
     content_release_id: UUID
     workflow_definition_version_id: UUID
     node_key: str
@@ -36,7 +37,8 @@ class QualityValidateNodeFact:
 class ArtifactApprovalGateCommand:
     project_id: UUID
     lesson_unit_id: UUID
-    artifact_version_id: UUID
+    source_type: str
+    source_version_id: UUID
     content_release_id: UUID
     workflow_definition_version_id: UUID
     gate_node_key: str
@@ -104,7 +106,8 @@ class WorkflowArtifactApprovalPort:
                     WorkflowRun.workflow_definition_version_id
                     == command.workflow_definition_version_id,
                     NodeInputSnapshot.input_key == command.source_input_ref,
-                    NodeInputSnapshot.source_version_id == command.artifact_version_id,
+                    NodeInputSnapshot.source_type == command.source_type,
+                    NodeInputSnapshot.source_version_id == command.source_version_id,
                 )
                 .order_by(NodeRun.run_no.desc())
                 .with_for_update(of=NodeRun)
@@ -158,16 +161,18 @@ class WorkflowApprovalReader:
 
     def validate_node_fact(self, node_run_id: UUID) -> QualityValidateNodeFact | None:
         row = self._session.execute(
-            select(NodeRun, WorkflowRun)
+            select(NodeRun, WorkflowRun, BranchRun.lesson_unit_id)
             .join(WorkflowRun, WorkflowRun.id == NodeRun.workflow_run_id)
+            .outerjoin(BranchRun, BranchRun.id == NodeRun.branch_run_id)
             .where(NodeRun.id == node_run_id)
         ).one_or_none()
         if row is None:
             return None
-        node, run = row
+        node, run, lesson_unit_id = row
         return QualityValidateNodeFact(
             organization_id=node.organization_id,
             project_id=run.project_id,
+            lesson_unit_id=lesson_unit_id,
             content_release_id=run.content_release_id,
             workflow_definition_version_id=run.workflow_definition_version_id,
             node_key=node.node_key,

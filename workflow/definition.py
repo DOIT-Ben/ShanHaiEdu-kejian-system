@@ -52,7 +52,7 @@ class WorkflowOutputDefinitionBinding:
     """The immutable reverse entry for one published model output definition."""
 
     content_definition_key: str
-    generation_template_key: str
+    generation_template_key: str | None
     producer_node_key: str
     execution_scope: str
     producer_branch_key: str
@@ -64,6 +64,7 @@ class WorkflowOutputDefinitionBinding:
     quality_validator_refs: tuple[tuple[str, str, str], ...]
     quality_gate_node_key: str | None
     quality_requirement_mode: str
+    quality_source_binding: str | None
     approval_completion: WorkflowApprovalCompletionBinding | None
 
 

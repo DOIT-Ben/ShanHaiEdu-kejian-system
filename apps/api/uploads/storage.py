@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from datetime import timedelta
+from io import BytesIO
 from pathlib import Path
 from typing import Protocol
 
@@ -43,6 +44,15 @@ class ObjectStorage(Protocol):
     ) -> str: ...
 
     def stat(self, *, bucket: str, key: str) -> ObjectMetadata: ...
+
+    def put_bytes(
+        self,
+        *,
+        bucket: str,
+        key: str,
+        payload: bytes,
+        media_type: str,
+    ) -> ObjectMetadata: ...
 
     def copy(
         self,
@@ -135,6 +145,33 @@ class MinioObjectStorage:
             sha256=hasher.hexdigest(),
         )
 
+    def put_bytes(
+        self,
+        *,
+        bucket: str,
+        key: str,
+        payload: bytes,
+        media_type: str,
+    ) -> ObjectMetadata:
+        if not payload or not media_type.strip():
+            raise ValueError("object storage payload and media type are required")
+        try:
+            self._ensure_bucket(bucket)
+            self._client.put_object(
+                bucket,
+                key,
+                BytesIO(payload),
+                len(payload),
+                content_type=media_type,
+            )
+            return self.stat(bucket=bucket, key=key)
+        except (S3Error, HTTPError, ObjectStorageError) as exc:
+            try:
+                self._client.remove_object(bucket, key)
+            except (S3Error, HTTPError):
+                pass
+            raise ObjectStorageError("object storage server-side upload failed") from exc
+
     def copy(
         self,
         *,
@@ -209,6 +246,13 @@ class MinioObjectStorage:
                 response.release_conn()
             if not completed:
                 destination.unlink(missing_ok=True)
+
+    def _ensure_bucket(self, bucket: str) -> None:
+        if self._client.bucket_exists(bucket):
+            return
+        if not self._create_bucket_if_missing:
+            raise ObjectStorageError("object storage bucket is unavailable")
+        self._client.make_bucket(bucket)
 
 
 def build_object_storage(settings: Settings) -> ObjectStorage | None:

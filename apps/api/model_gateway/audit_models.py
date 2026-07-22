@@ -33,7 +33,7 @@ class GenerationAttempt(Base):
         ),
         CheckConstraint(
             "operation_kind IN ('text_generate', 'image_generate', 'video_submit', "
-            "'video_poll', 'video_cancel', 'legacy_unknown')",
+            "'video_poll', 'video_cancel', 'deterministic_execute', 'legacy_unknown')",
             name="operation_kind_allowed",
         ),
         CheckConstraint("request_hash ~ '^[0-9a-f]{64}$'", name="request_hash_format"),

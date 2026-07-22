@@ -363,3 +363,25 @@ def build_golden_ppt_stage_outputs(case: dict[str, Any]) -> dict[str, dict[str, 
         "ppt.body_asset_prompts.generate": _body_output,
     }
     return {key: builder(ppt) for key, builder in builders.items() if key not in missing}
+
+
+def build_golden_ppt_runtime_page_facts(case: dict[str, Any]) -> list[dict[str, Any]]:
+    """Preserve the exact golden page facts consumed by deterministic PPT assembly."""
+
+    ppt = cast(dict[str, Any], case.get("ppt", {}))
+    missing = _missing_pages(ppt)
+    if missing:
+        raise ValueError(f"golden PPT runtime sources are incomplete: {', '.join(missing)}")
+    page_spec_set_key = cast(str, ppt["page_spec_set_key"])
+    return [
+        {
+            "page_key": page["page_key"],
+            "position": page["position"],
+            "page_type": page["page_type"],
+            "source_page_spec_set_key": page_spec_set_key,
+            "background_slot": page["asset_requirements"][0]["target_slot"],
+            "editable_elements": copy.deepcopy(page["editable_elements"]),
+            "layout": copy.deepcopy(page["layout"]),
+        }
+        for page in cast(list[dict[str, Any]], ppt["page_specs"])
+    ]

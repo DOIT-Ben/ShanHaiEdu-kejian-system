@@ -87,7 +87,7 @@ def test_registry_loads_the_published_catalog_with_one_deterministic_order() -> 
     intro = registered.node_by_key["intro.generate_options"]
     assert intro.optional_input_contract_refs == ("artifact:intro_option_set_source",)
     assert intro.binding["optional_input_contract_refs"] == ("artifact:intro_option_set_source",)
-    assert len(registered.output_definition_index) == 22
+    assert len(registered.output_definition_index) == 24
     assert registered.output_definition_index is registered.indexes.output_definition_index
     assert {
         producer.node_key for producer in registered.producers_by_contract["asset:image_candidates"]
@@ -344,7 +344,7 @@ def test_registry_rejects_output_persistence_on_a_deterministic_node() -> None:
     with pytest.raises(WorkflowDefinitionError) as caught:
         BUILTIN_WORKFLOW_REGISTRY.load(catalog)
 
-    assert caught.value.code == "WORKFLOW_EXECUTION_KIND_INVALID"
+    assert caught.value.code == "WORKFLOW_DETERMINISTIC_OUTPUT_INVALID"
 
 
 def test_registry_builds_an_immutable_validator_descriptor_index() -> None:

@@ -19,8 +19,9 @@ from apps.api.artifact_quality.binding import (
     resolve_quality_report_binding,
     validator_set_payload,
 )
-from apps.api.artifact_quality.contracts import ValidatorRef
+from apps.api.artifact_quality.contracts import QualitySourceType, ValidatorRef
 from apps.api.artifacts.models import Artifact, ArtifactVersion
+from apps.api.assets.approval_port import LinkedFileApprovalReader
 from apps.api.content_runtime.approval_port import ContentDefinitionApprovalReader
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext
@@ -42,6 +43,14 @@ class DeclaredArtifactQualityGate:
     validator_refs: tuple[ValidatorRef, ...]
     validator_set_hash: str
     accepted_conclusions: tuple[str, ...]
+    source_binding: str
+
+
+@dataclass(frozen=True, slots=True)
+class ApprovalQualitySource:
+    source_type: QualitySourceType
+    version_id: UUID
+    content_hash: str
 
 
 def resolve_declared_quality_gate(
@@ -66,6 +75,7 @@ def resolve_declared_quality_gate(
         output.quality_requirement_mode != "reports"
         or output.quality_validate_node_key is None
         or output.quality_gate_node_key is None
+        or output.quality_source_binding not in {"artifact", "linked_file_asset"}
         or not output.quality_report_refs
         or not output.quality_validator_refs
     ):
@@ -97,6 +107,7 @@ def resolve_declared_quality_gate(
         validator_refs=report_binding.validator_refs,
         validator_set_hash=report_binding.validator_set_hash,
         accepted_conclusions=accepted,
+        source_binding=output.quality_source_binding,
     )
 
 
@@ -104,6 +115,7 @@ class ArtifactQualityApprovalGuard:
     def __init__(self, session: Session, actor: ActorContext) -> None:
         self._actor = actor
         self._reports = ArtifactQualityApprovalEvidenceReader(session, actor)
+        self._linked_files = LinkedFileApprovalReader(session, actor)
         self._definitions = ContentDefinitionApprovalReader(session)
         self._workflows = WorkflowApprovalReader(session)
 
@@ -133,9 +145,11 @@ class ArtifactQualityApprovalGuard:
             raise self._invalid_gate(str(exc)) from exc
         if gate is None:
             return {}
+        source = self._approval_source(artifact, version, gate)
         report = self._reports.find_exact(
             project_id=artifact.project_id,
-            source_version_id=version.id,
+            source_type=source.source_type,
+            source_version_id=source.version_id,
             workflow_definition_version_id=workflow_definition_version_id,
             validator_set_hash=gate.validator_set_hash,
         )
@@ -155,14 +169,22 @@ class ArtifactQualityApprovalGuard:
             report,
             artifact=artifact,
             version=version,
+            source=source,
             content_release_id=content_release_id,
             workflow_definition_version_id=workflow_definition_version_id,
             gate=gate,
         )
-        return {
+        evidence = {
             "report_id": str(report.report_id),
             "evidence_hash": report.evidence_hash,
         }
+        if source.source_type == "asset":
+            evidence.update(
+                source_type="asset",
+                source_file_asset_version_id=str(source.version_id),
+                source_content_hash=source.content_hash,
+            )
+        return evidence
 
     def _require_exact_report(
         self,
@@ -170,20 +192,25 @@ class ArtifactQualityApprovalGuard:
         *,
         artifact: Artifact,
         version: ArtifactVersion,
+        source: ApprovalQualitySource,
         content_release_id: UUID,
         workflow_definition_version_id: UUID,
         gate: DeclaredArtifactQualityGate,
     ) -> None:
         node = self._workflows.validate_node_fact(report.validate_node_run_id)
         if node is None:
-            raise self._invalid_report()
+            raise _invalid_report()
         if (
             report.organization_id != self._actor.organization_id
             or report.organization_id != artifact.organization_id
             or report.project_id != artifact.project_id
             or report.lesson_unit_id != artifact.lesson_unit_id
-            or report.source_artifact_version_id != version.id
-            or report.source_content_hash != version.content_hash
+            or report.source_type != source.source_type
+            or report.source_artifact_version_id
+            != (version.id if source.source_type == "artifact" else None)
+            or report.source_file_asset_version_id
+            != (source.version_id if source.source_type == "asset" else None)
+            or report.source_content_hash != source.content_hash
             or report.content_release_id != content_release_id
             or report.workflow_definition_version_id != workflow_definition_version_id
             or report.validator_set_hash != gate.validator_set_hash
@@ -193,10 +220,42 @@ class ArtifactQualityApprovalGuard:
             or node.node_key != gate.validate_node_key
             or node.status != NodeStatus.APPROVED.value
             or node.project_id != artifact.project_id
+            or node.lesson_unit_id != artifact.lesson_unit_id
             or node.content_release_id != content_release_id
             or node.workflow_definition_version_id != workflow_definition_version_id
         ):
-            raise self._invalid_report()
+            raise _invalid_report()
+
+    def _approval_source(
+        self,
+        artifact: Artifact,
+        version: ArtifactVersion,
+        gate: DeclaredArtifactQualityGate,
+    ) -> ApprovalQualitySource:
+        if gate.source_binding == "artifact":
+            return ApprovalQualitySource(
+                source_type="artifact",
+                version_id=version.id,
+                content_hash=version.content_hash,
+            )
+        file_version_id = _uuid_value(version.content_json.get("file_asset_version_id"))
+        fact = self._linked_files.current_pptx(
+            project_id=artifact.project_id,
+            lesson_unit_id=artifact.lesson_unit_id,
+            file_asset_version_id=file_version_id,
+        )
+        if fact is None or (
+            version.content_json.get("mime_type") != fact.mime_type
+            or version.content_json.get("size_bytes") != fact.size_bytes
+            or version.content_json.get("sha256") != fact.sha256
+            or version.content_json.get("page_count") != fact.page_count
+        ):
+            raise _invalid_report()
+        return ApprovalQualitySource(
+            source_type="asset",
+            version_id=fact.file_asset_version_id,
+            content_hash=fact.sha256,
+        )
 
     @staticmethod
     def _invalid_gate(message: str) -> ApiError:
@@ -205,15 +264,6 @@ class ArtifactQualityApprovalGuard:
             code="ARTIFACT_QUALITY_GATE_INVALID",
             message=f"The artifact quality gate is invalid: {message}.",
         )
-
-    @staticmethod
-    def _invalid_report() -> ApiError:
-        return ApiError(
-            status_code=409,
-            code="ARTIFACT_QUALITY_REPORT_INVALID",
-            message="The artifact quality report does not match the fixed approval context.",
-        )
-
 
 def _accepted_conclusions(
     registered: RegisteredWorkflow,
@@ -234,3 +284,20 @@ def _accepted_conclusions(
             "the fixed human gate has an unsupported accepted conclusion",
         )
     return ("passed",)
+
+
+def _uuid_value(value: object) -> UUID:
+    try:
+        if type(value) is not str:
+            raise ValueError("UUID text is required")
+        return UUID(value)
+    except ValueError as exc:
+        raise _invalid_report() from exc
+
+
+def _invalid_report() -> ApiError:
+    return ApiError(
+        status_code=409,
+        code="ARTIFACT_QUALITY_REPORT_INVALID",
+        message="The artifact quality report does not match the fixed approval context.",
+    )
