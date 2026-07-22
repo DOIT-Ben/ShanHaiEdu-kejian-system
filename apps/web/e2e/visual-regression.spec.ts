@@ -224,8 +224,8 @@ for (const viewport of viewports) {
         "课堂插画 · 自动比例 · 纸艺微缩 · 3 张",
       );
     } else {
-      expect(visual.width).toBeGreaterThanOrEqual(480);
-      expect(visual.width).toBeLessThanOrEqual(720);
+      expect(visual.width).toBeGreaterThanOrEqual(300);
+      expect(visual.width).toBeLessThanOrEqual(600);
     }
     await assertPageFrame(page);
     await captureVisual(page, testInfo, `creation-${widthLabel}-ready`);

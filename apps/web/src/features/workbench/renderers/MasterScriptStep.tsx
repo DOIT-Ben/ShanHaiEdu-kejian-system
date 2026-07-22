@@ -276,7 +276,10 @@ export function MasterScriptStep() {
           setSummary(parsed.summary);
           setDirty(true);
         }}
-        onModeChange={setMode}
+        onModeChange={(nextMode) => {
+          if (nextMode === "edit") beginApprovedRevision();
+          setMode(nextMode);
+        }}
         onSave={persistScript}
         readOnly={stale}
         title="完整故事稿"

@@ -352,6 +352,11 @@ export function CreationStudioPage({ type }: { type: StudioType }) {
         },
       );
     }
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.set("itemId", item.id);
+    nextSearchParams.delete("assetId");
+    nextSearchParams.delete("shotId");
+    void navigate({ search: nextSearchParams.toString() }, { replace: true });
   };
 
   const generateAllPackageItems = () => {

@@ -62,10 +62,9 @@ test("母版剧本增加场次并刷新后保留", async ({ page }) => {
   await page.reload();
   await expect(page.getByTestId("markdown-preview")).toContainText("场次 4｜回到课堂");
   await page.getByRole("button", { name: "确认母版剧本" }).click();
-  await expect(page.getByRole("button", { name: "编辑", exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "重新编辑剧本" }).click();
+  await page.getByRole("button", { name: "编辑", exact: true }).click();
   await expect(page.getByRole("button", { name: "增加场次" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "编辑", exact: true })).toBeEnabled();
+  await expect(page.getByRole("textbox", { name: "母版剧本正文" })).toBeVisible();
 });
 
 test("封面重新生成和下载预览均有结果", async ({ page }, testInfo) => {
@@ -94,13 +93,18 @@ test("封面重新生成和下载预览均有结果", async ({ page }, testInfo)
   );
 });
 
-test("资产检查和视频生成进入任务中心", async ({ page }) => {
+test("视频资产入口和视频生成任务可到达", async ({ page }) => {
   await loginAsTeacher(page);
   await unlockWorkbenchStep(page, projectId, lessonId, "video-assets");
   await page.goto(`${workUrl}/video-assets`);
-  await page.getByRole("button", { name: "重新检查资产清单" }).click();
-  await expect(page.getByText("资产清单已重新检查")).toBeVisible();
-  await expect(page.getByRole("button", { name: "检查待生成内容" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "镜头图片制作 · 0/8" })).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "图片资产制作状态" }).getByRole("article"),
+  ).toHaveCount(8);
+  await expect(page.getByRole("link", { name: "进入图片创作台" })).toHaveAttribute(
+    "href",
+    /package=video-assets/,
+  );
   await unlockWorkbenchStep(page, projectId, lessonId, "final-video");
   await page.goto(`${workUrl}/final-video`);
   await page.getByRole("button", { name: "开始生成视频" }).click();

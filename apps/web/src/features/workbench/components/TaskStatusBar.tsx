@@ -20,6 +20,7 @@ export function TaskStatusBar({ projectId }: { projectId: string }) {
     <div className="flex min-h-8 shrink-0 items-center border-t border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] px-4 py-1 text-xs text-[var(--sh-ink-muted)]">
       {activeCount > 0 ? (
         <Link
+          aria-label={`${String(activeCount)} 项作品正在制作 · 查看任务`}
           className="flex items-center gap-1.5 font-medium text-[var(--sh-brand-700)] hover:underline"
           to={`/app/projects/${projectId}/tasks`}
         >
@@ -28,6 +29,7 @@ export function TaskStatusBar({ projectId }: { projectId: string }) {
         </Link>
       ) : actionCount > 0 ? (
         <Link
+          aria-label={`${String(actionCount)} 项需要你处理 · 查看任务`}
           className="flex items-center gap-1.5 font-medium text-[var(--sh-brand-700)] hover:underline"
           to={`/app/projects/${projectId}/tasks`}
         >

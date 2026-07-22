@@ -4,18 +4,25 @@ const storageKey = "shanhaiedu.mock-runtime.v1";
 
 const prerequisiteChains: Record<string, string[]> = {
   "ppt-outline": ["lesson-plan"],
-  "ppt-cover": ["lesson-plan", "ppt-outline"],
-  "ppt-pages": ["lesson-plan", "ppt-outline", "ppt-cover"],
-  "ppt-export": ["lesson-plan", "ppt-outline", "ppt-cover", "ppt-pages"],
+  "ppt-cover": ["lesson-plan", "ppt-outline", "ppt-design"],
+  "ppt-pages": ["lesson-plan", "ppt-outline", "ppt-design", "ppt-cover"],
+  "ppt-export": ["lesson-plan", "ppt-outline", "ppt-design", "ppt-cover", "ppt-pages"],
   "master-script": ["intro-options"],
   "rough-storyboard": ["intro-options", "master-script"],
   "video-style": ["intro-options", "master-script", "rough-storyboard"],
-  "video-assets": ["intro-options", "master-script", "rough-storyboard", "video-style"],
+  "video-assets": [
+    "intro-options",
+    "master-script",
+    "rough-storyboard",
+    "video-style",
+    "video-asset-plan",
+  ],
   "fine-storyboard": [
     "intro-options",
     "master-script",
     "rough-storyboard",
     "video-style",
+    "video-asset-plan",
     "video-assets",
   ],
   "final-video": [
@@ -23,6 +30,7 @@ const prerequisiteChains: Record<string, string[]> = {
     "master-script",
     "rough-storyboard",
     "video-style",
+    "video-asset-plan",
     "video-assets",
     "fine-storyboard",
   ],

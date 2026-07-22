@@ -93,7 +93,7 @@ export function VideoStyleStep() {
         title: "确定画面风格",
       });
     }
-    void navigate(`/app/projects/${projectId}/lessons/${lessonId}/work/video-assets`);
+    void navigate(`/app/projects/${projectId}/lessons/${lessonId}/work/video-asset-plan`);
   };
   return (
     <WorkbenchPageFrame width="workspace">

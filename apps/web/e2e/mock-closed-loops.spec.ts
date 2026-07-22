@@ -41,7 +41,7 @@ test("教材文件随新建项目进入教材页", async ({ page }) => {
 });
 
 test("新项目可以只通过页面操作走到真实视频生成门槛", async ({ page }, testInfo) => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   await loginAsTeacher(page);
   await page.goto("/app/projects/new");
   await page.getByLabel("项目名称").fill("百分数视频课例");
@@ -76,15 +76,20 @@ test("新项目可以只通过页面操作走到真实视频生成门槛", async
   await page.getByRole("button", { name: "确认故事镜头" }).click();
   await page.goto(`${workUrl}/video-style`);
   await page.getByRole("button", { name: "制作镜头图片" }).click();
-  await page.getByRole("link", { name: "开始制作镜头图片" }).click();
+  await page.getByRole("button", { name: "确认资产规划" }).click();
+  await page.getByTestId("work-step-content").getByRole("link", { name: "制作镜头图片" }).click();
+  await page.getByRole("link", { name: "进入图片创作台" }).click();
   await expect(page).toHaveURL(/\/app\/creation\/images\?.*package=video-assets/);
   await expect(page.getByRole("heading", { name: "图片创作台" })).toBeVisible();
   await expect(page.getByRole("link", { name: "返回项目工作台" })).toBeVisible();
 
-  const assetCards = page.getByTestId("project-creation-package").getByRole("button");
-  await expect(assetCards).toHaveCount(4);
-  for (let index = 0; index < 4; index += 1) {
-    await assetCards.nth(index).click();
+  for (let index = 0; index < 6; index += 1) {
+    await page.getByRole("button", { name: "打开项目资产" }).click();
+    const assetDrawer = page.getByRole("dialog", { name: "项目资产" });
+    const importButtons = assetDrawer.getByRole("button", { name: /导入/ });
+    await expect(importButtons).toHaveCount(6);
+    await importButtons.nth(index).click();
+    await assetDrawer.getByRole("button", { name: "关闭项目资产" }).click();
     await page.getByRole("button", { name: "开始创作图片" }).click();
     await page.getByRole("button", { name: "就用这张" }).click();
     await expect(page.getByText(/已挂载到“/)).toBeVisible();
@@ -92,7 +97,10 @@ test("新项目可以只通过页面操作走到真实视频生成门槛", async
   }
 
   await page.goto(`${workUrl}/video-assets`);
-  await page.getByTestId("workbench-content").getByRole("link", { name: "选择关键帧参考" }).click();
+  await page
+    .getByTestId("workbench-content")
+    .getByRole("link", { name: "设计视频分镜提示词" })
+    .click();
   const shotCards = page.getByRole("button", { name: /^镜头 \d/ });
   const fineDraftKey = `project:${projectId}:lesson:${lessonId}:fine-storyboard`;
   await expect(shotCards).toHaveCount(3);
@@ -100,12 +108,12 @@ test("新项目可以只通过页面操作走到真实视频生成门槛", async
     const shotCard = shotCards.nth(index);
     await shotCard.click();
     await expect(shotCard).toHaveAttribute("aria-pressed", "true");
-    let confirm = page.getByRole("button", { name: "确认当前关键帧" });
+    let confirm = page.getByRole("button", { name: "确认当前分镜" });
     if ((await confirm.count()) === 0) {
       const retry = page.getByRole("button", { name: "只重做这个关键帧" });
       if (await retry.isVisible()) {
         await retry.click();
-        confirm = page.getByRole("button", { name: "确认当前关键帧" });
+        confirm = page.getByRole("button", { name: "确认当前分镜" });
       }
     }
     await expect(confirm).toBeEnabled();
@@ -140,8 +148,20 @@ test("新项目可以只通过页面操作走到真实视频生成门槛", async
       }, fineDraftKey),
     )
     .toBe("3:approved");
-  await expect(page.getByRole("button", { name: "查看视频生成状态" })).toBeVisible();
-  await page.getByRole("button", { name: "查看视频生成状态" }).click();
+  await expect(page.getByRole("button", { name: "打开视频创作台" })).toBeVisible();
+  await page.getByRole("button", { name: "打开视频创作台" }).click();
+  for (let index = 0; index < 3; index += 1) {
+    await page.getByRole("button", { name: "打开项目资产" }).click();
+    const shotDrawer = page.getByRole("dialog", { name: "项目资产" });
+    const importButtons = shotDrawer.getByRole("button", { name: /导入/ });
+    await expect(importButtons).toHaveCount(3);
+    await importButtons.nth(index).click();
+    await shotDrawer.getByRole("button", { name: "关闭项目资产" }).click();
+    await page.getByRole("button", { name: "开始创作视频" }).click();
+    await page.getByRole("button", { name: "就用这张" }).click();
+    await expect(page.getByText(/已挂载到“/)).toBeVisible();
+  }
+  await page.goto(`${workUrl}/final-video`);
   await page.getByRole("button", { name: "开始生成视频" }).click();
   await expect(page.getByRole("button", { name: "视频尚未生成" })).toBeDisabled({
     timeout: 10_000,

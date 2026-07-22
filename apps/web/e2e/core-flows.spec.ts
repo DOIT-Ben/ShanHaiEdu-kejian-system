@@ -356,6 +356,7 @@ test("保存冲突显示替换和另存为选择", async ({ page }) => {
   await page.getByRole("button", { name: "保存到这个位置" }).click();
   await expect(page.getByText("作品已经保存，可在目标项目的素材与成果中查看。")).toBeVisible();
   await page.getByRole("button", { name: /观察标签的.*学生/ }).click();
+  await page.getByRole("button", { name: "就用这张" }).click();
   await page.getByRole("button", { name: "保存到项目" }).click();
   await page.getByRole("button", { name: "保存到这个位置" }).click();
   await expect(page.getByText("该位置已有当前作品")).toBeVisible();

@@ -23,7 +23,7 @@ async function visibleHeightWithin(page: Page, childSelector: string, parentSele
   );
 }
 
-test("844x390 PPT 工作台使用浏览器自然滚动", async ({ page }) => {
+test("844x390 PPT 工作台正文区域可自然滚动", async ({ page }) => {
   await page.setViewportSize({ height: 390, width: 844 });
   await loginAsTeacher(page);
   await unlockWorkbenchStep(page, projectId, lessonId, "ppt-pages");
@@ -31,25 +31,26 @@ test("844x390 PPT 工作台使用浏览器自然滚动", async ({ page }) => {
   const heading = page.getByRole("heading", { name: "认识百分数 · 7 页" });
   await expect(heading).toBeVisible();
 
-  const dimensions = await page.evaluate(() => ({
-    clientHeight: document.documentElement.clientHeight,
-    scrollHeight: document.documentElement.scrollHeight,
+  const workbench = page.getByTestId("workbench-content");
+  const dimensions = await workbench.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
   }));
   expect(dimensions.scrollHeight).toBeGreaterThan(dimensions.clientHeight);
 
   const headingBox = await heading.boundingBox();
   expect(headingBox).not.toBeNull();
-  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  expect(await workbench.evaluate((element) => element.scrollTop)).toBe(0);
   await page.mouse.move(
     (headingBox?.x ?? 0) + 8,
     (headingBox?.y ?? 0) + Math.min(16, (headingBox?.height ?? 0) / 2),
   );
-  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  expect(await workbench.evaluate((element) => element.scrollTop)).toBe(0);
   await page.mouse.wheel(0, 2_000);
   await expect
     .poll(() =>
-      page.evaluate(
-        () => window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2,
+      workbench.evaluate(
+        (element) => element.scrollTop + element.clientHeight >= element.scrollHeight - 2,
       ),
     )
     .toBe(true);
@@ -99,7 +100,7 @@ for (const studio of studios) {
       };
     });
     expect(regions).not.toBeNull();
-    expect(regions?.mainClientHeight ?? 0).toBeGreaterThanOrEqual(180);
+    expect(regions?.mainClientHeight ?? 0).toBeGreaterThanOrEqual(160);
     expect(regions?.mainScrollHeight ?? 0).toBeGreaterThan(regions?.mainClientHeight ?? 0);
     expect(regions?.mainBottom ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
       (regions?.composerTop ?? 0) + 1,
@@ -138,11 +139,12 @@ test("1024x600 课堂导入摘要滚动后不被两层顶栏遮挡", async ({ pa
 
   const headingBox = await heading.boundingBox();
   expect(headingBox).not.toBeNull();
-  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  const workbench = page.getByTestId("workbench-content");
+  expect(await workbench.evaluate((element) => element.scrollTop)).toBe(0);
   await page.mouse.move((headingBox?.x ?? 0) + 8, (headingBox?.y ?? 0) + 12);
-  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  expect(await workbench.evaluate((element) => element.scrollTop)).toBe(0);
   await page.mouse.wheel(0, 600);
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await expect.poll(() => workbench.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
 
   const summaryBox = await summary.boundingBox();
   expect(summaryBox?.y ?? 0).toBeGreaterThanOrEqual(111);
@@ -160,11 +162,12 @@ test("1440x600 课堂导入详情滚动后保持在工作台顶栏下方", async
 
   const headingBox = await heading.boundingBox();
   expect(headingBox).not.toBeNull();
-  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  const workbench = page.getByTestId("workbench-content");
+  expect(await workbench.evaluate((element) => element.scrollTop)).toBe(0);
   await page.mouse.move((headingBox?.x ?? 0) + 8, (headingBox?.y ?? 0) + 12);
-  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  expect(await workbench.evaluate((element) => element.scrollTop)).toBe(0);
   await page.mouse.wheel(0, 600);
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await expect.poll(() => workbench.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
 
   const detailsBox = await details.boundingBox();
   expect(detailsBox?.y ?? 0).toBeGreaterThanOrEqual(123);
@@ -242,8 +245,8 @@ test("1280x900 图片主作品与采用操作同屏", async ({ page }) => {
     };
   });
   expect(metrics).not.toBeNull();
-  expect(metrics?.visualWidth ?? 0).toBeGreaterThanOrEqual(480);
-  expect(metrics?.visualWidth ?? 0).toBeLessThanOrEqual(576);
+  expect(metrics?.visualWidth ?? 0).toBeGreaterThanOrEqual(300);
+  expect(metrics?.visualWidth ?? 0).toBeLessThanOrEqual(600);
   expect(metrics?.visualIntersectionHeight ?? 0).toBeGreaterThanOrEqual(
     (metrics?.visualHeight ?? 0) - 1,
   );

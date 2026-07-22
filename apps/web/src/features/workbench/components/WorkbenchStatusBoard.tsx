@@ -1,4 +1,4 @@
-import { CircleAlert, LoaderCircle } from "lucide-react";
+import { CircleAlert } from "lucide-react";
 import { parseWorkflowStatus, type WorkflowStatus } from "@/entities/workflow/model";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 
@@ -85,11 +85,5 @@ export function WorkbenchStatusBoard({
         </li>
       ))}
     </ul>
-  );
-}
-
-export function WorkbenchStatusBoardLoadingIcon() {
-  return (
-    <LoaderCircle aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />
   );
 }

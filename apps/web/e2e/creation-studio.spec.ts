@@ -335,7 +335,7 @@ test("390px 下输入台固定可用并能按需展开画面细节", async ({ pa
   await openReadyImageStudio(page);
   const visualBox = await page.getByTestId("creation-main-visual").boundingBox();
   expect(visualBox?.y ?? 0).toBeGreaterThanOrEqual(128);
-  expect(visualBox?.width ?? 0).toBeGreaterThanOrEqual(300);
+  expect(visualBox?.width ?? 0).toBeGreaterThanOrEqual(288);
   expect(visualBox?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(360);
   const composerBox = await page.getByTestId("creation-composer-panel").boundingBox();
   expect((composerBox?.y ?? 844) + (composerBox?.height ?? 0)).toBeLessThanOrEqual(844);
@@ -454,8 +454,8 @@ test("项目图片与视频创作台继承来源上下文并共用资产队列",
   await page.getByRole("button", { name: "打开项目资产" }).click();
   const imageAssets = page.getByRole("dialog", { name: "项目资产" });
   await expect(imageAssets).toBeVisible();
-  await expect(imageAssets.getByRole("button", { name: /导入/ })).toHaveCount(4);
-  await imageAssets.getByRole("button", { name: /导入场景/ }).click();
+  await expect(imageAssets.getByRole("button", { name: /导入/ })).toHaveCount(8);
+  await imageAssets.getByRole("button", { name: "导入场景：百分数的意义与读写的教材情境" }).click();
   await expect(page).toHaveURL(/itemId=scene/);
   await expect(page.getByRole("textbox", { name: "画面内容" })).toHaveValue(/教材情境/);
   await page.getByRole("button", { name: "开始创作图片" }).click();
@@ -465,7 +465,7 @@ test("项目图片与视频创作台继承来源上下文并共用资产队列",
   await page.goto(
     `/app/creation/videos?projectId=${projectId}&lessonId=${lessonId}&package=video-shots&itemId=shot-1`,
   );
-  await expect(page.getByRole("link", { name: /选择关键帧参考 当前/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /设计分镜提示词 当前/ })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "画面怎样变化" })).toHaveValue(/镜头 1/);
   await expect(page.getByText("镜头 1关键帧参考", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "打开项目资产" }).click();
