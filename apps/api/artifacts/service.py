@@ -18,6 +18,7 @@ from apps.api.artifacts.models import (
     ArtifactVersion,
 )
 from apps.api.artifacts.relation_service import ArtifactRelationService
+from apps.api.artifacts.replacement_service import ArtifactReplacementService
 from apps.api.artifacts.repository import ArtifactRepository
 from apps.api.artifacts.validation import ArtifactValidation
 from apps.api.content_runtime.models import ContentDefinitionVersion
@@ -133,7 +134,11 @@ class ArtifactService:
         render_summary: dict[str, Any] | None = None,
     ) -> ArtifactVersion:
         self._validation.validate_provenance(source_kind, source_node_run_id)
-        artifact = self._require_artifact(artifact_id, ProjectAction.EDIT, for_update=True)
+        replacement = ArtifactReplacementService(self._session, self._actor)
+        artifact = replacement.lock_artifact_mutation(
+            artifact_id,
+            action=ProjectAction.EDIT,
+        )
         draft = self._require_draft(artifact.id, draft_branch, expected_lock_version)
         content_hash, report = self._validated_submission(artifact, draft)
         existing = self._current_submitted(artifact)
@@ -153,6 +158,12 @@ class ArtifactService:
         )
         self._session.add(version)
         self._session.flush()
+        replacement.prepare_manual(
+            artifact,
+            existing.id if existing is not None else None,
+            draft.based_on_version_id,
+            version,
+        )
         self._complete_submission(artifact, draft, version, request_id)
         return version
 

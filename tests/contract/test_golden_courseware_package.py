@@ -233,6 +233,14 @@ def test_lesson_ppt_and_video_can_start_from_fixed_branch_inputs() -> None:
         assert payload.keys() <= {field["field_key"] for field in fields}
 
     lesson_input = branch_inputs["lesson_plan.generate"]
+    lesson_output = source_outputs["lesson_plan.generate"]["teaching_content"]
+    approved_lesson = lesson_input["lesson_unit_ref"]
+    assert lesson_output["source_lesson_unit_key"] == approved_lesson["lesson_unit_key"]
+    assert lesson_output["duration_minutes"] == approved_lesson["duration_minutes"]
+    assert lesson_output["teaching_scope"] == approved_lesson["material_scope"]
+    assert lesson_output["teaching_evidence_refs"] == approved_lesson["evidence_refs"]
+    assert lesson_output["content_boundary"] == approved_lesson["content_boundary"]
+    assert lesson_output["must_not_preteach"] == approved_lesson["must_not_preteach"]
     assert (
         lesson_input["lesson_unit_ref"]
         == source_outputs["lesson.division.generate"]["lesson_units"][0]

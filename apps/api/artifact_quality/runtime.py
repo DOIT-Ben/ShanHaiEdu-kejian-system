@@ -10,10 +10,21 @@ from apps.api.lessons.division_runtime import (
     LessonDivisionCoverageValidator,
     LessonDivisionSchemaValidator,
 )
+from apps.api.lessons.lesson_plan_quality import (
+    LESSON_PLAN_SCHEMA_REF,
+    LESSON_PLAN_SCOPE_REF,
+    LESSON_PLAN_TEACHING_QUALITY_REF,
+    LessonPlanSchemaQualityValidator,
+    LessonPlanScopeQualityValidator,
+    LessonPlanTeachingQualityValidator,
+)
 
 _VALIDATORS: dict[ValidatorRef, QualityValidator] = {
     LESSON_DIVISION_SCHEMA_REF: LessonDivisionSchemaValidator(),
     LESSON_DIVISION_COVERAGE_REF: LessonDivisionCoverageValidator(),
+    LESSON_PLAN_SCHEMA_REF: LessonPlanSchemaQualityValidator(),
+    LESSON_PLAN_SCOPE_REF: LessonPlanScopeQualityValidator(),
+    LESSON_PLAN_TEACHING_QUALITY_REF: LessonPlanTeachingQualityValidator(),
 }
 
 

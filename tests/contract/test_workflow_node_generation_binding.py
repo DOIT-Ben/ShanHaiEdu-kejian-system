@@ -139,6 +139,27 @@ def test_schema_and_complete_primary_math_catalog_are_valid() -> None:
         "approval:material_scope",
         "content:material_evidence",
     ]
+    lesson_plan_generate = node_by_key(catalog, "lesson_plan.generate")
+    assert lesson_plan_generate["input_contract_refs"] == [
+        "approval:lesson_division",
+        "content:material_evidence",
+    ]
+    assert lesson_plan_generate["context_policy"]["allowed_sources"] == [
+        "lesson_division.approved_version",
+        "material.approved_parse",
+        "material_scope.approved_version",
+        "project.teacher_preferences",
+    ]
+    lesson_plan_validate = node_by_key(catalog, "lesson_plan.validate")
+    assert lesson_plan_validate["input_contract_refs"] == [
+        "artifact:lesson_plan",
+        "approval:lesson_division",
+        "content:material_evidence",
+    ]
+    assert lesson_plan_validate["quality_report_persistence"]["supporting_input_refs"] == [
+        "approval:lesson_division",
+        "content:material_evidence",
+    ]
     for contract_ref, expected in {
         "prompt:image_request": {
             "ppt.cover.prompt.generate",
@@ -472,6 +493,25 @@ def test_lesson_division_declares_approval_completion_without_runtime_inference(
     assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
 
 
+def test_lesson_plan_declares_exact_workflow_gate_completion() -> None:
+    catalog = load_catalog()
+    persistence = node_by_key(catalog, "lesson_plan.generate")["output_persistence"]
+
+    assert persistence["approval_completion"] == {
+        "kind": "workflow_gate",
+        "source_input_ref": "artifact:lesson_plan",
+    }
+
+    persistence["approval_completion"]["collection_pointer"] = "/lesson_units"
+    assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
+
+    catalog = load_catalog()
+    node_by_key(catalog, "lesson_plan.generate")["output_persistence"]["approval_completion"][
+        "source_input_ref"
+    ] = "artifact:ppt_outline"
+    assert_rejected(catalog, "NODE_BINDING_OUTPUT_APPROVAL_COMPLETION_INVALID")
+
+
 def test_semantic_validator_rejects_reference_asset_schema_bypasses() -> None:
     catalog = load_catalog()
     mapping = node_by_key(catalog, "ppt.body_asset_prompts.generate")["output_persistence"][
@@ -612,7 +652,7 @@ def test_catalog_hash_is_deterministic_for_semantically_identical_objects() -> N
     assert first_validated.canonical_json == second_validated.canonical_json
     assert first_validated.content_hash == second_validated.content_hash
     assert first_validated.content_hash == (
-        "aafde8ef907e82a6f127dc1016cc52323706de0f4898e17a6afe7717895c46b2"
+        "80ba4a5f69537c4838a7b43ad19161ed6359083119f98dd3ca5a71e02df23bb2"
     )
 
 

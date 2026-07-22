@@ -45,6 +45,10 @@ CHAPTER_NODE_KEYS: dict[str, tuple[str, ...]] = {
     ),
 }
 
+SOURCE_INJECTION_LABELS = {
+    "lesson_division.approved_version": "仅目标课时投影（`division_key` + `lesson_unit`）",
+}
+
 CHAPTER_TITLES = {
     "LESSON.md": "课时划分与十二部分教案",
     "INTRO.md": "课程驱动的三类九套导入方案",
@@ -139,7 +143,10 @@ def _render_context(node: Mapping[str, Any]) -> list[str]:
     rows = ["| 上游快照 | 是否必须 | 注入范围 |", "| --- | --- | --- |"]
     exposure_labels = {"full": "完整快照", "summary": "摘要"}
     for binding in bindings:
-        exposure = exposure_labels.get(binding["exposure"], binding["exposure"])
+        exposure = SOURCE_INJECTION_LABELS.get(
+            binding["source"],
+            exposure_labels.get(binding["exposure"], binding["exposure"]),
+        )
         rows.append(f"| `{binding['source']}` | {yes_no(binding['required'])} | {cell(exposure)} |")
     return rows
 

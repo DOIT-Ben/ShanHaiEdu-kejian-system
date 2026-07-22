@@ -476,7 +476,8 @@
         "quality_gate": "输出顶层字段必须且只能按当前内容定义包含教学内容、教材分析、学情分析、设计意图、教学目标、教学重难点及突破策略、教学准备、教学过程、板书设计、课堂总结、分层作业和教学反思十二部分。不得使用不可评价的空泛目标，不得虚构班级掌握率或设备，不得超出批准教材，不得把准确答案提前放入导入。正文删除任何导入附录后仍须完整可试讲；结构、目标引用、证据引用和时间总量必须通过校验。",
         "context_bindings": [
           {"binding_key": "approved_lesson_unit", "source": "lesson_division.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 200000},
-          {"binding_key": "approved_material", "source": "material.approved_parse", "required": true, "exposure": "full", "max_items": 50, "max_bytes": 500000},
+          {"binding_key": "approved_material", "source": "material.approved_parse", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 500000},
+          {"binding_key": "approved_material_scope", "source": "material_scope.approved_version", "required": true, "exposure": "summary", "max_items": 1, "max_bytes": 50000},
           {"binding_key": "teacher_preferences", "source": "project.teacher_preferences", "required": false, "exposure": "summary", "max_items": 1, "max_bytes": 30000}
         ],
         "max_chars": 60000
