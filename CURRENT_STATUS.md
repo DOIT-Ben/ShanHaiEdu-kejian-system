@@ -58,7 +58,6 @@
 
 - [Decision #199](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/199)：当前唯一产品优先级是教师可见MVP纵向闭环；已合并可靠性能力继续复用，不再提前扩张与首条用户链无关的生产级合同和故障矩阵。
 - [Issue #4](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)与Draft [PR #111](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/111)：生产前端源码与#179至#182整改的唯一载体；下一步只解决最新`main`同步、现有浏览器/治理门禁和首条MVP链所需页面，不继续扩张无关页面。
-- [Issue #170](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/170)与Draft [PR #190](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/190)：只收口现有PPT Runtime、真实可编辑PPTX Artifact出口和阻断检查；合并后释放共享发布合同lease，不追加视频或生产化范围。
 - [Issue #118](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/118)与Draft [PR #196](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/196)：重新缩减为MVP真实教材、真实文本生成、预算与脱敏预检；在范围与Decision #199一致且现有CI失败关闭前不继续扩张阶段门禁。
 - [Decision #73](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/73)已经批准：PPT通常推荐10至20页，视频按故事和服务端价格事实推荐60至180秒，教师可以覆盖；TTS延后独立实施。
 - [Issue #48](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/48)：全流程生成节点与可配置模型I/O绑定的父任务当前为`status:in-progress`；黄金内容包`1.0.0`已正式发布，#89通用执行器已经合并。
