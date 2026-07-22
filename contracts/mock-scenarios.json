@@ -1,6 +1,6 @@
 {
   "$schema": "./mock-scenarios.schema.json",
-  "schema_version": "1.2",
+  "schema_version": "1.3",
   "scenarios": [
     {"id": "project_empty", "route": "/app/projects/:project_id", "description": "教材尚未上传的项目主页"},
     {"id": "lesson_collection", "route": "/app/projects/:project_id", "description": "课时列表读取、重排、信息修改和软归档"},
@@ -80,6 +80,22 @@
       "response_status": "200",
       "media_type": "application/json",
       "fixture": "fixtures/stage0/project-workflow.json"
+    }
+  ],
+  "intro_contract_scenarios": [
+    {
+      "id": "intro_options_approved",
+      "operation_id": "getLessonIntroOptions",
+      "response_status": "200",
+      "media_type": "application/json",
+      "fixture": "fixtures/intro/intro-options-approved.json"
+    },
+    {
+      "id": "intro_teacher_selection",
+      "operation_id": "selectLessonIntroOption",
+      "response_status": "201",
+      "media_type": "application/json",
+      "fixture": "fixtures/intro/intro-teacher-selection.json"
     }
   ],
   "creation_contract_scenarios": [

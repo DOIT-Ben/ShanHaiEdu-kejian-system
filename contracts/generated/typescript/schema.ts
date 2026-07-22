@@ -211,6 +211,40 @@ export interface paths {
         patch: operations["updateLessonBranches"];
         trace?: never;
     };
+    "/lessons/{lesson_id}/intro-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 获取课时导入方案与当前选择 */
+        get: operations["getLessonIntroOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lessons/{lesson_id}/intro-selections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 教师选择一个已批准课堂导入方案 */
+        post: operations["selectLessonIntroOption"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project_id}/materials/uploads": {
         parameters: {
             query?: never;
@@ -612,6 +646,66 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         IntroOptionSet: components["schemas"]["intro-option-set.schema"];
+        IntroOption: components["schemas"]["option"];
+        IntroOptionSetPublic: {
+            /** @enum {string} */
+            generation_mode: "default_nine" | "refine_existing";
+            lesson_unit_key: string;
+            knowledge_point: string;
+            options: components["schemas"]["option"][];
+            /** Format: date-time */
+            created_at: string;
+        };
+        IntroOptionVersion: {
+            /** Format: uuid */
+            artifact_version_id: string;
+            version_no: number;
+            /** @enum {string} */
+            approval_status: "approved" | "pending_review" | "changes_requested" | "revoked" | "unapproved";
+            stale: boolean;
+            selectable: boolean;
+            option_set: components["schemas"]["IntroOptionSetPublic"];
+        };
+        IntroSelection: {
+            /** Format: uuid */
+            selection_id: string;
+            /** Format: uuid */
+            artifact_version_id: string;
+            option_key: string;
+            /** @enum {string} */
+            selection_method: "teacher_selected" | "policy_default";
+            snapshot: components["schemas"]["option"];
+            reason: string;
+            active: boolean;
+            consumable: boolean;
+            unconsumable_reason: string | null;
+            /** Format: date-time */
+            selected_at: string;
+            /** Format: date-time */
+            deactivated_at: string | null;
+        };
+        IntroOptions: {
+            /** Format: uuid */
+            artifact_id: string;
+            /** Format: uuid */
+            current_approved_version_id: string | null;
+            display_version: components["schemas"]["IntroOptionVersion"] | null;
+            pending_version: components["schemas"]["IntroOptionVersion"] | null;
+            current_selection: components["schemas"]["IntroSelection"] | null;
+        };
+        IntroOptionsEnvelope: {
+            data: components["schemas"]["IntroOptions"];
+            request_id: string;
+        };
+        SelectIntroOptionRequest: {
+            /** Format: uuid */
+            artifact_version_id: string;
+            option_key: string;
+        };
+        IntroSelectionEnvelope: {
+            data: components["schemas"]["IntroSelection"];
+            request_id: string;
+        };
         /**
          * @deprecated
          * @description Legacy project field. manual maps to guided with automatic node actions disabled; assisted maps to guided while preserving node rules; automatic remains automatic.
@@ -1433,6 +1527,30 @@ export interface components {
             };
             request_id: string;
         };
+        /** @enum {unknown} */
+        tendency: "science" | "application" | "story";
+        option: {
+            option_key: string;
+            lesson_unit_key: string;
+            knowledge_point: string;
+            primary_tendency: components["schemas"]["tendency"];
+            secondary_tendencies: components["schemas"]["tendency"][];
+            title: string;
+            creative_concept: string;
+            hook: string;
+            viewer_value: string;
+            /** @enum {unknown} */
+            suggested_medium: "video" | "image" | "physical_object" | "question" | "performance" | "mixed";
+            duration_seconds: number;
+            course_anchor: string;
+            classroom_first_question: string;
+            handoff_moment: string;
+            must_not_preteach: string[];
+            fit_reason: string;
+            risks: string[];
+            recommendation_score: number;
+            recommendation_reason: string;
+        };
         /**
          * WorkflowNodeStatus
          * @enum {string}
@@ -1486,30 +1604,6 @@ export interface components {
                 };
             };
         } & unknown;
-        /** @enum {unknown} */
-        tendency: "science" | "application" | "story";
-        option: {
-            option_key: string;
-            lesson_unit_key: string;
-            knowledge_point: string;
-            primary_tendency: components["schemas"]["tendency"];
-            secondary_tendencies: components["schemas"]["tendency"][];
-            title: string;
-            creative_concept: string;
-            hook: string;
-            viewer_value: string;
-            /** @enum {unknown} */
-            suggested_medium: "video" | "image" | "physical_object" | "question" | "performance" | "mixed";
-            duration_seconds: number;
-            course_anchor: string;
-            classroom_first_question: string;
-            handoff_moment: string;
-            must_not_preteach: string[];
-            fit_reason: string;
-            risks: string[];
-            recommendation_score: number;
-            recommendation_reason: string;
-        };
         /**
          * IntroOptionSet
          * @description 由最小课程种子直接生成的一套或三类九套课堂导入方案。业务校验器额外保证主要倾向分布、课程追溯、辅助倾向交叉和最高推荐分唯一。
@@ -2002,6 +2096,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LessonEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    getLessonIntroOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lesson_id: components["parameters"]["LessonId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Safe approved, pending, and current-selection projection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntroOptionsEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    selectLessonIntroOption: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                lesson_id: components["parameters"]["LessonId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SelectIntroOptionRequest"];
+            };
+        };
+        responses: {
+            /** @description Immutable teacher selection created or replayed */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntroSelectionEnvelope"];
                 };
             };
             "4XX": components["responses"]["Error"];

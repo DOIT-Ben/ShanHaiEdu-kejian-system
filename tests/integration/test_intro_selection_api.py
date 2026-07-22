@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from copy import deepcopy
+from datetime import UTC, datetime
 from uuid import UUID
 
 import httpx
@@ -47,9 +48,7 @@ async def _approved_harness(
     return httpx.ASGITransport(app=app), engine, factory, prepared
 
 
-def _submit_pending_revision(
-    factory: sessionmaker[Session], prepared: ApprovedOptionSet
-) -> UUID:
+def _submit_pending_revision(factory: sessionmaker[Session], prepared: ApprovedOptionSet) -> UUID:
     with factory() as session, session.begin():
         original = session.get(ArtifactVersion, prepared.version_id)
         assert original is not None
@@ -148,9 +147,7 @@ async def test_intro_options_prefers_approved_version_and_teacher_selection_is_p
     pending_version_id = _submit_pending_revision(factory, prepared)
     try:
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            options = await client.get(
-                f"/api/v2/lessons/{prepared.lesson_unit_id}/intro-options"
-            )
+            options = await client.get(f"/api/v2/lessons/{prepared.lesson_unit_id}/intro-options")
             selected = await client.post(
                 f"/api/v2/lessons/{prepared.lesson_unit_id}/intro-selections",
                 headers={"Idempotency-Key": "issue-129-select-approved-v1"},
@@ -166,9 +163,7 @@ async def test_intro_options_prefers_approved_version_and_teacher_selection_is_p
                 headers={"Idempotency-Key": "issue-129-forged-policy"},
                 json=_selection_payload(prepared) | {"selection_method": "policy_default"},
             )
-            refreshed = await client.get(
-                f"/api/v2/lessons/{prepared.lesson_unit_id}/intro-options"
-            )
+            refreshed = await client.get(f"/api/v2/lessons/{prepared.lesson_unit_id}/intro-options")
     finally:
         engine.dispose()
 
@@ -178,9 +173,9 @@ async def test_intro_options_prefers_approved_version_and_teacher_selection_is_p
     assert replay.json()["data"] == selection
     assert forged_policy.status_code == 422
     assert forged_policy.json()["error"]["code"] == "VALIDATION_FAILED"
-    assert refreshed.json()["data"]["current_selection"]["selection_id"] == selection[
-        "selection_id"
-    ]
+    assert (
+        refreshed.json()["data"]["current_selection"]["selection_id"] == selection["selection_id"]
+    )
 
 
 async def test_intro_options_exposes_stale_and_revoked_as_not_selectable(
@@ -199,9 +194,7 @@ async def test_intro_options_exposes_stale_and_revoked_as_not_selectable(
                 "bindings": [],
             }
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            stale = await client.get(
-                f"/api/v2/lessons/{prepared.lesson_unit_id}/intro-options"
-            )
+            stale = await client.get(f"/api/v2/lessons/{prepared.lesson_unit_id}/intro-options")
         with factory() as session, session.begin():
             artifact = session.get(Artifact, prepared.artifact_id)
             assert artifact is not None
@@ -214,9 +207,7 @@ async def test_intro_options_exposes_stale_and_revoked_as_not_selectable(
                 request_id="issue-129-revoke",
             )
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            revoked = await client.get(
-                f"/api/v2/lessons/{prepared.lesson_unit_id}/intro-options"
-            )
+            revoked = await client.get(f"/api/v2/lessons/{prepared.lesson_unit_id}/intro-options")
     finally:
         engine.dispose()
 
@@ -230,6 +221,43 @@ async def test_intro_options_exposes_stale_and_revoked_as_not_selectable(
     assert revoked_data["current_approved_version_id"] is None
     assert revoked_data["display_version"]["approval_status"] == "revoked"
     assert revoked_data["display_version"]["selectable"] is False
+
+
+async def test_pending_only_version_is_visible_but_cannot_be_selected(
+    postgres_database_url: str,
+) -> None:
+    transport, engine, factory, prepared = await _approved_harness(postgres_database_url)
+    pending_version_id = _submit_pending_revision(factory, prepared)
+    try:
+        with factory() as session, session.begin():
+            ArtifactService(session, prepared.actor).review(
+                prepared.version_id,
+                action="revoke",
+                comment="Leave only the pending revision for Issue 129.",
+                request_id="issue-129-revoke-before-pending-query",
+            )
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            options = await client.get(f"/api/v2/lessons/{prepared.lesson_unit_id}/intro-options")
+            denied = await client.post(
+                f"/api/v2/lessons/{prepared.lesson_unit_id}/intro-selections",
+                headers={"Idempotency-Key": "issue-129-reject-pending-version"},
+                json={
+                    "artifact_version_id": str(pending_version_id),
+                    "option_key": prepared.option_keys[0],
+                },
+            )
+    finally:
+        engine.dispose()
+
+    assert options.status_code == 200
+    data = options.json()["data"]
+    assert data["current_approved_version_id"] is None
+    assert data["display_version"]["artifact_version_id"] == str(pending_version_id)
+    assert data["display_version"]["approval_status"] == "pending_review"
+    assert data["display_version"]["selectable"] is False
+    assert data["pending_version"] is None
+    assert denied.status_code == 409
+    assert denied.json()["error"]["code"] == "INTRO_SELECTION_INVALID"
 
 
 async def test_intro_selection_replay_reauthorizes_and_cross_tenant_is_hidden(
@@ -324,6 +352,7 @@ def _foreign_actor(factory: sessionmaker[Session]) -> ActorContext:
                 slug=f"issue-129-{organization_id.hex[:12]}",
                 name="Issue 129 foreign tenant",
                 status="active",
+                created_at=datetime.now(UTC),
             )
         )
         session.flush()
