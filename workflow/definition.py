@@ -71,8 +71,9 @@ class WorkflowApprovalCompletionBinding:
     """Explicit application effect attached to an approved generated output."""
 
     kind: str
-    collection_pointer: str
-    stable_key_field: str
+    collection_pointer: str | None
+    stable_key_field: str | None
+    source_input_ref: str | None
 
 
 @dataclass(frozen=True, slots=True)

@@ -51,7 +51,7 @@ def _lesson_division_output(case: dict[str, Any]) -> dict[str, Any]:
     division = cast(dict[str, Any], case["lesson_division"])
     lesson_plan = cast(dict[str, Any], case["lesson_plan"])
     analysis = cast(dict[str, Any], lesson_plan["sections"]["material_analysis"])
-    units = []
+    units: list[dict[str, Any]] = []
     for source_unit in cast(list[dict[str, Any]], division["lesson_units"]):
         unit = copy.deepcopy(source_unit)
         unit["prior_learning"] = analysis["prior_learning"]
@@ -101,19 +101,25 @@ def _lesson_plan_output(case: dict[str, Any]) -> dict[str, Any]:
     sections = cast(dict[str, Any], lesson["sections"])
     project = cast(dict[str, Any], case["project"])
     teaching = cast(dict[str, Any], sections["teaching_content"])
+    source_lesson_unit_key = cast(str, lesson["source_lesson_unit_key"])
+    approved_lesson = next(
+        unit
+        for unit in cast(list[dict[str, Any]], case["lesson_division"]["lesson_units"])
+        if unit["lesson_unit_key"] == source_lesson_unit_key
+    )
     return {
         "teaching_content": {
             "lesson_plan_key": lesson["lesson_plan_key"],
-            "source_lesson_unit_key": lesson["source_lesson_unit_key"],
+            "source_lesson_unit_key": source_lesson_unit_key,
             "lesson_topic": teaching["topic"],
             "subject": project["subject"],
             "grade": project["grade"],
             "lesson_type": teaching["lesson_type"],
-            "duration_minutes": teaching["duration_minutes"],
-            "teaching_scope": teaching["scope"],
-            "teaching_evidence_refs": copy.deepcopy(teaching["evidence_refs"]),
-            "content_boundary": teaching["content_boundary"],
-            "must_not_preteach": copy.deepcopy(teaching["must_not_preteach"]),
+            "duration_minutes": approved_lesson["duration_minutes"],
+            "teaching_scope": approved_lesson["material_scope"],
+            "teaching_evidence_refs": copy.deepcopy(approved_lesson["evidence_refs"]),
+            "content_boundary": approved_lesson["content_boundary"],
+            "must_not_preteach": copy.deepcopy(approved_lesson["must_not_preteach"]),
         },
         "material_analysis": copy.deepcopy(sections["material_analysis"]),
         "learner_analysis": _rename(

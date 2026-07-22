@@ -16,6 +16,7 @@ from apps.api.artifact_quality.binding import (
     resolve_quality_report_binding,
     validator_set_payload,
 )
+from apps.api.artifact_quality.context_builder import build_quality_validation_context
 from apps.api.artifact_quality.contracts import (
     ArtifactQualityReportResult,
     ArtifactQualityTransaction,
@@ -115,7 +116,11 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
                 "QUALITY_SOURCE_HASH_MISMATCH",
                 "the frozen source hash does not match the exact artifact version",
             )
-        supporting_inputs = self._resolve_supporting_inputs(execution, binding, node_run_id)
+        supporting_inputs, supporting_versions = self._resolve_supporting_inputs(
+            execution,
+            binding,
+            node_run_id,
+        )
         existing = self._reports.get_for_node(node_run_id)
         result = None if existing is None else _report_result(existing)
         if existing is not None:
@@ -128,22 +133,13 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
             )
         else:
             self._workflow.start(node_run_id)
-        return QualityValidationContext(
-            organization_id=execution.organization_id,
-            project_id=execution.project_id,
-            lesson_unit_id=execution.lesson_unit_id,
-            content_release_id=execution.content_release_id,
-            workflow_definition_version_id=execution.workflow_definition_version_id,
-            node_run_id=node_run_id,
-            source_type=source.source_type,
-            source_id=source.source_id,
-            source_version_id=source.source_version_id,
-            source_content_hash=source.content_hash,
-            source_content=source.content,
-            validator_refs=binding.validator_refs,
-            validator_set_hash=binding.validator_set_hash,
-            supporting_inputs=supporting_inputs,
-            existing_result=result,
+        return build_quality_validation_context(
+            execution,
+            source,
+            binding,
+            supporting_inputs,
+            supporting_versions,
+            result,
         )
 
     def _resolve_supporting_inputs(
@@ -151,7 +147,7 @@ class SqlAlchemyArtifactQualityTransaction(ArtifactQualityTransaction):
         execution: WorkflowExecutionContext,
         binding: QualityReportBinding,
         node_run_id: UUID,
-    ) -> dict[str, dict[str, Any]]:
+    ) -> tuple[dict[str, dict[str, Any]], dict[str, UUID]]:
         return resolve_quality_supporting_inputs(
             execution,
             binding,

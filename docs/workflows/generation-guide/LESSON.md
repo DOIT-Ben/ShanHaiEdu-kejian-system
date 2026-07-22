@@ -107,6 +107,7 @@
 | --- | --- | --- |
 | `lesson_division.approved_version` | 是 | 完整快照 |
 | `material.approved_parse` | 是 | 完整快照 |
+| `material_scope.approved_version` | 是 | 摘要 |
 | `project.teacher_preferences` | 否 | 摘要 |
 
 ### 实际提示词

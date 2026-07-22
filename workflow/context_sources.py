@@ -17,6 +17,7 @@ class ContextSourceDefinition:
     artifact_types: tuple[str, ...] = ()
     scope: ContextSourceScope | None = None
     branch_key: str | None = None
+    requires_current_approval: bool = False
 
 
 CONTEXT_SOURCE_REGISTRY = MappingProxyType(
@@ -26,17 +27,32 @@ CONTEXT_SOURCE_REGISTRY = MappingProxyType(
             "artifact", "selection:intro", ("intro_selection",), "lesson", "intro_options"
         ),
         "lesson_division.approved_version": ContextSourceDefinition(
-            "artifact", "approval:lesson_division", ("lesson_division",), "project", "project"
+            "artifact",
+            "approval:lesson_division",
+            ("lesson_division",),
+            "project",
+            "project",
+            True,
         ),
         "lesson_plan.approved_version": ContextSourceDefinition(
-            "artifact", "approval:lesson_plan", ("lesson_plan",), "lesson", "lesson_plan"
+            "artifact",
+            "approval:lesson_plan",
+            ("lesson_plan",),
+            "lesson",
+            "lesson_plan",
+            True,
         ),
         "material.approved_parse": ContextSourceDefinition("asset", "content:material_evidence"),
         "material_scope.approved_version": ContextSourceDefinition(
-            "artifact", "approval:material_scope", ("material_scope",), "project", "project"
+            "artifact",
+            "approval:material_scope",
+            ("material_scope",),
+            "project",
+            "project",
+            True,
         ),
         "ppt_outline.approved_version": ContextSourceDefinition(
-            "artifact", "approval:ppt_outline", ("ppt_outline",), "lesson", "ppt"
+            "artifact", "approval:ppt_outline", ("ppt_outline",), "lesson", "ppt", True
         ),
         "ppt_page_spec.current_version": ContextSourceDefinition(
             "artifact",
@@ -46,7 +62,7 @@ CONTEXT_SOURCE_REGISTRY = MappingProxyType(
             "ppt",
         ),
         "ppt_style.approved_version": ContextSourceDefinition(
-            "artifact", "contract:ppt_style", ("ppt_style",), "lesson", "ppt"
+            "artifact", "contract:ppt_style", ("ppt_style",), "lesson", "ppt", True
         ),
         "project.teacher_preferences": ContextSourceDefinition(
             "project", "project:teacher_preferences"
@@ -69,7 +85,12 @@ CONTEXT_SOURCE_REGISTRY = MappingProxyType(
             "asset", "asset:video_selected_clips"
         ),
         "video.master_script.approved_version": ContextSourceDefinition(
-            "artifact", "approval:video_master_script", ("video_master_script",), "lesson", "video"
+            "artifact",
+            "approval:video_master_script",
+            ("video_master_script",),
+            "lesson",
+            "video",
+            True,
         ),
         "video.rough_storyboard.approved_version": ContextSourceDefinition(
             "artifact",
@@ -77,6 +98,7 @@ CONTEXT_SOURCE_REGISTRY = MappingProxyType(
             ("video_rough_storyboard",),
             "lesson",
             "video",
+            True,
         ),
         "video.style.approved_version": ContextSourceDefinition(
             "artifact",
@@ -84,6 +106,7 @@ CONTEXT_SOURCE_REGISTRY = MappingProxyType(
             ("video_style_master_image_candidates",),
             "lesson",
             "video",
+            True,
         ),
     }
 )
@@ -125,9 +148,10 @@ ARTIFACT_CONTRACT_REGISTRY = MappingProxyType(
             ("ppt_cover_image_candidates",),
             "lesson",
             "ppt",
+            True,
         ),
         "approval:ppt_final": ContextSourceDefinition(
-            "artifact", "approval:ppt_final", ("ppt_final",), "lesson", "ppt"
+            "artifact", "approval:ppt_final", ("ppt_final",), "lesson", "ppt", True
         ),
         "artifact:ppt_page_previews": ContextSourceDefinition(
             "artifact", "artifact:ppt_page_previews", ("ppt_page_previews",), "lesson", "ppt"
@@ -166,7 +190,7 @@ ARTIFACT_CONTRACT_REGISTRY = MappingProxyType(
             "artifact", "artifact:audio_plan", ("audio_plan",), "lesson", "video"
         ),
         "approval:video_final": ContextSourceDefinition(
-            "artifact", "approval:video_final", ("video_final",), "lesson", "video"
+            "artifact", "approval:video_final", ("video_final",), "lesson", "video", True
         ),
         "artifact:subtitles": ContextSourceDefinition(
             "artifact", "artifact:subtitles", ("subtitles",), "lesson", "video"

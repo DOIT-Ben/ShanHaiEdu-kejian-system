@@ -8,7 +8,11 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from apps.api.artifacts.approval_completion import prepare_declared_approval
+from apps.api.artifacts.approval_completion import (
+    prepare_declared_approval,
+    retire_declared_approval_gate,
+)
+from apps.api.artifacts.approval_events import append_stale_approval_event
 from apps.api.artifacts.domain import ApprovalAction
 from apps.api.artifacts.models import Approval, Artifact, ArtifactVersion
 from apps.api.artifacts.relation_service import ArtifactRelationService
@@ -114,9 +118,7 @@ class ArtifactApprovalService:
         if artifact.current_approved_version_id == version.id and existing is not None:
             return existing
         if artifact.status != "in_review" or artifact.current_submitted_version_id != version.id:
-            raise self._state_conflict(
-                "Only the current submitted version in review can be approved."
-            )
+            raise self._state_conflict("Only the current submitted version can be approved.")
         project = self._require_project(artifact.project_id, for_update=False)
         previous_version_id = artifact.current_approved_version_id
         quality_evidence, stale_ids, stale_node_ids = prepare_declared_approval(
@@ -154,7 +156,9 @@ class ArtifactApprovalService:
             },
             request_id,
         )
-        self._append_stale_event(
+        append_stale_approval_event(
+            self._session,
+            self._actor,
             artifact,
             version.id,
             stale_ids,
@@ -197,6 +201,14 @@ class ArtifactApprovalService:
     ) -> Approval:
         if artifact.status != "in_review" or artifact.current_submitted_version_id != version.id:
             raise self._state_conflict("Only the current submitted version can be returned.")
+        project = self._require_project(artifact.project_id, for_update=False)
+        retire_declared_approval_gate(
+            self._session,
+            self._actor,
+            artifact,
+            version,
+            fixed_release=(project.content_release_id, project.workflow_definition_version_id),
+        )
         approval = self._record(
             version,
             ApprovalAction.REQUEST_CHANGES,
@@ -244,7 +256,9 @@ class ArtifactApprovalService:
             },
             request_id,
         )
-        self._append_stale_event(
+        append_stale_approval_event(
+            self._session,
+            self._actor,
             artifact,
             version.id,
             stale_ids,
@@ -303,28 +317,6 @@ class ArtifactApprovalService:
             event_type=event_type,
             resource=EventResource(type="artifact", id=artifact.id),
             payload=payload,
-            request_id=request_id,
-        )
-
-    def _append_stale_event(
-        self,
-        artifact: Artifact,
-        source_version_id: UUID,
-        stale_ids: list[UUID],
-        reason_code: str,
-        request_id: str | None,
-    ) -> None:
-        if not stale_ids:
-            return
-        EventWriter(self._session, self._actor.organization_id).append(
-            project_id=artifact.project_id,
-            event_type="workflow.downstream_stale.propagated",
-            resource=EventResource(type="artifact", id=artifact.id),
-            payload={
-                "source_version_id": str(source_version_id),
-                "affected_resource_ids": [str(item) for item in stale_ids],
-                "reason_code": reason_code,
-            },
             request_id=request_id,
         )
 

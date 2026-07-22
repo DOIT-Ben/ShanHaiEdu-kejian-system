@@ -69,17 +69,9 @@ class LessonPlanBusinessValidator:
         scope: ApprovedLessonPlanScope,
         content: dict[str, Any],
     ) -> LessonPlanValidationReport:
-        section_keys = self._section_keys()
-        if set(content) != set(section_keys):
-            raise LessonPlanSliceError(
-                "LESSON_PLAN_SECTION_MISMATCH: content differs from definition"
-            )
-        self._validate_schema(content)
-        teaching_content = self._mapping(content, "teaching_content")
-        self._validate_teaching_content(scope, teaching_content)
-        objective_assessments = self._validate_objectives(scope, content)
-        self._validate_process(scope, content, objective_assessments)
-        self._validate_homework(content, set(objective_assessments))
+        section_keys = self.validate_schema(content)
+        self.validate_scope(scope, content)
+        self.validate_teaching_quality(scope, content)
         return LessonPlanValidationReport(
             valid=True,
             findings=(),
@@ -93,6 +85,32 @@ class LessonPlanBusinessValidator:
                 "homework_references",
             ),
         )
+
+    def validate_schema(self, content: dict[str, Any]) -> tuple[str, ...]:
+        section_keys = self._section_keys()
+        if set(content) != set(section_keys):
+            raise LessonPlanSliceError(
+                "LESSON_PLAN_SECTION_MISMATCH: content differs from definition"
+            )
+        self._validate_schema(content)
+        return section_keys
+
+    def validate_scope(
+        self,
+        scope: ApprovedLessonPlanScope,
+        content: dict[str, Any],
+    ) -> None:
+        teaching_content = self._mapping(content, "teaching_content")
+        self._validate_teaching_content(scope, teaching_content)
+
+    def validate_teaching_quality(
+        self,
+        scope: ApprovedLessonPlanScope,
+        content: dict[str, Any],
+    ) -> None:
+        objective_assessments = self._validate_objectives(scope, content)
+        self._validate_process(scope, content, objective_assessments)
+        self._validate_homework(content, set(objective_assessments))
 
     def _section_keys(self) -> tuple[str, ...]:
         raw_properties = self._definition.schema_json.get("properties")

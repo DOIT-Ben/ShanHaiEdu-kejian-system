@@ -21,8 +21,9 @@ def resolve_quality_supporting_inputs(
     workflow: SqlAlchemyQualityWorkflowPort,
     artifacts: SqlAlchemyArtifactQualitySourcePort,
     assets: SqlAlchemyAssetQualitySourcePort,
-) -> dict[str, dict[str, Any]]:
+) -> tuple[dict[str, dict[str, Any]], dict[str, UUID]]:
     resolved: dict[str, dict[str, Any]] = {}
+    versions: dict[str, UUID] = {}
     for contract_ref in binding.supporting_input_refs:
         source_input = workflow.require_supporting_input(node_run_id, contract_ref)
         if source_input.source_type == "artifact":
@@ -50,4 +51,5 @@ def resolve_quality_supporting_inputs(
                 "the frozen supporting-input hash does not match the exact source",
             )
         resolved[contract_ref] = dict(source.content)
-    return resolved
+        versions[contract_ref] = source.source_version_id
+    return resolved, versions

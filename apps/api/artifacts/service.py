@@ -7,6 +7,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from apps.api.artifacts.approval_completion import retire_declared_approval_gate
 from apps.api.artifacts.approval_service import ArtifactApprovalService
 from apps.api.artifacts.authoring_guard import ArtifactAuthoringGuard
 from apps.api.artifacts.domain import ApprovalAction, canonical_content_hash
@@ -139,6 +140,22 @@ class ArtifactService:
         existing = self._current_submitted(artifact)
         if existing is not None and existing.content_hash == content_hash:
             return existing
+        if existing is not None:
+            project = self._validation.require_project(
+                artifact.project_id,
+                ProjectAction.EDIT,
+                for_update=False,
+            )
+            retire_declared_approval_gate(
+                self._session,
+                self._actor,
+                artifact,
+                existing,
+                fixed_release=(
+                    project.content_release_id,
+                    project.workflow_definition_version_id,
+                ),
+            )
         self._validation.require_source_node(source_node_run_id)
         version = self._new_version(
             artifact,

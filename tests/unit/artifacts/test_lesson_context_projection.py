@@ -8,6 +8,18 @@ from apps.api.artifacts.lesson_context_projection import (
 )
 
 
+def _lesson(key: str) -> dict[str, object]:
+    return {
+        "lesson_unit_key": key,
+        "title": f"Title {key}",
+        "duration_minutes": 40,
+        "material_scope": f"Scope {key}",
+        "core_learning_outcome": f"Outcome {key}",
+        "evidence_refs": [f"EV-{key}"],
+        "must_not_preteach": [f"Later {key}"],
+    }
+
+
 def test_lesson_division_context_exposes_only_the_target_lesson() -> None:
     first = _lesson("LESSON-001")
     second = _lesson("LESSON-002")
@@ -51,15 +63,3 @@ def test_lesson_division_context_requires_one_exact_target(
         )
 
     assert caught.value.code == "NODE_EXECUTION_LESSON_SCOPE_INVALID"
-
-
-def _lesson(key: str) -> dict[str, object]:
-    return {
-        "lesson_unit_key": key,
-        "title": f"Title {key}",
-        "duration_minutes": 40,
-        "material_scope": f"Scope {key}",
-        "core_learning_outcome": f"Outcome {key}",
-        "evidence_refs": [f"EV-{key}"],
-        "must_not_preteach": [f"Later {key}"],
-    }

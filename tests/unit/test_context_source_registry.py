@@ -26,3 +26,11 @@ def test_selected_video_clips_are_not_resolved_as_candidate_artifacts() -> None:
     assert definition.contract_ref == "asset:video_selected_clips"
     assert definition.artifact_types == ()
     assert resolve_artifact_source("video.clips.approved_versions") is None
+
+
+def test_approved_artifact_sources_require_the_current_approval_pointer() -> None:
+    approved = resolve_artifact_source("approval:lesson_division")
+    submitted = resolve_artifact_source("artifact:lesson_plan")
+
+    assert approved is not None and approved.requires_current_approval is True
+    assert submitted is not None and submitted.requires_current_approval is False

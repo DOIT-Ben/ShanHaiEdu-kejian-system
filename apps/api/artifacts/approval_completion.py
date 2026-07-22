@@ -18,7 +18,11 @@ from apps.api.lessons.approval_port import (
     LessonDivisionApprovalCommand,
     LessonDivisionApprovalPort,
 )
-from apps.api.workflows.approval_port import WorkflowApprovalReader
+from apps.api.workflows.approval_port import (
+    ArtifactApprovalGateCommand,
+    WorkflowApprovalReader,
+    WorkflowArtifactApprovalPort,
+)
 from workflow.registry import BUILTIN_WORKFLOW_REGISTRY
 
 
@@ -104,6 +108,19 @@ def _apply_declared_completion(
     output = BUILTIN_WORKFLOW_REGISTRY.load(graph).output_definition_index.get(definition_key)
     if output is None or output.approval_completion is None:
         return None
+    if output.approval_completion.kind == "workflow_gate":
+        _complete_artifact_gate(
+            session,
+            actor,
+            artifact,
+            version,
+            content_release_id=content_release_id,
+            workflow_definition_version_id=workflow_definition_version_id,
+            gate_node_key=output.quality_gate_node_key,
+            branch_key=output.producer_branch_key,
+            source_input_ref=output.approval_completion.source_input_ref,
+        )
+        return None
     if output.approval_completion.kind != "lesson_unit_sync":
         raise _invalid("The declared approval completion is unsupported.")
     if version.source_node_run_id is None or output.quality_gate_node_key is None:
@@ -122,6 +139,91 @@ def _apply_declared_completion(
             previous_content=previous,
             request_id=request_id,
         )
+    )
+
+
+def retire_declared_approval_gate(
+    session: Session,
+    actor: ActorContext,
+    artifact: Artifact,
+    version: ArtifactVersion,
+    *,
+    fixed_release: tuple[UUID, UUID],
+) -> None:
+    if artifact.lesson_unit_id is None:
+        return
+    content_release_id, workflow_definition_version_id = fixed_release
+    definition_key = ContentDefinitionApprovalReader(session).definition_key(
+        definition_id=artifact.content_definition_version_id,
+        content_release_id=content_release_id,
+    )
+    graph = WorkflowApprovalReader(session).published_graph(workflow_definition_version_id)
+    if definition_key is None or graph is None:
+        raise _invalid("The fixed content or workflow release is unavailable.")
+    output = BUILTIN_WORKFLOW_REGISTRY.load(graph).output_definition_index.get(definition_key)
+    if (
+        output is None
+        or output.approval_completion is None
+        or output.approval_completion.kind != "workflow_gate"
+    ):
+        return
+    command = _gate_command(
+        artifact,
+        version,
+        content_release_id=content_release_id,
+        workflow_definition_version_id=workflow_definition_version_id,
+        gate_node_key=output.quality_gate_node_key,
+        branch_key=output.producer_branch_key,
+        source_input_ref=output.approval_completion.source_input_ref,
+    )
+    WorkflowArtifactApprovalPort(session, actor).retire_if_present(command)
+
+
+def _complete_artifact_gate(
+    session: Session,
+    actor: ActorContext,
+    artifact: Artifact,
+    version: ArtifactVersion,
+    *,
+    content_release_id: UUID,
+    workflow_definition_version_id: UUID,
+    gate_node_key: str | None,
+    branch_key: str,
+    source_input_ref: str | None,
+) -> None:
+    command = _gate_command(
+        artifact,
+        version,
+        content_release_id=content_release_id,
+        workflow_definition_version_id=workflow_definition_version_id,
+        gate_node_key=gate_node_key,
+        branch_key=branch_key,
+        source_input_ref=source_input_ref,
+    )
+    WorkflowArtifactApprovalPort(session, actor).complete(command)
+
+
+def _gate_command(
+    artifact: Artifact,
+    version: ArtifactVersion,
+    *,
+    content_release_id: UUID,
+    workflow_definition_version_id: UUID,
+    gate_node_key: str | None,
+    branch_key: str,
+    source_input_ref: str | None,
+) -> ArtifactApprovalGateCommand:
+    if artifact.lesson_unit_id is None or gate_node_key is None or source_input_ref is None:
+        raise _invalid("The lesson-scoped approval gate declaration is incomplete.")
+    return ArtifactApprovalGateCommand(
+        project_id=artifact.project_id,
+        lesson_unit_id=artifact.lesson_unit_id,
+        artifact_version_id=version.id,
+        content_release_id=content_release_id,
+        workflow_definition_version_id=workflow_definition_version_id,
+        gate_node_key=gate_node_key,
+        branch_key=branch_key,
+        source_input_ref=source_input_ref,
     )
 
 

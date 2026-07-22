@@ -330,7 +330,9 @@ def _seed_submitted_quality_artifact(
 ) -> ApprovalSeed:
     runtime = _seed_runtime(factory)
     case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
-    lesson_plan_content = build_golden_branch_source_outputs(case)["lesson_plan.generate"]
+    outputs = build_golden_branch_source_outputs(case)
+    lesson_plan_content = outputs["lesson_plan.generate"]
+    division_content = outputs["lesson.division.generate"]
     with factory() as session, session.begin():
         upstream = session.get(ArtifactVersion, runtime.upstream_version_id)
         upstream_artifact = session.get(
@@ -343,8 +345,47 @@ def _seed_submitted_quality_artifact(
                 ContentDefinitionVersion.definition_key == "lesson_plan.generate.output"
             )
         )
+        division_definition = session.scalar(
+            select(ContentDefinitionVersion).where(
+                ContentDefinitionVersion.definition_key == "lesson.division.generate.output"
+            )
+        )
         run = session.get(WorkflowRun, runtime.workflow_run_id)
-        assert definition is not None and run is not None
+        assert definition is not None and division_definition is not None and run is not None
+        division_artifact = Artifact(
+            id=new_uuid7(),
+            organization_id=runtime.actor.organization_id,
+            project_id=runtime.project_id,
+            lesson_unit_id=None,
+            branch_key="project",
+            artifact_key=f"quality-division:{new_uuid7()}",
+            artifact_type="lesson_division",
+            content_definition_version_id=division_definition.id,
+            status="approved",
+            stale_reason_json=None,
+            created_by=runtime.actor.principal_id,
+            updated_by=runtime.actor.principal_id,
+        )
+        session.add(division_artifact)
+        session.flush()
+        division_version = ArtifactVersion(
+            id=new_uuid7(),
+            organization_id=runtime.actor.organization_id,
+            artifact_id=division_artifact.id,
+            version_no=1,
+            content_json=division_content,
+            content_hash=canonical_content_hash(division_content),
+            render_summary_json={},
+            source_kind="manual",
+            source_node_run_id=None,
+            context_snapshot_id=None,
+            prompt_snapshot_id=None,
+            validation_report_json={"valid": True},
+            created_by=runtime.actor.principal_id,
+        )
+        session.add(division_version)
+        session.flush()
+        division_artifact.current_approved_version_id = division_version.id
         lesson = LessonUnit(
             id=new_uuid7(),
             organization_id=runtime.actor.organization_id,
@@ -355,7 +396,7 @@ def _seed_submitted_quality_artifact(
             scope_summary="Exercise the generic artifact quality approval guard",
             objective_summary="Keep declared lesson division completion out of this fixture",
             estimated_minutes=40,
-            source_division_version_id=runtime.upstream_version_id,
+            source_division_version_id=division_version.id,
             status="active",
             created_by=runtime.actor.principal_id,
             updated_by=runtime.actor.principal_id,
@@ -503,6 +544,15 @@ def _seed_submitted_quality_artifact(
         )
         workflow.add_input_snapshot(
             node.id,
+            input_key="approval:lesson_division",
+            source_type="artifact",
+            source_id=division_artifact.id,
+            source_version_id=division_version.id,
+            content_hash=division_version.content_hash,
+            snapshot=dict(division_version.content_json),
+        )
+        workflow.add_input_snapshot(
+            node.id,
             input_key="content:material_evidence",
             source_type="material_parse",
             source_id=runtime.source_material_id,
@@ -534,6 +584,47 @@ def _execute_report(
         SqlAlchemyArtifactQualityTransactionFactory(factory, seeded.actor),
         registry,
     ).execute(seeded.validate_node_id)
+    if passed:
+        with factory() as session, session.begin():
+            validate = session.get(NodeRun, seeded.validate_node_id)
+            version = session.get(ArtifactVersion, seeded.version_id)
+            report = session.get(ArtifactQualityReport, result.report_id)
+            artifact = session.get(Artifact, seeded.artifact_id)
+            assert validate is not None and validate.branch_run_id is not None
+            assert version is not None and report is not None and artifact is not None
+            if (
+                artifact.current_submitted_version_id != version.id
+                or artifact.status != "in_review"
+            ):
+                return result.report_id
+            workflow = WorkflowRuntimeService(session, seeded.actor)
+            gate = workflow.create_branch_node_run(
+                validate.workflow_run_id,
+                validate.branch_run_id,
+                node_key="lesson_plan.approve",
+                status=NodeStatus.NOT_READY,
+            )
+            workflow.add_input_snapshot(
+                gate.id,
+                input_key="artifact:lesson_plan",
+                source_type="artifact",
+                source_id=seeded.artifact_id,
+                source_version_id=version.id,
+                content_hash=version.content_hash,
+                snapshot=dict(version.content_json),
+            )
+            workflow.add_input_snapshot(
+                gate.id,
+                input_key="report:lesson_plan_quality",
+                source_type="quality_report",
+                source_id=report.id,
+                source_version_id=report.id,
+                content_hash=report.evidence_hash,
+                snapshot={"report_id": str(report.id), "evidence_hash": report.evidence_hash},
+            )
+            workflow.transition_node(gate.id, NodeStatus.READY)
+            workflow.transition_node(gate.id, NodeStatus.DRAFT)
+            workflow.transition_node(gate.id, NodeStatus.REVIEW_REQUIRED)
     return result.report_id
 
 

@@ -15,6 +15,7 @@ from apps.api.artifacts.context_source_registry import (
 from apps.api.artifacts.domain import canonical_content_hash
 from apps.api.artifacts.execution_errors import ArtifactExecutionPortError
 from apps.api.artifacts.generated_write_guard import GeneratedArtifactWriteGuard
+from apps.api.artifacts.lesson_context_projection import project_artifact_context
 from apps.api.artifacts.models import Approval, Artifact, ArtifactVersion
 from apps.api.artifacts.relation_service import ArtifactRelationService
 from apps.api.database import utc_now
@@ -81,7 +82,11 @@ class SqlAlchemyArtifactPort:
                 artifact_version_id=version.id,
                 contract_ref=source,
                 artifact_type=artifact.artifact_type,
-                content=version.content_json,
+                content=project_artifact_context(
+                    source=source,
+                    lesson_key=execution.lesson_key,
+                    content=version.content_json,
+                ),
                 content_hash=version.content_hash,
             )
             for version, artifact in rows
