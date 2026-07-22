@@ -13,6 +13,7 @@ export type RuntimeNewProjectForm = {
   executionMode: "guided" | "automatic";
   grade: string;
   knowledgePoint: string;
+  sourceMode: "textbook" | "anchor";
   textbookEdition: string;
   title: string;
 };
@@ -50,6 +51,7 @@ export const defaultRuntimeNewProjectForm: RuntimeNewProjectForm = {
   executionMode: "guided",
   grade: "六年级",
   knowledgePoint: "",
+  sourceMode: "textbook",
   textbookEdition: "人教版",
   title: "",
 };
@@ -81,6 +83,7 @@ function isForm(value: unknown): value is RuntimeNewProjectForm {
     (form.executionMode === "guided" || form.executionMode === "automatic") &&
     typeof form.grade === "string" &&
     typeof form.knowledgePoint === "string" &&
+    (form.sourceMode === "textbook" || form.sourceMode === "anchor") &&
     typeof form.textbookEdition === "string" &&
     typeof form.title === "string"
   );
@@ -158,7 +161,13 @@ export function readRuntimeNewProjectRecovery(): RuntimeNewProjectRecovery | nul
     const raw = sessionStorage.getItem(RUNTIME_NEW_PROJECT_RECOVERY_KEY);
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
-    return isRecovery(parsed) ? parsed : null;
+    if (!parsed || typeof parsed !== "object") return null;
+    const candidate = parsed as { form?: Record<string, unknown> };
+    const migrated =
+      candidate.form && candidate.form.sourceMode === undefined
+        ? { ...candidate, form: { ...candidate.form, sourceMode: "textbook" } }
+        : candidate;
+    return isRecovery(migrated) ? migrated : null;
   } catch {
     return null;
   }

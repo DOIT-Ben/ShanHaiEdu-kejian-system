@@ -38,6 +38,7 @@ const projectSchema = z.object({
   executionMode: z.enum(["guided", "automatic"]),
   grade: z.string().min(1, "请选择年级"),
   knowledgePoint: z.string().min(2, "请输入本次要制作的知识点"),
+  sourceMode: z.enum(["textbook", "anchor"]),
   textbookEdition: z.string().min(1, "请选择教材版本"),
   title: z.string().min(2, "请输入项目名称"),
 });
@@ -61,6 +62,7 @@ function normalizeForm(
     executionMode: value.executionMode ?? fallback.executionMode,
     grade: value.grade ?? fallback.grade,
     knowledgePoint: value.knowledgePoint ?? fallback.knowledgePoint,
+    sourceMode: value.sourceMode ?? fallback.sourceMode,
     textbookEdition: value.textbookEdition ?? fallback.textbookEdition,
     title: value.title ?? fallback.title,
   };
@@ -131,14 +133,13 @@ export function RuntimeNewProjectPage() {
     const subscription = watch((values) => {
       const current = recoveryRef.current;
       const form = normalizeForm(values, current.form);
-      const fingerprint = current.file
-        ? runtimeNewProjectFingerprint(form, current.file)
-        : current.fingerprint;
+      const recoveryFile = form.sourceMode === "textbook" ? current.file : undefined;
+      const fingerprint = runtimeNewProjectFingerprint(form, recoveryFile);
       if (current.projectId && current.fingerprint && fingerprint !== current.fingerprint) {
-        replaceRecovery(withNewRuntimeNewProjectIntent(form, current.file));
+        replaceRecovery(withNewRuntimeNewProjectIntent(form, recoveryFile));
         return;
       }
-      patchRecovery({ form, fingerprint });
+      patchRecovery({ file: recoveryFile, form, fingerprint });
     });
     return () => subscription.unsubscribe();
   }, [patchRecovery, replaceRecovery, watch]);
@@ -188,6 +189,41 @@ export function RuntimeNewProjectPage() {
   );
 
   const submit = handleSubmit(async (values) => {
+    const form = normalizeForm(values);
+    if (values.sourceMode === "anchor") {
+      let current = recoveryRef.current;
+      const fingerprint = runtimeNewProjectFingerprint(form, undefined);
+      if (current.fingerprint !== fingerprint || current.file) {
+        current = replaceRecovery(withNewRuntimeNewProjectIntent(form, undefined));
+      } else {
+        current = patchRecovery({ form, errorMessage: undefined });
+      }
+      setMessage("");
+      try {
+        current = setSubmitStage("creating");
+        const project = await createProject({
+          idempotencyKey: current.intent.project,
+          input: {
+            execution_mode: values.executionMode,
+            grade: values.grade,
+            knowledge_point: values.knowledgePoint,
+            textbook_edition: values.textbookEdition,
+            title: values.title,
+          },
+        });
+        current = patchRecovery({ projectId: project.id });
+        await queryClient.invalidateQueries({ queryKey: projectKeys.all });
+        clearRuntimeNewProjectRecovery();
+        void navigate(`/app/projects/${project.id}`, { replace: true });
+      } catch (reason) {
+        const errorMessage =
+          reason instanceof Error ? reason.message : "项目没有创建完成，请稍后重试";
+        setMessage(errorMessage);
+        patchRecovery({ errorMessage });
+        setStage("idle");
+      }
+      return;
+    }
     if (!file) {
       setMessage("请选择一份 PDF 教材");
       return;
@@ -198,7 +234,6 @@ export function RuntimeNewProjectPage() {
     }
 
     const snapshot = fileSnapshot(file);
-    const form = normalizeForm(values);
     let current = recoveryRef.current;
     const refreshed = refreshExpiredRuntimeUploadSession(current);
     if (refreshed !== current) current = replaceRecovery(refreshed);
@@ -298,11 +333,13 @@ export function RuntimeNewProjectPage() {
   const canContinueJob = Boolean(recovery.projectId && recovery.jobId);
   const writeReady = isCsrfTokenAvailable();
   const submitting = stage !== "idle";
+  const sourceMode = watch("sourceMode");
+  const anchorSummary = `${watch("grade")} · ${watch("textbookEdition")} · ${watch("knowledgePoint") || "待填写知识点"}`;
 
   return (
     <div className="mx-auto max-w-[1120px] px-4 py-5 md:px-6 lg:px-8">
       <FocusPageHeader
-        description="填写课程信息并上传教材。系统会保存真实进度，刷新页面后也能继续查看。"
+        description="先确定课程范围；有教材时上传 PDF，没有教材时可直接用课程锚点创建。"
         title="新建课堂项目"
       />
 
@@ -347,6 +384,37 @@ export function RuntimeNewProjectPage() {
         className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]"
         onSubmit={(event) => void submit(event)}
       >
+        <fieldset className="lg:col-span-2" disabled={submitting}>
+          <legend className="text-sm font-semibold text-[var(--sh-ink-strong)]">
+            课程内容来源
+          </legend>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {[
+              ["textbook", "使用 PDF 教材", "上传教材并进入解析流程"],
+              ["anchor", "暂不使用教材", "用年级、版本和知识点限定课程范围"],
+            ].map(([value, label, detail]) => (
+              <label
+                className={`flex cursor-pointer items-start gap-3 rounded-[var(--sh-radius-md)] border px-4 py-3 transition-colors ${sourceMode === value ? "border-[var(--sh-action-primary)] bg-[var(--sh-brand-50)]" : "border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)] hover:bg-[var(--sh-surface-soft)]"}`}
+                key={value}
+              >
+                <input
+                  className="mt-1 size-4 accent-[var(--sh-action-primary)]"
+                  type="radio"
+                  value={value}
+                  {...register("sourceMode")}
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-[var(--sh-ink-strong)]">
+                    {label}
+                  </span>
+                  <span className="mt-1 block text-xs leading-5 text-[var(--sh-ink-muted)]">
+                    {detail}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
         <section className="rounded-[var(--sh-radius-lg)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-5 shadow-[var(--sh-shadow-card)]">
           <div className="flex items-center gap-2 text-[var(--sh-brand-700)]">
             <BookOpen aria-hidden="true" className="size-5" />
@@ -446,34 +514,52 @@ export function RuntimeNewProjectPage() {
         <section className="rounded-[var(--sh-radius-lg)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-5 shadow-[var(--sh-shadow-card)]">
           <div className="flex items-center gap-2 text-[var(--sh-brand-700)]">
             <FileText aria-hidden="true" className="size-5" />
-            <h2 className="font-semibold">上传教材</h2>
+            <h2 className="font-semibold">
+              {sourceMode === "textbook" ? "上传教材" : "确认课程范围"}
+            </h2>
           </div>
-          <label className="mt-4 grid min-h-40 cursor-pointer place-items-center rounded-[var(--sh-radius-md)] border border-dashed border-[var(--sh-brand-300)] bg-[var(--sh-brand-50)] p-5 text-center hover:border-[var(--sh-brand-500)]">
-            <input
-              accept="application/pdf"
-              className="sr-only"
-              disabled={submitting}
-              onChange={(event) => selectFile(event.target.files?.[0] ?? null)}
-              type="file"
-            />
-            <span>
-              <Upload aria-hidden="true" className="mx-auto size-7 text-[var(--sh-brand-600)]" />
-              <span className="mt-2 block text-sm font-semibold text-[var(--sh-ink-strong)]">
-                {file?.name ?? (recovery.file?.name ? "重新选择同一份 PDF" : "选择 PDF 教材")}
+          {sourceMode === "textbook" ? (
+            <label className="mt-4 grid min-h-40 cursor-pointer place-items-center rounded-[var(--sh-radius-md)] border border-dashed border-[var(--sh-brand-300)] bg-[var(--sh-brand-50)] p-5 text-center hover:border-[var(--sh-brand-500)]">
+              <input
+                accept="application/pdf"
+                className="sr-only"
+                disabled={submitting}
+                onChange={(event) => selectFile(event.target.files?.[0] ?? null)}
+                type="file"
+              />
+              <span>
+                <Upload aria-hidden="true" className="mx-auto size-7 text-[var(--sh-brand-600)]" />
+                <span className="mt-2 block text-sm font-semibold text-[var(--sh-ink-strong)]">
+                  {file?.name ?? (recovery.file?.name ? "重新选择同一份 PDF" : "选择 PDF 教材")}
+                </span>
+                <span className="mt-1 block text-xs text-[var(--sh-ink-muted)]">
+                  {file ? (file.size / 1024 / 1024).toFixed(1) + " MB" : "文件会直接上传到受控存储"}
+                </span>
               </span>
-              <span className="mt-1 block text-xs text-[var(--sh-ink-muted)]">
-                {file ? (file.size / 1024 / 1024).toFixed(1) + " MB" : "文件会直接上传到受控存储"}
-              </span>
-            </span>
-          </label>
+            </label>
+          ) : (
+            <div
+              aria-label="课程锚点摘要"
+              className="mt-4 rounded-[var(--sh-radius-md)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-soft)] px-4 py-4"
+              role="region"
+            >
+              <p className="text-xs font-medium text-[var(--sh-ink-faint)]">课程锚点</p>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[var(--sh-ink-strong)]">
+                {anchorSummary}
+              </p>
+              <p className="mt-2 text-xs leading-5 text-[var(--sh-ink-muted)]">
+                创建后仍可在项目中补充教材；当前不会建立教材解析任务。
+              </p>
+            </div>
+          )}
           {message ? (
             <p className="mt-3 text-sm text-[var(--sh-danger)]" role="alert">
               {message}
             </p>
           ) : null}
           <Button className="mt-4 w-full" disabled={submitting || !writeReady} type="submit">
-            {stage === "idle" ? <Upload aria-hidden="true" /> : null}
-            {stageLabels[stage]}
+            {stage === "idle" && sourceMode === "textbook" ? <Upload aria-hidden="true" /> : null}
+            {stage === "idle" && sourceMode === "anchor" ? "创建课程项目" : stageLabels[stage]}
           </Button>
           {!writeReady ? (
             <p className="mt-3 text-xs leading-5 text-[var(--sh-warning)]" role="status">
@@ -481,7 +567,9 @@ export function RuntimeNewProjectPage() {
             </p>
           ) : null}
           <p className="mt-3 text-xs leading-5 text-[var(--sh-ink-faint)]">
-            上传完成后会进入教材解析。页面只展示服务端返回的真实状态。
+            {sourceMode === "textbook"
+              ? "上传完成后会进入教材解析。页面只展示服务端返回的真实状态。"
+              : "项目创建后直接进入课程空间，不会显示虚假的上传或解析进度。"}
           </p>
         </section>
       </form>

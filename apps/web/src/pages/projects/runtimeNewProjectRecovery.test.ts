@@ -16,6 +16,7 @@ const form: RuntimeNewProjectForm = {
   executionMode: "guided",
   grade: "六年级",
   knowledgePoint: "百分数的意义",
+  sourceMode: "textbook",
   textbookEdition: "人教版",
   title: "认识百分数",
 };
@@ -60,6 +61,19 @@ describe("runtime new-project recovery", () => {
     );
 
     expect(readRuntimeNewProjectRecovery()).toBeNull();
+  });
+
+  it("restores old records as textbook mode", () => {
+    const recovery = createRuntimeNewProjectRecovery(form);
+    const legacy = {
+      ...recovery,
+      form: Object.fromEntries(
+        Object.entries(recovery.form).filter(([key]) => key !== "sourceMode"),
+      ),
+    };
+    sessionStorage.setItem(RUNTIME_NEW_PROJECT_RECOVERY_KEY, JSON.stringify(legacy));
+
+    expect(readRuntimeNewProjectRecovery()?.form.sourceMode).toBe("textbook");
   });
 
   it("keeps the metadata fingerprint stable after the digest is calculated", () => {

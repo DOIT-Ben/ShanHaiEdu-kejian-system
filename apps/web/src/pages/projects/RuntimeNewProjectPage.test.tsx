@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import * as materialsApi from "@/features/materials/api/materialsApi";
 import * as projectsApi from "@/features/projects/api/projectsApi";
 import { RuntimeNewProjectPage } from "@/pages/projects/RuntimeNewProjectPage";
@@ -19,6 +19,7 @@ const savedForm: RuntimeNewProjectForm = {
   executionMode: "guided",
   grade: "六年级",
   knowledgePoint: "百分数的意义",
+  sourceMode: "textbook",
   textbookEdition: "人教版",
   title: "认识百分数",
 };
@@ -30,7 +31,10 @@ function renderPage() {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={["/app/projects/new"]}>
-        <RuntimeNewProjectPage />
+        <Routes>
+          <Route element={<RuntimeNewProjectPage />} path="/app/projects/new" />
+          <Route element={<p>项目创建完成</p>} path="/app/projects/:projectId" />
+        </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -144,5 +148,37 @@ describe("RuntimeNewProjectPage recovery", () => {
     expect(screen.getByRole("combobox", { name: "选择制作方式" })).toBeDisabled();
     expect(fileInput).toBeDisabled();
     expect(screen.getByRole("button", { name: "重新开始" })).toBeDisabled();
+  });
+
+  it("creates an anchor-only project without inventing a material upload", async () => {
+    const user = userEvent.setup();
+    const createProject = vi.spyOn(projectsApi, "createProject").mockResolvedValue({
+      id: "01960000-0000-7000-8000-000000000222",
+    } as Awaited<ReturnType<typeof projectsApi.createProject>>);
+    const createUpload = vi.spyOn(materialsApi, "createMaterialUploadSession");
+    renderPage();
+
+    await user.click(screen.getByRole("radio", { name: /暂不使用教材/ }));
+    await user.type(screen.getByLabelText("项目名称"), "生活中的百分数");
+    await user.type(screen.getByLabelText("知识点"), "百分数的实际应用");
+
+    expect(screen.getByRole("region", { name: "课程锚点摘要" })).toHaveTextContent(
+      "六年级 · 人教版 · 百分数的实际应用",
+    );
+    await user.click(screen.getByRole("button", { name: "创建课程项目" }));
+
+    expect(await screen.findByText("项目创建完成")).toBeVisible();
+    expect(createProject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: {
+          execution_mode: "guided",
+          grade: "六年级",
+          knowledge_point: "百分数的实际应用",
+          textbook_edition: "人教版",
+          title: "生活中的百分数",
+        },
+      }),
+    );
+    expect(createUpload).not.toHaveBeenCalled();
   });
 });
