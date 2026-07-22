@@ -15,6 +15,7 @@ from apps.api.artifacts.authoring_provision import (
     GeneratedDraftRequest,
 )
 from apps.api.artifacts.models import Artifact, ArtifactRelation, ArtifactVersion
+from apps.api.artifacts.relation_service import ArtifactRelationService
 from apps.api.artifacts.service import ArtifactService
 from apps.api.database import build_engine, build_session_factory, utc_now
 from apps.api.identity.context import ActorContext, system_actor
@@ -90,6 +91,10 @@ async def test_manual_replacement_inherits_division_relation_and_stales_on_revok
 ) -> None:
     factory = build_session_factory(build_engine(migrated_database_url))
     prepared = await _prepare_generated_lesson_plan(factory)
+    previous_division_id, current_division_id = _carry_division_forward(
+        factory,
+        prepared,
+    )
     _stage_and_validate(factory, prepared.actor, prepared.version_id)
     _open_gate(factory, prepared.actor, prepared.version_id)
     with factory() as session, session.begin():
@@ -136,6 +141,7 @@ async def test_manual_replacement_inherits_division_relation_and_stales_on_revok
         )
         assert lesson is not None
         division_version_id = lesson.source_division_version_id
+        assert division_version_id == current_division_id
         relation = session.scalar(
             select(ArtifactRelation).where(
                 ArtifactRelation.from_artifact_version_id == division_version_id,
@@ -144,6 +150,14 @@ async def test_manual_replacement_inherits_division_relation_and_stales_on_revok
             )
         )
         assert relation is not None
+        historical_relation = session.scalar(
+            select(ArtifactRelation).where(
+                ArtifactRelation.from_artifact_version_id == previous_division_id,
+                ArtifactRelation.to_artifact_version_id == replacement_id,
+                ArtifactRelation.relation_type != "supersedes",
+            )
+        )
+        assert historical_relation is None
 
     with factory() as session, session.begin():
         ArtifactService(session, prepared.actor).review(
@@ -164,6 +178,10 @@ async def test_model_regeneration_retires_previous_exact_gate(
 ) -> None:
     factory = build_session_factory(build_engine(migrated_database_url))
     prepared = await _prepare_generated_lesson_plan(factory)
+    previous_division_id, current_division_id = _carry_division_forward(
+        factory,
+        prepared,
+    )
     _stage_and_validate(factory, prepared.actor, prepared.version_id)
     gate_id = _open_gate(factory, prepared.actor, prepared.version_id)
 
@@ -200,6 +218,22 @@ async def test_model_regeneration_retires_previous_exact_gate(
         assert replacement.artifact_version_id != prepared.version_id
         assert artifact.current_submitted_version_id == replacement.artifact_version_id
         assert gate.status == "skipped"
+        current_relation = session.scalar(
+            select(ArtifactRelation).where(
+                ArtifactRelation.from_artifact_version_id == current_division_id,
+                ArtifactRelation.to_artifact_version_id == replacement.artifact_version_id,
+                ArtifactRelation.relation_type != "supersedes",
+            )
+        )
+        historical_relation = session.scalar(
+            select(ArtifactRelation).where(
+                ArtifactRelation.from_artifact_version_id == previous_division_id,
+                ArtifactRelation.to_artifact_version_id == replacement.artifact_version_id,
+                ArtifactRelation.relation_type != "supersedes",
+            )
+        )
+        assert current_relation is not None
+        assert historical_relation is None
 
 
 async def test_gate_snapshot_uses_published_quality_report_ref(
@@ -292,6 +326,57 @@ def _open_generated_draft(
             )
         )
         return deepcopy(version.content_json), draft.lock_version
+
+
+def _carry_division_forward(
+    factory: sessionmaker[Session],
+    prepared: PreparedLessonPlan,
+) -> tuple[UUID, UUID]:
+    with factory() as session, session.begin():
+        lesson = session.scalar(
+            select(LessonUnit).where(LessonUnit.organization_id == prepared.actor.organization_id)
+        )
+        assert lesson is not None
+        previous = session.get(ArtifactVersion, lesson.source_division_version_id)
+        assert previous is not None
+        division = session.get(Artifact, previous.artifact_id)
+        assert division is not None
+        previous_relation = session.scalar(
+            select(ArtifactRelation).where(
+                ArtifactRelation.from_artifact_version_id == previous.id,
+                ArtifactRelation.to_artifact_version_id == prepared.version_id,
+                ArtifactRelation.relation_type != "supersedes",
+            )
+        )
+        assert previous_relation is not None
+        current = ArtifactVersion(
+            id=new_uuid7(),
+            organization_id=previous.organization_id,
+            artifact_id=previous.artifact_id,
+            version_no=previous.version_no + 1,
+            content_json=deepcopy(previous.content_json),
+            content_hash=previous.content_hash,
+            render_summary_json=dict(previous.render_summary_json),
+            source_kind="manual",
+            source_node_run_id=None,
+            context_snapshot_id=previous.context_snapshot_id,
+            prompt_snapshot_id=None,
+            validation_report_json=dict(previous.validation_report_json),
+            created_by=prepared.actor.principal_id,
+        )
+        session.add(current)
+        session.flush()
+        division.current_approved_version_id = current.id
+        lesson.source_division_version_id = current.id
+        session.flush()
+        ArtifactRelationService(session, prepared.actor).add(
+            from_version_id=current.id,
+            to_version_id=prepared.version_id,
+            relation_type=previous_relation.relation_type,
+            binding_key=previous_relation.binding_key,
+            impact_scope=previous_relation.impact_scope_json,
+        )
+        return previous.id, current.id
 
 
 def _seed_editor(

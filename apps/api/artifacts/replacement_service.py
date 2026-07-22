@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
+from collections.abc import Mapping
 from uuid import UUID
 
 from sqlalchemy import select
@@ -159,23 +161,47 @@ class ArtifactReplacementService:
         previous_version_id: UUID,
         replacement_version_id: UUID,
     ) -> None:
-        relations = list(
-            self._session.scalars(
-                select(ArtifactRelation)
-                .where(
-                    ArtifactRelation.organization_id == self._actor.organization_id,
-                    ArtifactRelation.to_artifact_version_id == previous_version_id,
-                    ArtifactRelation.relation_type != ArtifactRelationType.SUPERSEDES.value,
-                )
-                .order_by(
-                    ArtifactRelation.from_artifact_version_id,
-                    ArtifactRelation.relation_type,
-                    ArtifactRelation.binding_key,
-                    ArtifactRelation.id,
+        rows = self._session.execute(
+            select(
+                ArtifactRelation,
+                ArtifactVersion.artifact_id,
+                Artifact.current_approved_version_id,
+                Artifact.status,
+                Artifact.deleted_at,
+            )
+            .join(
+                ArtifactVersion,
+                ArtifactVersion.id == ArtifactRelation.from_artifact_version_id,
+            )
+            .join(Artifact, Artifact.id == ArtifactVersion.artifact_id)
+            .where(
+                ArtifactRelation.organization_id == self._actor.organization_id,
+                ArtifactRelation.to_artifact_version_id == previous_version_id,
+                ArtifactRelation.relation_type != ArtifactRelationType.SUPERSEDES.value,
+                ArtifactVersion.organization_id == self._actor.organization_id,
+                Artifact.organization_id == self._actor.organization_id,
+            )
+            .order_by(
+                ArtifactVersion.artifact_id,
+                ArtifactRelation.relation_type,
+                ArtifactRelation.binding_key,
+                ArtifactRelation.id,
+            )
+        ).all()
+        grouped: dict[tuple[UUID, str, str], list[tuple[ArtifactRelation, bool]]] = defaultdict(
+            list
+        )
+        for relation, source_artifact_id, current_version_id, status, deleted_at in rows:
+            key = (source_artifact_id, relation.relation_type, relation.binding_key)
+            grouped[key].append(
+                (
+                    relation,
+                    current_version_id == relation.from_artifact_version_id
+                    and status == "approved"
+                    and deleted_at is None,
                 )
             )
-        )
-        for relation in relations:
+        for relation in _current_incoming_relations(grouped):
             self._relations.add(
                 from_version_id=relation.from_artifact_version_id,
                 to_version_id=replacement_version_id,
@@ -183,6 +209,22 @@ class ArtifactReplacementService:
                 binding_key=relation.binding_key,
                 impact_scope=relation.impact_scope_json,
             )
+
+
+def _current_incoming_relations(
+    grouped: Mapping[tuple[UUID, str, str], list[tuple[ArtifactRelation, bool]]],
+) -> list[ArtifactRelation]:
+    selected: list[ArtifactRelation] = []
+    for candidates in grouped.values():
+        current = [relation for relation, active in candidates if active]
+        if len(current) != 1:
+            raise ApiError(
+                status_code=409,
+                code="ARTIFACT_SOURCE_VERSION_STALE",
+                message="An inherited artifact dependency is no longer current and approved.",
+            )
+        selected.append(current[0])
+    return selected
 
 
 def _not_found() -> ApiError:
