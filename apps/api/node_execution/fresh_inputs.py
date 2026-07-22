@@ -47,11 +47,23 @@ def compile_fresh_inputs(
     node_run_id: UUID,
     model_request_id: str,
     user_id: UUID | None,
+    artifact_selection: dict[str, UUID] | None = None,
 ) -> FreshNodeInputs:
     materials = definitions.resolve_materials(node_run_id)
     binding = materials.definition.node_binding
-    context_items = collect_context_items(artifacts, assets, execution, binding)
-    upstream = collect_upstream_artifacts(artifacts, execution, binding)
+    upstream = collect_upstream_artifacts(
+        artifacts,
+        execution,
+        binding,
+        artifact_selection=artifact_selection,
+    )
+    context_items = collect_context_items(
+        artifacts,
+        assets,
+        execution,
+        binding,
+        selected_upstream=upstream if artifact_selection is not None else None,
+    )
     compiled = compile_node_prompt(
         definition=materials.definition,
         execution=execution,

@@ -7,6 +7,9 @@ from typing import Any, cast
 from uuid import UUID
 
 import pytest
+
+from apps.api.artifact_quality.contracts import QualityValidationContext
+from apps.api.content_runtime.definition_projection import build_content_json_schema
 from apps.api.intro_options.quality import (
     INTRO_OPTION_SCHEMA_REF,
     INTRO_SINGLE_ANCHOR_REF,
@@ -15,9 +18,6 @@ from apps.api.intro_options.quality import (
     IntroSingleAnchorQualityValidator,
     IntroUniqueRecommendationQualityValidator,
 )
-
-from apps.api.artifact_quality.contracts import QualityValidationContext
-from apps.api.content_runtime.definition_projection import build_content_json_schema
 from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -101,6 +101,20 @@ def test_unique_recommendation_and_no_preteach_fail_closed() -> None:
     assert "INTRO_RECOMMENDATION_NOT_UNIQUE" in {
         str(item["code"]) for item in recommendation.findings
     }
+
+
+def test_cross_tendency_and_child_safety_fail_closed() -> None:
+    content = _content("default_nine")
+    options = cast(list[dict[str, Any]], content["options"])
+    for option in options:
+        option["secondary_tendencies"] = []
+    options[0]["hook"] = "安排儿童独自使用明火完成实验"
+
+    outcome = IntroOptionSchemaQualityValidator().validate(_context(content))
+
+    codes = {str(item["code"]) for item in outcome.findings}
+    assert "INTRO_TENDENCY_DISTRIBUTION_INVALID" in codes
+    assert "INTRO_CHILD_SAFETY_INVALID" in codes
 
 
 def _content(mode: str) -> dict[str, Any]:

@@ -254,11 +254,6 @@ def _compile_relation(
             "OUTPUT_PROJECTION_RELATION_TYPE_INVALID",
             "relation type is unsupported",
         ) from exc
-    if relation_type is ArtifactRelationType.SUPERSEDES:
-        raise OutputProjectionError(
-            "OUTPUT_PROJECTION_RELATION_TYPE_INVALID",
-            "generated output cannot declare supersedes",
-        )
     return GeneratedArtifactRelation(
         from_artifact_version_id=upstream_id,
         relation_type=relation_type,

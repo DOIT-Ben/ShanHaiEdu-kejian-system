@@ -2,9 +2,9 @@
   "format_version": "1.0",
   "package_key": "shanhai.primary_math.courseware",
   "name": "小学数学标准课件生产内容包",
-  "semantic_version": "1.1.0",
+  "semantic_version": "1.2.0",
   "runtime_constraint": ">=0.1.0 <1.0.0",
-  "change_summary": "发布显式48节点拓扑、22个模型节点输出持久化、质量报告/人工门禁声明和受限Artifact/CreationPackage投影合同；固定导入方案一套/九套、exact来源、独立批准和选择语义。",
+  "change_summary": "前向修正导入方案返修的同一Artifact supersedes血缘，并声明通用workflow gate批准终态；旧Release与既有项目绑定保持不变。",
   "dependencies": [],
   "items": [
     {

@@ -28,30 +28,17 @@ def collect_context_items(
     assets: AssetPort,
     execution: WorkflowExecutionContext,
     binding: Mapping[str, Any],
+    *,
+    selected_upstream: Mapping[str, ArtifactContextVersion] | None = None,
 ) -> tuple[ContextItem, ...]:
-    raw_policy = binding.get("context_policy")
-    if not isinstance(raw_policy, Mapping):
-        raise NodeExecutionError(
-            "NODE_EXECUTION_CONTEXT_POLICY_INVALID",
-            "the published context policy is invalid",
-        )
-    policy = cast(Mapping[str, Any], raw_policy)
-    allowed = policy.get("allowed_sources")
-    if not isinstance(allowed, Sequence) or isinstance(allowed, (str, bytes, bytearray)):
-        raise NodeExecutionError(
-            "NODE_EXECUTION_CONTEXT_POLICY_INVALID",
-            "the published context policy has no source allowlist",
-        )
-    sources: list[str] = []
-    artifact_context: dict[str, tuple[ArtifactContextVersion, ...]] = {}
-    for source in cast(Sequence[object], allowed):
-        if type(source) is not str:
-            raise NodeExecutionError(
-                "NODE_EXECUTION_CONTEXT_POLICY_INVALID",
-                "the published context source is invalid",
-            )
-        sources.append(source)
-        artifact_context[source] = artifacts.list_context_versions(execution, source)
+    sources = _context_sources(binding)
+    artifact_context = _context_artifact_versions(
+        artifacts,
+        execution,
+        sources,
+        optional_refs=set(_contract_refs(binding.get("optional_input_contract_refs", ()))),
+        selected_upstream=selected_upstream,
+    )
     items: list[ContextItem] = []
     for source in sources:
         items.extend(
@@ -74,10 +61,60 @@ def collect_context_items(
     return tuple(items)
 
 
+def _context_sources(binding: Mapping[str, Any]) -> tuple[str, ...]:
+    raw_policy = binding.get("context_policy")
+    if not isinstance(raw_policy, Mapping):
+        raise NodeExecutionError(
+            "NODE_EXECUTION_CONTEXT_POLICY_INVALID",
+            "the published context policy is invalid",
+        )
+    policy = cast(Mapping[str, Any], raw_policy)
+    allowed = policy.get("allowed_sources")
+    if not isinstance(allowed, Sequence) or isinstance(allowed, (str, bytes, bytearray)):
+        raise NodeExecutionError(
+            "NODE_EXECUTION_CONTEXT_POLICY_INVALID",
+            "the published context policy has no source allowlist",
+        )
+    sources: list[str] = []
+    for source in cast(Sequence[object], allowed):
+        if type(source) is not str:
+            raise NodeExecutionError(
+                "NODE_EXECUTION_CONTEXT_POLICY_INVALID",
+                "the published context source is invalid",
+            )
+        sources.append(source)
+    return tuple(sources)
+
+
+def _context_artifact_versions(
+    artifacts: ArtifactPort,
+    execution: WorkflowExecutionContext,
+    sources: tuple[str, ...],
+    *,
+    optional_refs: set[str],
+    selected_upstream: Mapping[str, ArtifactContextVersion] | None,
+) -> dict[str, tuple[ArtifactContextVersion, ...]]:
+    values: dict[str, tuple[ArtifactContextVersion, ...]] = {}
+    for source in sources:
+        definition = resolve_artifact_source(source)
+        if (
+            selected_upstream is not None
+            and definition is not None
+            and definition.contract_ref in optional_refs
+        ):
+            selected = selected_upstream.get(definition.contract_ref)
+            values[source] = (selected,) if selected is not None else ()
+        else:
+            values[source] = artifacts.list_context_versions(execution, source)
+    return values
+
+
 def collect_upstream_artifacts(
     artifacts: ArtifactPort,
     execution: WorkflowExecutionContext,
     binding: Mapping[str, Any],
+    *,
+    artifact_selection: Mapping[str, UUID] | None = None,
 ) -> dict[str, ArtifactContextVersion]:
     refs = _contract_refs(binding.get("input_contract_refs"))
     optional = _contract_refs(binding.get("optional_input_contract_refs", ()))
@@ -86,9 +123,25 @@ def collect_upstream_artifacts(
             "NODE_EXECUTION_OPTIONAL_INPUT_INVALID",
             "published optional inputs must be declared inputs",
         )
+    if artifact_selection is not None and not set(artifact_selection) <= set(optional):
+        raise NodeExecutionError(
+            "NODE_EXECUTION_ARTIFACT_SELECTION_INVALID",
+            "exact artifact selection may contain only declared optional inputs",
+        )
+    selected = (
+        artifacts.load_frozen_versions(execution, dict(artifact_selection))
+        if artifact_selection is not None
+        else {}
+    )
+    if selected:
+        artifacts.verify_frozen_versions(execution, selected)
     upstream: dict[str, ArtifactContextVersion] = {}
     for raw in refs:
-        values = artifacts.list_context_versions(execution, raw)
+        if artifact_selection is not None and raw in optional:
+            selected_value = selected.get(raw)
+            values = (selected_value,) if selected_value is not None else ()
+        else:
+            values = artifacts.list_context_versions(execution, raw)
         if len(values) > 1:
             raise NodeExecutionError(
                 "NODE_EXECUTION_INPUT_CONTRACT_AMBIGUOUS",
