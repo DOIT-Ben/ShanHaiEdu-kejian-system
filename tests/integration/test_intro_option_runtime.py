@@ -8,6 +8,8 @@ from pathlib import Path
 from uuid import UUID
 
 import pytest
+from apps.api.intro_options.quality import intro_runtime_quality_validator_registry
+from apps.api.intro_options.runtime import IntroOptionRuntimeService
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -21,8 +23,6 @@ from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, system_actor
 from apps.api.identity.models import Organization
 from apps.api.ids import new_uuid7
-from apps.api.intro_options.quality import intro_runtime_quality_validator_registry
-from apps.api.intro_options.runtime import IntroOptionRuntimeService
 from apps.api.lessons.models import LessonUnit
 from apps.api.model_gateway.audit import SqlAlchemyAttemptAuditSink
 from apps.api.model_gateway.audit_models import GenerationAttempt, UsageRecord
