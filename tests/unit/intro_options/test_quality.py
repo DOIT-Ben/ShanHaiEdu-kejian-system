@@ -7,9 +7,6 @@ from typing import Any, cast
 from uuid import UUID
 
 import pytest
-
-from apps.api.artifact_quality.contracts import QualityValidationContext
-from apps.api.content_runtime.definition_projection import build_content_json_schema
 from apps.api.intro_options.quality import (
     INTRO_OPTION_SCHEMA_REF,
     INTRO_SINGLE_ANCHOR_REF,
@@ -18,6 +15,9 @@ from apps.api.intro_options.quality import (
     IntroSingleAnchorQualityValidator,
     IntroUniqueRecommendationQualityValidator,
 )
+
+from apps.api.artifact_quality.contracts import QualityValidationContext
+from apps.api.content_runtime.definition_projection import build_content_json_schema
 from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
 
 ROOT = Path(__file__).resolve().parents[3]
