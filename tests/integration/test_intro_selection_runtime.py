@@ -4,16 +4,17 @@ from copy import deepcopy
 from datetime import UTC, datetime
 
 import pytest
-from apps.api.intro_selections.models import IntroSelection
-from apps.api.intro_selections.service import IntroSelectionService
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.exc import DBAPIError
 
-from apps.api.artifacts.models import Artifact, ArtifactVersion
+from apps.api.artifacts.models import Artifact
 from apps.api.artifacts.service import ArtifactService
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import ApiError
 from apps.api.identity.models import Organization, ProjectMember
 from apps.api.ids import new_uuid7
+from apps.api.intro_selections.models import IntroSelection
+from apps.api.intro_selections.service import IntroSelectionService
 from apps.api.lessons.models import LessonUnit
 from tests.fakes.identity import seed_test_actor
 from tests.integration.intro_selection_support import prepare_approved_option_set
@@ -40,12 +41,8 @@ async def test_teacher_selection_reselects_without_mutating_history_or_snapshot(
             idempotency_key="issue-128-teacher-first",
             ttl_seconds=3600,
         )
-        source = session.get(ArtifactVersion, prepared.version_id)
-        assert source is not None
-        source_content = deepcopy(source.content_json)
-        source_content["options"][0]["title"] = "Mutated after selection"
-        source.content_json = source_content
-        assert first.snapshot["title"] != "Mutated after selection"
+        original_snapshot = deepcopy(first.snapshot)
+        first.snapshot["title"] = "Mutated response copy"
 
     with factory() as session, session.begin():
         service = IntroSelectionService(session, prepared.actor)
@@ -81,9 +78,24 @@ async def test_teacher_selection_reselects_without_mutating_history_or_snapshot(
         assert rows[0].id == first.id == replay.id
         assert rows[1].id == second.id
         assert replay.active is False
-        assert rows[0].snapshot_json == first.snapshot
+        assert rows[0].snapshot_json == original_snapshot
         assert rows[0].actor_type == "user"
         assert rows[0].actor_user_id == prepared.actor.user_id
+
+    with factory() as session:
+        with pytest.raises(DBAPIError), session.begin():
+            session.execute(
+                update(IntroSelection)
+                .where(IntroSelection.id == first.id)
+                .values(snapshot_json={"option_key": prepared.option_keys[0]})
+            )
+    with factory() as session:
+        with pytest.raises(DBAPIError), session.begin():
+            session.execute(
+                update(IntroSelection)
+                .where(IntroSelection.id == first.id)
+                .values(active=True, deactivated_at=None, deactivated_by=None)
+            )
 
 
 async def test_every_new_or_replayed_teacher_command_reauthorizes(
@@ -227,36 +239,49 @@ async def test_revoke_stale_and_reapproval_never_revive_an_old_selection(
         artifact.status = "stale"
         artifact.stale_reason_json = {"reason_code": "UPSTREAM_CHANGED"}
     with factory() as session:
-        stale = IntroSelectionService(session, prepared.actor).get(selected.id)
+        service = IntroSelectionService(session, prepared.actor)
+        stale = service.get(selected.id)
         assert stale.active is True
         assert stale.consumable is False
         assert stale.unconsumable_reason == "source_stale"
+        with pytest.raises(ApiError):
+            service.current_consumable(
+                project_id=prepared.project_id,
+                lesson_unit_id=prepared.lesson_unit_id,
+            )
 
     with factory() as session, session.begin():
-        artifact = session.get(Artifact, prepared.artifact_id)
-        assert artifact is not None
-        artifact.status = "approved"
-        artifact.stale_reason_json = None
+        ArtifactService(session, prepared.actor).review(
+            prepared.version_id,
+            action="accept_stale",
+            comment="Explicitly accept the stale source.",
+            request_id="issue-128-accept-stale-source",
+        )
+    with factory() as session:
+        service = IntroSelectionService(session, prepared.actor)
+        restored = service.get(selected.id)
+        assert restored.consumable is False
+        assert restored.unconsumable_reason == "source_approval_changed"
+        with pytest.raises(ApiError):
+            service.current_consumable(
+                project_id=prepared.project_id,
+                lesson_unit_id=prepared.lesson_unit_id,
+            )
+
+    with factory() as session, session.begin():
         ArtifactService(session, prepared.actor).review(
             prepared.version_id,
             action="revoke",
-            comment="Revoke the source approval for Issue 128.",
+            comment="Revoke the newly accepted source approval.",
             request_id="issue-128-revoke-source",
         )
     with factory() as session:
-        revoked = IntroSelectionService(session, prepared.actor).get(selected.id)
+        service = IntroSelectionService(session, prepared.actor)
+        revoked = service.get(selected.id)
         assert revoked.consumable is False
         assert revoked.unconsumable_reason == "source_approval_changed"
-
-    _open_gate(factory, prepared.actor, prepared.version_id)
-    with factory() as session, session.begin():
-        ArtifactService(session, prepared.actor).review(
-            prepared.version_id,
-            action="approve",
-            comment="Reapprove the same version with a new approval fact.",
-            request_id="issue-128-reapprove-source",
-        )
-    with factory() as session:
-        reapproved = IntroSelectionService(session, prepared.actor).get(selected.id)
-        assert reapproved.consumable is False
-        assert reapproved.unconsumable_reason == "source_approval_changed"
+        with pytest.raises(ApiError):
+            service.current_consumable(
+                project_id=prepared.project_id,
+                lesson_unit_id=prepared.lesson_unit_id,
+            )

@@ -10,11 +10,13 @@ from apps.api.artifacts.models import Approval, ArtifactVersion
 from apps.api.artifacts.service import ArtifactService
 from apps.api.identity.context import ActorContext
 from apps.api.workflows.models import BranchRun, NodeRun, WorkflowRun
+from apps.api.workflows.service import WorkflowRuntimeService
 from tests.integration.test_intro_option_runtime import (
     _generate_default_nine,  # pyright: ignore[reportPrivateUsage]
     _open_gate,  # pyright: ignore[reportPrivateUsage]
     _validate,  # pyright: ignore[reportPrivateUsage]
 )
+from workflow.node_state import NodeStatus
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,17 +44,30 @@ async def prepare_approved_option_set(
             comment="Approve options for Issue 128 selection tests.",
             request_id="issue-128-approve-options",
         )
-    with factory() as session:
-        select_node_run_id = session.scalar(
-            select(NodeRun.id)
-            .join(BranchRun, BranchRun.id == NodeRun.branch_run_id)
-            .where(
+    with factory() as session, session.begin():
+        branch = session.scalar(
+            select(BranchRun).where(
                 BranchRun.lesson_unit_id == prepared.lesson_unit_id,
-                NodeRun.node_key == "intro.select",
+                BranchRun.branch_key == "intro_options",
+                BranchRun.status == "active",
             )
         )
+        assert branch is not None
+        select_node_run_id = (
+            WorkflowRuntimeService(
+                session,
+                prepared.actor,
+            )
+            .create_branch_node_run(
+                branch.workflow_run_id,
+                branch.id,
+                node_key="intro.select",
+                status=NodeStatus.READY,
+            )
+            .id
+        )
         record = session.get(Approval, approval.id)
-        assert select_node_run_id is not None and record is not None
+        assert record is not None
         version = record.artifact_version_id
         artifact_version = session.get(ArtifactVersion, version)
         assert artifact_version is not None

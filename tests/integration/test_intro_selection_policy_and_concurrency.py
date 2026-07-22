@@ -1,24 +1,24 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
-from copy import deepcopy
 from threading import Barrier
 
 import pytest
-from apps.api.intro_selections.models import IntroSelection
-from apps.api.intro_selections.service import IntroSelectionService
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from apps.api.artifacts.models import ArtifactVersion
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import ApiError
 from apps.api.identity.context import system_actor
+from apps.api.intro_selections.models import IntroSelection
+from apps.api.intro_selections.service import IntroSelectionService
+from apps.api.workflows.service import WorkflowRuntimeService
 from tests.integration.intro_selection_support import (
     ApprovedOptionSet,
     prepare_approved_option_set,
     set_select_policy_snapshot,
 )
+from workflow.node_state import NodeStatus
 
 
 async def test_policy_default_requires_explicit_exact_rule_and_unique_highest_score(
@@ -84,12 +84,10 @@ async def test_policy_default_requires_explicit_exact_rule_and_unique_highest_sc
         assert selected.option_key == selected.recommendation_evidence["option_key"]
 
     with factory() as session, session.begin():
-        version = session.get(ArtifactVersion, prepared.version_id)
-        assert version is not None
-        content = deepcopy(version.content_json)
-        options = content["options"]
-        options[1]["recommendation_score"] = options[0]["recommendation_score"]
-        version.content_json = content
+        WorkflowRuntimeService(
+            session,
+            system_actor(prepared.actor.organization_id),
+        ).transition_node(prepared.select_node_run_id, NodeStatus.DISABLED)
     with factory() as session:
         with pytest.raises(ApiError), session.begin():
             IntroSelectionService(
@@ -100,8 +98,8 @@ async def test_policy_default_requires_explicit_exact_rule_and_unique_highest_sc
                 lesson_unit_id=prepared.lesson_unit_id,
                 artifact_version_id=prepared.version_id,
                 node_run_id=prepared.select_node_run_id,
-                reason="A tie must be rejected.",
-                idempotency_key="issue-128-policy-tie",
+                reason="Use the unique highest recommendation.",
+                idempotency_key="issue-128-policy-allowed",
                 ttl_seconds=3600,
             )
 
