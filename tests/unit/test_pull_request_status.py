@@ -99,7 +99,7 @@ def test_vertical_slice_requires_all_concrete_delivery_fields() -> None:
     )
 
     assert validate_vertical_slice_declaration(
-        body, {"apps/api/routers/projects.py"}, required=True
+        body, {"apps/api/artifacts/router.py"}, required=True
     ) == [
         "vertical slice field Backend tests must be concrete",
         "vertical slice section must contain exactly one Real API Playwright field",
@@ -118,7 +118,7 @@ def test_vertical_slice_accepts_complete_delivery_matrix() -> None:
 
     assert (
         validate_vertical_slice_declaration(
-            body, {"contracts/openapi/active/openapi.yaml"}, required=True
+            body, {"contracts/api-surface.openapi.yaml"}, required=True
         )
         == []
     )
