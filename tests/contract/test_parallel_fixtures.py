@@ -65,4 +65,6 @@ def test_parallel_fixture_rejects_projection_drift(tmp_path: Path) -> None:
 
     errors = validate_parallel_fixture(tmp_path)
 
-    assert any("PPT example field approved_lesson_plan_version_id drifted" in error for error in errors)
+    assert any(
+        "PPT example field approved_lesson_plan_version_id drifted" in error for error in errors
+    )
