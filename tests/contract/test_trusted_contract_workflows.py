@@ -39,8 +39,18 @@ jobs:
 def test_untrusted_head_checkout_is_rejected(tmp_path: Path) -> None:
     workflow = tmp_path / LEASE_WORKFLOW
     workflow.parent.mkdir(parents=True)
+    fetch_command = (
+        "git fetch --no-tags origin "
+        "+refs/pull/${{ github.event.pull_request.number }}/head:"
+        "refs/remotes/origin/pr-head"
+    )
+    checker_command = (
+        "python scripts/check_development_lease.py "
+        "--base ${{ github.event.pull_request.base.sha }} "
+        "--head ${{ github.event.pull_request.head.sha }}"
+    )
     workflow.write_text(
-        """name: development-lease
+        f"""name: development-lease
 on:
   pull_request_target:
 jobs:
@@ -48,10 +58,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{{{ github.event.pull_request.head.sha }}}}
           persist-credentials: false
-      - run: git fetch --no-tags origin +refs/pull/${{ github.event.pull_request.number }}/head:refs/remotes/origin/pr-head
-      - run: python scripts/check_development_lease.py --base ${{ github.event.pull_request.base.sha }} --head ${{ github.event.pull_request.head.sha }}
+      - run: {fetch_command}
+      - run: {checker_command}
 """,
         encoding="utf-8",
     )
