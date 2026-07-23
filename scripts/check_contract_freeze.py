@@ -135,11 +135,7 @@ def _pattern_matches_or_contains(pattern: str, candidate: str) -> bool:
         return True
     prefix = pattern.removesuffix("/**").rstrip("/")
     other = candidate.removesuffix("/**").rstrip("/")
-    return (
-        prefix == other
-        or prefix.startswith(f"{other}/")
-        or other.startswith(f"{prefix}/")
-    )
+    return prefix == other or prefix.startswith(f"{other}/") or other.startswith(f"{prefix}/")
 
 
 def _check_freeze_catalog(root: Path, errors: list[str]) -> None:
@@ -152,28 +148,17 @@ def _check_freeze_catalog(root: Path, errors: list[str]) -> None:
         errors.append("full-chain freeze version is not v1")
     if freeze.get("status") != "frozen_for_parallel_development":
         errors.append("full-chain freeze is not marked frozen_for_parallel_development")
-    if freeze["source_release"]["semantic_version"] != catalog.get(
-        "semantic_version"
-    ):
+    if freeze["source_release"]["semantic_version"] != catalog.get("semantic_version"):
         errors.append("freeze release does not match workflow catalog release")
-    if freeze["source_release"]["semantic_version"] != manifest.get(
-        "semantic_version"
-    ):
+    if freeze["source_release"]["semantic_version"] != manifest.get("semantic_version"):
         errors.append("freeze release does not match content manifest release")
     if freeze["source_release"]["package_key"] != manifest.get("package_key"):
         errors.append("freeze package key does not match content manifest")
 
     catalog_nodes = catalog.get("nodes", [])
     if len(catalog_nodes) != 48:
-        errors.append(
-            "workflow catalog must contain exactly 48 nodes, "
-            f"found {len(catalog_nodes)}"
-        )
-    node_by_key = {
-        node.get("node_key"): node
-        for node in catalog_nodes
-        if isinstance(node, dict)
-    }
+        errors.append(f"workflow catalog must contain exactly 48 nodes, found {len(catalog_nodes)}")
+    node_by_key = {node.get("node_key"): node for node in catalog_nodes if isinstance(node, dict)}
     if len(node_by_key) != len(catalog_nodes):
         errors.append("workflow catalog contains missing or duplicate node_key values")
 
@@ -182,9 +167,7 @@ def _check_freeze_catalog(root: Path, errors: list[str]) -> None:
         for item in manifest.get("items", [])
         if isinstance(item, dict) and isinstance(item.get("item_key"), str)
     }
-    branches = {
-        branch["branch_key"]: branch for branch in freeze.get("branches", [])
-    }
+    branches = {branch["branch_key"]: branch for branch in freeze.get("branches", [])}
     if set(branches) != set(EXPECTED_NODE_SEQUENCES):
         errors.append("freeze branches must be exactly mainline, ppt, video, and delivery")
 
@@ -193,13 +176,9 @@ def _check_freeze_catalog(root: Path, errors: list[str]) -> None:
         branch = branches.get(branch_key)
         if branch is None:
             continue
-        actual_sequence = [
-            entry.get("node_key") for entry in branch["required_node_sequence"]
-        ]
+        actual_sequence = [entry.get("node_key") for entry in branch["required_node_sequence"]]
         if actual_sequence != expected_sequence:
-            errors.append(
-                f"{branch_key} node sequence differs from the frozen complete chain"
-            )
+            errors.append(f"{branch_key} node sequence differs from the frozen complete chain")
         for entry in branch["required_node_sequence"]:
             node_key = entry["node_key"]
             frozen_nodes.append(node_key)
@@ -214,17 +193,14 @@ def _check_freeze_catalog(root: Path, errors: list[str]) -> None:
             if node.get("execution_kind") == "model_generation":
                 template = node.get("generation_template_ref", {}).get("item_key")
                 if not isinstance(template, str) or template not in manifest_keys:
-                    errors.append(
-                        f"model node lacks published GenerationTemplate: {node_key}"
-                    )
+                    errors.append(f"model node lacks published GenerationTemplate: {node_key}")
     if len(frozen_nodes) != len(set(frozen_nodes)):
         errors.append("a workflow node appears in more than one frozen branch")
     if set(frozen_nodes) != set(node_by_key):
         missing = sorted(set(node_by_key) - set(frozen_nodes))
         extra = sorted(set(frozen_nodes) - set(node_by_key))
         errors.append(
-            "freeze must cover the exact 48-node catalog; "
-            f"missing={missing}, extra={extra}"
+            f"freeze must cover the exact 48-node catalog; missing={missing}, extra={extra}"
         )
 
     lesson_plan = node_by_key.get("lesson_plan.generate", {})
@@ -239,16 +215,12 @@ def _check_freeze_catalog(root: Path, errors: list[str]) -> None:
     ppt_inputs = set(ppt_entry.get("input_contract_refs", []))
     required_ppt_inputs = {"approval:lesson_plan", "content:material_evidence"}
     if not required_ppt_inputs.issubset(ppt_inputs):
-        errors.append(
-            "PPT entry must consume exact approved lesson plan and material evidence"
-        )
+        errors.append("PPT entry must consume exact approved lesson plan and material evidence")
 
     video_entry = node_by_key.get("video.master_script.generate", {})
     if video_entry.get("input_contract_refs") != ["selection:intro"]:
         errors.append("video entry must consume only selection:intro")
-    video_forbidden = set(
-        video_entry.get("context_policy", {}).get("forbidden_sources", [])
-    )
+    video_forbidden = set(video_entry.get("context_policy", {}).get("forbidden_sources", []))
     required_forbidden = {
         "lesson_plan.approved_version",
         "material.approved_parse",
@@ -256,8 +228,7 @@ def _check_freeze_catalog(root: Path, errors: list[str]) -> None:
     }
     if not required_forbidden.issubset(video_forbidden):
         errors.append(
-            "video entry must forbid lesson plan, material parse, and PPT outline "
-            "context"
+            "video entry must forbid lesson plan, material parse, and PPT outline context"
         )
 
     timeline = node_by_key.get("video.timeline.assemble", {})
@@ -265,9 +236,7 @@ def _check_freeze_catalog(root: Path, errors: list[str]) -> None:
         "video.clips.select",
         "audio.subtitles.compile",
     }
-    if not required_timeline_dependencies.issubset(
-        set(timeline.get("dependencies", []))
-    ):
+    if not required_timeline_dependencies.issubset(set(timeline.get("dependencies", []))):
         errors.append("video timeline must depend on formal clips and compiled subtitles")
     final_approval = node_by_key.get("video.final.approve", {})
     if final_approval.get("output_contract_refs") != ["approval:video_final"]:
@@ -279,20 +248,14 @@ def _check_freeze_catalog(root: Path, errors: list[str]) -> None:
         "approval:ppt_final",
         "approval:video_final",
     }
-    if not required_delivery_inputs.issubset(
-        set(delivery.get("input_contract_refs", []))
-    ):
+    if not required_delivery_inputs.issubset(set(delivery.get("input_contract_refs", []))):
         errors.append("delivery package must consume all approved lesson outputs")
 
 
 def _check_page_matrix(root: Path, errors: list[str]) -> None:
     matrix = _load_json(root / "contracts/page-api-fact-matrix.json")
-    active_ids = _operation_ids(
-        _load_yaml(root / "contracts/api-surface.openapi.yaml")
-    )
-    planned_ids = _operation_ids(
-        _load_yaml(root / "contracts/planned-api-surface.openapi.yaml")
-    )
+    active_ids = _operation_ids(_load_yaml(root / "contracts/api-surface.openapi.yaml"))
+    planned_ids = _operation_ids(_load_yaml(root / "contracts/planned-api-surface.openapi.yaml"))
 
     if not REQUIRED_STATE_MODEL.issubset(set(matrix.get("state_model", []))):
         errors.append("frontend state model omits required formal states")
@@ -308,33 +271,24 @@ def _check_page_matrix(root: Path, errors: list[str]) -> None:
             errors.append(f"matrix declares missing planned operation: {operation_id}")
         if availability == "candidate_required" and operation_id in active_ids:
             errors.append(
-                "candidate operation is already active and matrix must be updated: "
-                f"{operation_id}"
+                f"candidate operation is already active and matrix must be updated: {operation_id}"
             )
 
     for page in matrix.get("pages", []):
         route = page.get("route", "")
         scope_keys = set(page.get("scope_keys", []))
         if ":lessonId" in route and "lesson_id" not in scope_keys:
-            errors.append(
-                f"lesson page omits lesson_id scope: {page.get('page_key')}"
-            )
+            errors.append(f"lesson page omits lesson_id scope: {page.get('page_key')}")
         for operation_id in page.get("refresh_operations", []):
             if operation_id not in operation_by_id:
-                errors.append(
-                    f"page references undeclared refresh operation: {operation_id}"
-                )
+                errors.append(f"page references undeclared refresh operation: {operation_id}")
         for action in page.get("actions", []):
             for operation_id in action.get("operation_ids", []):
                 if operation_id not in operation_by_id:
-                    errors.append(
-                        f"action references undeclared operation: {operation_id}"
-                    )
+                    errors.append(f"action references undeclared operation: {operation_id}")
             exact_references = set(action.get("exact_references", []))
             if ":lessonId" in route and "lesson_id" not in exact_references:
-                errors.append(
-                    f"lesson action omits exact lesson_id: {action.get('action_key')}"
-                )
+                errors.append(f"lesson action omits exact lesson_id: {action.get('action_key')}")
             lowered = " ".join(action.get("exact_references", [])).lower()
             if "latest" in lowered:
                 errors.append(
@@ -392,46 +346,26 @@ def _check_two_lesson_fixture_data(fixture: dict[str, Any]) -> list[str]:
             errors.append(f"lesson plan is not approved for {lesson_id}")
         if intro.get("approval_status") != "approved":
             errors.append(f"intro option set is not approved for {lesson_id}")
-        if (
-            ppt_input.get("project_id") != project_id
-            or ppt_input.get("lesson_id") != lesson_id
-        ):
+        if ppt_input.get("project_id") != project_id or ppt_input.get("lesson_id") != lesson_id:
             errors.append(f"PPT input scope mismatch for {lesson_id}")
-        if ppt_input.get("approved_lesson_plan_version_id") != plan.get(
-            "artifact_version_id"
-        ):
-            errors.append(
-                f"PPT input does not use owner lesson plan version for {lesson_id}"
-            )
-        if (
-            video_input.get("project_id") != project_id
-            or video_input.get("lesson_id") != lesson_id
-        ):
+        if ppt_input.get("approved_lesson_plan_version_id") != plan.get("artifact_version_id"):
+            errors.append(f"PPT input does not use owner lesson plan version for {lesson_id}")
+        if video_input.get("project_id") != project_id or video_input.get("lesson_id") != lesson_id:
             errors.append(f"video input scope mismatch for {lesson_id}")
         if video_input.get("intro_selection_id") != intro.get("selection_id"):
-            errors.append(
-                f"video input does not use owner IntroSelection for {lesson_id}"
-            )
-        if video_input.get("intro_option_set_version_id") != intro.get(
-            "artifact_version_id"
-        ):
-            errors.append(
-                f"video input does not use owner option-set version for {lesson_id}"
-            )
+            errors.append(f"video input does not use owner IntroSelection for {lesson_id}")
+        if video_input.get("intro_option_set_version_id") != intro.get("artifact_version_id"):
+            errors.append(f"video input does not use owner option-set version for {lesson_id}")
         forbidden = VIDEO_FORBIDDEN_INPUT_KEYS.intersection(video_input)
         if forbidden:
             errors.append(
-                "video input leaks forbidden course context for "
-                f"{lesson_id}: {sorted(forbidden)}"
+                f"video input leaks forbidden course context for {lesson_id}: {sorted(forbidden)}"
             )
     return errors
 
 
 def _check_two_lesson_fixture(root: Path, errors: list[str]) -> None:
-    fixture_path = (
-        root
-        / "contracts/fixtures/contract-freeze/primary-math-two-lessons.json"
-    )
+    fixture_path = root / "contracts/fixtures/contract-freeze/primary-math-two-lessons.json"
     fixture = _load_json(fixture_path)
     errors.extend(_check_two_lesson_fixture_data(fixture))
 
@@ -442,8 +376,7 @@ def _check_leases(root: Path, errors: list[str]) -> None:
     required_tracks = {"shared_contract", "frontend", "ppt", "video", "mainline"}
     if set(tracks) != required_tracks:
         errors.append(
-            "development leases must define shared_contract, frontend, ppt, "
-            "video, and mainline"
+            "development leases must define shared_contract, frontend, ppt, video, and mainline"
         )
         return
 
@@ -451,8 +384,7 @@ def _check_leases(root: Path, errors: list[str]) -> None:
     shared_writer = tracks["shared_contract"]
     for path in shared_paths:
         if not any(
-            _pattern_matches_or_contains(pattern, path)
-            for pattern in shared_writer["writable"]
+            _pattern_matches_or_contains(pattern, path) for pattern in shared_writer["writable"]
         ):
             errors.append(f"shared-contract owner does not cover shared path: {path}")
 
@@ -465,14 +397,12 @@ def _check_leases(root: Path, errors: list[str]) -> None:
             for shared in shared_paths:
                 if _pattern_matches_or_contains(writable, shared):
                     errors.append(
-                        "consumer track writes shared contract path: "
-                        f"{track_key} -> {writable}"
+                        f"consumer track writes shared contract path: {track_key} -> {writable}"
                     )
         readable = track.get("readonly", []) + track.get("forbidden", [])
         for required_path in CORE_CONSUMER_READ_PATHS:
             if not any(
-                _pattern_matches_or_contains(pattern, required_path)
-                for pattern in readable
+                _pattern_matches_or_contains(pattern, required_path) for pattern in readable
             ):
                 errors.append(
                     "consumer track does not protect core contract path: "
