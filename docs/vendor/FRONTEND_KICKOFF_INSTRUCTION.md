@@ -1,86 +1,104 @@
-# 给生产前端承接方的开工指令
+# 给生产前端承接方的开工与续接指令
 
-本指令可直接发送给新的前端承接方。GitHub仓库`main`、Issue #4和现行合同是唯一事实来源，不再另发旧压缩包、聊天截图或补充说明。
+本文件只说明生产前端的长期工程边界和当前续接方式。当前交付顺序由[Decision #210](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/210)、`CURRENT_STATUS.md`、`docs/governance/DELIVERY_ROADMAP.md`和当前Issue共同决定。
 
-## 一、可直接发送的完整指令
+## 当前状态
 
-> 你们负责“山海教育课件系统”的生产级前端从零实现，任务入口是GitHub Issue #4：`https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4`。
+- 生产前端基线已经通过[PR #111](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/111)合并进入`main`。
+- 不再创建新的`feat/4-production-frontend`或长期前端重构分支。
+- 当前唯一前端业务任务是[Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11) / Draft PR #208中的R1真实纵向联调。
+- [Issue #211](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/211)负责生产Session与CSRF前置。
+- PPT、图片、视频、TTS、管理端扩张和完整创作中心不属于当前R1开工范围；长期设计继续保留，但不能据此自行实现。
+
+## 可直接发送的当前指令
+
+> 接手仓库：`https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system`
 >
-> 仓库地址：`https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system`。开始前依次阅读`README.md`、`AGENTS.md`、`CURRENT_STATUS.md`、Issue #4、本文、`docs/frontend/`、与页面相关的`docs/workflows/`以及`contracts/`。不要通读旧Git历史，不要参考旧聊天或已删除文档。
+> 开始前依次阅读`README.md`、`AGENTS.md`、`CURRENT_STATUS.md`、Decision #210、当前分配的Issue/PR、`docs/frontend/`和与该切片相关的active合同。不要从旧聊天、历史分支、planned API或本文件的长期产品章节自行恢复范围。
 >
-> 你们的唯一代码范围是`apps/web`以及前端直接需要的Storybook、MSW、前端测试、前端构建和前端部署配置。Codex负责`apps/api`、`workers`、`workflow`、`infra`、数据库、模型网关和共享合同。不得修改或代做后端，不得让浏览器直连模型，不得创建第二套业务数据库、任务状态或DTO。Figma不再作为交付或关闭条件；高保真结果以生产源码、Storybook和视觉回归基线验收。
+> 你负责`apps/web`、Storybook、MSW、前端测试、前端构建部署和真实API消费。不得修改`apps/api`、`workers`、`workflow`、`infra`、数据库、模型网关、服务端任务队列或OpenAPI/JSON Schema业务语义。
 >
-> 从最新`main`创建`feat/4-production-frontend`，当天建立Draft PR并关联Issue #4。所有源码必须通过PR进入仓库；ZIP、截图、录屏、静态HTML和预览链接不能代替源码。
+> 前端与后端保持代码所有权分离，但必须共享同一个功能Issue、页面—API—事实—验收矩阵和最终Playwright结果。发现合同缺口时，在当前Issue提交复现、影响、建议operationId和页面阻塞；由合同所有者修改active OpenAPI。不得手写第二套DTO或私有状态机。
 >
-> 这是全新前端，不是在旧页面上换皮。产品定位是“基于标准课件生产工作流的AI一站式创作平台”，不是臃肿的流程控制台。完整课件项目是主入口；一键生成和按步骤辅助创作共享同一工作流与数据。通用图片、视频、PPT创作台既执行项目节点任务，也可独立使用。项目批次按不可变CreationPackage写回固定槽位；独立批次附加到项目时必须显式选择目标并重新鉴权。
+> 当前R1页面必须完成：
 >
-> 固定技术栈：React 19、TypeScript严格模式、Vite、React Router、Tailwind CSS、Radix UI/shadcn、TanStack Query、Zustand仅管理UI状态、React Hook Form、Zod、Framer Motion、Vitest、Testing Library、Playwright和Storybook。不得改成Next.js、低代码平台或另一套框架。
+> ```text
+> 建立受控教师会话
+> → 新建或打开项目
+> → 上传/选择教材PDF
+> → 选择物理页范围
+> → 生成、编辑并批准课时划分
+> → 逐课时生成、编辑、局部重生成并批准十二部分教案
+> → 生成、编辑并批准三类九套
+> → 完成每课时唯一选择
+> → 刷新后从正式API和PostgreSQL恢复
+> ```
 >
-> 前期只按`contracts/api-surface.openapi.yaml`和`mock-scenarios.json`开发，类型也只从该当前合同生成。`contracts/planned-api-surface.openapi.yaml`仅用于查看后续方向，不得生成客户端、Mock接口或冒充已可联调。当前合同由CI与后端运行时OpenAPI双向校验；遇到合同缺口，在Issue #4提交复现、影响和建议，等待后端统一修改，不得手写重复DTO、私自增加字段或偷偷改变语义。
+> Session和CSRF不得由sessionStorage测试值、手工Cookie或生产Mock代替。所有写操作必须通过服务端会话、授权和CSRF校验。
 >
-> 所有生成节点必须展示：当前输入与选择、系统组装后的可编辑业务提示词、模型输出面板、编辑/审核/返修、确认进入下一步。刷新和失败不能丢失已编辑内容。高级参数默认收起，一个工作区域只保留一个主操作。
+> active API类型只从`contracts/api-surface.openapi.yaml`生成。`planned-api-surface.openapi.yaml`只用于查看方向，不得生成客户端、MSW运行时接口或冒充可联调能力。
 >
-> 教案结构由后端内容定义驱动，首发默认十二部分但不得硬编码。三类九套导入是独立附属成果，由单个课程驱动节点读取最小课程种子并直接生成。教师选择导入与教案审核互不阻塞。
+> 每个页面状态必须覆盖加载、空数据、权限失败、业务错误、409冲突、长任务进度和刷新恢复。不得因为端点缺失而保留“即将开放”、固定error状态、只读壳或必须手工输入内部ID的页面作为完成结果。
 >
-> PPT按大纲、页级设计、封面、视觉规范、正文资产、页面预览、编辑、可编辑PPTX推进。封面特殊设计，正文纯白，每页具有图像主视觉，关键文字、公式、数据和标注保持可编辑。
->
-> 视频只读取教师选定的导入方案快照，按母版剧本、粗分镜、视觉母版、图片资产、细分镜、候选片段、正式片段、音频字幕和MP4合成推进。图片资产先于细分镜，候选结果只有保存到项目后才成为正式片段。
->
-> 节点状态、后台任务状态、候选采用状态、批准状态和项目写回状态分别建模；保存提示词版本、生成、采用和写回项目不得合并成一个接口或本地状态。SSE必须支持心跳、`Last-Event-ID`和重连；409冲突、部分成功、暂停、取消、失败重试和过期状态必须有完整界面。
->
-> 第一检查点先提交路由图、页面清单、组件清单、API/事件映射、状态模型、生产源码与Storybook中的高保真首页/项目工作台/图片创作页、开发拆分和风险清单。这个检查点只用于确认结构和视觉方向，通过后继续完成全部前端，不重新发明产品和合同。
->
-> 完整交付必须包含React/TypeScript生产源码、Storybook、视觉回归基线、OpenAPI生成客户端接入、MSW场景、单元/组件/视觉/端到端测试、环境配置、构建部署说明、组件路由清单、删除旧实现清单和交接记录。
->
-> 每次交付报告准确分支、提交、变更文件、测试命令、测试结果、可访问预览、阻塞和下一步。不得使用假数据计时器、静态素材或前端模拟任务宣称真实后端已经完成。
+> 普通前端测试可以使用MSW；真实联调验收必须使用生产构建或等价真实运行时、正式API和PostgreSQL。生产构建不得加载MSW、供应商密钥、调试后门或浏览器直连模型代码。
 
-## 二、第一检查点
+## 代码边界
 
-承接方开始编码前必须提供：
+前端唯一代码范围：
 
-- 页面、路由、布局骨架和导航关系。
-- Feature、共享组件和生成组件的目录设计。
-- OpenAPI Query、Mutation、SSE事件和MSW场景映射。
-- 节点、任务、候选、批准和保存状态模型。
-- 首页、项目课时工作台、图片创作台和生成节点高保真设计。
-- 组件复用边界和禁止形成巨型组件的措施。
-- 分阶段提交、测试和联调计划。
+- `apps/web`；
+- Storybook与视觉回归；
+- 前端MSW测试场景；
+- 前端单元、组件和Playwright测试；
+- 前端构建、部署配置和生成客户端消费封装。
 
-这一检查点确认的是结构与视觉，不允许承接方借此改变现行产品流程。
+明确禁止：
 
-## 三、完整开发里程碑
+- 服务端业务、数据库、Worker、任务队列或Provider调用；
+- 修改OpenAPI和JSON Schema业务语义；
+- 私有DTO、私有业务状态机或复制后端校验；
+- 使用localStorage、静态JSON、定时器假进度或Fixture冒充正式保存；
+- 创建第二套前端、长期frontend分支或不可评审的一次性代码包。
 
-1. 工程、Design Tokens、全局布局、首页、认证和项目创建。
-2. 教材、课时、动态教案、三类九套导入和审核。
-3. 通用图片/视频/PPT创作中心、任务、项目资产与成果。
-4. PPT页级创作、正文纯白、可编辑内容和PPTX交付。
-5. 视频故事、粗分镜、视觉母版、资产、细分镜、片段、音频和合成。
-6. 管理端、真实联调、性能、安全、无障碍、清理和交接。
+## 固定技术栈
 
-前端可以整体推进，但源码必须组件化并通过可审核提交进入同一Draft PR或经批准的子PR，不能最后一次性投递无法评审的代码包。
+React 19、TypeScript严格模式、Vite、React Router、Tailwind CSS、Radix UI/shadcn、TanStack Query、Zustand仅管理UI状态、React Hook Form、Zod、Framer Motion、Vitest、Testing Library、Playwright和Storybook。
 
-## 四、验收门禁
+不得改用Next.js、低代码平台或浏览器直连模型的框架。
 
-每个阶段必须提供：
+## R1交付清单
 
-- 可访问预览和对应源码提交。
-- Storybook组件状态。
-- `lint`、`typecheck`、Vitest、Storybook build和production build结果。
-- 对应Playwright关键流程。
-- 1440、1280、1024视觉回归。
-- 键盘操作、焦点、对比度和基础屏幕阅读器检查。
-- Mock模式与真实API模式差异清单。
+- 登录、会话恢复、过期和登出界面。
+- 项目列表、新建项目和项目恢复。
+- 教材上传/选择、解析状态和物理页范围。
+- 课时划分生成、编辑、批准和刷新恢复。
+- 每课时十二部分教案生成、字段编辑、局部重生成、批准和历史状态。
+- 三类九套生成、编辑、批准、唯一选择和刷新恢复。
+- active OpenAPI生成客户端消费，不维护重复DTO。
+- Storybook覆盖关键组件状态。
+- 真实API Playwright覆盖完整R1和刷新恢复。
+- 1440、1280、1024和390关键页面回归。
+- format、lint、typecheck、Vitest、Storybook build和production build通过。
+- 删除被本次实现替代的占位、固定error、known-ID入口和生产Mock路径。
 
-生产构建不得包含MSW、供应商密钥、调试后门或浏览器直连模型代码。
+## 长期产品边界
 
-## 五、明确拒收
+完整产品仍包含项目课时工作台、通用图片/视频/PPT创作中心、PPT/PPTX、课堂导入视频、任务、资产、交付和管理端。相关设计保留在`docs/frontend/`和`docs/workflows/`。
 
-- 复制旧前端、在旧布局上补丁式换皮。
-- 巨型流程控制台、满屏状态卡或专业术语占据视觉中心。
-- 把通用创作中心做成只能挂在项目下的页面。
-- 硬编码十二部分教案、节点顺序、模型供应商或输出字段。
-- 只显示最终结果，不显示提示词、版本、输入和审核过程。
-- 用一个状态控制节点、任务、候选、批准和保存。
-- 长任务阻塞HTTP、刷新丢失、失败清空用户编辑。
-- 静态HTML、截图、录屏或无法构建的源码。
-- 私自修改后端、合同语义或数据库。
+这些内容只有在R1关闭并由新的当前Issue激活后才能实施。承接方不得把长期页面清单当作当前并行任务，也不得因为长期页面尚未接入而阻塞R1。
+
+## 完成定义
+
+R1前端只有同时满足以下条件才算完成：
+
+- 页面真实操作使用active API；
+- 正式Session、授权和CSRF通过；
+- PostgreSQL保存与刷新恢复通过；
+- 真实API Playwright通过；
+- 生产构建不包含Mock；
+- 生成客户端无漂移；
+- 所有前端必需检查为绿色；
+- 当前Issue验收完成；
+- 独立只读子智能体审查绑定最终base/head，P0/P1清零。
+
+截图、录屏、Figma、Storybook、MSW、ZIP或预览链接都不能单独替代上述证据。
