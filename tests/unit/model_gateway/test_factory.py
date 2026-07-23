@@ -9,6 +9,7 @@ from apps.api.model_gateway.contracts import (
 )
 from apps.api.model_gateway.factory import (
     build_provider_media_reference_resolver,
+    build_real_image_gateway,
     build_real_text_gateway,
 )
 from apps.api.settings import Settings
@@ -55,6 +56,32 @@ async def test_real_gateway_routes_all_stage2_text_capabilities(monkeypatch) -> 
         }
     finally:
         await provider.aclose()
+
+
+def test_real_image_gateway_requires_server_route_and_secret(monkeypatch) -> None:
+    storage = FakeObjectStorage()
+    settings = Settings(_env_file=None, environment="test")
+    with pytest.raises(ModelGatewayError) as missing_route:
+        build_real_image_gateway(settings, storage=storage)
+    assert missing_route.value.code == GatewayErrorCode.ROUTE_UNAVAILABLE
+
+    configured = Settings(
+        _env_file=None,
+        environment="test",
+        image_provider_name="newapi-image",
+        image_provider_base_url="https://provider.test/v1",
+        image_provider_model="gpt-image-2",
+        image_provider_secret_env="PROVIDER_IMAGE_TEST_SECRET",
+    )
+    monkeypatch.delenv("PROVIDER_IMAGE_TEST_SECRET", raising=False)
+    with pytest.raises(ModelGatewayError) as missing_secret:
+        build_real_image_gateway(configured, storage=storage)
+    assert missing_secret.value.code == GatewayErrorCode.ROUTE_UNAVAILABLE
+
+    monkeypatch.setenv("PROVIDER_IMAGE_TEST_SECRET", "test-only-key")
+    _gateway, provider = build_real_image_gateway(configured, storage=storage)
+    assert provider.provider_name == "newapi-image"
+    assert provider.model_name == "gpt-image-2"
 
 
 def test_provider_media_resolver_requires_server_only_route_and_secret(

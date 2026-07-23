@@ -109,6 +109,20 @@ bash infra/dev/compose.sh run --rm --no-deps \
 
 命令只输出脱敏Provider/模型、request ID、UTC、耗时、用量、成本和结论，不输出密钥、提示词或模型正文。
 
+真实图片只通过显式`image-smoke --real`调用。图片密钥仍由仓库外环境注入，输出目录必须位于仓库外；命令固定生成一张`1920x1080` PNG，并只打印脱敏Provider/模型、request ID、尺寸、大小和SHA-256：
+
+```bash
+bash infra/dev/compose.sh run --rm --no-deps \
+  -e NEWAPI_IMAGE_API_KEY \
+  -e SHANHAI_IMAGE_PROVIDER_NAME \
+  -e SHANHAI_IMAGE_PROVIDER_BASE_URL \
+  -e SHANHAI_IMAGE_PROVIDER_MODEL \
+  -e SHANHAI_IMAGE_PROVIDER_SECRET_ENV \
+  -e SHANHAI_IMAGE_PROVIDER_TIMEOUT_SECONDS \
+  workspace uv run python -m apps.api.cli image-smoke --real \
+  --prompt "受控图片冒烟提示词" --output-dir /tmp/shanhaiedu-image-smoke
+```
+
 ## 目标代码结构
 
 ```text

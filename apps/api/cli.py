@@ -28,7 +28,10 @@ from apps.api.model_gateway.contracts import (
     VideoOperationStatus,
     VideoPollRequest,
 )
-from apps.api.model_gateway.factory import build_real_text_gateway, build_real_video_gateway
+from apps.api.model_gateway.factory import (
+    build_real_text_gateway,
+    build_real_video_gateway,
+)
 from apps.api.model_gateway.fake import DeterministicFakeTextProvider
 from apps.api.model_gateway.gateway import ModelGateway
 from apps.api.model_gateway.provider_media import cleanup_expired_provider_media

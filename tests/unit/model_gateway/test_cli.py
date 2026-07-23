@@ -18,6 +18,7 @@ from apps.api.cli import (
 from apps.api.model_gateway.contracts import (
     GatewayErrorCode,
     GeneratedFileFact,
+    ImageGatewayResult,
     ModelCapability,
     ModelGatewayError,
     ModelUsage,
@@ -25,6 +26,7 @@ from apps.api.model_gateway.contracts import (
     VideoGatewayResult,
     VideoOperationStatus,
 )
+from apps.api.model_gateway.image_smoke import ImageSmokeOutcome, run_image_smoke
 from apps.api.model_gateway.video_smoke import VideoProbeResult
 from apps.api.settings import Settings, get_settings
 
@@ -62,6 +64,98 @@ async def test_video_smoke_configuration_failure_excludes_prompt(capsys) -> None
     assert summary["conclusion"] == "failed"
     assert "prompt" not in summary
     assert "must-not-appear" not in json.dumps(summary)
+
+
+async def test_image_smoke_configuration_failure_excludes_prompt(
+    capsys,
+    tmp_path: Path,
+) -> None:
+    get_settings.cache_clear()
+    try:
+        exit_code = await run_image_smoke(
+            prompt="must-not-appear-in-an-image-smoke-summary",
+            output_dir=tmp_path,
+        )
+    finally:
+        get_settings.cache_clear()
+
+    summary = json.loads(capsys.readouterr().out)
+    assert exit_code == 1
+    assert summary["conclusion"] == "failed"
+    assert "prompt" not in summary
+    assert "must-not-appear" not in json.dumps(summary)
+
+
+async def test_image_smoke_success_uses_minimal_auditable_summary(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys,
+    tmp_path: Path,
+) -> None:
+    request_id = "req_image_smoke_018f0000-0000-7000-8000-000000000001"
+    outcome = ImageSmokeOutcome(
+        request_id=request_id,
+        result=ImageGatewayResult(
+            request_id=request_id,
+            route=RouteDecision(
+                capability=ModelCapability.IMAGE_GENERATE_EDUCATION_16X9,
+                provider="newapi-image",
+                model="gpt-image-2",
+                reason="configured_primary",
+            ),
+            provider_request_id="provider-image-request-1",
+            actual_model="gpt-image-2",
+            files=[
+                GeneratedFileFact(
+                    storage_key="model-gateway/images/request/image.png",
+                    sha256="b" * 64,
+                    size_bytes=1024,
+                    mime_type="image/png",
+                    width=1920,
+                    height=1080,
+                )
+            ],
+            usage=ModelUsage(output_units={"images": 1}),
+            latency_ms=1234,
+        ),
+        file=GeneratedFileFact(
+            storage_key="model-gateway/images/request/image.png",
+            sha256="b" * 64,
+            size_bytes=1024,
+            mime_type="image/png",
+            width=1920,
+            height=1080,
+        ),
+    )
+
+    async def execute(**_kwargs) -> ImageSmokeOutcome:
+        return outcome
+
+    monkeypatch.setattr("apps.api.model_gateway.image_smoke.execute_image_smoke", execute)
+
+    exit_code = await run_image_smoke(
+        prompt="must-not-appear-in-an-image-smoke-summary",
+        output_dir=tmp_path,
+    )
+
+    summary = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert set(summary) == {
+        "conclusion",
+        "utc",
+        "provider",
+        "model",
+        "request_id",
+        "provider_request_id",
+        "width",
+        "height",
+        "size_bytes",
+        "sha256",
+    }
+    assert summary["request_id"] == request_id
+    assert summary["width"] == 1920
+    assert summary["height"] == 1080
+    assert "must-not-appear" not in json.dumps(summary)
+    assert str(tmp_path) not in json.dumps(summary)
 
 
 async def test_video_smoke_rejects_an_unpaired_private_media_selector(capsys) -> None:
@@ -218,6 +312,25 @@ def test_video_smoke_cli_requires_an_explicit_real_flag() -> None:
             "video-smoke",
             "--prompt",
             "a short test video",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 2
+    assert "requires --real" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+def test_image_smoke_cli_requires_an_explicit_real_flag() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "apps.api.cli",
+            "image-smoke",
+            "--prompt",
+            "a classroom background",
         ],
         capture_output=True,
         text=True,

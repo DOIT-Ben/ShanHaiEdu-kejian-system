@@ -30,6 +30,8 @@ from apps.api.identity.context import ActorContext
 from apps.api.ids import new_uuid7
 from apps.api.lessons.models import LessonUnit
 from apps.api.model_gateway.audit_models import GenerationAttempt, UsageRecord
+from apps.api.ppt_rendering import BackgroundImage
+from apps.api.ppt_rendering.images import inspect_background
 from apps.api.ppt_runtime.service import PptRuntimeService
 from apps.api.ppt_runtime.sqlalchemy import SqlAlchemyPptRuntimeTransactionFactory
 from apps.api.workflows.models import BranchRun
@@ -96,6 +98,8 @@ def build_ppt_service(
 def seed_ppt(
     factory: sessionmaker[Session],
     storage: FakeObjectStorage,
+    *,
+    background_dir: Path | None = None,
 ) -> PptSeed:
     runtime = _seed_runtime(factory)
     case = cast(dict[str, Any], json.loads(GOLDEN_PATH.read_text(encoding="utf-8")))
@@ -174,13 +178,18 @@ def seed_ppt(
         asset_service = ProjectAssetService(session, runtime.actor)
         for position, page in enumerate(cast(list[dict[str, Any]], case["ppt"]["page_specs"]), 1):
             requirement = page["asset_requirements"][0]
-            payload = png_bytes(
-                width=160,
-                height=90,
-                red=220 + position,
-                green=240,
-                blue=250,
+            payload = (
+                (background_dir / f"page-{position:02d}.png").read_bytes()
+                if background_dir is not None
+                else png_bytes(
+                    width=160,
+                    height=90,
+                    red=220 + position,
+                    green=240,
+                    blue=250,
+                )
             )
+            image = inspect_background(BackgroundImage(content=payload, media_type="image/png"))
             asset = FileAsset(
                 id=new_uuid7(),
                 organization_id=runtime.actor.organization_id,
@@ -212,8 +221,8 @@ def seed_ppt(
                 byte_size=metadata.size_bytes,
                 sha256=cast(str, metadata.sha256),
                 etag=metadata.etag,
-                width=160,
-                height=90,
+                width=image.width,
+                height=image.height,
                 duration_ms=None,
                 page_count=None,
                 scan_status="clean",

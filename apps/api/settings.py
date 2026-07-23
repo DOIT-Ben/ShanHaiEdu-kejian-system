@@ -57,6 +57,19 @@ class Settings(BaseSettings):
         pattern=r"^[A-Z][A-Z0-9_]{2,127}$",
     )
     text_provider_timeout_seconds: float = Field(default=30, gt=0, le=120)
+    image_provider_name: str | None = None
+    image_provider_base_url: HttpUrl | None = None
+    image_provider_model: str | None = None
+    image_provider_secret_env: str = Field(
+        default="NEWAPI_IMAGE_API_KEY",
+        pattern=r"^[A-Z][A-Z0-9_]{2,127}$",
+    )
+    image_provider_timeout_seconds: float = Field(default=360, gt=0, le=600)
+    image_provider_max_response_bytes: int = Field(
+        default=25_000_000,
+        ge=1,
+        le=100_000_000,
+    )
     video_provider_name: str | None = None
     video_provider_base_url: HttpUrl | None = None
     video_provider_model: str | None = None

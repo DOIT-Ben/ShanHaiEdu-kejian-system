@@ -45,6 +45,10 @@ def test_env_example_is_a_loadable_local_quick_start_configuration() -> None:
     assert settings.text_provider_base_url is None
     assert settings.text_provider_model is None
     assert settings.text_provider_secret_env == "NEWAPI_TEXT_API_KEY"
+    assert settings.image_provider_name is None
+    assert settings.image_provider_base_url is None
+    assert settings.image_provider_model is None
+    assert settings.image_provider_secret_env == "NEWAPI_IMAGE_API_KEY"
     assert settings.video_provider_name is None
     assert settings.video_provider_base_url is None
     assert settings.video_provider_model is None

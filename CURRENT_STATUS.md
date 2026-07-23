@@ -4,7 +4,7 @@
 
 验证基线：`main`；#130与PR #141、#146与PR #148、#89与PR #147、#133与PR #164、#134与PR #174、#125与PR #177、#126与PR #178、#116与PR #183、#127与PR #184、#128与PR #187、#129与PR #192及#170与PR #190已经进入当前树，Decision #185已经批准关闭；[Decision #199](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/199)已经批准把当前交付重心切换为教师可见MVP纵向闭环；不可变`1.1.0`、`1.2.0`与既有项目保持不变，新的`1.3.0`/v2为待显式发布候选；实现事实以本文件所在提交的代码、迁移和测试为准，任务状态以链接的GitHub Issue和Pull Request为准
 
-当前阶段：阶段1后端轨道、公共基座和教材到Intro运行时已经具备，#170已完成PPT确定性装配、导出与正式Artifact质量事务；产品仍未完成真实图片Provider、10页黄金PPTX和浏览器纵向演示。Decision #199终止“按阶段编号继续扩张后端底座”的默认顺序；当前唯一出口改为从生产前端创建项目、上传教材、查看正式任务进度、打开并修改/批准教案与PPT、下载真实可编辑PPTX，并验证一次失败重试和刷新恢复。
+当前阶段：阶段1后端轨道、公共基座和教材到Intro运行时已经具备，#170已完成PPT确定性装配、导出与正式Artifact质量事务；#171已在当前树接入真实图片Provider，并以“1～5的认识”黄金项目生成10张真实图片、10页可编辑PPTX，完成正式质量批准和Microsoft PowerPoint实机打开。产品仍未完成浏览器纵向演示。Decision #199终止“按阶段编号继续扩张后端底座”的默认顺序；当前唯一出口改为从生产前端创建项目、上传教材、查看正式任务进度、打开并修改/批准教案与PPT、下载真实可编辑PPTX，并验证一次失败重试和刷新恢复。
 
 本文件只描述现在，不保存开发日志。任务细节、负责人、讨论和交接以GitHub Issue与Pull Request为准。
 
@@ -13,7 +13,7 @@
 - 后端已经具备可运行的FastAPI模块化单体、PostgreSQL、Redis、MinIO、Alembic、Worker、Outbox、SSE和幂等基座。
 - API和测试已经覆盖租户与用户边界、项目、课时与分支、上传、文件资产与不可变版本、内容发布、工作流运行、产物审核与依赖、Prompt与Context快照、教材PDF解析以及项目资产原子绑定。
 - OpenAPI、JSON Schema、生成TypeScript客户端、确定性Mock/Fake和后端CI已经进入自动门禁；文本模型网关已经完成受控真实冒烟。
-- 正式发布的`shanhai.primary_math.courseware@1.0.0`继续固定原内容、v1工作流和既有项目绑定；不可变`1.1.0`、`1.2.0`保留既有合同，当前树新增`1.3.0`/v2前向候选，为PPT装配/导出发布确定性输出、linked-file质量源和workflow gate声明。显式PostgreSQL发布可原子成为后续新项目默认，但尚未宣称生产环境已执行该发布；旧Release和既有项目绑定不会被改写。“1～5的认识”黄金Fixture已用于PPT运行时合同、事务和失败路径测试，但不代表真实文本/图片Provider或最终视觉生产完成。
+- 正式发布的`shanhai.primary_math.courseware@1.0.0`继续固定原内容、v1工作流和既有项目绑定；不可变`1.1.0`、`1.2.0`保留既有合同，当前树新增`1.3.0`/v2前向候选，为PPT装配/导出发布确定性输出、linked-file质量源和workflow gate声明。显式PostgreSQL发布可原子成为后续新项目默认，但尚未宣称生产环境已执行该发布；旧Release和既有项目绑定不会被改写。“1～5的认识”黄金Fixture已经完成真实图片、正式PPT Runtime、10页可编辑PPTX和PowerPoint实机打开验收；这不代表生产环境已执行内容发布或浏览器链路已完成。
 - 已审核的Markdown TemplateDraft可以通过显式CompilationProfile确定性编译为同一套结构化内容包合同；该能力不替代内容发布服务或模型节点执行运行时。
 - 当前可以通过自动化测试和API/CLI验证后端链路，但尚未完成浏览器到真实API的阶段1纵向演示，不得描述为阶段1产品完成。
 - 生产前端由[Issue #4](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)和唯一Draft [PR #111](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/111)承载，#179至#182正在同一分支收口。源码已经存在，但PR仍落后`main`且浏览器/治理门禁未通过；在其合并并由#11完成真实API联调前，不得把Mock闭环、交付ZIP或本地分支描述为生产前端完成。
@@ -46,6 +46,7 @@
 - [Issue #128](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/128)与[PR #187](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/187)已经在当前树实现：teacher_selected与policy_default形成不可变IntroSelection快照；每课时唯一active、并发重选、幂等历史、命令前重鉴权、exact批准失效、策略显式auto_select和唯一最高分均由PostgreSQL事务与数据库约束固定。
 - [Issue #129](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/129)与[PR #192](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/192)已经在当前树实现：Intro方案查询和教师选择已成为唯一runtime API；公开投影、客户端类型、逐命令鉴权、跨租户、幂等、并发和待审/撤销/stale拒绝均由合同与PostgreSQL测试固定。
 - [Issue #170](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/170)与[PR #190](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/190)已经在当前树实现：`ppt.pages.assemble`和`pptx.export`复用NodeRun、Attempt/Usage、owner租约、对象存储、Artifact/FileAsset、QualityReport与唯一Approval guard，能从正式页规格和每页exact背景生成可编辑PPTX并在取消、恢复、并发和事务故障下保持原子；该结果仍是deterministic运行时，不是完整真实PPT出口。
+- [Issue #171](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/171)与PR #202已经在当前树实现：服务端Model Gateway新增同步OpenAI-compatible真实图片Adapter和显式脱敏冒烟；唯一黄金项目的10张`1920x1080`真实图片进入#170 Runtime，形成10页可编辑PPTX、exact质量报告和批准证据，并由Microsoft PowerPoint 16.0无修复提示打开及逐页渲染。
 - [Issue #90](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/90)已经完成GenerationAttempt租约、心跳、过期恢复、并发安全序号、未知提交与取消协调；失去租约的Worker不能覆盖终态，历史未知提交不会自动重提或重复写入用量。
 - [Issue #85](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/85)与[PR #98](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/98)已经把37个运行时操作与5个规划操作分层，生成客户端只保留真实可调用接口，CI会拒绝静态合同与FastAPI运行时双向漂移。
 - [Issue #44](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/44)的实现已经提供TemplateDraft到结构化内容包的确定性编译入口、CompilationProfile、CLI和合同测试。
@@ -64,26 +65,24 @@
 - [Issue #86](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/86)：已由PR #138合并关闭，统一ArtifactRelation类型、方向与stale影响语义。
 - [Issue #131](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/131)：已由PR #161完成ContentDefinition字段级编辑权限、不可变策略来源、可信生成首写和窄化服务端provision守卫。
 - [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)：PR #111合并后的首个联调任务，覆盖项目创建、教材上传、正式任务/SSE、教案/PPT读取与批准、失败重试、刷新恢复和PPTX下载；不得由Mock替代。
-- [Issue #171](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/171)：使用唯一“1～5的认识”黄金项目运行全部11个PPT节点、真实文本/图片Provider、10页PPTX及PowerPoint/WPS打开与最终质量批准，是PPT轨道下一项。
 
 ## 当前阻塞
 
 - 阶段1整体产品出口仍缺少生产前端的真实API联调；后端轨道通过不代表完整阶段1产品完成。
 - PR #111当前仍落后`main`，浏览器和仓库治理检查失败；#118的Python质量与治理检查失败。两者在最终Head门禁通过前都不能转Ready或合并。
 - #48的机器合同和黄金数据已由#89接入通用执行器，#131字段级编辑权限、#133不可变质量报告、#134批准守卫、#125课时划分、#126教案运行时、#116 Intro合同、#127方案集运行时、#128不可变选择、#129 runtime API和#170 PPT确定性运行时已完成；不得把确定性Fake或可执行PPTX装配器冒充真实Provider与完整视觉出口。
-- ShanHaiEdu已经具备Provider中立媒体基础层和Attempt租约恢复，但真实图片/视频Adapter、供应商私有状态映射与受控真实冒烟仍未实现，不能把确定性Fake或恢复基座描述为真实媒体出口。
-- TTS与实时价格计算当前不实现、不冒烟，也不阻塞MVP；PPT真实文本/图片、10页黄金成片、PowerPoint/WPS实机打开与最终质量批准仍需#171验收。
+- ShanHaiEdu已经具备Provider中立媒体基础层、真实同步图片Adapter、真实视频Adapter和Attempt租约恢复；#171证明了受控真实图片到可编辑PPTX的黄金出口，但尚未把真实图片生成接入浏览器项目操作，不能把CLI和黄金验收描述为生产前端完成。
+- TTS与实时价格计算当前不实现、不冒烟，也不阻塞MVP；PPT黄金验收已经完成，剩余阻塞是生产前端合并和真实API纵向联调。
 - #175、#176和#189不再是#170之后的自动下一任务；它们的最终声明、逐镜头血缘和90秒全节点验收延后到首个MVP纵向闭环之后重新评估和拆分。
 
 ## 下一个阶段出口
 
 唯一下一阶段出口是教师可见MVP纵向闭环，不再用更多后台合同或CLI门禁替代浏览器结果。按以下顺序推进：
 
-1. #171复用现有10页黄金项目完成唯一一次真实文本、真实图片与可编辑PPTX验收，不另建5页或第二套“最小黄金”口径。
-2. #4/PR #111同步最新`main`，关闭浏览器与治理阻断并合并生产前端源码；#118只保留MVP所需真实教材/文本验收，先修复范围和CI，不扩大生产门禁。
-3. #11在正式前端上完成创建项目、上传教材、真实任务/SSE、教案与PPT读取、修改/批准、失败重试和刷新恢复。
-4. #108提供课程摘要、页数、生成进度、预览和真实PPTX下载，不建设浏览器内PPT编辑器。
-5. 使用一个受控真实小学数学项目完成浏览器演示和复验。成功证据必须来自正式API、PostgreSQL、受控真实文本/图片Provider和真实可打开PPTX；Fake、fixture与MSW只用于普通测试。
+1. #4/PR #111同步最新`main`，关闭浏览器与治理阻断并合并生产前端源码；#118只保留MVP所需真实教材/文本验收，先修复范围和CI，不扩大生产门禁。
+2. #11在正式前端上完成创建项目、上传教材、真实任务/SSE、教案与PPT读取、修改/批准、失败重试和刷新恢复。
+3. #108提供课程摘要、页数、生成进度、预览和真实PPTX下载，不建设浏览器内PPT编辑器。
+4. 使用一个受控真实小学数学项目完成浏览器演示和复验。成功证据必须来自正式API、PostgreSQL、受控真实文本/图片Provider和真实可打开PPTX；Fake、fixture与MSW只用于普通测试。
 
 以下事项不阻塞上述出口：新的Content Release扩张、完整音频权利声明、逐镜头lineage/stale、90秒视频全节点、真实TTS、生产扩容和全量可观测性。视频在首个MVP通过后另建最小短片纵向Issue，先验证生成、播放、采用和回写项目，再决定是否恢复#175/#176/#189原范围。
 
@@ -118,4 +117,4 @@
 4. 被分配的Issue和PR
 5. 与任务直接相关的模块文档、合同、代码和测试
 
-新对话先读取Decision #199并从最新`main`复验#170的合并、Issue关闭、分支清理和唯一Alembic迁移头，再将#171转为`status:ready`并以“1～5的认识”黄金项目作为唯一输入启动真实PPT验收；同时核对#4/PR #111、#11与#118/PR #196的实时状态。不存在唯一无冲突的MVP下一任务时保持只读，不得按旧路线自动启动#175、#176或#189。正式`1.0.0`、不可变`1.1.0`/`1.2.0`及既有项目绑定必须保持不变；新的`1.3.0`/v2只由显式发布命令前向激活，不能把测试数据库发布冒充生产已执行。当前API客户端只从runtime合同生成，planned合同不可用于联调。不得从外部旧Skill恢复七部分教案、固定50秒视频、视频读取教案/PPT、第二套DTO或把TemplateDraft编译器当成模型执行运行时。
+新对话先读取Decision #199并从最新`main`复验#171的合并、Issue关闭、分支清理及真实黄金PPT证据，再核对#4/PR #111、#11与#118/PR #196的实时状态；当前第一步是收口生产前端合并门禁，随后由#11完成真实API纵向联调。不存在唯一无冲突的MVP下一任务时保持只读，不得按旧路线自动启动#175、#176或#189。正式`1.0.0`、不可变`1.1.0`/`1.2.0`及既有项目绑定必须保持不变；新的`1.3.0`/v2只由显式发布命令前向激活，不能把测试数据库发布冒充生产已执行。当前API客户端只从runtime合同生成，planned合同不可用于联调。不得从外部旧Skill恢复七部分教案、固定50秒视频、视频读取教案/PPT、第二套DTO或把TemplateDraft编译器当成模型执行运行时。

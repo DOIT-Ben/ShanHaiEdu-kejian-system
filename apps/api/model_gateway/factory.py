@@ -24,6 +24,10 @@ from apps.api.model_gateway.openai_compatible import (
     OpenAICompatibleConfig,
     OpenAICompatibleTextProvider,
 )
+from apps.api.model_gateway.openai_compatible_image import (
+    OpenAICompatibleImageConfig,
+    OpenAICompatibleImageProvider,
+)
 from apps.api.model_gateway.provider_media import (
     ProviderMediaReferenceResolver,
     ProviderMediaResolverConfig,
@@ -63,6 +67,41 @@ def build_real_text_gateway(
                 ModelCapability.TEXT_STRUCTURED_CREATIVE_EDUCATION: provider,
             },
             audit_sink=audit_sink,
+        ),
+        provider,
+    )
+
+
+def build_real_image_gateway(
+    settings: Settings,
+    *,
+    storage: ObjectStorage,
+) -> tuple[ModelGateway, OpenAICompatibleImageProvider]:
+    if not (
+        settings.image_provider_name
+        and settings.image_provider_base_url
+        and settings.image_provider_model
+    ):
+        raise ModelGatewayError(GatewayErrorCode.ROUTE_UNAVAILABLE, retryable=False)
+    secret = os.environ.get(settings.image_provider_secret_env)
+    if not secret:
+        raise ModelGatewayError(GatewayErrorCode.ROUTE_UNAVAILABLE, retryable=False)
+    provider = OpenAICompatibleImageProvider(
+        OpenAICompatibleImageConfig(
+            provider_name=settings.image_provider_name,
+            base_url=str(settings.image_provider_base_url),
+            model=settings.image_provider_model,
+            api_key=SecretStr(secret),
+            timeout_seconds=settings.image_provider_timeout_seconds,
+            storage_bucket=settings.object_storage_bucket,
+            max_response_bytes=settings.image_provider_max_response_bytes,
+        ),
+        storage=storage,
+    )
+    return (
+        ModelGateway(
+            {},
+            image_routes={ModelCapability.IMAGE_GENERATE_EDUCATION_16X9: provider},
         ),
         provider,
     )
