@@ -144,6 +144,59 @@ def validate_size_declaration(
     return []
 
 
+def validate_vertical_slice_declaration(
+    body: str,
+    changed_files: set[str],
+    *,
+    required: bool = False,
+) -> list[str]:
+    normalized_files = {path.replace("\\", "/") for path in changed_files}
+    touches_boundary = any(
+        path.startswith(VERTICAL_BOUNDARY_PREFIXES) for path in normalized_files
+    )
+
+    if VERTICAL_MARKER.search(body) is None:
+        if required:
+            return ["PR must select exactly one vertical slice declaration"]
+        return []
+
+    choices = [
+        match.group("choice")
+        for match in VERTICAL_DECLARATION.finditer(body)
+        if match.group("checked").lower() == "x"
+    ]
+    if len(choices) != 1:
+        return ["PR must select exactly one vertical slice declaration"]
+
+    choice = choices[0]
+    if touches_boundary and choice != "vertical-slice-required":
+        return [
+            "PR changes a production delivery boundary but declares vertical-slice-not-required"
+        ]
+    if choice == "vertical-slice-not-required":
+        return []
+
+    sections = [
+        match.group()
+        for match in MARKDOWN_H2_SECTION.finditer(body)
+        if VERTICAL_MARKER.search(match.group()) is not None
+    ]
+    if len(sections) != 1:
+        return ["PR must contain exactly one vertical slice delivery section"]
+
+    errors: list[str] = []
+    section = sections[0]
+    for label in VERTICAL_REQUIRED_FIELDS:
+        values = _review_field_values(section, label)
+        if len(values) != 1:
+            errors.append(f"vertical slice section must contain exactly one {label} field")
+            continue
+        normalized_value = values[0].strip().lower()
+        if normalized_value in {"", "pending", "n/a", "none", "not applicable"}:
+            errors.append(f"vertical slice field {label} must be concrete")
+    return errors
+
+
 def changed_files(base_sha: str, head_sha: str) -> set[str]:
     result = subprocess.run(
         ["git", "diff", "--name-only", f"{base_sha}...{head_sha}"],
@@ -204,6 +257,13 @@ def main() -> int:
     additions, deletions, binary_file_count = changed_line_counts(args.base_sha, args.head_sha)
     declarations_required = args.pr_number >= FIRST_REQUIRED_GOVERNANCE_PR
     errors = validate_status_declaration(args.body, files)
+    errors.extend(
+        validate_vertical_slice_declaration(
+            args.body,
+            files,
+            required=declarations_required,
+        )
+    )
     errors.extend(
         validate_review_declaration(
             args.body,
