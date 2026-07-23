@@ -1,0 +1,19 @@
+{
+  "source_fixture": "contracts/fixtures/contract-freeze/primary-math-two-lessons.json",
+  "inputs": [
+    {
+      "project_id": "PROJECT-FREEZE-001",
+      "lesson_id": "LESSON-FREEZE-001",
+      "approved_lesson_plan_version_id": "ARTIFACT-LESSON-PLAN-VERSION-001",
+      "material_parse_version_id": "MATERIAL-PARSE-NUMBERS-001",
+      "material_scope_artifact_version_id": "MATERIAL-SCOPE-VERSION-001"
+    },
+    {
+      "project_id": "PROJECT-FREEZE-001",
+      "lesson_id": "LESSON-FREEZE-002",
+      "approved_lesson_plan_version_id": "ARTIFACT-LESSON-PLAN-VERSION-002",
+      "material_parse_version_id": "MATERIAL-PARSE-NUMBERS-001",
+      "material_scope_artifact_version_id": "MATERIAL-SCOPE-VERSION-001"
+    }
+  ]
+}
