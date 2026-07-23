@@ -63,8 +63,21 @@ jobs:
       - name: Install locked dependencies
         run: uv sync --frozen
 
-      - name: Check freeze Python formatting
-        run: uv run ruff format --check scripts/check_contract_freeze.py tests/contract/test_contract_freeze.py
+      - name: Format freeze Python diagnostic copy
+        run: uv run ruff format scripts/check_contract_freeze.py tests/contract/test_contract_freeze.py
+
+      - name: Upload formatted freeze sources
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-freeze-formatted-sources
+          path: |
+            scripts/check_contract_freeze.py
+            tests/contract/test_contract_freeze.py
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Reject unformatted freeze Python
+        run: git diff --exit-code -- scripts/check_contract_freeze.py tests/contract/test_contract_freeze.py
 
       - name: Lint freeze Python
         run: uv run ruff check scripts/check_contract_freeze.py tests/contract/test_contract_freeze.py
