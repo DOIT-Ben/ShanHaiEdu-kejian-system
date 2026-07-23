@@ -153,6 +153,15 @@ class ArtifactEnvelope(BaseModel):
     request_id: str
 
 
+class ArtifactListData(BaseModel):
+    items: list[ArtifactRead]
+
+
+class ArtifactListEnvelope(BaseModel):
+    data: ArtifactListData
+    request_id: str
+
+
 class ArtifactDraftEnvelope(BaseModel):
     data: ArtifactDraftRead
     request_id: str

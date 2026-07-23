@@ -52,6 +52,37 @@ class LessonCollectionEnvelope(BaseModel):
     request_id: str
 
 
+class PrepareLessonDivisionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    material_id: UUID
+    material_parse_version_id: UUID
+    page_start: int = Field(gt=0)
+    page_end: int = Field(gt=0)
+    duration_minutes: int = Field(default=40, ge=30, le=60)
+    requested_lesson_count: int | None = Field(default=None, ge=1, le=20)
+    special_requirements: str = Field(default="", max_length=4000)
+
+    @model_validator(mode="after")
+    def require_ordered_pages(self) -> PrepareLessonDivisionRequest:
+        if self.page_end < self.page_start:
+            raise ValueError("page_end must not be before page_start")
+        return self
+
+
+class LessonDivisionPreparationRead(BaseModel):
+    material_scope_artifact_id: UUID
+    material_scope_version_id: UUID
+    generate_node_run_id: UUID
+    validate_node_run_id: UUID
+    gate_node_run_id: UUID
+
+
+class LessonDivisionPreparationEnvelope(BaseModel):
+    data: LessonDivisionPreparationRead
+    request_id: str
+
+
 class LessonCollectionItemUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

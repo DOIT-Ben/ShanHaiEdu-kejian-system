@@ -54,6 +54,7 @@ async def test_project_upload_and_job_api_matches_stage0_contract(
         "getProject",
         "createMaterialUploadSession",
         "confirmMaterialUpload",
+        "listProjectMaterials",
         "getGenerationJob",
         "cancelGenerationJob",
         "streamGenerationJobEvents",
@@ -132,6 +133,26 @@ async def test_project_upload_and_job_api_matches_stage0_contract(
                 operation_id="confirmMaterialUpload",
                 status="202",
             )
+            materials_response = await client.get(
+                f"/api/v2/projects/{project_id}/materials"
+            )
+            assert materials_response.status_code == 200
+            assert_contract_response(
+                materials_response,
+                operation_id="listProjectMaterials",
+                status="200",
+            )
+            assert materials_response.json()["data"]["items"] == [
+                {
+                    "id": upload["material_id"],
+                    "original_filename": "lesson.pdf",
+                    "mime_type": "application/pdf",
+                    "upload_status": "confirmed",
+                    "confirmed_at": materials_response.json()["data"]["items"][0][
+                        "confirmed_at"
+                    ],
+                }
+            ]
             job_id = confirm_response.json()["data"]["job_id"]
 
             job_response = await client.get(f"/api/v2/generation-jobs/{job_id}")

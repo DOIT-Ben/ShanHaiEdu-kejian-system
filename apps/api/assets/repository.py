@@ -60,6 +60,19 @@ class FileAssetRepository:
             current_version=row[2],
         )
 
+    def list_materials(self, project_id: UUID) -> list[SourceMaterial]:
+        statement = (
+            select(SourceMaterial)
+            .where(
+                SourceMaterial.project_id == project_id,
+                SourceMaterial.organization_id == self._actor.organization_id,
+                SourceMaterial.deleted_at.is_(None),
+            )
+            .order_by(SourceMaterial.created_at.desc(), SourceMaterial.id.desc())
+        )
+        statement = self._scope_to_member(statement, SourceMaterial.project_id)
+        return list(self._session.scalars(statement))
+
     def get_parse(self, parse_id: UUID, *, for_update: bool = False) -> MaterialParseVersion | None:
         statement = (
             select(MaterialParseVersion)

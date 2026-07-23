@@ -40,6 +40,15 @@ class ArtifactRepository:
             )
         )
 
+    def list_for_project(self, project_id: UUID) -> list[Artifact]:
+        return list(
+            self._session.scalars(
+                self._visible_artifacts()
+                .where(Artifact.project_id == project_id)
+                .order_by(Artifact.updated_at.desc(), Artifact.id.desc())
+            )
+        )
+
     def get_draft(
         self,
         artifact_id: UUID,

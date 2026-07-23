@@ -196,6 +196,26 @@ def test_coverage_uses_approved_scope_subset_and_rejects_scope_outside_exact_par
     assert "MATERIAL_SCOPE_EVIDENCE_INVALID" in finding_codes(invalid)
 
 
+def test_coverage_accepts_formal_pdf_page_block_evidence() -> None:
+    content = division_content(lesson_unit("LESSON-01", 1), lesson_unit("LESSON-02", 2))
+    context = validation_context(content)
+    context.supporting_inputs["content:material_evidence"] = {
+        "pages": [
+            {
+                "page_number": 3,
+                "text_blocks": [
+                    {"block_id": "EV-01", "text": "one"},
+                    {"block_id": "EV-02", "text": "two"},
+                ],
+            }
+        ]
+    }
+
+    outcome = LessonDivisionCoverageValidator().validate(context)
+
+    assert outcome.passed is True
+
+
 @pytest.mark.parametrize(
     ("scope_change", "expected_code"),
     (

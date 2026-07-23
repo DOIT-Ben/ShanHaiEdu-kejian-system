@@ -18,6 +18,8 @@ from apps.api.artifacts.schemas import (
     ArtifactDraftEnvelope,
     ArtifactDraftRead,
     ArtifactEnvelope,
+    ArtifactListData,
+    ArtifactListEnvelope,
     ArtifactRead,
     ArtifactVersionEnvelope,
     ArtifactVersionRead,
@@ -37,6 +39,28 @@ from apps.api.settings import Settings
 
 router = APIRouter(tags=["artifacts"])
 ETAG_PATTERN = re.compile(r'^(?:W/)?"(?P<version>[1-9][0-9]*)"$')
+
+
+@router.get(
+    "/api/v2/projects/{project_id}/artifacts",
+    response_model=ArtifactListEnvelope,
+    operation_id="listProjectArtifacts",
+)
+def list_project_artifacts(
+    project_id: UUID,
+    request: Request,
+    actor: Annotated[ActorContext, Depends(get_actor_context)],
+    session: Annotated[Session, Depends(get_session)],
+) -> ArtifactListEnvelope:
+    ProjectAccessService(session, actor).require(project_id, ProjectAction.VIEW)
+    items = [
+        serialize_artifact(session, actor, artifact)
+        for artifact in ArtifactRepository(session, actor).list_for_project(project_id)
+    ]
+    return ArtifactListEnvelope(
+        data=ArtifactListData(items=items),
+        request_id=request.state.request_id,
+    )
 
 
 @router.post(

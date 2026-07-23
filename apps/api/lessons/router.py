@@ -6,7 +6,7 @@ import re
 from typing import Annotated, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Request, Response
+from fastapi import APIRouter, Depends, Header, Request, Response, status
 from sqlalchemy.orm import Session
 
 from apps.api.dependencies import get_session
@@ -20,14 +20,18 @@ from apps.api.lessons.domain import (
     LessonCollectionEdit,
     workflow_status_for_branch,
 )
+from apps.api.lessons.material_scope_service import MaterialScopePreparationService
 from apps.api.lessons.models import LessonBranchConfig, LessonUnit
 from apps.api.lessons.repository import LessonRepository
 from apps.api.lessons.schemas import (
     LessonBranchRead,
     LessonCollectionData,
     LessonCollectionEnvelope,
+    LessonDivisionPreparationEnvelope,
+    LessonDivisionPreparationRead,
     LessonEnvelope,
     LessonRead,
+    PrepareLessonDivisionRequest,
     UpdateLessonBranchesRequest,
     UpdateLessonCollectionRequest,
 )
@@ -37,6 +41,67 @@ from apps.api.settings import Settings
 
 router = APIRouter(tags=["lessons"])
 ETAG_PATTERN = re.compile(r'^(?:W/)?"(?P<version>[1-9][0-9]*)"$')
+
+
+@router.post(
+    "/api/v2/projects/{project_id}/lesson-division-runs",
+    response_model=LessonDivisionPreparationEnvelope,
+    status_code=status.HTTP_201_CREATED,
+    operation_id="prepareLessonDivision",
+)
+def prepare_lesson_division(
+    project_id: UUID,
+    payload: PrepareLessonDivisionRequest,
+    request: Request,
+    idempotency_key: Annotated[
+        str,
+        Header(alias="Idempotency-Key", min_length=8, max_length=128),
+    ],
+    actor: Annotated[ActorContext, Depends(get_actor_context)],
+    session: Annotated[Session, Depends(get_session)],
+) -> LessonDivisionPreparationEnvelope:
+    settings = cast(Settings, request.app.state.settings)
+
+    def command() -> CommandResult:
+        prepared = MaterialScopePreparationService(session, actor).prepare(
+            project_id,
+            material_id=payload.material_id,
+            material_parse_version_id=payload.material_parse_version_id,
+            page_start=payload.page_start,
+            page_end=payload.page_end,
+            duration_minutes=payload.duration_minutes,
+            requested_lesson_count=payload.requested_lesson_count,
+            special_requirements=payload.special_requirements,
+            request_id=request.state.request_id,
+        )
+        data = LessonDivisionPreparationRead.model_validate(prepared, from_attributes=True)
+        return CommandResult(
+            status_code=201,
+            body=data.model_dump(mode="json"),
+            resource_type="artifact",
+            resource_id=prepared.material_scope_artifact_id,
+        )
+
+    with session.begin():
+        result = IdempotencyService(
+            session,
+            actor.organization_id,
+            ttl_seconds=settings.idempotency_ttl_seconds,
+        ).execute(
+            scope=f"lesson-division.prepare:{project_id}:{actor.principal_id}",
+            key=idempotency_key,
+            payload=payload.model_dump(mode="json"),
+            authorize=lambda: ProjectAccessService(session, actor).require(
+                project_id,
+                ProjectAction.GENERATE,
+                for_update=True,
+            ),
+            command=command,
+        )
+    return LessonDivisionPreparationEnvelope(
+        data=LessonDivisionPreparationRead.model_validate(result.body),
+        request_id=request.state.request_id,
+    )
 
 
 @router.get(

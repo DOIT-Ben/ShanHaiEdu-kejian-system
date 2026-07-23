@@ -19,6 +19,7 @@ from apps.api.jobs.router import router as jobs_router
 from apps.api.lessons.router import router as lessons_router
 from apps.api.logging import configure_logging
 from apps.api.middleware import RequestContextMiddleware
+from apps.api.node_execution.router import router as node_execution_router
 from apps.api.projects.router import router as projects_router
 from apps.api.prompt_runtime.router import router as prompt_runtime_router
 from apps.api.settings import Settings, get_settings
@@ -72,6 +73,7 @@ def create_app(
     app.include_router(uploads_router)
     app.include_router(jobs_router)
     app.include_router(workflows_router)
+    app.include_router(node_execution_router)
 
     @app.get("/health/live", tags=["system"], include_in_schema=False)
     @app.get("/api/v2/health/live", tags=["system"], operation_id="getLiveness")

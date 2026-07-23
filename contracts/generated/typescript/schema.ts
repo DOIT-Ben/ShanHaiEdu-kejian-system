@@ -245,6 +245,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project_id}/materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询项目已上传教材 */
+        get: operations["listProjectMaterials"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project_id}/materials/uploads": {
         parameters: {
             query?: never;
@@ -337,7 +354,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** 查询项目内容产物 */
+        get: operations["listProjectArtifacts"];
         put?: never;
         /** 创建项目内容产物及活动草稿 */
         post: operations["createArtifact"];
@@ -426,6 +444,23 @@ export interface paths {
         get: operations["getPromptPreview"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/node-runs/{node_run_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 使用现有运行时执行文本生成节点 */
+        post: operations["startNodeRun"];
         delete?: never;
         options?: never;
         head?: never;
@@ -909,6 +944,22 @@ export interface components {
             size_bytes: number;
             sha256: string;
         };
+        SourceMaterial: {
+            /** Format: uuid */
+            id: string;
+            original_filename: string;
+            mime_type: string;
+            /** @enum {unknown} */
+            upload_status: "pending_upload" | "confirmed" | "rejected";
+            /** Format: date-time */
+            confirmed_at: string | null;
+        };
+        SourceMaterialListEnvelope: {
+            data: {
+                items: components["schemas"]["SourceMaterial"][];
+            };
+            request_id: string;
+        };
         FileAssetVersion: {
             /** Format: uuid */
             id: string;
@@ -1065,6 +1116,25 @@ export interface components {
             started_at?: string | null;
             /** Format: date-time */
             finished_at?: string | null;
+        };
+        StartNodeRunRequest: {
+            user_revision?: string | null;
+        };
+        NodeExecutionResult: {
+            /** Format: uuid */
+            node_run_id: string;
+            /** Format: uuid */
+            artifact_version_id: string;
+            /** Format: uuid */
+            creation_package_id: string | null;
+            /** Format: uuid */
+            attempt_id: string | null;
+            /** Format: uuid */
+            usage_id: string | null;
+        };
+        NodeExecutionEnvelope: {
+            data: components["schemas"]["NodeExecutionResult"];
+            request_id: string;
         };
         WorkflowRun: {
             /** Format: uuid */
@@ -1501,6 +1571,12 @@ export interface components {
         };
         ArtifactEnvelope: {
             data: components["schemas"]["Artifact"];
+            request_id: string;
+        };
+        ArtifactListEnvelope: {
+            data: {
+                items: components["schemas"]["Artifact"][];
+            };
             request_id: string;
         };
         ArtifactDraftEnvelope: {
@@ -2153,6 +2229,29 @@ export interface operations {
             "4XX": components["responses"]["Error"];
         };
     };
+    listProjectMaterials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Newest-first project material summaries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceMaterialListEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
     createMaterialUploadSession: {
         parameters: {
             query?: never;
@@ -2271,6 +2370,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkflowEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    listProjectArtifacts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current project artifact states */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactListEnvelope"];
                 };
             };
             "4XX": components["responses"]["Error"];
@@ -2438,6 +2560,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PromptPreviewEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    startNodeRun: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                node_run_id: components["parameters"]["NodeRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartNodeRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Existing node execution committed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeExecutionEnvelope"];
                 };
             };
             "4XX": components["responses"]["Error"];
