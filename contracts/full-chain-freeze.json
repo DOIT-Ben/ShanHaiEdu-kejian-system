@@ -1,0 +1,159 @@
+{
+  "$schema": "./full-chain-freeze.schema.json",
+  "contract_version": "shanhai.full-chain-freeze/v1",
+  "contract_key": "primary_math.courseware.full_chain",
+  "status": "frozen_for_parallel_development",
+  "source_release": {
+    "package_key": "shanhai.primary_math.courseware",
+    "semantic_version": "1.4.0",
+    "immutability": "forward_only"
+  },
+  "source_files": {
+    "workflow_catalog": "contracts/fixtures/workflow-node-generation-bindings/primary-math-courseware.json",
+    "content_manifest": "contracts/fixtures/primary-math-courseware-package/manifest.json",
+    "generation_source": "workflow/builtin/primary_math_courseware/generation-source.json",
+    "ppt_handbook": "docs/workflows/PPT_PRODUCTION.md",
+    "video_handbook": "docs/workflows/VIDEO_PRODUCTION.md"
+  },
+  "global_invariants": [
+    "one_project_contains_one_or_more_isolated_lesson_units",
+    "lesson_outputs_require_organization_project_lesson_release_workflow_and_exact_source_identity",
+    "downstream_consumes_exact_versions_never_project_latest",
+    "provider_success_is_not_artifact_submission_quality_approval_or_adoption",
+    "historical_content_releases_and_existing_project_bindings_are_immutable",
+    "frontend_consumes_active_openapi_generated_client_only",
+    "ppt_consumes_exact_approved_lesson_plan",
+    "video_consumes_exact_intro_selection_snapshot_only",
+    "video_must_include_script_storyboards_assets_shots_clips_tts_subtitles_timeline_and_final_validation",
+    "cross_lesson_reads_writes_and_stale_propagation_fail_closed"
+  ],
+  "branches": [
+    {
+      "branch_key": "mainline",
+      "scope": "mixed",
+      "entry_contract_refs": ["material:file_asset"],
+      "terminal_contract_refs": ["approval:lesson_plan", "selection:intro"],
+      "required_node_sequence": [
+        {"node_key": "material.file_validate", "expected_execution_kind": "deterministic", "expected_scope": "project", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "material.parse", "expected_execution_kind": "deterministic", "expected_scope": "project", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "material.scope_review", "expected_execution_kind": "human_gate", "expected_scope": "project", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "lesson.division.generate", "expected_execution_kind": "model_generation", "expected_scope": "project", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "lesson.division.validate", "expected_execution_kind": "deterministic", "expected_scope": "project", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "lesson.division.approve", "expected_execution_kind": "human_gate", "expected_scope": "project", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "lesson_plan.generate", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "lesson_plan.validate", "expected_execution_kind": "deterministic", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "lesson_plan.approve", "expected_execution_kind": "human_gate", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "intro.generate_options", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "intro.validate", "expected_execution_kind": "deterministic", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "intro.approve", "expected_execution_kind": "human_gate", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "intro.select", "expected_execution_kind": "human_gate", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"}
+      ],
+      "golden_assertions": [
+        "approved_material_scope_is_exact_and_page_traceable",
+        "lesson_division_covers_scope_once_without_overlap",
+        "lesson_unit_sync_uses_stable_lesson_unit_key",
+        "lesson_plan_has_twelve_sections_and_closed_class_time",
+        "lesson_plan_reads_current_lesson_only",
+        "intro_default_mode_contains_three_plus_three_plus_three_options",
+        "intro_has_one_recommendation_and_no_preteach",
+        "intro_selection_references_exact_approved_option_set"
+      ]
+    },
+    {
+      "branch_key": "ppt",
+      "scope": "lesson_unit",
+      "entry_contract_refs": ["approval:lesson_plan", "content:material_evidence"],
+      "terminal_contract_refs": ["approval:ppt_final"],
+      "required_node_sequence": [
+        {"node_key": "ppt.content_analyze", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "ppt.outline.generate", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "ppt.outline.approve", "expected_execution_kind": "human_gate", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "ppt.pages.generate", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "ppt.cover.prompt.generate", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "ppt.cover.image.generate", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "ppt.cover.approve", "expected_execution_kind": "human_gate", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "ppt.style_contract.build", "expected_execution_kind": "deterministic", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "ppt.body_asset_prompts.generate", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "ppt.body_assets.generate", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "ppt.pages.assemble", "expected_execution_kind": "deterministic", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "pptx.export", "expected_execution_kind": "deterministic", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "ppt.final.validate", "expected_execution_kind": "deterministic", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "ppt.final.approve", "expected_execution_kind": "human_gate", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"}
+      ],
+      "golden_assertions": [
+        "ppt_entry_references_exact_approved_lesson_plan",
+        "outline_preserves_teaching_sequence_and_one_task_per_page",
+        "cover_approval_precedes_style_contract",
+        "body_pages_use_solid_white_background",
+        "accurate_text_numbers_formulas_and_answers_remain_editable",
+        "each_required_image_has_creation_package_generation_result_and_adoption_lineage",
+        "assembly_uses_same_lesson_page_specs_and_adopted_assets",
+        "pptx_is_openable_editable_and_hash_bound",
+        "page_change_stales_only_dependent_page_and_export"
+      ]
+    },
+    {
+      "branch_key": "video",
+      "scope": "lesson_unit",
+      "entry_contract_refs": ["selection:intro"],
+      "terminal_contract_refs": ["approval:video_final"],
+      "required_node_sequence": [
+        {"node_key": "video.master_script.generate", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "video.master_script.approve", "expected_execution_kind": "human_gate", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "video.rough_storyboard.generate", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "video.rough_storyboard.approve", "expected_execution_kind": "human_gate", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "video.style_master.prompt.generate", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "video.style_master.image.generate", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "video.style_master.approve", "expected_execution_kind": "human_gate", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "video.asset_inventory.generate", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "video.asset_prompts.generate", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "video.assets.generate", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "video.fine_storyboard.generate", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "video.shots.generate", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "video.clips.select", "expected_execution_kind": "human_gate", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "audio.plan.generate", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "audio.tts.generate", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact", "required_runtime_outcome": "real_tts_file_asset_and_timing_evidence"},
+        {"node_key": "audio.subtitles.compile", "expected_execution_kind": "deterministic", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "video.timeline.assemble", "expected_execution_kind": "deterministic", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact", "required_runtime_outcome": "real_multi_clip_audio_subtitle_mp4"},
+        {"node_key": "video.classroom_quality.evaluate", "expected_execution_kind": "model_generation", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "video.technical.validate", "expected_execution_kind": "deterministic", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"},
+        {"node_key": "video.final.approve", "expected_execution_kind": "human_gate", "expected_scope": "lesson_unit", "freeze_level": "existing_catalog_exact"}
+      ],
+      "golden_assertions": [
+        "video_entry_contains_exact_intro_selection_snapshot_only",
+        "video_context_forbids_lesson_plan_material_and_ppt",
+        "master_script_ends_at_handoff_and_does_not_preteach",
+        "rough_storyboard_precedes_style_and_asset_generation",
+        "style_master_does_not_replace_character_scene_prop_and_creature_assets",
+        "fine_storyboard_preserves_scene_beat_shot_and_asset_lineage",
+        "each_shot_has_one_visible_beat_and_legal_duration",
+        "candidate_result_becomes_clip_only_after_selection_and_project_save",
+        "tts_has_real_audio_file_timing_pronunciation_and_duration_evidence",
+        "subtitles_match_audio_and_shot_timeline",
+        "timeline_uses_one_formal_clip_per_shot_and_real_audio",
+        "final_mp4_has_picture_audio_subtitles_codec_duration_and_hash_evidence",
+        "final_video_stops_at_classroom_handoff_and_does_not_preteach"
+      ]
+    },
+    {
+      "branch_key": "delivery",
+      "scope": "project",
+      "entry_contract_refs": ["approval:lesson_plan", "artifact:intro_option_set", "approval:ppt_final", "approval:video_final"],
+      "terminal_contract_refs": ["package:delivery"],
+      "required_node_sequence": [
+        {"node_key": "delivery.package", "expected_execution_kind": "deterministic", "expected_scope": "project", "freeze_level": "existing_catalog_exact"}
+      ],
+      "golden_assertions": [
+        "delivery_contains_approved_outputs_only",
+        "delivery_manifest_records_exact_versions_and_hashes",
+        "delivery_rejects_cross_project_cross_lesson_or_stale_inputs",
+        "delivery_does_not_modify_upstream_artifacts"
+      ]
+    }
+  ],
+  "change_policy": {
+    "historical_release": "never_modify_in_place",
+    "shared_contract_owner": "single_writer",
+    "consumer_change_process": "contract_change_then_rebase"
+  }
+}
