@@ -73,9 +73,45 @@ jobs:
       - name: Install locked dependencies
         run: uv sync --frozen
 
-      - name: Check contract governance Python formatting
+      - name: Format contract governance diagnostic copy
         run: >-
-          uv run ruff format --check
+          uv run ruff format
+          scripts/check_contract_freeze.py
+          scripts/check_development_lease.py
+          scripts/check_parallel_fixtures.py
+          tests/contract/test_contract_freeze.py
+          tests/contract/test_development_lease.py
+          tests/contract/test_parallel_fixtures.py
+
+      - name: Capture contract governance formatting diff
+        run: >-
+          git diff --
+          scripts/check_contract_freeze.py
+          scripts/check_development_lease.py
+          scripts/check_parallel_fixtures.py
+          tests/contract/test_contract_freeze.py
+          tests/contract/test_development_lease.py
+          tests/contract/test_parallel_fixtures.py
+          > contract-governance-format.diff
+
+      - name: Upload contract governance formatting diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-governance-formatted-sources
+          path: |
+            contract-governance-format.diff
+            scripts/check_contract_freeze.py
+            scripts/check_development_lease.py
+            scripts/check_parallel_fixtures.py
+            tests/contract/test_contract_freeze.py
+            tests/contract/test_development_lease.py
+            tests/contract/test_parallel_fixtures.py
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Reject unformatted contract governance Python
+        run: >-
+          git diff --exit-code --
           scripts/check_contract_freeze.py
           scripts/check_development_lease.py
           scripts/check_parallel_fixtures.py
