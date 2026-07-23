@@ -7,6 +7,9 @@ import argparse
 import re
 import subprocess
 import sys
+from pathlib import Path
+
+import yaml
 
 DECLARATION = re.compile(
     r"^-\s*\[[xX]\]\s*`(?P<choice>status-update-(?:required|not-required))`",
@@ -46,7 +49,7 @@ VERTICAL_BOUNDARY_PREFIXES = (
     "apps/web/src/",
     "contracts/openapi/active/",
 )
-VERTICAL_BOUNDARY_PATHS = ("contracts/api-surface.openapi.yaml",)
+VERTICAL_BOUNDARY_PATHS = ("apps/api/main.py", "contracts/api-surface.openapi.yaml")
 FIRST_REQUIRED_GOVERNANCE_PR = 93  # Remove under #94 after legacy PR #62 closes.
 
 
@@ -177,14 +180,37 @@ def _touches_vertical_boundary(path: str) -> bool:
     )
 
 
+def _declared_values(value: str) -> list[str]:
+    quoted = [item.strip() for item in re.findall(r"`([^`]+)`", value) if item.strip()]
+    if quoted:
+        return quoted
+    return [item.strip() for item in re.split(r"[,，;；]", value) if item.strip()]
+
+
+def _active_operation_ids(repo_root: Path) -> set[str] | None:
+    contract_path = repo_root / "contracts/api-surface.openapi.yaml"
+    if not contract_path.is_file():
+        return None
+    document = yaml.safe_load(contract_path.read_text(encoding="utf-8")) or {}
+    operation_ids: set[str] = set()
+    for path_item in document.get("paths", {}).values():
+        if not isinstance(path_item, dict):
+            continue
+        for operation in path_item.values():
+            if isinstance(operation, dict) and isinstance(operation.get("operationId"), str):
+                operation_ids.add(operation["operationId"])
+    return operation_ids
+
+
 def validate_vertical_slice_declaration(
     body: str,
     changed_files: set[str],
     *,
     required: bool = False,
+    repo_root: Path | None = None,
 ) -> list[str]:
     normalized_files = {path.replace("\\", "/") for path in changed_files}
-    touches_boundary = any(path.startswith(VERTICAL_BOUNDARY_PREFIXES) for path in normalized_files)
+    touches_boundary = any(_touches_vertical_boundary(path) for path in normalized_files)
 
     if VERTICAL_MARKER.search(body) is None:
         if required:
@@ -216,17 +242,39 @@ def validate_vertical_slice_declaration(
         return ["PR must contain exactly one vertical slice delivery section"]
 
     errors: list[str] = []
+    field_values: dict[str, str] = {}
     section = sections[0]
     for label in VERTICAL_REQUIRED_FIELDS:
         values = _review_field_values(section, label)
         if len(values) != 1:
             errors.append(f"vertical slice section must contain exactly one {label} field")
             continue
+        field_values[label] = values[0]
         normalized_value = values[0].strip().lower()
         if normalized_value in {"", "pending", "n/a", "none", "not applicable"}:
             errors.append(f"vertical slice field {label} must be concrete")
-    return errors
+    if errors:
+        return errors
 
+    resolved_root = repo_root or Path.cwd()
+    active_operation_ids = _active_operation_ids(resolved_root)
+    if active_operation_ids is None:
+        errors.append("active OpenAPI contract is unavailable for vertical slice validation")
+    else:
+        declared_operation_ids = _declared_values(field_values["Active operationIds"])
+        unknown_operation_ids = sorted(set(declared_operation_ids) - active_operation_ids)
+        if unknown_operation_ids:
+            errors.append(
+                "vertical slice declares unknown active operationIds: "
+                + ", ".join(unknown_operation_ids)
+            )
+
+    for label in ("Backend tests", "Real API Playwright"):
+        for declared_test in _declared_values(field_values[label]):
+            relative_path = declared_test.split("::", 1)[0].strip()
+            if not (resolved_root / relative_path).is_file():
+                errors.append(f"vertical slice declares missing {label} file: {relative_path}")
+    return errors
 
 def changed_files(base_sha: str, head_sha: str) -> set[str]:
     result = subprocess.run(
