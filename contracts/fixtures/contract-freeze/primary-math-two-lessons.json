@@ -1,0 +1,184 @@
+{
+  "fixture_version": "shanhai.contract-freeze-two-lessons/v1",
+  "fixture_key": "primary-math.numbers-1-to-5.two-lessons",
+  "purpose": "Provide stable exact upstream inputs for parallel mainline, PPT, complete-video and frontend development without pretending that real providers have run.",
+  "project": {
+    "organization_id": "ORG-FREEZE-001",
+    "project_id": "PROJECT-FREEZE-001",
+    "content_release_id": "RELEASE-PRIMARY-MATH-140",
+    "content_release_version": "1.4.0",
+    "workflow_definition_version_id": "WORKFLOW-PRIMARY-MATH-140",
+    "source_material_id": "MATERIAL-NUMBERS-001",
+    "material_parse_version_id": "MATERIAL-PARSE-NUMBERS-001",
+    "material_evidence_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+    "material_scope_artifact_version_id": "MATERIAL-SCOPE-VERSION-001",
+    "lesson_division_artifact_version_id": "LESSON-DIVISION-VERSION-001",
+    "lesson_division_approval_id": "LESSON-DIVISION-APPROVAL-001"
+  },
+  "lessons": [
+    {
+      "lesson_id": "LESSON-FREEZE-001",
+      "lesson_unit_key": "LESSON-001",
+      "position": 1,
+      "title": "1～3的数量感知与对应",
+      "duration_minutes": 40,
+      "material_evidence_keys": ["EV-MAT-01", "EV-MAT-02"],
+      "content_boundary": {
+        "must_teach": ["逐个对应数出1～3个物体", "建立物体数量、点子和数字1～3的对应"],
+        "must_not_preteach": ["数字4和5的规范书写", "比较大小", "第几", "加法", "减法"]
+      },
+      "lesson_plan": {
+        "artifact_id": "ARTIFACT-LESSON-PLAN-001",
+        "artifact_version_id": "ARTIFACT-LESSON-PLAN-VERSION-001",
+        "content_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+        "approval_id": "APPROVAL-LESSON-PLAN-001",
+        "approval_status": "approved",
+        "sections": [
+          "teaching_content",
+          "material_analysis",
+          "learner_analysis",
+          "design_intent",
+          "teaching_objectives",
+          "key_difficulties_and_strategies",
+          "preparation",
+          "teaching_process",
+          "board_design",
+          "lesson_summary",
+          "differentiated_homework",
+          "teaching_reflection"
+        ]
+      },
+      "intro": {
+        "artifact_id": "ARTIFACT-INTRO-001",
+        "artifact_version_id": "ARTIFACT-INTRO-VERSION-001",
+        "content_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+        "approval_id": "APPROVAL-INTRO-001",
+        "approval_status": "approved",
+        "selection_id": "INTRO-SELECTION-001",
+        "selected_option_key": "INTRO-INDEPENDENT-001",
+        "selection_snapshot": {
+          "knowledge_point": "1～3的数量感知与对应",
+          "creative_concept": "小动物搬家时需要为每个家庭成员准备一件物品",
+          "hook": "三只小动物为什么总有一只拿不到行李？",
+          "course_anchor": "逐个对应数出1～3个物体",
+          "classroom_first_question": "怎样摆放，才能一眼看出每只小动物都有一件行李？",
+          "handoff_moment": "画面停在三只小动物和两件行李面前，等待学生提出补齐方法",
+          "must_not_preteach": ["直接说出一一对应定义", "比较数字大小", "讲解加减法"],
+          "suggested_medium": "paper_clay_story",
+          "duration_seconds": 90
+        }
+      },
+      "parallel_inputs": {
+        "ppt": {
+          "project_id": "PROJECT-FREEZE-001",
+          "lesson_id": "LESSON-FREEZE-001",
+          "approved_lesson_plan_version_id": "ARTIFACT-LESSON-PLAN-VERSION-001",
+          "lesson_plan_content_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+          "material_parse_version_id": "MATERIAL-PARSE-NUMBERS-001",
+          "material_scope_artifact_version_id": "MATERIAL-SCOPE-VERSION-001",
+          "ppt_preferences": {"aspect_ratio": "16:9", "preferred_page_count": 10, "style_key": "style.primary_math.paper_clay"}
+        },
+        "video": {
+          "project_id": "PROJECT-FREEZE-001",
+          "lesson_id": "LESSON-FREEZE-001",
+          "intro_selection_id": "INTRO-SELECTION-001",
+          "intro_option_set_version_id": "ARTIFACT-INTRO-VERSION-001",
+          "selected_option_key": "INTRO-INDEPENDENT-001",
+          "selected_option_snapshot_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+          "video_preferences": {"aspect_ratio": "16:9", "duration_seconds": 90, "language": "zh-CN", "style_key": "style.primary_math.paper_clay", "voice_style": "亲切、清晰、自然", "speech_rate": 0.95}
+        }
+      }
+    },
+    {
+      "lesson_id": "LESSON-FREEZE-002",
+      "lesson_unit_key": "LESSON-002",
+      "position": 2,
+      "title": "数字4、5的认读与规范书写",
+      "duration_minutes": 40,
+      "material_evidence_keys": ["EV-MAT-03", "EV-MAT-04"],
+      "content_boundary": {
+        "must_teach": ["建立数量4、5与数字符号的对应", "按规范笔顺书写数字4和5"],
+        "must_not_preteach": ["比较大小", "第几", "分与合", "加法", "减法", "0的认识"]
+      },
+      "lesson_plan": {
+        "artifact_id": "ARTIFACT-LESSON-PLAN-002",
+        "artifact_version_id": "ARTIFACT-LESSON-PLAN-VERSION-002",
+        "content_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+        "approval_id": "APPROVAL-LESSON-PLAN-002",
+        "approval_status": "approved",
+        "sections": [
+          "teaching_content",
+          "material_analysis",
+          "learner_analysis",
+          "design_intent",
+          "teaching_objectives",
+          "key_difficulties_and_strategies",
+          "preparation",
+          "teaching_process",
+          "board_design",
+          "lesson_summary",
+          "differentiated_homework",
+          "teaching_reflection"
+        ]
+      },
+      "intro": {
+        "artifact_id": "ARTIFACT-INTRO-002",
+        "artifact_version_id": "ARTIFACT-INTRO-VERSION-002",
+        "content_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+        "approval_id": "APPROVAL-INTRO-002",
+        "approval_status": "approved",
+        "selection_id": "INTRO-SELECTION-002",
+        "selected_option_key": "INTRO-APPLICATION-002",
+        "selection_snapshot": {
+          "knowledge_point": "数字4、5的认读与规范书写",
+          "creative_concept": "邮递员需要把四件和五件包裹送到正确数字门牌",
+          "hook": "门牌被风吹乱后，包裹该送到哪一间房？",
+          "course_anchor": "把数量4、5与数字符号对应，并关注数字外形",
+          "classroom_first_question": "你能根据包裹数量找到正确的门牌吗？",
+          "handoff_moment": "画面停在数字4和5的门牌与对应包裹前，等待学生辨认并说明理由",
+          "must_not_preteach": ["直接示范完整笔顺", "比较4和5的大小", "讲解数的分与合"],
+          "suggested_medium": "paper_clay_application",
+          "duration_seconds": 90
+        }
+      },
+      "parallel_inputs": {
+        "ppt": {
+          "project_id": "PROJECT-FREEZE-001",
+          "lesson_id": "LESSON-FREEZE-002",
+          "approved_lesson_plan_version_id": "ARTIFACT-LESSON-PLAN-VERSION-002",
+          "lesson_plan_content_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+          "material_parse_version_id": "MATERIAL-PARSE-NUMBERS-001",
+          "material_scope_artifact_version_id": "MATERIAL-SCOPE-VERSION-001",
+          "ppt_preferences": {"aspect_ratio": "16:9", "preferred_page_count": 10, "style_key": "style.primary_math.paper_clay"}
+        },
+        "video": {
+          "project_id": "PROJECT-FREEZE-001",
+          "lesson_id": "LESSON-FREEZE-002",
+          "intro_selection_id": "INTRO-SELECTION-002",
+          "intro_option_set_version_id": "ARTIFACT-INTRO-VERSION-002",
+          "selected_option_key": "INTRO-APPLICATION-002",
+          "selected_option_snapshot_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+          "video_preferences": {"aspect_ratio": "16:9", "duration_seconds": 90, "language": "zh-CN", "style_key": "style.primary_math.paper_clay", "voice_style": "亲切、清晰、自然", "speech_rate": 0.95}
+        }
+      }
+    }
+  ],
+  "isolation_assertions": [
+    "lesson_ids_are_unique",
+    "lesson_unit_keys_are_unique",
+    "lesson_plan_artifact_version_ids_are_unique",
+    "intro_option_set_version_ids_are_unique",
+    "intro_selection_ids_are_unique",
+    "ppt_input_lesson_id_matches_owner_lesson",
+    "ppt_input_approved_lesson_plan_version_matches_owner_lesson",
+    "video_input_lesson_id_matches_owner_lesson",
+    "video_input_intro_selection_matches_owner_lesson",
+    "video_input_does_not_include_lesson_plan_material_or_ppt_content",
+    "changing_one_lesson_does_not_stale_or_replace_the_other_lesson"
+  ],
+  "non_claims": [
+    "fixture_does_not_prove_real_provider_execution",
+    "fixture_does_not_contain_real_image_video_audio_pptx_or_mp4_files",
+    "fixture_does_not_replace_real_file_probe_and_teaching_acceptance"
+  ]
+}
