@@ -82,7 +82,7 @@
 
 1. #4/PR #111同步最新`main`，关闭最终浏览器与治理门禁，只保留首条MVP链需要的生产页面并合并源码。
 2. #11在该页面完成“选择已上传教材和物理页码 -> 真实`newapi/deepseek` -> 课时划分 -> 每课时十二部分教案 -> 三类九套 -> 编辑/局部重生成 -> 批准 -> 唯一选择 -> 刷新恢复”的正式API联调。
-3. #207合并后，#205立即建立唯一跨栈短分支和Draft PR，先并行实现不触碰`apps/web`的`1.5.0`最小前向绑定、视频runtime/API和后端红测；PR #111与#11释放`apps/web`后，再在同一分支接入现有教师页面，完成“上传或选择唯一关键帧 -> 生成6秒级真实短片 -> 轮询状态 -> 播放 -> 采用 -> 刷新恢复”。该PR不得以只有后端、没有页面结果的状态转Ready或合并，只复用真实视频Adapter、关键帧relay、NodeRun、GenerationResult/Adoption、FileAssetVersion与项目资产合同，不恢复完整视频链。
+3. #207合并后，#205立即建立唯一跨栈短分支和Draft PR。Phase A只并行实现`1.5.0`发布源/binding、内部视频runtime/service与隔离后端红测，明确不修改`apps/web`、active OpenAPI、生成客户端或#11持有的共享接口文件；PR #111与#11释放上述边界后，Phase B再在同一分支补最小公开API、生成客户端和现有教师页面，完成“上传或选择唯一关键帧 -> 生成6秒级真实短片 -> 轮询状态 -> 播放 -> 采用 -> 刷新恢复”。该PR不得以只有Phase A、没有页面结果的状态转Ready或合并，只复用真实视频Adapter、关键帧relay、NodeRun、GenerationResult/Adoption、FileAssetVersion与项目资产合同，不恢复完整视频链。
 4. 使用一个受控真实小学数学项目完成浏览器复验；成功证据必须同时来自正式页面、正式API、PostgreSQL、真实文本/视频Provider、真实MP4和真实保存，Fake、fixture与MSW只用于普通测试。
 5. 由未参与实现的教学验收子智能体审查教师可用性与教学质量，并根据意见只优化一轮后复验完整链路。
 6. 首个MVP关闭后再分别评估PPT/PPTX、完整图片链、完整视频链、TTS、自动重试与SSE hardening，不把这些任务倒灌为当前门槛。
