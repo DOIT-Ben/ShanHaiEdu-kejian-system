@@ -2,6 +2,8 @@
 
 本目录保存前端、后端和内容运行时共同依赖的唯一现行机器合同。设计说明见 `docs/backend/05_API_SSE权限与安全.md`，本目录文件优先用于代码生成、Mock 和 CI 校验。
 
+当前业务切片还必须遵守[Decision #210](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/210)的纵向交付门禁：active合同表示运行时可调用，不等于教师功能已经完成。只有FastAPI运行时、生成客户端、生产页面消费者、正式持久化事实和真实API浏览器验收共同通过，当前业务切片才能关闭。
+
 ## 文件
 
 - `api-conventions.md`：HTTP、分页、并发、幂等和错误约定。
@@ -39,6 +41,15 @@
 - `typescript/client.ts`：基于生成paths和openapi-fetch的共享客户端工厂。
 
 上述首套业务内容包的人类可读确定性投影位于`docs/workflows/generation-guide/`。它供产品负责人、内容管理员和开发者审查，不是第二套机器合同，也不是教师公共界面。
+
+## 当前切片激活规则
+
+- 新业务operation进入active前，必须有FastAPI运行时实现、合同测试和明确的当前消费者；仅有未来页面需求时保留在planned合同。
+- active合同变化必须同步生成bundle和TypeScript客户端；生成后有diff即阻塞合并。
+- 前端消费者不得通过手写DTO、未声明字段、静态Mock或known-ID深链绕过缺失合同。
+- 后端端点通过单元测试不代表业务切片完成；当前父Issue还必须提供生产页面消费、PostgreSQL事实和真实API Playwright证据。
+- Session、授权和CSRF属于写操作合同的一部分；前端Token注入不能替代服务端校验。
+- 发布Release、Artifact审核、统一Job/NodeRun状态和项目写回语义只有一个活动所有者，不得由并行分支分别扩展。
 
 ## 使用规则
 
