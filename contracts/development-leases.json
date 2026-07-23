@@ -60,7 +60,12 @@
         "tests/contract/test_parallel_fixtures.py",
         "docs/governance/CONTRACT_FREEZE.md"
       ],
-      "readonly": ["apps/web/**", "apps/api/ppt/**", "apps/api/video/**", "apps/api/lessons/**"],
+      "readonly": [
+        "apps/web/**",
+        "apps/api/ppt_runtime/**",
+        "apps/api/video_runtime/**",
+        "apps/api/lessons/**"
+      ],
       "forbidden": [],
       "contract_change_required": false
     },
@@ -86,12 +91,19 @@
     },
     {
       "track_key": "ppt",
-      "role": "Complete PPT internal node implementation using exact approved lesson-plan fixtures.",
+      "role": "Complete PPT internal runtime implementation using exact approved lesson-plan fixtures; shared execution routing, Artifact semantics, Model Gateway and release contracts remain single-writer.",
       "writable": [
-        "apps/api/ppt/**",
-        "workers/ppt/**",
-        "tests/unit/ppt/**",
-        "tests/integration/ppt/**",
+        "apps/api/ppt_runtime/**",
+        "apps/api/assets/ppt_runtime_contracts.py",
+        "apps/api/assets/ppt_runtime_port.py",
+        "apps/api/assets/pptx_writer.py",
+        "scripts/golden_courseware_ppt_outputs.py",
+        "tests/unit/ppt_runtime/**",
+        "tests/unit/test_ppt_runtime_service.py",
+        "tests/integration/ppt_runtime_*.py",
+        "tests/integration/test_ppt_runtime*.py",
+        "tests/contract/test_ppt_runtime_contract.py",
+        "tests/contract/test_golden_ppt_runtime_projection.py",
         "contracts/fixtures/parallel-inputs/ppt/**"
       ],
       "readonly": [
@@ -113,18 +125,18 @@
         "apps/api/node_execution/**",
         "apps/api/artifacts/**",
         "apps/api/model_gateway/**",
-        "apps/api/video/**"
+        "apps/api/video_runtime/**"
       ],
       "contract_change_required": true
     },
     {
       "track_key": "video",
-      "role": "Complete video internal node implementation using exact IntroSelection fixtures, including real TTS, subtitles, timeline and final MP4.",
+      "role": "Complete video internal runtime implementation using exact IntroSelection fixtures, including real TTS, subtitles, timeline and final MP4; shared execution routing, Artifact semantics, Model Gateway and release contracts remain single-writer.",
       "writable": [
-        "apps/api/video/**",
-        "workers/video/**",
-        "tests/unit/video/**",
-        "tests/integration/video/**",
+        "apps/api/video_runtime/**",
+        "tests/unit/video_runtime/**",
+        "tests/integration/test_video_runtime*.py",
+        "tests/contract/test_video_golden_node_release.py",
         "contracts/fixtures/parallel-inputs/video/**"
       ],
       "readonly": [
@@ -146,13 +158,13 @@
         "apps/api/node_execution/**",
         "apps/api/artifacts/**",
         "apps/api/model_gateway/**",
-        "apps/api/ppt/**"
+        "apps/api/ppt_runtime/**"
       ],
       "contract_change_required": true
     },
     {
       "track_key": "mainline",
-      "role": "Material, lesson division, lesson plan and intro runtime integration using the frozen shared contract.",
+      "role": "Material, lesson division, lesson plan and intro domain implementation using the frozen shared contract; shared node execution, Artifact and API changes require a prior Contract Change.",
       "writable": [
         "apps/api/lessons/**",
         "apps/api/uploads/**",
@@ -180,8 +192,8 @@
         "apps/api/node_execution/**",
         "apps/api/artifacts/**",
         "apps/api/model_gateway/**",
-        "apps/api/ppt/**",
-        "apps/api/video/**"
+        "apps/api/ppt_runtime/**",
+        "apps/api/video_runtime/**"
       ],
       "contract_change_required": true
     }
