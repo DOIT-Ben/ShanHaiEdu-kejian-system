@@ -86,8 +86,27 @@ jobs:
       - name: Lint freeze Python
         run: uv run ruff check scripts/check_contract_freeze.py tests/contract/test_contract_freeze.py
 
-      - name: Validate full-chain freeze
-        run: uv run python scripts/check_contract_freeze.py
+      - name: Capture full-chain validation result
+        run: |
+          set +e
+          uv run python scripts/check_contract_freeze.py > contract-freeze-validation.txt 2>&1
+          status=$?
+          printf '%s\n' "$status" > contract-freeze-validation.status
+          cat contract-freeze-validation.txt
+          exit 0
+
+      - name: Upload freeze validation diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-freeze-validation
+          path: |
+            contract-freeze-validation.txt
+            contract-freeze-validation.status
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Reject invalid full-chain freeze
+        run: test "$(cat contract-freeze-validation.status)" = "0"
 
       - name: Run freeze regression tests
         run: uv run pytest tests/contract/test_contract_freeze.py
