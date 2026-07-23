@@ -1,0 +1,35 @@
+{
+  "entry": "selection:intro",
+  "stages": [
+    "video.master_script.generate",
+    "video.master_script.approve",
+    "video.rough_storyboard.generate",
+    "video.rough_storyboard.approve",
+    "video.style_master.prompt.generate",
+    "video.style_master.image.generate",
+    "video.style_master.approve",
+    "video.asset_inventory.generate",
+    "video.asset_prompts.generate",
+    "video.assets.generate",
+    "video.fine_storyboard.generate",
+    "video.shots.generate",
+    "video.clips.select",
+    "audio.plan.generate",
+    "audio.tts.generate",
+    "audio.subtitles.compile",
+    "video.timeline.assemble",
+    "video.classroom_quality.evaluate",
+    "video.technical.validate",
+    "video.final.approve"
+  ],
+  "terminal": "approval:video_final",
+  "required_real_outputs": [
+    "adopted image FileAssetVersion values",
+    "one adopted video clip FileAssetVersion per shot",
+    "real TTS audio FileAssetVersion values",
+    "compiled subtitle ArtifactVersion",
+    "real final MP4 FileAssetVersion",
+    "classroom and technical quality evidence",
+    "final Approval"
+  ]
+}
