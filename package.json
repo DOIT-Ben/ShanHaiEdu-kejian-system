@@ -10,6 +10,7 @@
     "contracts:lint": "redocly lint contracts/api-surface.openapi.yaml && redocly lint contracts/planned-api-surface.openapi.yaml",
     "contracts:surface": "uv run python scripts/check_api_surface.py",
     "contracts:schema": "ajv compile --spec=draft2020 -c ajv-formats -s 'contracts/*.schema.json'",
+    "contracts:freeze": "uv run python scripts/check_contract_freeze.py",
     "contracts:bundle": "redocly bundle contracts/api-surface.openapi.yaml -o contracts/generated/openapi.bundle.yaml",
     "contracts:generate": "pnpm contracts:bundle && openapi-typescript contracts/generated/openapi.bundle.yaml -o contracts/generated/typescript/schema.ts",
     "contracts:typecheck": "tsc -p tsconfig.contracts.json --noEmit",
