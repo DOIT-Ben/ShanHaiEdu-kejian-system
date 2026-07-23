@@ -171,20 +171,15 @@ def _touches_vertical_boundary(path: str) -> bool:
         or path in VERTICAL_BOUNDARY_PATHS
         or (
             path.startswith("apps/api/")
-            and (
-                path.endswith("/router.py")
-                or path.endswith("/routers.py")
-                or "/routers/" in path
-            )
+            and (path.endswith("/router.py") or path.endswith("/routers.py") or "/routers/" in path)
         )
     )
 
 
 def _declared_values(value: str) -> list[str]:
-    quoted = [item.strip() for item in re.findall(r"`([^`]+)`", value) if item.strip()]
-    if quoted:
-        return quoted
-    return [item.strip() for item in re.split(r"[,，;；]", value) if item.strip()]
+    return [
+        item.strip().strip("`") for item in re.split(r"[,;\uFF0C\uFF1B]", value) if item.strip()
+    ]
 
 
 def _active_operation_ids(repo_root: Path) -> set[str] | None:
@@ -275,6 +270,7 @@ def validate_vertical_slice_declaration(
             if not (resolved_root / relative_path).is_file():
                 errors.append(f"vertical slice declares missing {label} file: {relative_path}")
     return errors
+
 
 def changed_files(base_sha: str, head_sha: str) -> set[str]:
     result = subprocess.run(
