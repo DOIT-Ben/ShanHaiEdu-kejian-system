@@ -95,7 +95,7 @@ def _changed_paths(base_sha: str, head_sha: str, root: Path = ROOT) -> list[str]
         "-z",
         "--find-renames",
         "--find-copies",
-        "--diff-filter=ACMRD",
+        "--diff-filter=ACMRTD",
         f"{base_sha}...{head_sha}",
     ]
     completed = subprocess.run(
