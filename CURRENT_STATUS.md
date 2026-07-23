@@ -65,7 +65,7 @@ PR #208当前不能合并，已确认存在：
 
 Issue #4中曾授权继续`feat/4-production-frontend-rebuild`的评论已经由Decision #210原位取代；该分支与通用创作中心冻结，不得继续提交、开PR或占用`apps/web`/公共合同。
 
-Issue #2、#4、#48、#84、#117、#135、#139、#165、#166、#191和#195已经统一调整为`status:blocked`、`priority:p2`；它们只保留历史父范围、代码所有权或已批准设计，不构成当前开工授权。
+Issue #2、#4、#48、#82、#83、#84、#91、#92、#106、#117、#135、#139、#165、#166、#191和#195已经统一调整为`status:blocked`、`priority:p2`；它们只保留历史父范围、代码所有权或已批准设计，不构成当前开工授权。
 
 [Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)与[PR #209](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/209)暂停，不得以Phase A或后端局部完成合并。
 
