@@ -27,6 +27,9 @@
 - `builtin-generation-source.schema.json`：仓库内置业务生成源的紧凑声明合同；由确定性构建器展开为可发布内容包。
 - `golden-courseware-case.schema.json`：黄金教材、教案、三类九套、PPT、视频、音频和交付期望的跨成果测试合同。
 - `workflow-node-generation-binding.schema.json`：v2业务节点执行类型、48节点显式拓扑、必需/可选输入、生成模板、validator descriptor、三类参考策略、Artifact/CreationPackage输出投影、质量报告和人工/策略门禁的声明式绑定目录。
+- `full-chain-freeze.schema.json` / `full-chain-freeze.json`：并行开发前锁定主链、完整PPT、完整视频和交付包的48节点索引、作用域、顺序与黄金断言；精确输入输出继续引用不可变节点目录，不建立第二份合同。
+- `page-api-fact-matrix.schema.json` / `page-api-fact-matrix.json`：页面动作、active/planned/candidate operationId、正式事实、exact引用和刷新恢复方式。
+- `development-leases.schema.json` / `development-leases.json`：共享合同单一写入者以及前端、主链、PPT、视频轨道的可写、只读和禁止路径。
 - `markdown-template-draft.schema.json`：普通Markdown导入后的可审核模板草稿。
 - `markdown-template-compilation-profile.schema.json`：已审核模板草稿编译为内容包时的显式发布配置。
 - `mock-scenarios.json`：前端必须覆盖的关键 Mock 场景。
@@ -35,6 +38,7 @@
 - `fixtures/workflow-node-generation-bindings/`：覆盖教材、课时、教案、三类九套、PPT、图片、视频、音频和交付的48节点完整脱敏目录样例（22个`model_generation`、13个`deterministic`、13个`human_gate`）。
 - `fixtures/primary-math-courseware-package/`：由内置生成源确定性展开的首套小学数学业务内容包；22个模型节点均有输入、Prompt、输出、投影和生成模板。
 - `fixtures/golden-projects/`：不包含原教材和媒体文件的脱敏黄金项目；固定可复现实例、上下文隔离、跨成果质量不变量和分支可消费的精确规划输出。
+- `fixtures/contract-freeze/`：同一Project双课时的exact教案与IntroSelection交接样本，用于证明PPT/视频输入隔离并阻止跨课时串线。
 - `generated/`：由当前OpenAPI确定性生成的bundle和TypeScript类型，不是第二份手工合同。
 - `typescript/client.ts`：基于生成paths和openapi-fetch的共享客户端工厂。
 
@@ -58,6 +62,8 @@
 14. 项目来源只能写回创作包固定项目与槽位；独立来源写回项目必须显式提交目标、重新鉴权并保存授权快照。
 15. 旧`manual/assisted/automatic`和旧创作端点必须通过显式兼容与弃用周期迁移；已发布策略快照不改写，客户端未迁移完成前不得删除旧值或静默改变含义。
 16. 新客户端通过`AutomationPolicyMode`、`source_kind`和四个独立创作动作接入；旧`AutomationMode`及候选直接写回入口只用于兼容，并在OpenAPI中标记`deprecated`。
+17. 并行开发必须消费`full-chain-freeze.json`、`page-api-fact-matrix.json`和`development-leases.json`；任何轨道需要改变共享合同，必须先提交Contract Change并等待共享合同合并后再rebase。
+18. `provider_succeeded`、Artifact提交、质量通过、Approval、Adoption和项目写回是不同事实；前端和下游节点不得合并这些状态。
 
 ## 本地命令
 
@@ -65,6 +71,8 @@
 pnpm install --frozen-lockfile
 pnpm contracts:lint
 pnpm contracts:surface
+pnpm contracts:schema
+pnpm contracts:freeze
 pnpm contracts:generate
 pnpm contracts:typecheck
 pnpm contracts:test
@@ -117,4 +125,4 @@ uv run pytest tests\contract\test_golden_courseware_package.py
 
 `scripts/golden_courseware_branch_inputs.py` 将跨成果聚合数据确定性投影为教案、PPT和视频分支入口，以及16个符合各自 `ContentDefinition` 的规划型节点输出；`scripts/golden_courseware_stage_inputs.py` 继续连接不依赖真实媒体的内部阶段。其余7个节点依赖真实图片、视频、TTS文件或最终媒体质检，只保留合同和Provider门禁，不在黄金Fixture中伪造候选文件、SHA或质量报告。
 
-普通CI只运行脱敏Fixture和确定性构建，不要求教材原件或真实Provider。传入受控本地PDF的命令额外核验SHA-256、总页数和黄金页段；真实文本、图片和视频仍属于对应适配器任务与里程碑出口。TTS当前只保留计划数据，待音频Provider可用后独立验收。
+普通CI只运行脱敏Fixture和确定性构建，不要求教材原件或真实Provider。传入受控本地PDF的命令额外核验SHA-256、总页数和黄金页段；真实文本、图片和视频仍属于对应适配器任务与里程碑出口。TTS必须在完整视频里程碑使用真实音频Provider和文件探针独立验收，不得以计划数据或占位音频宣称完成。
