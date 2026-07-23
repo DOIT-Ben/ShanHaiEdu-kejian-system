@@ -1,7 +1,7 @@
 name: development-lease
 
 on:
-  pull_request:
+  pull_request_target:
     types:
       - opened
       - synchronize
@@ -21,17 +21,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Checkout full history
+      - name: Checkout trusted base
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch untrusted PR objects without checkout
+        run: >-
+          git fetch --no-tags origin
+          +refs/pull/${{ github.event.pull_request.number }}/head:refs/remotes/origin/pr-head
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Validate changed paths against declared track
+      - name: Validate changed paths with trusted checker
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: >-
