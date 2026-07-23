@@ -16,7 +16,7 @@
 - 正式发布的`shanhai.primary_math.courseware@1.0.0`继续固定原内容、v1工作流和既有项目绑定；不可变`1.1.0`、`1.2.0`保留既有合同，当前树新增`1.3.0`/v2前向候选，为PPT装配/导出发布确定性输出、linked-file质量源和workflow gate声明。显式PostgreSQL发布可原子成为后续新项目默认，但尚未宣称生产环境已执行该发布；旧Release和既有项目绑定不会被改写。“1～5的认识”黄金Fixture已用于PPT运行时合同、事务和失败路径测试，但不代表真实文本/图片Provider或最终视觉生产完成。
 - 已审核的Markdown TemplateDraft可以通过显式CompilationProfile确定性编译为同一套结构化内容包合同；该能力不替代内容发布服务或模型节点执行运行时。
 - 当前可以通过自动化测试和API/CLI验证后端链路，但尚未完成浏览器到真实API的阶段1纵向演示，不得描述为阶段1产品完成。
-- 生产前端由[Issue #4](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)和唯一Draft [PR #111](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/111)承载，#179至#182正在同一分支收口。源码已经存在，但PR仍落后`main`且浏览器/治理门禁未通过；在其合并并由#11完成真实API联调前，不得把Mock闭环、交付ZIP或本地分支描述为生产前端完成。
+- 生产前端由[Issue #4](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)和唯一[PR #111](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/111)承载，#179至#182正在同一分支收口。当前Head的Frontend quality与browser检查已经通过，PR已退出Draft；仍需同步包含#118的最新`main`、收敛#201首条页面范围、通过最终Head门禁并合并。在其合并并由#11完成真实API联调前，不得把Mock闭环、交付ZIP或本地分支描述为生产前端完成。
 
 ## 已完成
 
@@ -58,21 +58,20 @@
 ## 当前工作
 
 - [Decision #199](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/199)：当前唯一产品优先级是教师可见MVP纵向闭环；已合并可靠性能力继续复用，不再提前扩张与首条用户链无关的生产级合同和故障矩阵。
-- [Issue #4](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)与Draft [PR #111](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/111)：生产前端源码与#179至#182整改的唯一载体；下一步只解决最新`main`同步、现有浏览器/治理门禁和首条MVP链所需页面，不继续扩张无关页面。
+- [Issue #4](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)与[PR #111](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/111)：生产前端源码与#179至#182整改的唯一载体；Frontend quality与browser已通过，下一步只解决最新`main`同步、#201首条MVP链范围收敛、最终门禁与合并，不继续扩张无关页面。
 - [Decision #73](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/73)已经批准：PPT通常推荐10至20页，视频按故事和服务端价格事实推荐60至180秒，教师可以覆盖；TTS延后独立实施。
 - [Issue #48](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/48)：全流程生成节点与可配置模型I/O绑定的父任务当前为`status:in-progress`；黄金内容包`1.0.0`已正式发布，#89通用执行器已经合并。
 - [Issue #86](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/86)：已由PR #138合并关闭，统一ArtifactRelation类型、方向与stale影响语义。
 - [Issue #131](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/131)：已由PR #161完成ContentDefinition字段级编辑权限、不可变策略来源、可信生成首写和窄化服务端provision守卫。
 - [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)：PR #111合并后的首个联调任务；只完成教材与物理页码选择、真实`newapi/deepseek`、课时划分、十二部分教案、三类九套、编辑/局部重生成、批准/唯一选择和刷新恢复，不得由Mock替代。
-- [Issue #171](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/171)：保持为独立PPT轨道任务，不是首个教师页面的前置或完成门槛。
 
 ## 当前阻塞
 
 - 阶段1整体产品出口仍缺少生产前端的真实API联调；后端轨道通过不代表完整阶段1产品完成。
-- PR #111仍是唯一生产前端源码现场；在同步最新`main`、通过最终Head门禁并合并前，#11不能建立竞争`apps/web`分支。
+- PR #111仍是唯一生产前端源码现场；当前Frontend quality与browser已绿，但在同步最新`main`、收敛#201页面范围、通过最终Head门禁并合并前，#11不能建立竞争`apps/web`分支。
 - #48的机器合同和黄金数据已由#89接入通用执行器，#131字段级编辑权限、#133不可变质量报告、#134批准守卫、#125课时划分、#126教案运行时、#116 Intro合同、#127方案集运行时、#128不可变选择、#129 runtime API和#170 PPT确定性运行时已完成；不得把确定性Fake或可执行PPTX装配器冒充真实Provider与完整视觉出口。
 - ShanHaiEdu已经具备Provider中立媒体基础层和Attempt租约恢复，但真实图片/视频Adapter、供应商私有状态映射与受控真实冒烟仍未实现，不能把确定性Fake或恢复基座描述为真实媒体出口。
-- PPT真实文本/图片、10页黄金成片、PPTX实机打开、视频、TTS与实时价格计算均保持独立后续任务，不阻塞首个MVP。
+- #107、#108与#171已经正式暂停为`status:blocked`/`priority:p2`；PPT真实文本/图片、10页黄金成片、PPTX实机打开、视频、TTS与实时价格计算均保持独立后续任务，不阻塞或占用首个MVP资源。
 - #175、#176和#189不再是#170之后的自动下一任务；它们的最终声明、逐镜头血缘和90秒全节点验收延后到首个MVP纵向闭环之后重新评估和拆分。
 
 ## 下一个阶段出口
