@@ -66,11 +66,15 @@ jobs:
       - name: Format freeze Python diagnostic copy
         run: uv run ruff format scripts/check_contract_freeze.py tests/contract/test_contract_freeze.py
 
-      - name: Upload formatted freeze sources
+      - name: Capture Ruff formatting diff
+        run: git diff -- scripts/check_contract_freeze.py tests/contract/test_contract_freeze.py > contract-freeze-format.diff
+
+      - name: Upload formatted freeze diagnostics
         uses: actions/upload-artifact@v4
         with:
           name: contract-freeze-formatted-sources
           path: |
+            contract-freeze-format.diff
             scripts/check_contract_freeze.py
             tests/contract/test_contract_freeze.py
           if-no-files-found: error
