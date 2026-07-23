@@ -3,14 +3,14 @@
   "kind": "prompt_template",
   "metadata": {
     "key": "video.shots.generate.prompt",
-    "name": "逐镜头候选视频生成业务Prompt",
+    "name": "课堂导入短片候选生成业务Prompt",
     "domain": "primary_math",
     "locale": "zh-CN"
   },
   "spec": {
     "template_key": "video.shots.generate.prompt",
-    "title": "逐镜头候选视频生成业务Prompt",
-    "description": "按细分镜逐shot生成候选视频，候选通过校验、采用并保存后才形成正式clip。",
+    "title": "课堂导入短片候选生成业务Prompt",
+    "description": "从exact导入选择和教师明确选择的唯一关键帧生成一个6秒级候选短片，教师采用并保存后才写回项目。",
     "model_capability": "video.image_to_video.6s_30s",
     "input_definition_ref": {
       "item_key": "video.shots.generate.input",
@@ -24,33 +24,42 @@
       {
         "section_key": "role",
         "layer": "role",
-        "content": "你是服务端逐shot视频生成执行器。",
+        "content": "你是服务端课堂导入短片生成执行器。",
         "editable": false,
         "visible_to_teacher": true
       },
       {
         "section_key": "task",
         "layer": "task",
-        "content": "严格按一个已冻结shot合同生成指定数量候选，按image_index顺序传入shot_keyframe和continuity_reference，不改写故事、时长、动作或固定槽位。",
+        "content": "严格依据已冻结的导入方案和唯一关键帧生成一个6秒级课堂导入短片，不扩写成完整视频，不解释must_not_preteach内容。",
         "editable": true,
         "visible_to_teacher": true
       },
       {
         "section_key": "method",
         "layer": "method",
-        "content": "通过模型网关选择满足video.image_to_video.6s_30s能力的路由；只传节点允许的参考资产与业务提示词。记录候选键、实际时长、分辨率、帧率、媒体类型、SHA-256和质量标记。候选阶段不创建clip_id；只有校验通过、被采用并原子保存到shot槽位后才形成正式clip。",
+        "content": "通过模型网关选择满足video.image_to_video.6s_30s能力的路由；只传exact shot_keyframe、导入方案业务提示和发布内固定style.primary_math.paper_clay风格。候选数固定为1，候选阶段不自动采用；只有教师显式采用并原子保存到项目槽位后才成为正式课堂导入视频。",
         "editable": false,
         "visible_to_teacher": false
       },
       {
         "section_key": "quality_gate",
         "layer": "quality_gate",
-        "content": "输出可播放且时长匹配6至30秒shot合同；首尾状态、主体身份、资产、动作、光线和镜头连续；无文字字幕水印Logo和儿童安全问题；失败只影响当前shot；Provider私有参数和临时URL不进入业务产物。",
+        "content": "输出必须是可解码的MP4，实际时长为6秒级，MIME、非零size、SHA-256和ffprobe事实一致；画面服务creative_concept、hook、course_anchor和classroom_first_question，不越过handoff_moment，不出现字幕水印Logo或儿童安全问题；Provider私有参数和临时URL不进入业务产物。",
         "editable": false,
         "visible_to_teacher": false
       }
     ],
-    "context_bindings": [],
+    "context_bindings": [
+      {
+        "binding_key": "selected_intro",
+        "source": "intro_selection.snapshot",
+        "required": true,
+        "exposure": "full",
+        "max_items": 1,
+        "max_bytes": 100000
+      }
+    ],
     "user_edit_policy": {
       "mode": "replace_editable_layer",
       "max_chars": 35000
