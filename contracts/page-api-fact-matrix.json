@@ -158,7 +158,7 @@
           "action_key": "generate_and_adopt_ppt_images",
           "operation_ids": ["createCreationPackage", "createCreationBatch", "saveCreationPromptVersion", "generateCreationItem", "generateCreationBatch", "getGenerationJob", "streamGenerationJobEvents", "adoptGenerationResult", "saveAdoptionToProject", "listProjectAssetSlots"],
           "formal_facts": ["CreationPackage", "PromptVersion", "GenerationResult", "Adoption", "FileAssetVersion", "AssetBinding"],
-          "exact_references": ["creation_package_id", "creation_item_id", "prompt_version_id", "generation_result_id", "adoption_id", "target_slot", "file_asset_version_id"],
+          "exact_references": ["lesson_id", "creation_package_id", "creation_item_id", "prompt_version_id", "generation_result_id", "adoption_id", "target_slot", "file_asset_version_id"],
           "completion_rule": "Candidate generation, adoption and project save are separate; assembly reads only adopted assets saved to fixed lesson slots."
         }
       ],
@@ -180,7 +180,7 @@
           "action_key": "generate_and_adopt_video_assets_and_clips",
           "operation_ids": ["createCreationPackage", "createCreationBatch", "saveCreationPromptVersion", "generateCreationItem", "generateCreationBatch", "getGenerationJob", "streamGenerationJobEvents", "adoptGenerationResult", "saveAdoptionToProject", "listProjectAssetSlots"],
           "formal_facts": ["CreationPackage", "PromptVersion", "GenerationResult", "Adoption", "image FileAssetVersion", "video FileAssetVersion", "AssetBinding"],
-          "exact_references": ["creation_package_id", "prompt_version_id", "generation_result_id", "adoption_id", "shot_id", "target_slot", "file_asset_version_id"],
+          "exact_references": ["lesson_id", "creation_package_id", "prompt_version_id", "generation_result_id", "adoption_id", "shot_id", "target_slot", "file_asset_version_id"],
           "completion_rule": "A candidate becomes a formal clip only after adoption and atomic save to the exact shot slot; one final version has one current clip per shot."
         }
       ],
