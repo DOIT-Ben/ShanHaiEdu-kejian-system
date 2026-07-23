@@ -71,14 +71,8 @@ def test_status_declaration_requires_exactly_one_choice() -> None:
     ]
 
 
-
 def vertical_section(declarations: str, fields: str = "") -> str:
-    return (
-        "## 纵向切片交付\n\n"
-        f"{declarations}\n\n"
-        f"{fields}\n\n"
-        "## 子智能体审查"
-    )
+    return f"## 纵向切片交付\n\n{declarations}\n\n{fields}\n\n## 子智能体审查"
 
 
 def test_vertical_slice_declaration_is_required_for_current_prs() -> None:
@@ -88,15 +82,11 @@ def test_vertical_slice_declaration_is_required_for_current_prs() -> None:
 
 
 def test_vertical_slice_rejects_opt_out_for_production_boundary() -> None:
-    body = vertical_section(
-        f"{VERTICAL_REQUIRED_UNCHECKED}\n{VERTICAL_NOT_REQUIRED}"
-    )
+    body = vertical_section(f"{VERTICAL_REQUIRED_UNCHECKED}\n{VERTICAL_NOT_REQUIRED}")
 
     assert validate_vertical_slice_declaration(
         body, {"apps/web/src/pages/HomePage.tsx"}, required=True
-    ) == [
-        "PR changes a production delivery boundary but declares vertical-slice-not-required"
-    ]
+    ) == ["PR changes a production delivery boundary but declares vertical-slice-not-required"]
 
 
 def test_vertical_slice_requires_all_concrete_delivery_fields() -> None:
@@ -126,19 +116,23 @@ def test_vertical_slice_accepts_complete_delivery_matrix() -> None:
         "Real API Playwright: apps/web/e2e/r1-teacher-flow.spec.ts::creates_project\n",
     )
 
-    assert validate_vertical_slice_declaration(
-        body, {"contracts/openapi/active/openapi.yaml"}, required=True
-    ) == []
+    assert (
+        validate_vertical_slice_declaration(
+            body, {"contracts/openapi/active/openapi.yaml"}, required=True
+        )
+        == []
+    )
 
 
 def test_vertical_slice_opt_out_accepts_non_boundary_change() -> None:
-    body = vertical_section(
-        f"{VERTICAL_REQUIRED_UNCHECKED}\n{VERTICAL_NOT_REQUIRED}"
-    )
+    body = vertical_section(f"{VERTICAL_REQUIRED_UNCHECKED}\n{VERTICAL_NOT_REQUIRED}")
 
-    assert validate_vertical_slice_declaration(
-        body, {"docs/governance/DELIVERY_ROADMAP.md"}, required=True
-    ) == []
+    assert (
+        validate_vertical_slice_declaration(
+            body, {"docs/governance/DELIVERY_ROADMAP.md"}, required=True
+        )
+        == []
+    )
 
 
 def test_review_declaration_keeps_legacy_pr_body_compatible() -> None:
