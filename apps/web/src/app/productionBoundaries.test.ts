@@ -33,6 +33,19 @@ describe("production source boundaries", () => {
     expect(appSource).not.toContain("apiConfig.mode");
   });
 
+  it("生产路由保留独立可用的创作中心", () => {
+    const runtimeSource = readFileSync(resolve(sourceRoot, "app/RuntimeApp.tsx"), "utf8");
+
+    expect(runtimeSource).toContain('import("@/pages/creation/CreationHomePage")');
+    expect(runtimeSource).toContain('import("@/pages/creation/CreationStudioPage")');
+    expect(runtimeSource).toContain('path="creation"');
+    expect(runtimeSource).toContain('path="creation/:studioPath"');
+    expect(runtimeSource).not.toContain("creationAvailable={false}");
+    expect(runtimeSource).not.toMatch(
+      /<Route element={<RuntimeUnavailablePage \/>} path="creation\/\*" \/>/,
+    );
+  });
+
   it("生产源不静态导入开发 Mock 真源", () => {
     const violations = productionSources(sourceRoot).flatMap((path) => {
       const source = readFileSync(path, "utf8");

@@ -22,6 +22,9 @@ export type RuntimeApiState = {
   assetSlotReads: number;
   assetUnbinds: number;
   confirmRequests: number;
+  creationBatchRequests: number;
+  creationGenerateRequests: number;
+  creationPromptRequests: number;
   createProjectRequests: number;
   csrfHeaders: string[];
   idempotencyHeaders: string[];
@@ -235,6 +238,7 @@ async function json(route: Route, body: unknown, status = 200, headers?: Record<
 }
 
 export async function installRuntimeApi(page: Page, options: RuntimeApiOptions = {}) {
+  let creationJobStarted = false;
   let currentProject = {
     ...baseProject,
     execution_mode: baseProject.execution_mode as "guided" | "automatic",
@@ -253,6 +257,9 @@ export async function installRuntimeApi(page: Page, options: RuntimeApiOptions =
     assetSlotReads: 0,
     assetUnbinds: 0,
     confirmRequests: 0,
+    creationBatchRequests: 0,
+    creationGenerateRequests: 0,
+    creationPromptRequests: 0,
     createProjectRequests: 0,
     csrfHeaders: [],
     idempotencyHeaders: [],
@@ -334,6 +341,88 @@ export async function installRuntimeApi(page: Page, options: RuntimeApiOptions =
         title: body.title ?? baseProject.title,
       };
       await json(route, envelope(currentProject, "req_create_project"), 201);
+      return;
+    }
+
+    if (method === "POST" && path === "/api/v2/creation-batches") {
+      state.creationBatchRequests += 1;
+      const body = request.postDataJSON() as {
+        source_kind: "standalone";
+        studio_type: "image" | "presentation" | "video";
+        title: string;
+      };
+      await json(
+        route,
+        envelope(
+          {
+            id: "01960000-0000-7000-8000-000000000501",
+            items: [
+              {
+                id: "01960000-0000-7000-8000-000000000502",
+                item_key: "item-01",
+                status: "draft",
+                title: body.title,
+              },
+            ],
+            source_kind: body.source_kind,
+            status: "draft",
+            studio_type: body.studio_type,
+            title: body.title,
+          },
+          "req_creation_batch",
+        ),
+        201,
+      );
+      return;
+    }
+
+    if (
+      method === "POST" &&
+      path === "/api/v2/creation-items/01960000-0000-7000-8000-000000000502/prompt-versions"
+    ) {
+      state.creationPromptRequests += 1;
+      const body = request.postDataJSON() as {
+        business_prompt: string;
+        generation_profile: "balanced" | "quality" | "speed";
+        output_spec: Record<string, unknown>;
+        reference_asset_version_ids: string[];
+      };
+      await json(
+        route,
+        envelope(
+          {
+            ...body,
+            content_hash: "runtime-creation-prompt",
+            created_at: now,
+            creation_item_id: "01960000-0000-7000-8000-000000000502",
+            id: "01960000-0000-7000-8000-000000000503",
+            version_no: 1,
+          },
+          "req_creation_prompt",
+        ),
+        201,
+      );
+      return;
+    }
+
+    if (
+      method === "POST" &&
+      path === "/api/v2/creation-items/01960000-0000-7000-8000-000000000502/generate"
+    ) {
+      state.creationGenerateRequests += 1;
+      creationJobStarted = true;
+      await json(
+        route,
+        envelope(
+          {
+            events_url: `/api/v2/generation-jobs/${jobId}/events/stream`,
+            job_id: jobId,
+            status: "queued",
+          },
+          "req_creation_generate",
+        ),
+        202,
+      );
       return;
     }
 
@@ -642,13 +731,15 @@ export async function installRuntimeApi(page: Page, options: RuntimeApiOptions =
         envelope(
           {
             id: jobId,
-            project_id: projectId,
-            job_type: "parse_material",
+            project_id: creationJobStarted ? null : projectId,
+            job_type: creationJobStarted ? "creation" : "parse_material",
             status,
             progress_percent: status === "succeeded" ? 100 : 48,
             progress_message:
               status === "succeeded"
-                ? "教材已经整理完成"
+                ? creationJobStarted
+                  ? "作品生成任务已完成"
+                  : "教材已经整理完成"
                 : status === "failed"
                   ? "教材处理没有完成"
                   : "正在整理教材内容",
