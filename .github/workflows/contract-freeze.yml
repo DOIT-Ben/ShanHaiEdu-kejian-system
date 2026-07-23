@@ -1,0 +1,76 @@
+name: contract-freeze
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/contract-freeze.yml"
+      - "contracts/full-chain-freeze.json"
+      - "contracts/full-chain-freeze.schema.json"
+      - "contracts/page-api-fact-matrix.json"
+      - "contracts/page-api-fact-matrix.schema.json"
+      - "contracts/development-leases.json"
+      - "contracts/development-leases.schema.json"
+      - "contracts/fixtures/contract-freeze/**"
+      - "contracts/fixtures/parallel-inputs/**"
+      - "contracts/fixtures/workflow-node-generation-bindings/**"
+      - "contracts/fixtures/primary-math-courseware-package/**"
+      - "contracts/api-surface.openapi.yaml"
+      - "contracts/planned-api-surface.openapi.yaml"
+      - "scripts/check_contract_freeze.py"
+      - "tests/contract/test_contract_freeze.py"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/contract-freeze.yml"
+      - "contracts/full-chain-freeze.json"
+      - "contracts/full-chain-freeze.schema.json"
+      - "contracts/page-api-fact-matrix.json"
+      - "contracts/page-api-fact-matrix.schema.json"
+      - "contracts/development-leases.json"
+      - "contracts/development-leases.schema.json"
+      - "contracts/fixtures/contract-freeze/**"
+      - "contracts/fixtures/parallel-inputs/**"
+      - "contracts/fixtures/workflow-node-generation-bindings/**"
+      - "contracts/fixtures/primary-math-courseware-package/**"
+      - "contracts/api-surface.openapi.yaml"
+      - "contracts/planned-api-surface.openapi.yaml"
+      - "scripts/check_contract_freeze.py"
+      - "tests/contract/test_contract_freeze.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contract-freeze-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.10.6"
+          enable-cache: true
+          python-version: "3.12"
+
+      - name: Install locked dependencies
+        run: uv sync --frozen
+
+      - name: Check freeze Python formatting
+        run: uv run ruff format --check scripts/check_contract_freeze.py tests/contract/test_contract_freeze.py
+
+      - name: Lint freeze Python
+        run: uv run ruff check scripts/check_contract_freeze.py tests/contract/test_contract_freeze.py
+
+      - name: Validate full-chain freeze
+        run: uv run python scripts/check_contract_freeze.py
+
+      - name: Run freeze regression tests
+        run: uv run pytest tests/contract/test_contract_freeze.py
