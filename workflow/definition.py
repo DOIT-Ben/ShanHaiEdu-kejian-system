@@ -49,7 +49,7 @@ class WorkflowProducerRef:
 
 @dataclass(frozen=True, slots=True)
 class WorkflowOutputDefinitionBinding:
-    """The immutable reverse entry for one published model output definition."""
+    """The immutable reverse entry for one published Artifact definition."""
 
     content_definition_key: str
     generation_template_key: str | None

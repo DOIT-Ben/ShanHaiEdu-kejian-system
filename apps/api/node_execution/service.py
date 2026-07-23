@@ -36,9 +36,10 @@ class NodeExecutionService:
         node_run_id: UUID,
         *,
         request_id: str,
+        user_revision: str | None = None,
         cancellation: CancellationToken | None = None,
     ) -> CommittedNodeExecution:
-        prepared = self._prepare(node_run_id, request_id)
+        prepared = self._prepare(node_run_id, request_id, user_revision)
         if prepared.committed_result is not None:
             return prepared.committed_result
         if prepared.recovery_available:
@@ -66,8 +67,15 @@ class NodeExecutionService:
             raise NodeExecutionError(exc.code.value, "model invocation failed") from exc
         return self._validate_and_commit(prepared, pending)
 
-    def _prepare(self, node_run_id: UUID, request_id: str) -> PreparedNodeExecution:
+    def _prepare(
+        self,
+        node_run_id: UUID,
+        request_id: str,
+        user_revision: str | None,
+    ) -> PreparedNodeExecution:
         with self._transactions.begin() as transaction:
+            if user_revision is not None:
+                return transaction.prepare(node_run_id, request_id, user_revision)
             return transaction.prepare(node_run_id, request_id)
 
     def _validate_and_commit(

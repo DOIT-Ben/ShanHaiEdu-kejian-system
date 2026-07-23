@@ -257,10 +257,14 @@ def build_package(source_path: Path, output_root: Path, *, contracts_root: Path)
     source = _load_object(source_path)
     source_schema = _load_object(contracts_root / "builtin-generation-source.schema.json")
     Draft202012Validator.check_schema(source_schema)
-    Draft202012Validator(
-        source_schema,
-        format_checker=FormatChecker(),
-    ).validate(source)
+    source_validator = cast(
+        Any,
+        Draft202012Validator(
+            source_schema,
+            format_checker=FormatChecker(),
+        ),
+    )
+    source_validator.validate(source)
 
     if output_root.exists() and any(output_root.iterdir()):
         raise ValueError(f"output directory must be empty: {output_root}")
@@ -284,6 +288,31 @@ def build_package(source_path: Path, output_root: Path, *, contracts_root: Path)
             manifest_items=manifest_items,
             item=item,
             filename=_safe_filename(key, "style"),
+            contracts_root=contracts_root,
+        )
+
+    for artifact in cast(list[dict[str, Any]], source.get("artifacts", [])):
+        key = cast(str, artifact["definition_key"])
+        if key in node_keys:
+            raise ValueError(f"duplicate content item: {key}")
+        node_keys.add(key)
+        item = _item(
+            "content_definition",
+            key,
+            cast(str, artifact["title"]),
+            {
+                "definition_key": key,
+                "title": artifact["title"],
+                "description": artifact["description"],
+                "definition_role": "artifact",
+                "fields": artifact["fields"],
+            },
+        )
+        _append_item(
+            items=files,
+            manifest_items=manifest_items,
+            item=item,
+            filename=_safe_filename(key, "output"),
             contracts_root=contracts_root,
         )
 

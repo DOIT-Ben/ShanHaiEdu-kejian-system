@@ -95,7 +95,6 @@ def validate_execution_kind_declaration(node: dict[str, Any]) -> None:
                 "model_capability",
                 "generation_template_ref",
                 "executor_ref",
-                "output_persistence",
                 "quality_report_persistence",
             },
         ),

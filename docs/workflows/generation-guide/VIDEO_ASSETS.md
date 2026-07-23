@@ -4,7 +4,7 @@
 
 本页用于产品负责人、内容管理员和开发者审查后台生成合同，不是教师端界面文案。
 
-内容包：`shanhai.primary_math.courseware@1.3.0`。
+内容包：`shanhai.primary_math.courseware@1.4.0`。
 
 说明：Task 是教师在创作台可修改的业务指令；Role、Method 和 Quality Gate 由平台固定，防止结构和教学边界被改坏。
 

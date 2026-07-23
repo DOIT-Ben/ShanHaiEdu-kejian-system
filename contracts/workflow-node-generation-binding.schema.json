@@ -823,7 +823,6 @@
                 {"required": ["model_capability"]},
                 {"required": ["generation_template_ref"]},
                 {"required": ["executor_ref"]},
-                {"required": ["output_persistence"]},
                 {"required": ["quality_report_persistence"]}
               ]
             },

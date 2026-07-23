@@ -8,6 +8,7 @@ from pydantic import SecretStr
 from sqlalchemy.orm import Session
 
 from apps.api.assets.provider_media import SqlAlchemyProviderMediaAssetReader
+from apps.api.model_gateway.audit_contracts import AttemptAuditSink
 from apps.api.model_gateway.contracts import (
     GatewayErrorCode,
     ModelCapability,
@@ -33,6 +34,8 @@ from apps.api.uploads.storage import ObjectStorage
 
 def build_real_text_gateway(
     settings: Settings,
+    *,
+    audit_sink: AttemptAuditSink | None = None,
 ) -> tuple[ModelGateway, OpenAICompatibleTextProvider]:
     if not (
         settings.text_provider_name
@@ -52,7 +55,17 @@ def build_real_text_gateway(
             timeout_seconds=settings.text_provider_timeout_seconds,
         )
     )
-    return ModelGateway({ModelCapability.TEXT_SMOKE: provider}), provider
+    return (
+        ModelGateway(
+            {
+                ModelCapability.TEXT_SMOKE: provider,
+                ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: provider,
+                ModelCapability.TEXT_STRUCTURED_CREATIVE_EDUCATION: provider,
+            },
+            audit_sink=audit_sink,
+        ),
+        provider,
+    )
 
 
 def build_real_video_gateway(

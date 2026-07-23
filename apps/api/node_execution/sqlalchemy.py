@@ -91,16 +91,12 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
     ) -> None:
         self._session = session
         self._actor = actor
-        self._workflow: SqlAlchemyWorkflowExecutionPort = SqlAlchemyWorkflowExecutionPort(
-            session, actor
-        )
+        self._workflow = SqlAlchemyWorkflowExecutionPort(session, actor)
         self._definitions = SqlAlchemyRuntimeDefinitionReader(session, actor, self._workflow)
         self._artifacts: SqlAlchemyArtifactPort = SqlAlchemyArtifactPort(session, actor)
         self._assets: SqlAlchemyAssetPort = SqlAlchemyAssetPort(session, actor)
         self._snapshots: PromptSnapshotPort = SqlAlchemyPromptSnapshotPort(session, actor)
-        self._packages: SqlAlchemyCreationPackagePort = SqlAlchemyCreationPackagePort(
-            session, actor
-        )
+        self._packages = SqlAlchemyCreationPackagePort(session, actor)
         self._attempts = SqlAlchemyAttemptExecutionPort(session, actor)
         self._fault_injector = fault_injector
         self._recovery = SqlAlchemyRecoveryFactStore(
@@ -110,7 +106,9 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
             fault_injector,
         )
 
-    def prepare(self, node_run_id: UUID, request_id: str) -> PreparedNodeExecution:
+    def prepare(
+        self, node_run_id: UUID, request_id: str, user_revision: str | None = None
+    ) -> PreparedNodeExecution:
         execution = self._workflow.require_context(node_run_id, for_update=True)
         if execution.status == NodeStatus.CANCEL_REQUESTED.value:
             return prepare_cancel_requested_execution(execution, request_id, self._actor.user_id)
@@ -126,13 +124,14 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
                 attempts=self._attempts,
                 packages=self._packages,
             )
-        return self._prepare_new(execution, node_run_id, request_id)
+        return self._prepare_new(execution, node_run_id, request_id, user_revision)
 
     def _prepare_new(
         self,
         execution: WorkflowExecutionContext,
         node_run_id: UUID,
         request_id: str,
+        user_revision: str | None,
     ) -> PreparedNodeExecution:
         succeeded = self._attempts.succeeded_attempt(
             node_run_id=node_run_id,
@@ -143,13 +142,14 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
             if succeeded is not None:
                 return self._prepare_recovery(execution, node_run_id, frozen, succeeded)
             return self._prepare_frozen_invocation(execution, node_run_id, frozen)
-        return self._prepare_fresh(execution, node_run_id, request_id)
+        return self._prepare_fresh(execution, node_run_id, request_id, user_revision)
 
     def _prepare_fresh(
         self,
         execution: WorkflowExecutionContext,
         node_run_id: UUID,
         request_id: str,
+        user_revision: str | None,
     ) -> PreparedNodeExecution:
         inputs = compile_fresh_inputs(
             definitions=self._definitions,
@@ -160,6 +160,7 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
             node_run_id=node_run_id,
             model_request_id=self._attempts.next_model_request_id(node_run_id),
             user_id=self._actor.user_id,
+            user_revision=user_revision,
             artifact_selection=ArtifactInputSelectionReader(
                 self._session,
                 self._actor,

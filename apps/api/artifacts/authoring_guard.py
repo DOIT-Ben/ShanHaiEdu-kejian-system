@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Mapping
+from copy import deepcopy
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -17,6 +19,8 @@ from apps.api.content_runtime.authoring_policy import (
 from apps.api.content_runtime.authoring_policy_loader import AuthoringPolicyLoader
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext
+
+INITIAL_LOCKED_FIELDS_REPORT_KEY = "initial_locked_fields"
 
 
 class ArtifactAuthoringGuard:
@@ -38,6 +42,39 @@ class ArtifactAuthoringGuard:
         if version.content_hash != canonical_content_hash(version.content_json):
             raise self._baseline_error()
         return version.content_json
+
+    @staticmethod
+    def record_initial_locked_fields(
+        report: dict[str, Any],
+        fields: Mapping[str, Any],
+    ) -> None:
+        report[INITIAL_LOCKED_FIELDS_REPORT_KEY] = deepcopy(dict(fields))
+
+    @staticmethod
+    def initial_locked_fields(draft: ArtifactDraft) -> dict[str, Any] | None:
+        fields = draft.validation_report_json.get(INITIAL_LOCKED_FIELDS_REPORT_KEY)
+        if fields is None:
+            return None
+        if not isinstance(fields, dict):
+            raise ArtifactAuthoringGuard._baseline_error()
+        raw_fields = cast(dict[object, object], fields)
+        baseline: dict[str, Any] = {}
+        for key, value in raw_fields.items():
+            if not isinstance(key, str):
+                raise ArtifactAuthoringGuard._baseline_error()
+            baseline[key] = deepcopy(value)
+        if not baseline:
+            raise ArtifactAuthoringGuard._baseline_error()
+        return baseline
+
+    @staticmethod
+    def preserve_initial_locked_fields(
+        previous_report: dict[str, Any],
+        report: dict[str, Any],
+    ) -> None:
+        fields = previous_report.get(INITIAL_LOCKED_FIELDS_REPORT_KEY)
+        if fields is not None:
+            report[INITIAL_LOCKED_FIELDS_REPORT_KEY] = deepcopy(fields)
 
     def validate(
         self,

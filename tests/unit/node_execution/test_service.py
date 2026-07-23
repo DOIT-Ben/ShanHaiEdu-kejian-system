@@ -89,11 +89,18 @@ def gateway_result(text: str = '{"title":"Lesson 1"}') -> TextGatewayResult:
 class FakeTransaction:
     events: list[str]
     commit_error: Exception | None = None
+    expected_user_revision: str | None = None
 
-    def prepare(self, node_run_id: UUID, request_id: str) -> PreparedNodeExecution:
+    def prepare(
+        self,
+        node_run_id: UUID,
+        request_id: str,
+        user_revision: str | None = None,
+    ) -> PreparedNodeExecution:
         self.events.append("prepare")
         assert node_run_id == NODE_RUN_ID
         assert request_id == "request-89"
+        assert user_revision == self.expected_user_revision
         return prepared()
 
     def checkpoint(
@@ -127,9 +134,16 @@ class FakeTransaction:
 
 
 class FakeTransactionFactory:
-    def __init__(self, events: list[str], *, commit_error: Exception | None = None) -> None:
+    def __init__(
+        self,
+        events: list[str],
+        *,
+        commit_error: Exception | None = None,
+        expected_user_revision: str | None = None,
+    ) -> None:
         self.events = events
         self.commit_error = commit_error
+        self.expected_user_revision = expected_user_revision
         self.transactions = 0
 
     @contextmanager
@@ -137,7 +151,11 @@ class FakeTransactionFactory:
         self.transactions += 1
         self.events.append(f"tx{self.transactions}:open")
         try:
-            yield FakeTransaction(self.events, commit_error=self.commit_error)
+            yield FakeTransaction(
+                self.events,
+                commit_error=self.commit_error,
+                expected_user_revision=self.expected_user_revision,
+            )
         except Exception:
             self.events.append(f"tx{self.transactions}:rollback")
             raise
@@ -235,6 +253,23 @@ async def test_runs_model_only_between_t1_and_t2() -> None:
         "commit",
         "tx3:commit",
     ]
+
+
+async def test_passes_teacher_revision_only_into_transactional_preparation() -> None:
+    events: list[str] = []
+    revision = "Use one classroom-ready counting activity."
+    service = NodeExecutionService(
+        FakeTransactionFactory(events, expected_user_revision=revision),
+        FakeModel(events),
+    )
+
+    result = await service.execute(
+        NODE_RUN_ID,
+        request_id="request-89",
+        user_revision=revision,
+    )
+
+    assert result.artifact_version_id == ARTIFACT_VERSION_ID
 
 
 async def test_model_failure_uses_a_separate_short_terminal_transaction() -> None:
