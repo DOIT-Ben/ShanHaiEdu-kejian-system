@@ -24,8 +24,7 @@ def validate_trusted_contract_workflows(root: Path = ROOT) -> list[str]:
         "trusted base checkout": "ref: ${{ github.event.pull_request.base.sha }}",
         "credentials disabled": "persist-credentials: false",
         "PR objects fetched without checkout": (
-            "+refs/pull/${{ github.event.pull_request.number }}/head:"
-            "refs/remotes/origin/pr-head"
+            "+refs/pull/${{ github.event.pull_request.number }}/head:refs/remotes/origin/pr-head"
         ),
         "trusted checker invocation": "python scripts/check_development_lease.py",
         "exact base argument": "--base ${{ github.event.pull_request.base.sha }}",
@@ -36,7 +35,9 @@ def validate_trusted_contract_workflows(root: Path = ROOT) -> list[str]:
             errors.append(f"development lease workflow lacks {label}")
 
     if re.search(r"(?m)^\s{2}pull_request:\s*$", text):
-        errors.append("development lease workflow must not run from the untrusted pull_request context")
+        errors.append(
+            "development lease workflow must not run from the untrusted pull_request context"
+        )
     if text.count("uses: actions/checkout@") != 1:
         errors.append("development lease workflow must perform exactly one trusted checkout")
     forbidden_checkout_refs = (
