@@ -50,11 +50,7 @@ def validate_changed_paths(
     forbidden = track.get("forbidden", [])
     errors: list[str] = []
     for path in sorted(set(changed_paths)):
-        blocked_by = [
-            pattern
-            for pattern in [*readonly, *forbidden]
-            if _matches(path, pattern)
-        ]
+        blocked_by = [pattern for pattern in [*readonly, *forbidden] if _matches(path, pattern)]
         if blocked_by:
             errors.append(f"{track_key} track cannot modify {path}; protected by {blocked_by}")
             continue
