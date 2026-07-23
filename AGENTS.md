@@ -80,6 +80,7 @@ Mandatory integration rules:
 - Shared contracts, generated clients, authentication bootstrap, artifact approval and published content releases have a single active writer.
 - A product slice cannot close while any required consumer is a placeholder, read-only shell, known-ID deep link or production-disabled action.
 - New media or downstream slices cannot bypass an unfinished upstream release gate merely because fixtures or golden handbooks exist.
+- Every current Pull Request must select exactly one `vertical-slice-required` or `vertical-slice-not-required` declaration. A Pull Request that changes production pages, API routers or active OpenAPI cannot opt out. A required slice must name concrete page routes, active operationIds, formal facts, backend tests and real-API Playwright in its Pull Request body; `pending` and `N/A` fail the governance check.
 
 
 ## 4. Branch and commit rules
