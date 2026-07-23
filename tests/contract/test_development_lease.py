@@ -25,10 +25,7 @@ def test_parse_development_track_from_pr_body() -> None:
 
 
 def test_duplicate_development_track_declarations_are_rejected() -> None:
-    body = (
-        "development-track: `frontend`\n"
-        "development-track: `shared_contract`\n"
-    )
+    body = "development-track: `frontend`\ndevelopment-track: `shared_contract`\n"
 
     assert parse_development_track(body) is None
 
