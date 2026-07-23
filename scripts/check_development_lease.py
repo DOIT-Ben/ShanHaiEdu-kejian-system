@@ -56,14 +56,10 @@ def validate_changed_paths(
             if _matches(path, pattern)
         ]
         if blocked_by:
-            errors.append(
-                f"{track_key} track cannot modify {path}; protected by {blocked_by}"
-            )
+            errors.append(f"{track_key} track cannot modify {path}; protected by {blocked_by}")
             continue
         if not any(_matches(path, pattern) for pattern in writable):
-            errors.append(
-                f"{track_key} track has no writable lease for changed path: {path}"
-            )
+            errors.append(f"{track_key} track has no writable lease for changed path: {path}")
     return errors
 
 
@@ -102,10 +98,7 @@ def main() -> int:
     body = os.environ.get(args.body_env, "")
     track_key = parse_development_track(body)
     if track_key is None:
-        print(
-            "error: pull request body must contain `development-track: <track>`",
-            file=sys.stderr,
-        )
+        print("error: pull request body must contain `development-track: <track>`", file=sys.stderr)
         return 1
 
     try:
@@ -120,10 +113,7 @@ def main() -> int:
             print(f"error: {error}", file=sys.stderr)
         return 1
 
-    print(
-        f"development lease checks passed for {track_key}: "
-        f"{len(changed_paths)} changed paths"
-    )
+    print(f"development lease checks passed for {track_key}: {len(changed_paths)} changed paths")
     return 0
 
 
