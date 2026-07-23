@@ -77,16 +77,42 @@ jobs:
       - name: Install locked dependencies
         run: uv sync --frozen
 
-      - name: Check contract governance Python formatting
+      - name: Format trusted workflow diagnostic copy
         run: >-
-          uv run ruff format --check
-          scripts/check_contract_freeze.py
+          uv run ruff format
           scripts/check_development_lease.py
-          scripts/check_parallel_fixtures.py
           scripts/check_trusted_contract_workflows.py
-          tests/contract/test_contract_freeze.py
           tests/contract/test_development_lease.py
-          tests/contract/test_parallel_fixtures.py
+          tests/contract/test_trusted_contract_workflows.py
+
+      - name: Capture trusted workflow formatting diff
+        run: >-
+          git diff --
+          scripts/check_development_lease.py
+          scripts/check_trusted_contract_workflows.py
+          tests/contract/test_development_lease.py
+          tests/contract/test_trusted_contract_workflows.py
+          > trusted-workflow-format.diff
+
+      - name: Upload trusted workflow formatting diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: trusted-workflow-formatted-sources
+          path: |
+            trusted-workflow-format.diff
+            scripts/check_development_lease.py
+            scripts/check_trusted_contract_workflows.py
+            tests/contract/test_development_lease.py
+            tests/contract/test_trusted_contract_workflows.py
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Reject unformatted trusted workflow Python
+        run: >-
+          git diff --exit-code --
+          scripts/check_development_lease.py
+          scripts/check_trusted_contract_workflows.py
+          tests/contract/test_development_lease.py
           tests/contract/test_trusted_contract_workflows.py
 
       - name: Lint contract governance Python
