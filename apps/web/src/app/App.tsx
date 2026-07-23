@@ -1,12 +1,8 @@
 import { lazy, Suspense } from "react";
-import { apiConfig } from "@/shared/api/config";
 
 const RuntimeApp = lazy(() =>
   import("@/app/RuntimeApp").then((module) => ({ default: module.RuntimeApp })),
 );
-const MockApp = import.meta.env.DEV
-  ? lazy(() => import("@/app/MockApp").then((module) => ({ default: module.MockApp })))
-  : null;
 
 function AppLoading() {
   return (
@@ -20,6 +16,9 @@ function AppLoading() {
 }
 
 export function App() {
-  const useMockApp = import.meta.env.DEV && apiConfig.mode === "mock" && MockApp !== null;
-  return <Suspense fallback={<AppLoading />}>{useMockApp ? <MockApp /> : <RuntimeApp />}</Suspense>;
+  return (
+    <Suspense fallback={<AppLoading />}>
+      <RuntimeApp />
+    </Suspense>
+  );
 }

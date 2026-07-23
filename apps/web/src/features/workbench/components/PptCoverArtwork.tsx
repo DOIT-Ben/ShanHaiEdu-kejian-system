@@ -64,7 +64,7 @@ export function PptCoverArtwork({
           <span className="absolute bottom-[8%] right-[9%] h-1.5 w-[22%] rounded-full bg-[var(--sh-art-gold)]/75" />
         </>
       )}
-      <div className="relative flex size-full max-w-[58%] flex-col justify-center px-[8%]">
+      <div className="relative flex size-full max-w-[58%] flex-col justify-center px-[8%] [&_h1]:text-inherit [&_h2]:text-inherit [&_h3]:text-inherit [&_h4]:text-inherit">
         {children}
       </div>
     </div>

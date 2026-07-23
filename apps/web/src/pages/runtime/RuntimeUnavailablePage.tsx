@@ -4,7 +4,7 @@ import { buttonVariants } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 
 export function RuntimeUnavailablePage({
-  description = "这项能力正在接入你的课堂数据，现阶段不会用演示内容代替真实结果。",
+  description = "这项功能暂未开放，请返回当前项目继续已支持的操作。",
   title = "这里还没有可用内容",
 }: {
   description?: string;

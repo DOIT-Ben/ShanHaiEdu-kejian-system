@@ -4,9 +4,11 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import * as jobsApi from "@/features/jobs/api/jobsApi";
+import * as lessonsApi from "@/features/lessons/api/lessonsApi";
 import * as projectsApi from "@/features/projects/api/projectsApi";
 import { RuntimeProjectSetupPage } from "@/pages/projects/RuntimeProjectSetupPage";
 import { configureCsrfTokenProvider } from "@/shared/api/client";
+import { useJobEvents } from "@/shared/api/useJobEvents";
 import type { GenerationJobDto } from "@/features/jobs/api/jobsApi";
 
 vi.mock("@/shared/api/useJobEvents", () => ({ useJobEvents: vi.fn() }));
@@ -46,6 +48,11 @@ describe("RuntimeProjectSetupPage", () => {
       title: "认识百分数",
     } as Awaited<ReturnType<typeof projectsApi.getProject>>);
     vi.spyOn(jobsApi, "getGenerationJob").mockResolvedValue(runningJob);
+    vi.spyOn(lessonsApi, "listProjectLessons").mockResolvedValue({
+      etag: '"lessons-v0"',
+      lessons: [],
+      lockVersion: 0,
+    });
   });
 
   afterEach(() => {
@@ -70,6 +77,9 @@ describe("RuntimeProjectSetupPage", () => {
 
     await user.click(retryButton);
     await waitFor(() => expect(cancelJob).toHaveBeenCalledTimes(2));
+    expect(cancelJob.mock.calls[0]?.[0].idempotencyKey).toBe(
+      cancelJob.mock.calls[1]?.[0].idempotencyKey,
+    );
   });
 
   it("向辅助技术公开教材处理进度", async () => {
@@ -80,4 +90,85 @@ describe("RuntimeProjectSetupPage", () => {
     expect(progress).toHaveAttribute("aria-valuemax", "100");
     expect(progress).toHaveAttribute("aria-valuenow", "42");
   });
+
+  it("教材任务进入终态后停止事件流", async () => {
+    vi.mocked(jobsApi.getGenerationJob).mockResolvedValueOnce({
+      ...runningJob,
+      progress_message: "教材整理完成",
+      progress_percent: 100,
+      status: "succeeded",
+    });
+
+    renderPage();
+
+    expect(await screen.findByRole("heading", { name: "教材已经准备好" })).toBeVisible();
+    expect(vi.mocked(useJobEvents)).not.toHaveBeenCalledWith(jobId, projectId);
+  });
+
+  it("教材解析成功但服务端没有课时时明确阻断后续生成", async () => {
+    vi.mocked(jobsApi.getGenerationJob).mockResolvedValueOnce({
+      ...runningJob,
+      progress_message: "教材整理完成",
+      progress_percent: 100,
+      status: "succeeded",
+    });
+    vi.mocked(lessonsApi.listProjectLessons).mockResolvedValueOnce({
+      etag: '"lessons-v0"',
+      lessons: [],
+      lockVersion: 0,
+    });
+
+    renderPage();
+
+    expect(await screen.findByRole("heading", { name: "课时尚未建立" })).toBeVisible();
+    expect(screen.getByText(/课时创建和教案生成暂不可用/)).toBeVisible();
+    expect(screen.queryByText(/课时建议还在准备/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "返回项目" })).toHaveAttribute(
+      "href",
+      `/app/projects/${projectId}`,
+    );
+    expect(screen.queryByRole("link", { name: "查看课时" })).not.toBeInTheDocument();
+  });
+
+  it("教材解析成功且服务端已有课时时进入课时页面", async () => {
+    vi.mocked(jobsApi.getGenerationJob).mockResolvedValueOnce({
+      ...runningJob,
+      progress_message: "教材整理完成",
+      progress_percent: 100,
+      status: "succeeded",
+    });
+    vi.mocked(lessonsApi.listProjectLessons).mockResolvedValueOnce({
+      etag: '"lessons-v1"',
+      lessons: [{ id: "lesson-1" } as lessonsApi.LessonDto],
+      lockVersion: 1,
+    });
+
+    renderPage();
+
+    expect(await screen.findByRole("heading", { name: "课时已经可以核对" })).toBeVisible();
+    expect(screen.getByText("项目中已经保存 1 个课时，可以进入课时页核对和编辑。")).toBeVisible();
+    expect(screen.getByRole("link", { name: "查看课时" })).toHaveAttribute(
+      "href",
+      `/app/projects/${projectId}/lessons`,
+    );
+    expect(screen.queryByText(/课时创建和教案生成暂不可用/)).not.toBeInTheDocument();
+  });
+
+  it.each([null, "01960000-0000-7000-8000-000000000099"])(
+    "拒绝归属为 %s 的教材任务且不允许取消或启动事件流",
+    async (jobProjectId) => {
+      vi.mocked(jobsApi.getGenerationJob).mockResolvedValueOnce({
+        ...runningJob,
+        project_id: jobProjectId,
+      });
+      const cancelJob = vi.spyOn(jobsApi, "cancelGenerationJob");
+
+      renderPage();
+
+      expect(await screen.findByRole("heading", { name: "教材进度暂时无法打开" })).toBeVisible();
+      expect(screen.queryByRole("button", { name: "取消任务" })).not.toBeInTheDocument();
+      expect(cancelJob).not.toHaveBeenCalled();
+      expect(vi.mocked(useJobEvents)).not.toHaveBeenCalledWith(jobId, projectId);
+    },
+  );
 });

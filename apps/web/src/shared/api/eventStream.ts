@@ -163,6 +163,16 @@ function isAbort(reason: unknown, signal: AbortSignal) {
   return signal.aborted || (reason instanceof DOMException && reason.name === "AbortError");
 }
 
+function isPermanentClientError(reason: unknown) {
+  return (
+    reason instanceof SseStreamError &&
+    reason.status >= 400 &&
+    reason.status < 500 &&
+    reason.status !== 408 &&
+    reason.status !== 429
+  );
+}
+
 function waitForRetry(delayMs: number, signal: AbortSignal) {
   return new Promise<boolean>((resolve) => {
     if (signal.aborted) {
@@ -239,6 +249,7 @@ export async function runSseSubscription({
         failedAttempts = 0;
         continue;
       }
+      if (isPermanentClientError(reason)) throw reason;
       failedAttempts += 1;
     }
     if (!(await wait(retryDelay(failedAttempts), signal))) return;

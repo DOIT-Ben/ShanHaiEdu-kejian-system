@@ -20,15 +20,17 @@ import {
   type ProjectEntryField,
   type ProjectEntryValues,
 } from "@/features/projects/components/ProjectEntryForm";
-import { isCsrfTokenAvailable } from "@/shared/api/client";
+import { ApiError, isCsrfTokenAvailable } from "@/shared/api/client";
 import { Button } from "@/shared/ui/Button";
 import {
   clearRuntimeNewProjectRecovery,
+  canReplayRuntimeMaterialConfirmation,
   createRuntimeNewProjectRecovery,
   defaultRuntimeNewProjectForm,
   fileSnapshot,
   readRuntimeNewProjectRecovery,
   refreshExpiredRuntimeUploadSession,
+  restartRuntimeMaterialUpload,
   runtimeNewProjectFingerprint,
   sameFileSnapshot,
   withNewRuntimeNewProjectIntent,
@@ -43,7 +45,7 @@ const projectSchema = z.object({
   grade: z.string().min(1, "请选择年级"),
   knowledgePoint: z.string().min(2, "请输入本次要制作的知识点"),
   sourceMode: z.enum(["textbook", "anchor"]),
-  textbookEdition: z.string().min(1, "请选择教材版本"),
+  textbookEdition: z.string(),
   title: z.string().min(2, "请输入项目名称"),
 });
 
@@ -90,6 +92,12 @@ function stageDescription(stage: RuntimeNewProjectStage) {
     default:
       return "已记住这份教材和课程信息，刷新后可以继续。";
   }
+}
+
+function projectSetupPath(projectId: string, jobId: string, materialId?: string) {
+  const params = new URLSearchParams({ jobId });
+  if (materialId) params.set("materialId", materialId);
+  return `/app/projects/${projectId}/setup?${params.toString()}`;
 }
 
 export function RuntimeNewProjectPage() {
@@ -221,8 +229,8 @@ export function RuntimeNewProjectPage() {
             execution_mode: values.executionMode,
             grade: values.grade,
             knowledge_point: values.knowledgePoint,
-            textbook_edition: values.textbookEdition,
             title: values.title,
+            ...(values.textbookEdition ? { textbook_edition: values.textbookEdition } : {}),
           },
         });
         current = patchRecovery({ projectId: project.id });
@@ -261,7 +269,12 @@ export function RuntimeNewProjectPage() {
 
     setMessage("");
     try {
-      current = setSubmitStage("checking");
+      if (canReplayRuntimeMaterialConfirmation(current)) {
+        setStage("checking");
+        current = patchRecovery({ errorMessage: undefined });
+      } else {
+        current = setSubmitStage("checking");
+      }
       const sha256 = await sha256File(file);
       // Same metadata with different content is a different intent. Do not
       // attach a new digest to an old project or upload session.
@@ -286,8 +299,8 @@ export function RuntimeNewProjectPage() {
             execution_mode: values.executionMode,
             grade: values.grade,
             knowledge_point: values.knowledgePoint,
-            textbook_edition: values.textbookEdition,
             title: values.title,
+            ...(values.textbookEdition ? { textbook_edition: values.textbookEdition } : {}),
           },
         });
         projectId = project.id;
@@ -329,13 +342,20 @@ export function RuntimeNewProjectPage() {
       });
       current = patchRecovery({ jobId: job.job_id, stage: "confirming" });
       await queryClient.invalidateQueries({ queryKey: projectKeys.all });
-      void navigate(
-        "/app/projects/" + projectId + "/setup?jobId=" + encodeURIComponent(job.job_id),
-        { replace: true },
-      );
+      void navigate(projectSetupPath(projectId, job.job_id, session.material_id), {
+        replace: true,
+      });
     } catch (reason) {
-      const errorMessage =
-        reason instanceof Error ? reason.message : "项目没有创建完成，请稍后重试";
+      const uploadRejected =
+        current.stage === "confirming" &&
+        reason instanceof ApiError &&
+        reason.code === "UPLOAD_REJECTED";
+      if (uploadRejected) current = replaceRecovery(restartRuntimeMaterialUpload(current));
+      const errorMessage = uploadRejected
+        ? "教材上传状态已失效，请重新提交，系统会继续使用当前项目"
+        : reason instanceof Error
+          ? reason.message
+          : "项目没有创建完成，请稍后重试";
       setMessage(errorMessage);
       patchRecovery({ errorMessage });
       setStage("idle");
@@ -348,7 +368,7 @@ export function RuntimeNewProjectPage() {
   const submitting = stage !== "idle";
   const formValues = watch();
   const sourceMode = formValues.sourceMode;
-  const anchorSummary = `${formValues.grade} · ${formValues.textbookEdition} · ${formValues.knowledgePoint || "待填写知识点"}`;
+  const anchorSummary = `${formValues.grade} · ${formValues.textbookEdition || "未指定教材版本"} · ${formValues.knowledgePoint || "待填写知识点"}`;
   const setField = (field: ProjectEntryField, value: string) => {
     setValue(field, value, {
       shouldDirty: true,
@@ -366,9 +386,10 @@ export function RuntimeNewProjectPage() {
   return (
     <ProjectEntryFrame
       disabled={submitting}
-      onSourceModeChange={(mode) =>
-        setValue("sourceMode", mode, { shouldDirty: true, shouldValidate: true })
-      }
+      onSourceModeChange={(mode) => {
+        setValue("sourceMode", mode, { shouldDirty: true, shouldValidate: true });
+        if (mode === "anchor" && stage === "idle") setMessage("");
+      }}
       sourceMode={sourceMode}
     >
       {hasPendingProject ? (
@@ -389,7 +410,11 @@ export function RuntimeNewProjectPage() {
             {canContinueJob ? (
               <Button asChild className="min-h-9" size="sm" variant="secondary">
                 <Link
-                  to={`/app/projects/${recovery.projectId ?? ""}/setup?jobId=${encodeURIComponent(recovery.jobId ?? "")}`}
+                  to={projectSetupPath(
+                    recovery.projectId ?? "",
+                    recovery.jobId ?? "",
+                    recovery.uploadSession?.material_id,
+                  )}
                 >
                   继续查看进度
                 </Link>
@@ -408,6 +433,7 @@ export function RuntimeNewProjectPage() {
       ) : null}
 
       <ProjectEntryForm
+        allowUnspecifiedTextbookEdition
         anchorSummary={anchorSummary}
         busy={submitting}
         errors={{
@@ -415,7 +441,7 @@ export function RuntimeNewProjectPage() {
           title: errors.title?.message,
         }}
         file={file}
-        message={message || (!writeReady ? "暂时无法保存，请刷新页面后重试。" : "")}
+        message={message || (!writeReady ? "当前会话仅支持查看，无法创建项目。" : "")}
         modeOptions={modeOptions}
         onFieldChange={setField}
         onFileChange={selectFile}

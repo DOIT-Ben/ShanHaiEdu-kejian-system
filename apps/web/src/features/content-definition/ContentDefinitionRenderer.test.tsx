@@ -53,7 +53,8 @@ describe("ContentDefinitionRenderer", () => {
     expect(screen.getByRole("textbox", { name: "目标" })).toBeInTheDocument();
     fireEvent.change(screen.getByDisplayValue("理解百分数"), { target: { value: "解释百分数" } });
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ goal: "解释百分数" }));
-    expect(screen.getByText(/此内容类型需要升级后才能编辑/)).toBeInTheDocument();
+    expect(screen.getByText("此项内容暂不支持编辑，请等待系统升级。")).toBeInTheDocument();
+    expect(screen.queryByText("future_widget")).not.toBeInTheDocument();
   });
 
   it("允许动态列表增加项目", () => {

@@ -4,22 +4,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import * as lessonsApi from "@/features/lessons/api/lessonsApi";
 import * as projectsApi from "@/features/projects/api/projectsApi";
-import * as workflowApi from "@/features/workflow/api/workflowApi";
 import { RuntimeLessonWorkbenchPage } from "@/pages/projects/RuntimeLessonWorkbenchPage";
+import { useProjectEvents } from "@/shared/api/useProjectEvents";
 
 vi.mock("@/shared/api/useProjectEvents", () => ({ useProjectEvents: vi.fn() }));
 
 const projectId = "01960000-0000-7000-8000-000000000001";
 const lessonId = "01960000-0000-7000-8000-000000000002";
+const otherProjectId = "01960000-0000-7000-8000-000000000099";
 
-function renderPage() {
+function renderPage(stepKey = "lesson_plan") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter
-        initialEntries={[`/app/projects/${projectId}/lessons/${lessonId}/work/lesson_plan`]}
+        initialEntries={[`/app/projects/${projectId}/lessons/${lessonId}/work/${stepKey}`]}
       >
         <Routes>
           <Route
@@ -41,6 +42,7 @@ describe("RuntimeLessonWorkbenchPage", () => {
     vi.spyOn(lessonsApi, "getLesson").mockResolvedValue({
       lesson: {
         id: lessonId,
+        project_id: projectId,
         lesson_key: "lesson-1",
         title: "百分数的意义",
         objective_summary: "理解百分数表示一个数是另一个数的百分之几。",
@@ -62,28 +64,17 @@ describe("RuntimeLessonWorkbenchPage", () => {
         ],
       },
     } as Awaited<ReturnType<typeof lessonsApi.getLesson>>);
-    vi.spyOn(workflowApi, "getProjectWorkflow").mockResolvedValue({
-      project: { id: projectId },
-      lessons: [],
-      node_runs: [
-        {
-          id: "01960000-0000-7000-8000-000000000003",
-          node_key: "lesson_plan",
-          status: "running",
-          title: "生成教案",
-        },
-      ],
-    } as unknown as Awaited<ReturnType<typeof workflowApi.getProjectWorkflow>>);
   });
 
   afterEach(() => vi.restoreAllMocks());
 
-  it("从真实项目、课时和工作流数据渲染课时工作台", async () => {
+  it("只渲染可归属当前课时的事实，不从项目节点键推断进度", async () => {
     renderPage();
 
     expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("百分数的意义");
-    expect(screen.getByText("生成教案")).toBeVisible();
-    expect(screen.getByText("正在处理")).toBeVisible();
+    expect(screen.getByRole("alert", { name: "制作进度读取失败" })).toHaveTextContent(
+      "这一步暂时没有可显示的制作进度",
+    );
     expect(screen.getByRole("link", { name: /返回项目/ })).toHaveAttribute(
       "href",
       `/app/projects/${projectId}`,
@@ -92,5 +83,43 @@ describe("RuntimeLessonWorkbenchPage", () => {
       "href",
       `/app/projects/${projectId}/lessons/${lessonId}/work/ppt`,
     );
+  });
+
+  it("旧连字符路由与未知步骤都不会泄漏内部键", async () => {
+    const first = renderPage("lesson-plan");
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("教案");
+    expect(screen.queryByText(/lesson-plan/)).not.toBeInTheDocument();
+    first.unmount();
+
+    renderPage("future-node-v2");
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("当前步骤");
+    expect(screen.queryByText(/future-node-v2/)).not.toBeInTheDocument();
+  });
+
+  it("拒绝打开不属于路由项目的课时且不启动项目事件流", async () => {
+    vi.mocked(lessonsApi.getLesson).mockResolvedValueOnce({
+      lesson: {
+        branches: [],
+        created_at: "2030-01-01T00:00:00Z",
+        estimated_minutes: 40,
+        id: lessonId,
+        lesson_key: "lesson-1",
+        lock_version: 1,
+        objective_summary: "不应展示",
+        position: 1,
+        project_id: otherProjectId,
+        scope_summary: "不应展示",
+        source_division_version_id: "01960000-0000-7000-8000-000000000098",
+        status: "active",
+        title: "其他项目课时",
+        updated_at: "2030-01-01T00:00:01Z",
+      },
+    });
+
+    renderPage();
+
+    expect(await screen.findByRole("heading", { name: "暂时无法打开课时" })).toBeVisible();
+    expect(screen.queryByText("其他项目课时")).not.toBeInTheDocument();
+    expect(vi.mocked(useProjectEvents)).not.toHaveBeenCalledWith(projectId);
   });
 });

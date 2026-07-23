@@ -78,10 +78,7 @@ export function WorkbenchStatusBoard({
               </span>
             ) : null}
           </span>
-          <StatusBadge
-            label={labels[item.status] ?? item.status}
-            status={badgeStatus(item.status)}
-          />
+          <StatusBadge label={labels[item.status]} status={badgeStatus(item.status)} />
         </li>
       ))}
     </ul>

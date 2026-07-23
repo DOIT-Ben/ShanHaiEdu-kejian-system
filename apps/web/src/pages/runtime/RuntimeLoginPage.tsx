@@ -19,14 +19,14 @@ export function RuntimeLoginPage() {
             使用学校账户进入
           </h1>
           <p className="mt-3 text-sm leading-6 text-[var(--sh-ink-muted)]">
-            登录由学校统一管理。完成登录后，回到这里即可继续准备课程。
+            当前会话仅支持查看课堂工作区，创建、编辑和取消等操作暂不可用。
           </p>
           <Link className={`${buttonVariants()} mt-7 w-full`} to="/app/projects">
             返回课堂工作区
             <ArrowRight aria-hidden="true" />
           </Link>
           <p className="mt-4 text-center text-xs leading-5 text-[var(--sh-ink-faint)]">
-            如果你已经登录，请直接返回课堂工作区；若页面仍为空，请联系学校管理员。
+            已由学校建立有效会话的用户，可以返回课堂工作区继续查看。
           </p>
         </section>
       </main>

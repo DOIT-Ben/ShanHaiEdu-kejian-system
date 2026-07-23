@@ -73,7 +73,7 @@ export function useJobEvents(jobId: string | undefined, projectId?: string) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!jobId || apiConfig.mode !== "real") return;
+    if (!jobId) return;
     const abortController = new AbortController();
     const invalidate = async () => {
       const keys = jobEventQueryKeys(jobId, projectId);
@@ -99,6 +99,8 @@ export function useJobEvents(jobId: string | undefined, projectId?: string) {
       refreshSnapshot: () => invalidate(),
       signal: abortController.signal,
       writeCursor: (sequence) => saveJobLastSequence(jobId, sequence),
+    }).catch(() => {
+      if (!abortController.signal.aborted) void invalidate();
     });
     return () => abortController.abort();
   }, [jobId, projectId, queryClient]);

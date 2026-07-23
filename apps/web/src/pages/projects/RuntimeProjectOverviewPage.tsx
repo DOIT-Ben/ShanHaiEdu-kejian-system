@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, BookOpenCheck, FileText, Images } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import {
   getProjectAutomationPolicyVersioned,
@@ -11,7 +11,7 @@ import { ProjectLessonGrid } from "@/features/projects/components/ProjectOvervie
 import { listProjectLessons } from "@/features/lessons/api/lessonsApi";
 import { isCsrfTokenAvailable } from "@/shared/api/client";
 import { useProjectEvents } from "@/shared/api/useProjectEvents";
-import { buttonVariants } from "@/shared/ui/Button";
+import { Button, buttonVariants } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 import { Select } from "@/shared/ui/Select";
 
@@ -104,13 +104,46 @@ export function RuntimeProjectOverviewPage() {
         title={project.title}
       />
 
+      <nav aria-label="项目资料" className="mt-4 flex flex-wrap gap-2">
+        <Link
+          className={buttonVariants({ size: "sm", variant: "secondary" })}
+          to={`/app/projects/${projectId}/materials`}
+        >
+          <FileText aria-hidden="true" />
+          教材与解析
+        </Link>
+        <Link
+          className={buttonVariants({ size: "sm", variant: "secondary" })}
+          to={`/app/projects/${projectId}/lessons`}
+        >
+          <BookOpenCheck aria-hidden="true" />
+          编辑课时
+        </Link>
+        <Link
+          className={buttonVariants({ size: "sm", variant: "secondary" })}
+          to={`/app/projects/${projectId}/assets`}
+        >
+          <Images aria-hidden="true" />
+          项目素材
+        </Link>
+      </nav>
+
       <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <ProjectLessonGrid lessons={lessonSummaries} loading={lessonsQuery.isLoading} />
+        <ProjectLessonGrid
+          emptyMessage="当前项目还没有课时。课时创建和教案生成暂不可用。"
+          errorMessage={lessonsQuery.isError ? "课时暂时无法读取，请检查网络后重试。" : undefined}
+          lessons={lessonSummaries}
+          loading={lessonsQuery.isLoading}
+          onRetry={() => void lessonsQuery.refetch()}
+        />
 
         <aside className="h-fit rounded-[var(--sh-radius-lg)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-5 shadow-[var(--sh-shadow-card)]">
           <h2 className="font-semibold text-[var(--sh-ink-strong)]">制作方式</h2>
           <p className="mt-2 text-sm leading-6 text-[var(--sh-ink-muted)]">
             边看边确认适合逐步调整；自动完成会继续执行当前允许的步骤。
+          </p>
+          <p className="mt-3 rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-soft)] p-3 text-xs leading-5 text-[var(--sh-ink-muted)]">
+            课程范围已保存；教材使用情况暂时不会显示在这里。
           </p>
           <Select
             ariaLabel="选择制作方式"
@@ -131,13 +164,25 @@ export function RuntimeProjectOverviewPage() {
             ]}
             value={policyQuery.data?.policy.mode}
           />
-          {!writeReady ? (
+          {policyQuery.isError ? (
+            <div className="mt-3 text-xs leading-5 text-[var(--sh-danger)]" role="alert">
+              <p>制作方式暂时无法读取，请检查网络后重试。</p>
+              <Button
+                className="mt-3"
+                onClick={() => void policyQuery.refetch()}
+                size="sm"
+                variant="secondary"
+              >
+                重新读取制作方式
+              </Button>
+            </div>
+          ) : !writeReady ? (
             <p className="mt-3 text-xs leading-5 text-[var(--sh-warning)]" role="status">
               暂时不能修改制作方式，请刷新页面后重试。
             </p>
           ) : null}
           {policyMutation.isError ? (
-            <p className="mt-3 text-xs leading-5 text-[var(--sh-danger)]">
+            <p className="mt-3 text-xs leading-5 text-[var(--sh-danger)]" role="alert">
               制作方式没有保存，请刷新后再试。
             </p>
           ) : null}

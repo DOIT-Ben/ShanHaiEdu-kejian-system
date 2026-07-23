@@ -36,7 +36,7 @@ export function HomeBrandHero({
       <p className="mt-1 truncate text-sm text-[var(--sh-ink-muted)]">
         {hasProject
           ? (lessonTitle ?? "课时信息将在进入项目后显示")
-          : "上传教材后，先安排课时，再继续完成教案和课堂作品。"}
+          : "先确定课程范围，可按需添加教材，再继续安排课时和课堂内容。"}
       </p>
     </section>
   );

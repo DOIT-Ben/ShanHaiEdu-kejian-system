@@ -6,12 +6,12 @@ import { apiConfig } from "@/shared/api/config";
 import "@/shared/styles/index.css";
 
 async function enableMocking() {
-  if (apiConfig.mode !== "mock" || import.meta.env.PROD) {
+  if (!import.meta.env.DEV || apiConfig.mode !== "mock") {
     return;
   }
 
-  const { worker } = await import("@/shared/api/mocks/browser");
-  await worker.start({ onUnhandledRequest: "bypass" });
+  const { startContractMocking } = await import("@/shared/api/mocks/browser");
+  await startContractMocking();
 }
 
 async function enableRuntimeContractTest() {

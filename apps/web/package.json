@@ -13,6 +13,7 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc -b --pretty false",
     "generate:api": "corepack pnpm --dir ../.. contracts:generate && prettier --write src/generated/api-schema.ts",
+    "verify:api-generated": "corepack pnpm generate:api && node scripts/verify-generated-api.mjs",
     "test": "vitest run --maxWorkers=2",
     "test:watch": "vitest --maxWorkers=2",
     "storybook": "storybook dev -p 6006",
@@ -20,7 +21,7 @@
     "test:storybook:a11y": "node scripts/test-storybook-a11y.mjs",
     "test:e2e": "playwright test --workers=2",
     "test:e2e:runtime": "playwright test --config=playwright.runtime.config.ts",
-    "release:check": "corepack pnpm generate:api && corepack pnpm format && corepack pnpm lint && corepack pnpm typecheck && corepack pnpm test && corepack pnpm build:storybook && corepack pnpm test:storybook:a11y && corepack pnpm build && corepack pnpm test:e2e --project=chromium && corepack pnpm test:e2e:runtime --project=runtime-chromium"
+    "release:check": "corepack pnpm verify:api-generated && corepack pnpm format && corepack pnpm lint && corepack pnpm typecheck && corepack pnpm test && corepack pnpm build:storybook && corepack pnpm test:storybook:a11y && corepack pnpm build && corepack pnpm test:e2e --project=chromium && corepack pnpm test:e2e:runtime --project=runtime-chromium"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
@@ -51,7 +52,6 @@
     "@playwright/test": "^1.54.2",
     "@storybook/addon-a11y": "^9.1.1",
     "@storybook/addon-docs": "^9.1.1",
-    "@storybook/addon-viewport": "9.0.8",
     "@storybook/react-vite": "^9.1.1",
     "@tailwindcss/vite": "^4.1.12",
     "@testing-library/jest-dom": "^6.6.4",

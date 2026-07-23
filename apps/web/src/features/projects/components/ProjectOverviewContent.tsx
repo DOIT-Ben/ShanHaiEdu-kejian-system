@@ -1,6 +1,6 @@
 import { BookOpen, CheckCircle2, Clock3 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { buttonVariants } from "@/shared/ui/Button";
+import { Button, buttonVariants } from "@/shared/ui/Button";
 
 export type ProjectLessonSummary = {
   branches: ReadonlyArray<{ enabled: boolean; key: string; label: string; to: string }>;
@@ -12,14 +12,18 @@ export type ProjectLessonSummary = {
 
 type ProjectLessonGridProps = {
   emptyMessage?: string;
+  errorMessage?: string;
   lessons: readonly ProjectLessonSummary[];
   loading?: boolean;
+  onRetry?: () => void;
 };
 
 export function ProjectLessonGrid({
-  emptyMessage = "课时建议还没有准备好。",
+  emptyMessage = "当前项目还没有课时。",
+  errorMessage,
   lessons,
   loading = false,
+  onRetry,
 }: ProjectLessonGridProps) {
   return (
     <section aria-labelledby="lesson-list-title">
@@ -27,7 +31,9 @@ export function ProjectLessonGrid({
         <h2 className="text-lg font-semibold" id="lesson-list-title">
           课时安排
         </h2>
-        <span className="text-sm text-[var(--sh-ink-muted)]">{lessons.length} 个课时</span>
+        <span className="text-sm text-[var(--sh-ink-muted)]">
+          {loading ? "读取中" : errorMessage ? "暂不可用" : `${String(lessons.length)} 个课时`}
+        </span>
       </div>
       {loading ? (
         <div className="grid gap-3 sm:grid-cols-2" role="status">
@@ -38,6 +44,18 @@ export function ProjectLessonGrid({
             />
           ))}
           <span className="sr-only">正在读取课时</span>
+        </div>
+      ) : errorMessage ? (
+        <div
+          className="rounded-[var(--sh-radius-md)] border border-[var(--sh-danger)] bg-[var(--sh-danger-soft)] p-6 text-sm text-[var(--sh-danger)]"
+          role="alert"
+        >
+          <p>{errorMessage}</p>
+          {onRetry ? (
+            <Button className="mt-4" onClick={onRetry} size="sm" variant="secondary">
+              重新读取课时
+            </Button>
+          ) : null}
         </div>
       ) : lessons.length ? (
         <div className="grid gap-3 sm:grid-cols-2">

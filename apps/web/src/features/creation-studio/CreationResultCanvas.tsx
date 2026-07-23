@@ -7,14 +7,17 @@ import { presentationPreviewPages, type StudioType } from "@/features/creation-s
 function PresentationResult({ variation }: { variation: number }) {
   const [page, setPage] = useState(2);
   return (
-    <div className="flex flex-col gap-3">
-      <div className="mx-auto w-full max-w-[960px]">
+    <div className="flex min-w-0 flex-col gap-3">
+      <div className="mx-auto min-w-0 w-full max-w-[960px]">
         <CreativeResultVisual page={page} type="presentation" variant={variation} />
         <p className="mt-2 text-center text-xs text-[var(--sh-ink-muted)]">
           第 {page + 1} 页 · {presentationPreviewPages[page]}
         </p>
       </div>
-      <aside aria-label="PPT 页面" className="mx-auto flex max-w-full gap-2 overflow-x-auto pb-1">
+      <aside
+        aria-label="PPT 页面"
+        className="mx-auto flex w-full min-w-0 max-w-full gap-2 overflow-x-auto pb-1"
+      >
         {presentationPreviewPages.map((label, index) => (
           <button
             aria-pressed={page === index}
@@ -131,6 +134,7 @@ export function CreationResultCanvas({
       ) : (
         <motion.div
           animate={{ opacity: 1, scale: 1 }}
+          className="min-w-0"
           initial={{ opacity: 0, scale: reduceMotion ? 1 : 0.985 }}
           key={`candidate-${String(candidate)}`}
           transition={{ duration: reduceMotion ? 0 : 0.32, ease: [0.2, 0.8, 0.2, 1] }}

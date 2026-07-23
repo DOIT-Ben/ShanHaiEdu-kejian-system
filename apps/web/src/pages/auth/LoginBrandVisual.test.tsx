@@ -14,7 +14,7 @@ describe("LoginBrandVisual", () => {
   });
 
   it("登录页不再引用旧占位 SVG", () => {
-    const source = readFileSync(resolve(__dirname, "LoginPage.tsx"), "utf8");
+    const source = readFileSync(resolve(__dirname, "../runtime/RuntimeLoginPage.tsx"), "utf8");
 
     expect(source).not.toContain("slide-percent-cover.svg");
     expect(source).not.toContain("juice-observation.svg");

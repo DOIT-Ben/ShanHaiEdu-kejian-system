@@ -223,7 +223,7 @@ function FieldBlock({ field, onChange, value }: FieldProps) {
       ) : (
         <div className="mt-3 flex items-start gap-2 rounded-[var(--sh-radius-sm)] bg-[var(--sh-danger-soft)] p-3 text-sm text-[var(--sh-danger)]">
           <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-          此内容类型需要升级后才能编辑：{field.type}
+          此项内容暂不支持编辑，请等待系统升级。
         </div>
       )}
     </section>

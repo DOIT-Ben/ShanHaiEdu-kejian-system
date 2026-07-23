@@ -35,6 +35,7 @@ function ShellPreview() {
 const meta = {
   title: "全局布局/应用壳",
   component: AppShell,
+  tags: ["core-viewport"],
   parameters: { layout: "fullscreen" },
   render: () => <ShellPreview />,
 } satisfies Meta<typeof AppShell>;

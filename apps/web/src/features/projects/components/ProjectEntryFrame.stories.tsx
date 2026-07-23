@@ -27,7 +27,7 @@ function ProjectEntryPreview({
     executionMode: "guided",
     grade: "六年级",
     knowledgePoint: "百分数的意义",
-    textbookEdition: "人教版",
+    textbookEdition: initialMode === "anchor" ? "" : "人教版",
     title: "认识百分数",
   });
   const setField = (field: ProjectEntryField, value: string) =>
@@ -36,7 +36,8 @@ function ProjectEntryPreview({
   return (
     <ProjectEntryFrame onSourceModeChange={setSourceMode} sourceMode={sourceMode}>
       <ProjectEntryForm
-        anchorSummary={`${values.grade} · ${values.textbookEdition} · ${values.knowledgePoint}`}
+        allowUnspecifiedTextbookEdition
+        anchorSummary={`${values.grade} · ${values.textbookEdition || "未指定教材版本"} · ${values.knowledgePoint}`}
         busy={false}
         errors={showErrors ? { knowledgePoint: "请输入知识点", title: "请输入项目名称" } : {}}
         file={null}
@@ -55,6 +56,7 @@ function ProjectEntryPreview({
 const meta = {
   title: "项目/创建入口",
   component: ProjectEntryFrame,
+  tags: ["core-viewport"],
   args: {
     children: null,
     disabled: false,

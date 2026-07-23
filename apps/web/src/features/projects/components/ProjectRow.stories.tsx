@@ -16,6 +16,7 @@ const project = {
 const meta = {
   title: "项目/项目行",
   component: ProjectRow,
+  tags: ["core-viewport"],
   args: { project },
 } satisfies Meta<typeof ProjectRow>;
 

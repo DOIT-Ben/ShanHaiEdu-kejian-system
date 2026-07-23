@@ -4,6 +4,7 @@ import { WorkbenchStatusBoard } from "@/features/workbench/components/WorkbenchS
 const meta = {
   title: "工作台/制作进度板",
   component: WorkbenchStatusBoard,
+  tags: ["core-viewport"],
   args: {
     items: [
       { id: "plan", status: "succeeded", title: "教案" },

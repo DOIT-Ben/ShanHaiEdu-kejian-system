@@ -14,6 +14,8 @@ type LessonWorkbenchSummaryProps = {
   durationLabel?: string;
   lessonTitle: string;
   objective: string;
+  progressErrorMessage?: string;
+  progressState?: "error" | "loading" | "ready";
   statuses: readonly WorkbenchStatusItem[];
 };
 
@@ -23,6 +25,8 @@ export function LessonWorkbenchSummary({
   durationLabel,
   lessonTitle,
   objective,
+  progressErrorMessage,
+  progressState,
   statuses,
 }: LessonWorkbenchSummaryProps) {
   const currentBranch = branches.find((branch) => branch.key === currentBranchKey);
@@ -51,7 +55,11 @@ export function LessonWorkbenchSummary({
           </div>
           <div className="mt-6 border-t border-[var(--sh-line-subtle)] pt-5">
             <h3 className="text-sm font-semibold text-[var(--sh-ink-strong)]">制作进度</h3>
-            <WorkbenchStatusBoard items={statuses} />
+            <WorkbenchStatusBoard
+              errorMessage={progressErrorMessage}
+              items={statuses}
+              state={progressState}
+            />
           </div>
         </div>
       </section>

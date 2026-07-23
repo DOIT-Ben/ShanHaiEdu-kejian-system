@@ -24,6 +24,31 @@ const RuntimeProjectOverviewPage = lazy(() =>
     default: module.RuntimeProjectOverviewPage,
   })),
 );
+const RuntimeMaterialsPage = lazy(() =>
+  import("@/pages/projects/RuntimeMaterialsPage").then((module) => ({
+    default: module.RuntimeMaterialsPage,
+  })),
+);
+const RuntimeLessonsPage = lazy(() =>
+  import("@/pages/projects/RuntimeLessonsPage").then((module) => ({
+    default: module.RuntimeLessonsPage,
+  })),
+);
+const RuntimeJobPage = lazy(() =>
+  import("@/pages/projects/RuntimeJobPage").then((module) => ({
+    default: module.RuntimeJobPage,
+  })),
+);
+const RuntimeAssetsPage = lazy(() =>
+  import("@/pages/projects/RuntimeAssetsPage").then((module) => ({
+    default: module.RuntimeAssetsPage,
+  })),
+);
+const RuntimeArtifactPage = lazy(() =>
+  import("@/pages/projects/RuntimeArtifactPage").then((module) => ({
+    default: module.RuntimeArtifactPage,
+  })),
+);
 const RuntimeLessonWorkbenchPage = lazy(() =>
   import("@/pages/projects/RuntimeLessonWorkbenchPage").then((module) => ({
     default: module.RuntimeLessonWorkbenchPage,
@@ -64,6 +89,17 @@ export function RuntimeApp() {
               <Route element={<RuntimeNewProjectPage />} path="projects/new" />
               <Route element={<RuntimeProjectSetupPage />} path="projects/:projectId/setup" />
               <Route element={<RuntimeProjectOverviewPage />} path="projects/:projectId" />
+              <Route
+                element={<RuntimeMaterialsPage />}
+                path="projects/:projectId/materials/:materialId?"
+              />
+              <Route element={<RuntimeLessonsPage />} path="projects/:projectId/lessons" />
+              <Route element={<RuntimeAssetsPage />} path="projects/:projectId/assets" />
+              <Route
+                element={<RuntimeArtifactPage />}
+                path="projects/:projectId/artifacts/:artifactId"
+              />
+              <Route element={<RuntimeJobPage />} path="projects/:projectId/jobs/:jobId" />
               <Route
                 element={<RuntimeLessonWorkbenchPage />}
                 path="projects/:projectId/lessons/:lessonId/work/:stepKey"

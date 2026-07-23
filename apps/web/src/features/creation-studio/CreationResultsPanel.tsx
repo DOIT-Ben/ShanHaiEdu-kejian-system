@@ -194,13 +194,13 @@ export function CreationResultsPanel({
   const compareCandidates = candidates.slice(compareStart, compareStart + 3);
   const visualWidth = fullscreen
     ? type === "image"
-      ? "w-[min(88vmin,960px)]"
-      : "w-[min(92vw,1280px)]"
+      ? "min-w-0 w-[min(88vmin,960px)]"
+      : "min-w-0 w-[min(92vw,1280px)]"
     : type === "image"
-      ? "w-[min(100%,320px)] md:w-[clamp(320px,32vw,440px)]"
+      ? "min-w-0 w-[min(100%,320px)] md:w-[clamp(320px,32vw,440px)]"
       : type === "video"
-        ? "w-full max-w-[520px]"
-        : "w-full max-w-[720px]";
+        ? "min-w-0 w-full max-w-[520px]"
+        : "min-w-0 w-full max-w-[720px]";
   const workspaceWidth = type === "image" ? "max-w-[920px]" : "max-w-[900px]";
   const downloadLabel =
     type === "image" ? "下载这张图片" : type === "video" ? "下载关键帧说明" : "下载课件预览";

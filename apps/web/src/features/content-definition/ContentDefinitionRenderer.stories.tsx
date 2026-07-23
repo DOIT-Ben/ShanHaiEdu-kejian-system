@@ -45,6 +45,7 @@ const compactDefinition: ContentDefinition = {
 const meta = {
   title: "业务组件/动态内容渲染器",
   component: ContentDefinitionRenderer,
+  tags: ["core-viewport"],
   args: { definition: lessonPlanDefinition, data: lessonPlanData },
 } satisfies Meta<typeof ContentDefinitionRenderer>;
 

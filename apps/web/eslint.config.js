@@ -29,11 +29,12 @@ export default tseslint.config(
     },
   },
   {
-    files: [
-      "src/app/RuntimeApp.tsx",
-      "src/layouts/Runtime*.tsx",
-      "src/pages/runtime/**/*.{ts,tsx}",
-      "src/pages/projects/Runtime*.{ts,tsx}",
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: [
+      "src/main.tsx",
+      "src/shared/api/mocks/**/*.{ts,tsx}",
+      "src/**/*.{test,spec}.{ts,tsx}",
+      "src/**/*.stories.{ts,tsx}",
     ],
     rules: {
       "no-restricted-imports": [
@@ -41,8 +42,15 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: ["@/app/MockApp", "@/shared/api/mocks/*", "@/shared/data/mockData"],
-              message: "Runtime 页面只能消费真实 API 和无状态产品组件，不能导入 MockRuntime。",
+              group: [
+                "@/app/MockApp",
+                "@/shared/api/mockClient",
+                "@/shared/api/mocks/*",
+                "@/shared/auth/mockAuth",
+                "@/shared/auth/mockCredentials.development",
+                "@/shared/data/mockData",
+              ],
+              message: "生产源只能消费 Runtime API 和无状态产品组件，不能导入开发 Mock 真源。",
             },
           ],
         },

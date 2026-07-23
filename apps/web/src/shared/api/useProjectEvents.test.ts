@@ -1,9 +1,14 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, waitFor } from "@testing-library/react";
+import { createElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import {
   clearProjectLastSequence,
+  invalidateProjectQueries,
   projectEventQueryKeys,
   readProjectLastSequence,
   streamProjectEvents,
+  useProjectEvents,
 } from "@/shared/api/useProjectEvents";
 import { runSseSubscription, SseStreamError } from "@/shared/api/eventStream";
 
@@ -247,6 +252,7 @@ describe("project event transport", () => {
     expect(projectEventQueryKeys("project-1", projectEvent)).toEqual([
       ["generation-jobs", projectEvent.resource.id],
       ["tasks", "project-1"],
+      ["projects", "project-1", "materials"],
     ]);
 
     const keysFor = (type: string, id = `${type}-1`) =>
@@ -257,6 +263,7 @@ describe("project event transport", () => {
     expect(keysFor("automation_policy")).toEqual([["projects", "project-1", "automation-policy"]]);
     expect(keysFor("lesson_collection")).toEqual([
       ["projects", "project-1", "lessons"],
+      ["lessons"],
       ["projects", "project-1"],
       ["projects"],
       ["projects", "project-1", "workflow"],
@@ -268,6 +275,7 @@ describe("project event transport", () => {
     ]);
     expect(keysFor("source_material", "material-1")).toEqual([
       ["projects", "project-1", "materials"],
+      ["projects", "project-1", "materials", "material-1"],
       ["projects", "project-1", "materials", "material-1", "file-asset"],
       ["projects", "project-1", "materials", "material-1", "parse-versions"],
       ["projects", "project-1", "workflow"],
@@ -287,6 +295,75 @@ describe("project event transport", () => {
       ["projects"],
       ["projects", "project-1", "workflow"],
     ]);
+  });
+
+  it("invalidates every single-lesson cache after a collection event", async () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(["lessons", "lesson-1"], { title: "旧课时一" });
+    queryClient.setQueryData(["lessons", "lesson-2"], { title: "旧课时二" });
+    queryClient.setQueryData(["unrelated", "lesson-1"], { title: "不相关" });
+
+    await invalidateProjectQueries(queryClient, "project-1", {
+      ...projectEvent,
+      resource: { id: "collection-1", type: "lesson_collection" },
+    });
+
+    expect(queryClient.getQueryState(["lessons", "lesson-1"])?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(["lessons", "lesson-2"])?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(["unrelated", "lesson-1"])?.isInvalidated).toBe(false);
+  });
+
+  it("invalidates the combined material details cache after a source material event", async () => {
+    const queryClient = new QueryClient();
+    const materialKey = ["projects", "project-1", "materials", "material-1"] as const;
+    queryClient.setQueryData(materialKey, { asset: { id: "asset-1" }, parseVersions: [] });
+
+    await invalidateProjectQueries(queryClient, "project-1", {
+      ...projectEvent,
+      resource: { id: "material-1", type: "source_material" },
+    });
+
+    expect(queryClient.getQueryState(materialKey)?.isInvalidated).toBe(true);
+  });
+
+  it("invalidates material detail caches when a generation job changes", async () => {
+    const queryClient = new QueryClient();
+    const materialKey = ["projects", "project-1", "materials", "material-1"] as const;
+    const parseVersionsKey = [...materialKey, "parse-versions"] as const;
+    queryClient.setQueryData(materialKey, { asset: { id: "asset-1" } });
+    queryClient.setQueryData(parseVersionsKey, { items: [] });
+
+    await invalidateProjectQueries(queryClient, "project-1", projectEvent);
+
+    expect(queryClient.getQueryState(materialKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(parseVersionsKey)?.isInvalidated).toBe(true);
+  });
+
+  it("refreshes the REST snapshot once when the stream ends on a permanent client error", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(Response.json({ error: { code: "FORBIDDEN" } }, { status: 403 }));
+    const queryClient = new QueryClient();
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
+    function ProjectEventProbe() {
+      useProjectEvents("project-1");
+      return null;
+    }
+
+    const view = render(
+      createElement(QueryClientProvider, { client: queryClient }, createElement(ProjectEventProbe)),
+    );
+
+    await waitFor(() =>
+      expect(invalidateQueries).toHaveBeenCalledWith({
+        exact: true,
+        queryKey: ["projects"],
+        refetchType: "active",
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledOnce();
+    view.unmount();
+    fetchMock.mockRestore();
   });
 
   it("removes the saved project sequence", () => {

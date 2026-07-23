@@ -5,6 +5,7 @@ import {
   fileSnapshot,
   readRuntimeNewProjectRecovery,
   refreshExpiredRuntimeUploadSession,
+  restartRuntimeMaterialUpload,
   runtimeNewProjectFingerprint,
   sameFileSnapshot,
   withNewRuntimeNewProjectIntent,
@@ -109,13 +110,12 @@ describe("runtime new-project recovery", () => {
     expect(next.fingerprint).toBe(runtimeNewProjectFingerprint(next.form, nextFile));
   });
 
-  it("keeps the project but rotates upload recovery after a signed URL expires", () => {
+  it("keeps the project but rotates upload recovery before confirmation after a signed URL expires", () => {
     const current = {
       ...createRuntimeNewProjectRecovery(form),
       etag: '"material-v1"',
-      jobId: "01960000-0000-7000-8000-000000000003",
       projectId: "01960000-0000-7000-8000-000000000001",
-      stage: "confirming" as const,
+      stage: "uploading" as const,
       uploadSession: {
         expires_at: "2026-07-20T07:59:00Z",
         material_id: "01960000-0000-7000-8000-000000000004",
@@ -139,5 +139,61 @@ describe("runtime new-project recovery", () => {
     expect(refreshed.etag).toBeUndefined();
     expect(refreshed.jobId).toBeUndefined();
     expect(refreshed.stage).toBe("uploading");
+  });
+
+  it("keeps an expired confirmed upload intent so the server can replay a lost response", () => {
+    const current = {
+      ...createRuntimeNewProjectRecovery(form),
+      etag: '"material-v1"',
+      projectId: "01960000-0000-7000-8000-000000000001",
+      stage: "confirming" as const,
+      uploadSession: {
+        expires_at: "2026-07-20T07:59:00Z",
+        material_id: "01960000-0000-7000-8000-000000000004",
+        method: "PUT" as const,
+        required_headers: { "Content-Type": "application/pdf" },
+        upload_session_id: "01960000-0000-7000-8000-000000000002",
+        upload_url: "https://upload.example.test/material",
+      },
+    };
+
+    const refreshed = refreshExpiredRuntimeUploadSession(
+      current,
+      Date.parse("2026-07-20T08:00:00Z"),
+    );
+
+    expect(refreshed).toBe(current);
+    expect(refreshed.intent.confirm).toBe(current.intent.confirm);
+    expect(refreshed.uploadSession).toBe(current.uploadSession);
+    expect(refreshed.etag).toBe(current.etag);
+  });
+
+  it("rotates upload and confirmation intents after an explicit confirmation rejection", () => {
+    const current = {
+      ...createRuntimeNewProjectRecovery(form),
+      etag: '"material-v1"',
+      jobId: "01960000-0000-7000-8000-000000000003",
+      projectId: "01960000-0000-7000-8000-000000000001",
+      stage: "confirming" as const,
+      uploadSession: {
+        expires_at: "2026-07-20T07:59:00Z",
+        material_id: "01960000-0000-7000-8000-000000000004",
+        method: "PUT" as const,
+        required_headers: { "Content-Type": "application/pdf" },
+        upload_session_id: "01960000-0000-7000-8000-000000000002",
+        upload_url: "https://upload.example.test/material",
+      },
+    };
+
+    const restarted = restartRuntimeMaterialUpload(current, Date.parse("2026-07-20T08:00:00Z"));
+
+    expect(restarted.projectId).toBe(current.projectId);
+    expect(restarted.intent.project).toBe(current.intent.project);
+    expect(restarted.intent.upload).not.toBe(current.intent.upload);
+    expect(restarted.intent.confirm).not.toBe(current.intent.confirm);
+    expect(restarted.uploadSession).toBeUndefined();
+    expect(restarted.etag).toBeUndefined();
+    expect(restarted.jobId).toBeUndefined();
+    expect(restarted.stage).toBe("uploading");
   });
 });

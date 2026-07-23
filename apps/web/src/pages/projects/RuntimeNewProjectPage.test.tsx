@@ -8,12 +8,13 @@ import * as projectsApi from "@/features/projects/api/projectsApi";
 import { RuntimeNewProjectPage } from "@/pages/projects/RuntimeNewProjectPage";
 import {
   createRuntimeNewProjectRecovery,
+  fileSnapshot,
   readRuntimeNewProjectRecovery,
   runtimeNewProjectFingerprint,
   writeRuntimeNewProjectRecovery,
   type RuntimeNewProjectForm,
 } from "@/pages/projects/runtimeNewProjectRecovery";
-import { configureCsrfTokenProvider } from "@/shared/api/client";
+import { ApiError, configureCsrfTokenProvider } from "@/shared/api/client";
 
 const savedForm: RuntimeNewProjectForm = {
   executionMode: "guided",
@@ -23,6 +24,35 @@ const savedForm: RuntimeNewProjectForm = {
   textbookEdition: "人教版",
   title: "认识百分数",
 };
+
+function expiredConfirmingRecovery(file: File) {
+  const sha256 = "a".repeat(64);
+  const snapshot = { ...fileSnapshot(file), sha256 };
+  return {
+    sha256,
+    stored: {
+      ...createRuntimeNewProjectRecovery(savedForm),
+      etag: '"material-v1"',
+      file: snapshot,
+      fingerprint: runtimeNewProjectFingerprint(savedForm, snapshot),
+      intent: {
+        confirm: "confirm-original",
+        project: "project-original",
+        upload: "upload-original",
+      },
+      projectId: "01960000-0000-7000-8000-000000000001",
+      stage: "confirming" as const,
+      uploadSession: {
+        expires_at: "2020-01-01T00:00:00Z",
+        material_id: "01960000-0000-7000-8000-000000000004",
+        method: "PUT" as const,
+        required_headers: { "Content-Type": "application/pdf" },
+        upload_session_id: "01960000-0000-7000-8000-000000000002",
+        upload_url: "https://upload.example.test/material",
+      },
+    },
+  };
+}
 
 function renderPage() {
   const queryClient = new QueryClient({
@@ -34,6 +64,7 @@ function renderPage() {
         <Routes>
           <Route element={<RuntimeNewProjectPage />} path="/app/projects/new" />
           <Route element={<p>项目创建完成</p>} path="/app/projects/:projectId" />
+          <Route element={<p>教材任务已建立</p>} path="/app/projects/:projectId/setup" />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -184,20 +215,171 @@ describe("RuntimeNewProjectPage recovery", () => {
     expect(createUpload).not.toHaveBeenCalled();
   });
 
-  it("applies the shared PDF extension and size rules before hashing", async () => {
+  it("clears a textbook file error after switching to anchor-only mode", async () => {
+    const user = userEvent.setup({ applyAccept: false });
+    renderPage();
+
+    await user.upload(
+      screen.getByLabelText(/选择 PDF 教材/),
+      new File(["not-a-pdf"], "教材.txt", { type: "text/plain" }),
+    );
+    expect(screen.getByText("目前只支持 PDF 教材")).toBeVisible();
+
+    await user.click(screen.getByRole("radio", { name: /暂不使用教材/ }));
+
+    expect(screen.queryByText("目前只支持 PDF 教材")).not.toBeInTheDocument();
+  });
+
+  it("allows an anchor-only project to omit the optional textbook edition", async () => {
+    const user = userEvent.setup();
+    const createProject = vi.spyOn(projectsApi, "createProject").mockResolvedValue({
+      id: "01960000-0000-7000-8000-000000000223",
+    } as Awaited<ReturnType<typeof projectsApi.createProject>>);
+    renderPage();
+
+    await user.click(screen.getByRole("radio", { name: /暂不使用教材/ }));
+    await user.type(screen.getByLabelText("项目名称"), "生活中的百分数");
+    await user.type(screen.getByLabelText("知识点"), "百分数的实际应用");
+    await user.click(screen.getByRole("combobox", { name: "教材版本" }));
+    await user.click(screen.getByRole("option", { name: "不指定教材版本" }));
+
+    expect(screen.getByRole("region", { name: "课程锚点摘要" })).toHaveTextContent(
+      "六年级 · 未指定教材版本 · 百分数的实际应用",
+    );
+    await user.click(screen.getByRole("button", { name: "创建课程项目" }));
+
+    expect(await screen.findByText("项目创建完成")).toBeVisible();
+    const request = createProject.mock.calls[0]?.[0];
+    expect(request?.input).not.toHaveProperty("textbook_edition");
+  });
+
+  it("applies the shared PDF extension and non-empty rules before hashing", async () => {
     const user = userEvent.setup({ applyAccept: false });
     const sha256 = vi.spyOn(materialsApi, "sha256File");
     renderPage();
     const fileInput = screen.getByLabelText(/选择 PDF 教材/);
-    const oversized = new File(["pdf"], "教材.pdf", { type: "application/pdf" });
-    Object.defineProperty(oversized, "size", { value: 100 * 1024 * 1024 + 1 });
 
-    await user.upload(fileInput, oversized);
-    expect(screen.getByText("教材文件不能超过 100 MB")).toBeVisible();
+    await user.upload(fileInput, new File([], "教材.pdf", { type: "application/pdf" }));
+    expect(screen.getByText("教材文件不能为空")).toBeVisible();
     expect(sha256).not.toHaveBeenCalled();
 
     await user.upload(fileInput, new File(["pdf"], "教材.pdf", { type: "" }));
     expect(screen.getByRole("button", { name: "移除教材文件" })).toBeVisible();
     expect(screen.queryByText("目前只支持 PDF 教材")).not.toBeInTheDocument();
+  });
+
+  it("retries an expired confirmation with the original intent after a lost response", async () => {
+    const user = userEvent.setup();
+    const file = new File(["textbook"], "百分数.pdf", {
+      lastModified: 1_720_000_000_000,
+      type: "application/pdf",
+    });
+    const { sha256, stored } = expiredConfirmingRecovery(file);
+    writeRuntimeNewProjectRecovery(stored);
+    vi.spyOn(materialsApi, "sha256File").mockResolvedValue(sha256);
+    const createUpload = vi.spyOn(materialsApi, "createMaterialUploadSession");
+    const uploadFile = vi.spyOn(materialsApi, "uploadMaterialFile");
+    const confirmUpload = vi.spyOn(materialsApi, "confirmMaterialUpload").mockResolvedValue({
+      events_url: "/api/v2/generation-jobs/01960000-0000-7000-8000-000000000003/events/stream",
+      job_id: "01960000-0000-7000-8000-000000000003",
+      status: "queued",
+    });
+    renderPage();
+
+    expect(readRuntimeNewProjectRecovery()).toMatchObject({
+      etag: stored.etag,
+      intent: stored.intent,
+      stage: "confirming",
+      uploadSession: stored.uploadSession,
+    });
+    await user.upload(screen.getByLabelText(/重新选择同一份 PDF/), file);
+    await waitFor(() =>
+      expect(readRuntimeNewProjectRecovery()).toMatchObject({
+        etag: stored.etag,
+        intent: stored.intent,
+        stage: "confirming",
+        uploadSession: stored.uploadSession,
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: "创建项目并上传教材" }));
+
+    await waitFor(() =>
+      expect(confirmUpload).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idempotencyKey: "confirm-original",
+          uploadSessionId: stored.uploadSession.upload_session_id,
+        }),
+      ),
+    );
+    expect(createUpload).not.toHaveBeenCalled();
+    expect(uploadFile).not.toHaveBeenCalled();
+  });
+
+  it("starts a new upload intent only after the server explicitly rejects confirmation", async () => {
+    const user = userEvent.setup();
+    const file = new File(["textbook"], "百分数.pdf", {
+      lastModified: 1_720_000_000_000,
+      type: "application/pdf",
+    });
+    const { sha256, stored } = expiredConfirmingRecovery(file);
+    writeRuntimeNewProjectRecovery(stored);
+    vi.spyOn(materialsApi, "sha256File").mockResolvedValue(sha256);
+    vi.spyOn(materialsApi, "confirmMaterialUpload").mockRejectedValue(
+      new ApiError({
+        error: {
+          code: "UPLOAD_REJECTED",
+          message: "The upload session is no longer confirmable.",
+          retryable: false,
+        },
+        request_id: "request-confirm-rejected",
+      }),
+    );
+    renderPage();
+
+    await user.upload(screen.getByLabelText(/重新选择同一份 PDF/), file);
+    await user.click(screen.getByRole("button", { name: "创建项目并上传教材" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("教材上传状态已失效，请重新提交");
+    const restarted = readRuntimeNewProjectRecovery();
+    expect(restarted?.projectId).toBe(stored.projectId);
+    expect(restarted?.intent.project).toBe(stored.intent.project);
+    expect(restarted?.intent.upload).not.toBe(stored.intent.upload);
+    expect(restarted?.intent.confirm).not.toBe(stored.intent.confirm);
+    expect(restarted?.uploadSession).toBeUndefined();
+    expect(restarted?.etag).toBeUndefined();
+  });
+
+  it("keeps the original confirmation intent after a retryable network failure", async () => {
+    const user = userEvent.setup();
+    const file = new File(["textbook"], "百分数.pdf", {
+      lastModified: 1_720_000_000_000,
+      type: "application/pdf",
+    });
+    const { sha256, stored } = expiredConfirmingRecovery(file);
+    writeRuntimeNewProjectRecovery(stored);
+    vi.spyOn(materialsApi, "sha256File").mockResolvedValue(sha256);
+    const confirmUpload = vi.spyOn(materialsApi, "confirmMaterialUpload").mockRejectedValue(
+      new ApiError({
+        error: {
+          code: "NETWORK_ERROR",
+          message: "网络连接失败，请检查网络后重试",
+          retryable: true,
+        },
+        request_id: "unknown",
+      }),
+    );
+    renderPage();
+
+    await user.upload(screen.getByLabelText(/重新选择同一份 PDF/), file);
+    await user.click(screen.getByRole("button", { name: "创建项目并上传教材" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("网络连接失败，请检查网络后重试");
+    expect(confirmUpload).toHaveBeenCalledWith(
+      expect.objectContaining({ idempotencyKey: stored.intent.confirm }),
+    );
+    const persisted = readRuntimeNewProjectRecovery();
+    expect(persisted?.intent).toEqual(stored.intent);
+    expect(persisted?.uploadSession).toEqual(stored.uploadSession);
+    expect(persisted?.etag).toBe(stored.etag);
   });
 });

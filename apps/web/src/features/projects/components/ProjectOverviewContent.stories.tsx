@@ -18,6 +18,7 @@ const lessons = [
 const meta = {
   title: "项目/课时概览",
   component: ProjectLessonGrid,
+  tags: ["core-viewport"],
   args: { lessons },
 } satisfies Meta<typeof ProjectLessonGrid>;
 
@@ -27,6 +28,13 @@ type Story = StoryObj<typeof meta>;
 export const Ready: Story = {};
 export const Loading: Story = { args: { lessons: [], loading: true } };
 export const Empty: Story = { args: { lessons: [] } };
+export const ErrorState: Story = {
+  args: {
+    errorMessage: "课时暂时无法读取，请检查网络后重试。",
+    lessons: [],
+    onRetry: () => undefined,
+  },
+};
 export const Narrow390: Story = {
   parameters: { viewport: { defaultViewport: "narrow390" } },
 };

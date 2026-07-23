@@ -15,6 +15,7 @@ export type ProjectEntryValues = {
 export type ProjectEntryField = keyof ProjectEntryValues;
 
 type ProjectEntryFormProps = {
+  allowUnspecifiedTextbookEdition?: boolean;
   anchorSummary: string;
   busy: boolean;
   disabled?: boolean;
@@ -36,10 +37,12 @@ type ProjectEntryFormProps = {
 
 const grades = ["一年级", "二年级", "三年级", "四年级", "五年级", "六年级"];
 const textbookEditions = ["人教版", "北师大版", "苏教版", "冀教版"];
+const unspecifiedTextbookEditionValue = "__unspecified_textbook_edition__";
 const inputClass =
   "mt-2 min-h-10 w-full rounded-[var(--sh-radius-sm)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)] px-3 text-sm text-[var(--sh-ink-strong)] outline-none transition focus:border-[var(--sh-brand-300)] focus:shadow-[var(--sh-shadow-focus)]";
 
 export function ProjectEntryForm({
+  allowUnspecifiedTextbookEdition = false,
   anchorSummary,
   busy,
   disabled = false,
@@ -119,9 +122,28 @@ export function ProjectEntryForm({
               ariaLabel="教材版本"
               className="mt-2 w-full"
               disabled={unavailable}
-              onValueChange={(value) => onFieldChange("textbookEdition", value)}
-              options={textbookEditions.map((value) => ({ label: value, value }))}
-              value={values.textbookEdition}
+              onValueChange={(value) =>
+                onFieldChange(
+                  "textbookEdition",
+                  value === unspecifiedTextbookEditionValue ? "" : value,
+                )
+              }
+              options={[
+                ...(allowUnspecifiedTextbookEdition
+                  ? [
+                      {
+                        label: "不指定教材版本",
+                        value: unspecifiedTextbookEditionValue,
+                      },
+                    ]
+                  : []),
+                ...textbookEditions.map((value) => ({ label: value, value })),
+              ]}
+              value={
+                allowUnspecifiedTextbookEdition && !values.textbookEdition
+                  ? unspecifiedTextbookEditionValue
+                  : values.textbookEdition
+              }
             />
           </label>
         </div>
@@ -211,7 +233,7 @@ export function ProjectEntryForm({
                   {recoveredFileName ? "重新选择同一份 PDF" : "选择 PDF 教材"}
                 </span>
                 <span className="mt-1 block text-xs text-[var(--sh-ink-muted)]">
-                  单个文件不超过 100 MB
+                  仅支持 PDF 教材
                 </span>
               </span>
             </label>
@@ -222,7 +244,7 @@ export function ProjectEntryForm({
             className="mt-4 rounded-[var(--sh-radius-md)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-soft)] px-4 py-4"
             role="region"
           >
-            <p className="text-xs font-medium text-[var(--sh-ink-faint)]">课程范围</p>
+            <p className="text-xs font-medium text-[var(--sh-ink-muted)]">课程范围</p>
             <p className="mt-2 text-sm font-semibold leading-6 text-[var(--sh-ink-strong)]">
               {anchorSummary}
             </p>

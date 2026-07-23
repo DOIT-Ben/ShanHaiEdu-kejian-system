@@ -1,67 +1,74 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { AlertTriangle, Check, X } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
-import {
-  createMockSaveConflict,
-  resolveMockSaveConflict,
-  useMockRuntime,
-} from "@/shared/api/mockClient";
-import {
-  listMockSavedResults,
-  saveMockResult,
-  type MockSavedResult,
-  type MockSavedResultPreview,
-  type MockSavedResultType,
-} from "@/shared/api/mocks/savedResults";
 import { Button } from "@/shared/ui/Button";
 import { IconButton } from "@/shared/ui/IconButton";
 import { Select } from "@/shared/ui/Select";
-import { requiredItem } from "@/shared/lib/requiredItem";
+
+export type SaveResultType = "image" | "ppt_page" | "video" | "audio" | "document";
+
+export type SaveResultPreview = {
+  candidate: number;
+  generation: number;
+  ratio: string;
+};
 
 export type SaveResultDescriptor = {
   id: string;
-  preview?: MockSavedResultPreview;
-  type: MockSavedResultType;
+  preview?: SaveResultPreview;
+  type: SaveResultType;
   title: string;
   lessonLabel?: string;
 };
 
-type SaveToProjectDialogProps = {
-  allowedSlotKeys?: string[];
-  customSlots?: SaveSlot[];
-  lockSourceProject?: boolean;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSaved: (result: MockSavedResult) => void;
-  result: SaveResultDescriptor;
-  returnFocusRef?: RefObject<HTMLElement | null>;
-  sourceProjectId?: string;
+export type SaveProjectOption = {
+  id: string;
+  title: string;
 };
 
-type SaveSlot = {
-  accepts: MockSavedResultType[];
+export type SaveSlot = {
+  accepts: SaveResultType[];
   key: string;
   label: string;
 };
 
-const slots: SaveSlot[] = [
-  { accepts: ["image"], key: "ppt.page-3.hero", label: "PPT 第 3 页主视觉（课堂讲解时显示）" },
-  { accepts: ["image"], key: "video.shot-2", label: "课堂视频镜头 2（作为画面素材）" },
-  { accepts: ["image"], key: "project.shared-images", label: "项目通用教学图片" },
-  { accepts: ["video"], key: "video.intro", label: "课堂导入视频" },
-  { accepts: ["video"], key: "project.shared-videos", label: "项目通用视频" },
-  { accepts: ["ppt_page"], key: "ppt.full-deck", label: "当前课时课堂课件" },
-  { accepts: ["ppt_page"], key: "project.shared-presentations", label: "项目通用课件" },
-  { accepts: ["audio"], key: "project.shared-audio", label: "项目通用音频" },
-  { accepts: ["document"], key: "project.documents", label: "项目文档" },
-];
+export type SaveReplaceMode = "reject_if_occupied" | "replace_active" | "append";
+
+export type SaveToProjectIntent = {
+  projectId: string;
+  replaceMode: SaveReplaceMode;
+  result: SaveResultDescriptor;
+  slotKey: string;
+};
+
+export type SaveConflict = {
+  canAppend: boolean;
+  message?: string;
+};
+
+export type SaveToProjectDialogProps = {
+  busy?: boolean;
+  conflict?: SaveConflict;
+  errorMessage?: string;
+  lockSourceProject?: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (intent: SaveToProjectIntent) => void;
+  open: boolean;
+  projects: readonly SaveProjectOption[];
+  result: SaveResultDescriptor;
+  returnFocusRef?: RefObject<HTMLElement | null>;
+  slots: readonly SaveSlot[];
+  sourceProjectId?: string;
+};
 
 export function SaveConflictNotice({
   canAppendToShared,
+  message,
   onModeChange,
   replaceMode,
 }: {
   canAppendToShared: boolean;
+  message?: string;
   onModeChange: (mode: "replace" | "append") => void;
   replaceMode: "replace" | "append";
 }) {
@@ -69,10 +76,10 @@ export function SaveConflictNotice({
     <div className="rounded-[var(--sh-radius-sm)] border border-[var(--sh-warning)]/30 bg-[var(--sh-warning-soft)] p-4">
       <p className="flex items-center gap-2 text-sm font-semibold text-[var(--sh-ink-strong)]">
         <AlertTriangle aria-hidden="true" className="size-4 text-[var(--sh-warning)]" />
-        该位置已有当前作品
+        {message ?? "该位置已有当前作品"}
       </p>
       <p className="mt-2 text-sm text-[var(--sh-ink-muted)]">
-        替换会保留原版本，并提示受影响的 PPTX 重新导出。
+        替换会停用当前绑定，并保留原有版本记录。
       </p>
       <div className="mt-3 grid gap-2">
         <label className="flex cursor-pointer items-center gap-2 rounded-md bg-[var(--sh-surface-elevated)] p-3 text-sm">
@@ -90,7 +97,7 @@ export function SaveConflictNotice({
               onChange={() => onModeChange("append")}
               type="radio"
             />
-            另存为项目通用素材
+            追加到这个保存位置
           </label>
         ) : null}
       </div>
@@ -99,101 +106,55 @@ export function SaveConflictNotice({
 }
 
 export function SaveToProjectDialog({
-  allowedSlotKeys,
-  customSlots,
+  busy = false,
+  conflict,
+  errorMessage,
   lockSourceProject = false,
   onOpenChange,
-  onSaved,
+  onSave,
   open,
+  projects,
   result,
   returnFocusRef,
+  slots,
   sourceProjectId,
 }: SaveToProjectDialogProps) {
-  const runtime = useMockRuntime();
-  const firstProjectId = runtime.projects[0]?.id ?? "";
-  const availableSlots = (customSlots ?? slots).filter(
-    (slot) =>
-      slot.accepts.includes(result.type) &&
-      (!allowedSlotKeys || allowedSlotKeys.includes(slot.key)),
-  );
-  const defaultSlot = requiredItem(availableSlots, 0, `${result.type} 对应的保存位置`);
-  const canAppendToShared = availableSlots.some((slot) => slot.key.startsWith("project."));
+  const availableSlots = slots.filter((slot) => slot.accepts.includes(result.type));
+  const firstProjectId = projects[0]?.id ?? "";
+  const firstSlotKey = availableSlots[0]?.key ?? "";
   const [projectId, setProjectId] = useState(() => sourceProjectId ?? firstProjectId);
-  const [slotKey, setSlotKey] = useState(defaultSlot.key);
-  const [conflictId, setConflictId] = useState<string | null>(null);
+  const [slotKey, setSlotKey] = useState(firstSlotKey);
   const [replaceMode, setReplaceMode] = useState<"replace" | "append">("replace");
   const returnFocusElement = useRef<HTMLElement | null>(null);
-  const conflict = conflictId
-    ? runtime.saveConflicts.find((item) => item.id === conflictId && item.status === "open")
-    : undefined;
 
   useEffect(() => {
     if (!open) return;
     setProjectId(sourceProjectId ?? firstProjectId);
-    setSlotKey(defaultSlot.key);
-    setConflictId(null);
+    setSlotKey(firstSlotKey);
     setReplaceMode("replace");
-  }, [defaultSlot.key, firstProjectId, open, sourceProjectId]);
-
-  const abandonConflict = () => {
-    if (conflictId) resolveMockSaveConflict(conflictId, "kept");
-    setConflictId(null);
-    setReplaceMode("replace");
-  };
+  }, [firstProjectId, firstSlotKey, open, sourceProjectId]);
 
   const save = () => {
-    if (!projectId) return;
-    const occupied = listMockSavedResults(runtime, projectId).find(
-      (savedResult) => savedResult.slotKey === slotKey && savedResult.resultId !== result.id,
-    );
-    if (!conflict && occupied) {
-      const created = createMockSaveConflict({
-        current_version: occupied.savedAt,
-        project_id: projectId,
-        requested_version: new Date().toISOString(),
-        result_id: result.id,
-        slot_key: slotKey,
-      });
-      setConflictId(created.id);
-      return;
-    }
-    if (conflict) {
-      resolveMockSaveConflict(conflict.id, replaceMode === "replace" ? "replaced" : "kept");
-    }
-    const appendToShared = Boolean(conflict && replaceMode === "append" && canAppendToShared);
-    const sharedSlot = availableSlots.find((slot) => slot.key.startsWith("project."));
-    const targetSlotKey = appendToShared
-      ? `${sharedSlot?.key ?? defaultSlot.key}:${result.id}`
-      : slotKey;
-    const targetSlot = appendToShared
-      ? (sharedSlot ?? defaultSlot)
-      : (availableSlots.find((slot) => slot.key === targetSlotKey) ?? defaultSlot);
-    const savedResult = saveMockResult({
-      lessonLabel: result.lessonLabel ?? "独立创作",
-      ...(result.preview ? { preview: result.preview } : {}),
+    if (!projectId || !slotKey || busy) return;
+    onSave({
       projectId,
-      replaceMode,
-      resultId: result.id,
-      slotKey: targetSlotKey,
-      slotLabel: targetSlot.label,
-      title: result.title,
-      type: result.type,
+      replaceMode: conflict
+        ? replaceMode === "append"
+          ? "append"
+          : "replace_active"
+        : "reject_if_occupied",
+      result,
+      slotKey,
     });
-    setConflictId(null);
-    onSaved(savedResult);
-    onOpenChange(false);
   };
+
+  const lockedProjectTitle = projects.find((project) => project.id === sourceProjectId)?.title;
   return (
-    <Dialog.Root
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen && conflictId) abandonConflict();
-        onOpenChange(nextOpen);
-      }}
-      open={open}
-    >
+    <Dialog.Root onOpenChange={onOpenChange} open={open}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-[var(--sh-overlay-scrim)] backdrop-blur-[1px]" />
         <Dialog.Content
+          aria-busy={busy}
           className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,520px)] -translate-x-1/2 -translate-y-1/2 rounded-[var(--sh-radius-md)] bg-[var(--sh-surface-elevated)] p-6 shadow-[var(--sh-shadow-floating)]"
           onCloseAutoFocus={(event) => {
             event.preventDefault();
@@ -211,11 +172,11 @@ export function SaveToProjectDialog({
                 保存到项目
               </Dialog.Title>
               <Dialog.Description className="mt-1 text-sm text-[var(--sh-ink-muted)]">
-                保存后作品才会进入项目的素材与成果。
+                确认目标项目和保存位置后再提交。
               </Dialog.Description>
             </div>
             <Dialog.Close asChild>
-              <IconButton label="关闭">
+              <IconButton disabled={busy} label="关闭">
                 <X aria-hidden="true" />
               </IconButton>
             </Dialog.Close>
@@ -225,21 +186,15 @@ export function SaveToProjectDialog({
               <span className="text-sm font-semibold text-[var(--sh-ink-strong)]">目标项目</span>
               {lockSourceProject && sourceProjectId ? (
                 <div className="mt-2 rounded-[var(--sh-radius-sm)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-soft)] px-3 py-2.5 text-sm">
-                  {runtime.projects.find((project) => project.id === sourceProjectId)?.title ??
-                    "来源项目"}
+                  {lockedProjectTitle ?? "来源项目"}
                 </div>
               ) : (
                 <Select
                   ariaLabel="目标项目"
                   className="mt-2 w-full"
-                  onValueChange={(nextProjectId) => {
-                    abandonConflict();
-                    setProjectId(nextProjectId);
-                  }}
-                  options={runtime.projects.map((project) => ({
-                    label: project.title,
-                    value: project.id,
-                  }))}
+                  disabled={busy}
+                  onValueChange={setProjectId}
+                  options={projects.map((project) => ({ label: project.title, value: project.id }))}
                   value={projectId}
                 />
               )}
@@ -249,29 +204,40 @@ export function SaveToProjectDialog({
               <Select
                 ariaLabel="保存位置"
                 className="mt-2 w-full"
-                onValueChange={(nextSlotKey) => {
-                  abandonConflict();
-                  setSlotKey(nextSlotKey);
-                }}
+                disabled={busy}
+                onValueChange={setSlotKey}
                 options={availableSlots.map((slot) => ({ label: slot.label, value: slot.key }))}
                 value={slotKey}
               />
             </label>
+            {availableSlots.length === 0 ? (
+              <p className="text-sm text-[var(--sh-danger)]" role="alert">
+                当前作品没有可用的保存位置。
+              </p>
+            ) : null}
             {conflict ? (
               <SaveConflictNotice
-                canAppendToShared={canAppendToShared}
+                canAppendToShared={conflict.canAppend}
+                message={conflict.message}
                 onModeChange={setReplaceMode}
                 replaceMode={replaceMode}
               />
             ) : null}
+            {errorMessage ? (
+              <p className="text-sm text-[var(--sh-danger)]" role="alert">
+                {errorMessage}
+              </p>
+            ) : null}
           </div>
           <div className="mt-7 flex justify-end gap-2">
             <Dialog.Close asChild>
-              <Button variant="quiet">取消</Button>
+              <Button disabled={busy} variant="quiet">
+                取消
+              </Button>
             </Dialog.Close>
-            <Button disabled={!projectId} onClick={save}>
+            <Button disabled={busy || !projectId || !slotKey} onClick={save}>
               <Check aria-hidden="true" />
-              {conflict ? "确认保存" : "保存到这个位置"}
+              {busy ? "正在保存" : conflict ? "确认保存" : "保存到这个位置"}
             </Button>
           </div>
         </Dialog.Content>

@@ -110,7 +110,7 @@ export function ProjectsPage() {
         <p className="mt-4 rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-6 text-center text-sm text-[var(--sh-ink-muted)]">
           {normalizedSearch
             ? "没有找到匹配的项目，请调整搜索词。"
-            : "还没有项目，从一份教材开始吧。"}
+            : "还没有项目，从课程范围或教材开始吧。"}
         </p>
       ) : null}
 

@@ -7,9 +7,9 @@
 
 ## 当前交付边界
 
-前端不再是单一 Mock-first 工程。生产构建统一进入 `RuntimeApp`，开发 Mock 入口通过环境和动态导入隔离；构建边界检查会拒绝 MSW Worker、Mock Runtime 标识、演示凭据和缺失静态素材。
+前端只有一个 `RuntimeApp` 页面与路由树。real 模式连接真实 API；DEV 模式只动态启用 MSW 网络 adapter。构建边界检查会拒绝 MSW Worker、本地业务运行时标识、开发凭据和缺失静态素材。
 
-当前源码由 Open Draft PR [#111](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/111) 承载，尚未合并或获得发布批准。真实模式已经实现项目、教材三段式上传、Generation Job/项目 SSE、课时读取和项目概览的前端纵向链，但真实认证、完整业务页面和部署环境端到端联调仍未完成，因此 `dist` 目前只能作为候选构建产物，不能宣称生产发布完成。
+当前源码由 Open Draft PR [#111](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/111) 承载，尚未合并或获得发布批准。真实模式已经实现项目、教材三段式上传、Generation Job/项目 SSE、课时读取/编辑、项目概览，以及教材、素材、Artifact 和 Job 资源页；但真实认证、资源发现、生成/交付合同和部署环境端到端联调仍未完成，因此 `dist` 目前只能作为候选构建产物，不能宣称生产发布完成。
 
 ## 构建验证
 
@@ -23,6 +23,7 @@ corepack pnpm --filter @shanhaiedu/web lint
 corepack pnpm --filter @shanhaiedu/web typecheck
 corepack pnpm --filter @shanhaiedu/web test
 corepack pnpm --filter @shanhaiedu/web build:storybook
+corepack pnpm --filter @shanhaiedu/web test:storybook:a11y
 corepack pnpm --filter @shanhaiedu/web build
 corepack pnpm --filter @shanhaiedu/web test:e2e --project=chromium
 corepack pnpm --filter @shanhaiedu/web test:e2e:runtime --project=runtime-chromium
@@ -39,7 +40,7 @@ corepack pnpm --filter @shanhaiedu/web release:check
 生产内容边界检查能够证明：
 
 - 不存在 `mockServiceWorker.js` 或 MSW Worker 注册代码；
-- 不包含已知 Mock Runtime 标识和开发演示凭据；
+- 不包含已知本地业务运行时标识和开发凭据；
 - 文本产物中的 `/assets/...` 引用都有对应构建文件。
 
 它不能证明真实认证、API 可用性、对象存储 CORS、SSE 反向代理、真实媒体 Provider、监控或业务页面已经通过生产验收。
@@ -54,7 +55,7 @@ VITE_API_BASE_URL=/api/v2
 VITE_RELEASE_VERSION=<发布标识>
 ```
 
-不要把 `.env.local`、真实教材、签名上传或下载地址、服务密钥、Mock 数据或演示凭据复制到产物目录。浏览器不得持有模型 Provider 密钥。
+不要把 `.env.local`、真实教材、签名上传或下载地址、服务密钥、DEV fixture 或开发凭据复制到产物目录。浏览器不得持有模型 Provider 密钥。
 
 ## 发布前置条件
 
@@ -62,8 +63,8 @@ VITE_RELEASE_VERSION=<发布标识>
 
 1. PR #111 完成前端门禁、独立审查和合并，部署只从受保护的可发布提交构建；
 2. 服务端提供并验证真实认证 bootstrap、当前用户、退出、Cookie、CSRF 和权限合同，前端安装 `configureCsrfTokenProvider`；
-3. 项目创建、上传会话、对象存储直传、上传确认、Job REST/SSE、课时和项目概览在目标环境完成浏览器端到端联调；
-4. Workflow、Artifact、素材槽位、创作四动作、任务、交付和管理端按对应阶段接入 Runtime 页面，不能以 `MockApp` 代替；
+3. 项目创建、上传会话、对象存储直传、上传确认、Job REST/SSE、课时、项目概览和当前资源页在目标环境完成浏览器端到端联调；
+4. 服务端补齐教材/Artifact/Job 项目级发现、Artifact 可编辑字段权限、课时/教案生成、创作结果查询、正式 PPTX、最终视频和交付合同；DEV MSW 结果不能代替真实联调；
 5. 真实图片/视频能力上线前，服务端媒体 Adapter、供应商状态映射和受控真实冒烟单独通过；前端静态素材不作为 Provider 验收；
 6. 前端 CI、合同兼容、关键浏览器流程、可访问预览、发布标识、监控和回滚产物全部可验证。
 
@@ -85,15 +86,16 @@ VITE_RELEASE_VERSION=<发布标识>
 当前 Runtime 范围至少检查：
 
 1. `/app`、`/app/projects`、`/app/projects/new` 和项目详情可直接打开、刷新和返回；
-2. 未认证、无权限、会话过期和 CSRF 缺失均安全失败，不出现 Mock 假成功；
+2. 未认证、无权限、会话过期和 CSRF 缺失均安全失败，不出现 DEV fixture 假成功；
 3. 项目创建后能够完成教材 SHA-256、上传会话、对象存储 PUT、ETag 与确认请求；
 4. setup 页面刷新后可凭 `jobId` 恢复 Job REST 快照，SSE 中断后携带 `Last-Event-ID` 重连；
 5. 409/`EVENT_HISTORY_EXPIRED` 会清除游标并重新读取 REST 快照，任务取消和失败不会显示为成功；
-6. Job 成功后能够读取课时和项目概览，AutomationPolicy 并发更新不会绕过 ETag；
-7. 生产网络请求中不存在 MSW 注册、演示凭据或浏览器本地业务真相；
-8. 浏览器控制台、错误上报和访问日志不显示密钥、完整教材、签名 URL 或内部供应商响应。
+6. Job 成功后只读取服务端已有课时；空集合明确阻断课时/教案生成并可返回项目，AutomationPolicy 并发更新不会绕过 ETag；
+7. 课时集合与分支写入携带 ETag/`If-Match`；素材绑定只接受已选择的服务端素材；Artifact 没有字段合同时不显示裸 JSON 编辑器；
+8. 生产网络请求中不存在 MSW 注册、开发凭据或浏览器本地业务真相；
+9. 浏览器控制台、错误上报和访问日志不显示密钥、完整教材、签名 URL 或内部供应商响应。
 
-后续 Runtime 页面开放时，再把对应 Workflow、Artifact、素材槽位、创作四动作、任务、交付和管理端流程加入同一部署验收，不提前把开发 Mock 流程列为已通过项。
+后续 Runtime 流程开放时，再把 Workflow 节点、Artifact 发现与安全草稿编辑、创作结果恢复、PPTX、最终视频、任务、交付和管理端加入同一部署验收，不提前把 DEV MSW 场景列为已通过的生产能力。
 
 ## 回滚
 

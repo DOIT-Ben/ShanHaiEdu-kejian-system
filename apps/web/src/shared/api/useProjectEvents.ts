@@ -77,6 +77,7 @@ const assetResourceTypes = new Set([
 function materialEventQueryKeys(projectId: string, materialId: string) {
   return [
     ["projects", projectId, "materials"],
+    ["projects", projectId, "materials", materialId],
     ["projects", projectId, "materials", materialId, "file-asset"],
     ["projects", projectId, "materials", materialId, "parse-versions"],
     ["projects", projectId, "workflow"],
@@ -107,6 +108,7 @@ export function projectEventQueryKeys(projectId: string, event: ProjectStreamEve
     return [
       ["generation-jobs", event.resource.id],
       ["tasks", projectId],
+      ["projects", projectId, "materials"],
     ] as const;
   }
   if (event.resource.type === "project") {
@@ -118,6 +120,7 @@ export function projectEventQueryKeys(projectId: string, event: ProjectStreamEve
   if (event.resource.type === "lesson_collection") {
     return [
       ["projects", projectId, "lessons"],
+      ["lessons"],
       ["projects", projectId],
       ["projects"],
       workflowKey,
@@ -142,7 +145,7 @@ export function projectEventQueryKeys(projectId: string, event: ProjectStreamEve
   return [["projects", projectId], ["projects"], workflowKey] as const;
 }
 
-async function invalidateProjectQueries(
+export async function invalidateProjectQueries(
   queryClient: ReturnType<typeof useQueryClient>,
   projectId: string,
   event?: ProjectStreamEvent,
@@ -172,7 +175,14 @@ async function invalidateProjectQueries(
   const keys = projectEventQueryKeys(projectId, event);
   await Promise.all(
     keys.map((queryKey) =>
-      queryClient.invalidateQueries({ queryKey, exact: true, refetchType: "active" }),
+      queryClient.invalidateQueries({
+        queryKey,
+        exact: !(
+          (queryKey.length === 1 && queryKey[0] === "lessons") ||
+          (queryKey.length === 3 && queryKey[1] === projectId && queryKey[2] === "materials")
+        ),
+        refetchType: "active",
+      }),
     ),
   );
 }
@@ -181,7 +191,7 @@ export function useProjectEvents(projectId: string | undefined) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!projectId || apiConfig.mode !== "real") return;
+    if (!projectId) return;
     const abortController = new AbortController();
     const clearCursor = () => clearProjectLastSequence(projectId);
     void runSseSubscription({
@@ -200,6 +210,18 @@ export function useProjectEvents(projectId: string | undefined) {
       refreshSnapshot: () => invalidateProjectQueries(queryClient, projectId),
       signal: abortController.signal,
       writeCursor: (sequence) => saveProjectLastSequence(projectId, sequence),
+    }).catch(async (reason: unknown) => {
+      if (
+        abortController.signal.aborted ||
+        (reason instanceof DOMException && reason.name === "AbortError")
+      ) {
+        return;
+      }
+      try {
+        await invalidateProjectQueries(queryClient, projectId);
+      } catch {
+        // A permanent stream failure is already terminal; the UI keeps its last readable snapshot.
+      }
     });
     return () => abortController.abort();
   }, [projectId, queryClient]);

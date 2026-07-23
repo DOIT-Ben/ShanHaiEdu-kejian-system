@@ -30,6 +30,7 @@ function EditableStory(args: ComponentProps<typeof CreationComposer>) {
 const meta = {
   title: "创作台/输入区",
   component: CreationComposer,
+  tags: ["core-viewport"],
   parameters: { layout: "fullscreen" },
   args: {
     advancedOpen: false,

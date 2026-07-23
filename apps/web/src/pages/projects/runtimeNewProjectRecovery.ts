@@ -241,18 +241,15 @@ export function isRuntimeUploadSessionExpired(session: UploadSessionDto, now = D
   return !Number.isFinite(expiresAt) || expiresAt <= now;
 }
 
-/**
- * Keeps the already-created project but rotates the upload and confirmation
- * intents when a signed upload URL has expired. Reusing the old URL would make
- * every refresh retry the same permanently-invalid request.
- */
-export function refreshExpiredRuntimeUploadSession(
+export function canReplayRuntimeMaterialConfirmation(recovery: RuntimeNewProjectRecovery) {
+  return Boolean(recovery.stage === "confirming" && recovery.uploadSession && recovery.etag);
+}
+
+/** Starts a fresh material upload without duplicating the already-created project. */
+export function restartRuntimeMaterialUpload(
   recovery: RuntimeNewProjectRecovery,
   now = Date.now(),
 ): RuntimeNewProjectRecovery {
-  if (!recovery.uploadSession || !isRuntimeUploadSessionExpired(recovery.uploadSession, now)) {
-    return recovery;
-  }
   return {
     ...recovery,
     etag: undefined,
@@ -267,4 +264,20 @@ export function refreshExpiredRuntimeUploadSession(
     updatedAt: now,
     uploadSession: undefined,
   };
+}
+
+/**
+ * Rotates an expired signed upload URL unless confirmation may already have
+ * succeeded. In that case the original confirmation key must be retried first
+ * so the server can replay the accepted Job without creating a second upload.
+ */
+export function refreshExpiredRuntimeUploadSession(
+  recovery: RuntimeNewProjectRecovery,
+  now = Date.now(),
+): RuntimeNewProjectRecovery {
+  if (!recovery.uploadSession || !isRuntimeUploadSessionExpired(recovery.uploadSession, now)) {
+    return recovery;
+  }
+  if (canReplayRuntimeMaterialConfirmation(recovery)) return recovery;
+  return restartRuntimeMaterialUpload(recovery, now);
 }

@@ -298,7 +298,7 @@ export function HomePage({
           ? "继续当前项目"
           : needsProjectChoice
             ? "选择一个项目继续"
-            : "上传教材开始制作"));
+            : "创建课程项目"));
   const nextDetail = currentProject?.currentLesson ?? currentProject?.knowledgePoint;
   const brandHeading = projectQuery.isLoading
     ? "正在读取课堂项目"
@@ -420,7 +420,7 @@ export function HomePage({
               src={emptyProjectDesk}
             />
             <p className="text-sm text-[var(--sh-ink-muted)]">
-              上传教材后，这里会显示当前课时和制作进度。
+              创建项目后，这里会显示课程信息和已有课时。
             </p>
           </div>
         ) : null}

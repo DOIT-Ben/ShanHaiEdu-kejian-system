@@ -4,6 +4,7 @@ import { LessonWorkbenchSummary } from "@/features/workbench/components/LessonWo
 const meta = {
   title: "工作台/课时总览",
   component: LessonWorkbenchSummary,
+  tags: ["core-viewport"],
   args: {
     branches: [
       { enabled: true, key: "lesson_plan", label: "教案", to: "/app" },

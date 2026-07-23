@@ -4,6 +4,7 @@ import { CreationResultsPanel } from "@/features/creation-studio/CreationResults
 const meta = {
   title: "创作台/结果对话",
   component: CreationResultsPanel,
+  tags: ["core-viewport"],
   args: {
     candidate: 0,
     candidateCount: 3,
