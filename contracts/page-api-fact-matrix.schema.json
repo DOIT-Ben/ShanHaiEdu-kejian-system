@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shanhaiedu.local/contracts/page-api-fact-matrix.schema.json",
+  "title": "ShanHaiEdu Page API Formal Fact Matrix",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["matrix_version", "state_model", "operations", "pages", "forbidden_frontend_behaviors"],
+  "properties": {
+    "matrix_version": {"const": "shanhai.page-api-fact-matrix/v1"},
+    "state_model": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/operation"}
+    },
+    "pages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/page"}
+    },
+    "forbidden_frontend_behaviors": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    }
+  },
+  "$defs": {
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation_id", "availability", "formal_fact_role"],
+      "properties": {
+        "operation_id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]+$"},
+        "availability": {"enum": ["active", "planned", "candidate_required"]},
+        "formal_fact_role": {"type": "string", "minLength": 1},
+        "promotion_requirement": {"type": "string", "minLength": 1}
+      }
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["page_key", "route", "scope_keys", "actions", "refresh_operations"],
+      "properties": {
+        "page_key": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+        "route": {"type": "string", "minLength": 1},
+        "scope_keys": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["project_id", "lesson_id", "node_run_id", "artifact_id", "artifact_version_id", "job_id", "creation_package_id"]}
+        },
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/action"}
+        },
+        "refresh_operations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]+$"}
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action_key", "operation_ids", "formal_facts", "exact_references", "completion_rule"],
+      "properties": {
+        "action_key": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+        "operation_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]+$"}
+        },
+        "formal_facts": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "exact_references": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "completion_rule": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}
