@@ -2,6 +2,8 @@
 
 本目录保存前端、后端和内容运行时共同依赖的唯一现行机器合同。设计说明见 `docs/backend/05_API_SSE权限与安全.md`，本目录文件优先用于代码生成、Mock 和 CI 校验。
 
+当前业务切片还必须遵守[Decision #210](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/210)的纵向交付门禁：active合同表示运行时可调用，不等于教师功能已经完成。只有FastAPI运行时、生成客户端、生产页面消费者、正式持久化事实和真实API浏览器验收共同通过，当前业务切片才能关闭。
+
 ## 文件
 
 - `api-conventions.md`：HTTP、分页、并发、幂等和错误约定。
@@ -26,6 +28,8 @@
 - `generation-template.schema.json`：输入、风格、Prompt、输出、投影和逻辑能力的组合。
 - `builtin-generation-source.schema.json`：仓库内置业务生成源的紧凑声明合同；由确定性构建器展开为可发布内容包。
 - `golden-courseware-case.schema.json`：黄金教材、教案、三类九套、PPT、视频、音频和交付期望的跨成果测试合同。
+- `delivery-slice.schema.json`：生产页面、active API、正式持久化事实和真实测试的单行纵向交付证据合同。
+- `delivery-slices/`：按`<issue>-<slice>.yaml`保存当前纵向切片回归清单；PR正文证据并集必须与清单一致。
 - `workflow-node-generation-binding.schema.json`：v2业务节点执行类型、48节点显式拓扑、必需/可选输入、生成模板、validator descriptor、三类参考策略、Artifact/CreationPackage输出投影、质量报告和人工/策略门禁的声明式绑定目录。
 - `markdown-template-draft.schema.json`：普通Markdown导入后的可审核模板草稿。
 - `markdown-template-compilation-profile.schema.json`：已审核模板草稿编译为内容包时的显式发布配置。
@@ -39,6 +43,17 @@
 - `typescript/client.ts`：基于生成paths和openapi-fetch的共享客户端工厂。
 
 上述首套业务内容包的人类可读确定性投影位于`docs/workflows/generation-guide/`。它供产品负责人、内容管理员和开发者审查，不是第二套机器合同，也不是教师公共界面。
+
+## 当前切片激活规则
+
+- 新业务operation进入active前，必须有FastAPI运行时实现、合同测试和明确的当前消费者；仅有未来页面需求时保留在planned合同。
+- active合同变化必须同步生成bundle和TypeScript客户端；生成后有diff即阻塞合并。
+- 前端消费者不得通过手写DTO、未声明字段、静态Mock或known-ID深链绕过缺失合同。
+- 后端端点通过单元测试不代表业务切片完成；当前父Issue还必须提供生产页面消费、PostgreSQL事实和真实API Playwright证据。
+- Session、授权和CSRF属于写操作合同的一部分；前端Token注入不能替代服务端校验。
+- PR声明的operationId必须来自active OpenAPI标准HTTP方法；`x-*`扩展、planned operation或未被运行时和当前消费者共同使用的名称不能作为完成证据。
+- 改变生产交付边界的PR必须同时改变一份`delivery-slices/<issue>-<slice>.yaml`，使页面路由、真实导航、API方法/路径、正式事实和精确测试选择器在同一行绑定；机器只核验结构、一致性和实际执行，业务断言的充分性仍由独立评审确认。
+- 发布Release、Artifact审核、统一Job/NodeRun状态和项目写回语义只有一个活动所有者，不得由并行分支分别扩展。
 
 ## 使用规则
 

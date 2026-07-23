@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shanhaiedu.example/contracts/delivery-slice.schema.json",
+  "title": "Vertical delivery slice evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "issue", "rows"],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "issue": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "rows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/row"
+      }
+    }
+  },
+  "$defs": {
+    "nonEmptyStrings": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation_id", "method", "path"],
+      "properties": {
+        "operation_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+        },
+        "method": {
+          "enum": [
+            "GET",
+            "PUT",
+            "POST",
+            "DELETE",
+            "OPTIONS",
+            "HEAD",
+            "PATCH",
+            "TRACE"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^/"
+        }
+      }
+    },
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "page_route",
+        "navigation_path",
+        "api_requests",
+        "formal_facts",
+        "backend_tests",
+        "real_api_playwright"
+      ],
+      "properties": {
+        "page_route": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "navigation_path": {
+          "type": "string",
+          "pattern": "^/[^:*]*$"
+        },
+        "api_requests": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/request"
+          }
+        },
+        "formal_facts": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "backend_tests": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "real_api_playwright": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        }
+      }
+    }
+  }
+}

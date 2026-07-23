@@ -133,6 +133,17 @@ PR正文必须包含：
 - 独立子智能体审查人、审查范围、findings处置、验证命令和残余风险。
 - `CURRENT_STATUS.md`新鲜度二选一声明及判断依据；触发状态页更新时，必须在同一PR同步状态页。
 - PR规模二选一声明；原始变更超过20个文件、净新增超过800行或包含二进制/未知统计项时选择`pr-size-review-map-required`，列出业务源码、生成物、Schema、迁移和测试的评审导航，并说明为何不能继续拆分。
+- 纵向切片二选一声明。修改生产页面、FastAPI路由或active OpenAPI时必须选择`vertical-slice-required`，并填写可机器核验的页面路由、active `operationId`、正式事实、后端测试、真实API Playwright和本PR变更的`contracts/delivery-slices/<issue>-<slice>.yaml`；其余PR才可选择`vertical-slice-not-required`。
+
+纵向切片证据必须满足：
+
+- 页面路由是`apps/web/src/app/RuntimeApp.tsx`中当前注册的完整路由，不接受计划路由或描述性名称。
+- `operationId`来自`contracts/api-surface.openapi.yaml`的标准HTTP方法，不接受`x-*`扩展字段。
+- 正式事实是`apps/api`当前持久化模型文件中存在的精确类名，不接受概念名、服务/DTO类或未来模型名。
+- 后端测试使用仓库内`tests/integration/**/*.py`的精确pytest节点选择器。
+- 真实API浏览器测试使用`apps/web/e2e/real-api/**/*.spec.ts(x)`的精确Playwright测试标题；由独立配置和CI工作流启动真实FastAPI、PostgreSQL和Redis，禁止MSW、请求拦截或浏览器内伪造会话替代真实链路。
+- Delivery manifest的`issue`、文件名前缀和PR的`Closes #<issue>`必须一致；每行把一个生产路由、具体导航地址、active API方法/路径、正式事实和精确测试选择器绑成同一条链，正文五类证据的并集必须与清单完全一致。
+- 机器门禁只证明清单结构、仓库事实和测试执行结果一致；测试断言是否充分证明教师业务因果关系，仍由同一独立子智能体在精确base/head上审查。
 
 超过20个业务源码文件或800行净新增非生成代码的PR，必须提供评审导航并说明为何不能拆分。初始化、生成代码、Schema和迁移可以例外，但应与手写业务代码分开列出。
 

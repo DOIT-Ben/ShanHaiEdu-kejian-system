@@ -55,6 +55,34 @@ Do not begin by reading all Git history, all documents or prior chat transcripts
 
 See `docs/governance/TEAM_WORKFLOW.md` for the full lifecycle.
 
+### 3.1 Vertical product delivery
+
+Frontend and backend remain separate code ownership areas, but user-facing completion is never assessed separately.
+
+Every current product slice must have one parent Issue that contains a page–API–fact–acceptance matrix. Before implementation starts, that matrix must identify:
+
+- the exact teacher action and route;
+- the active OpenAPI `operationId` used by the page;
+- the formal PostgreSQL, object-storage or immutable runtime fact read or written;
+- loading, empty, error, conflict, permission and refresh-recovery behavior;
+- the backend integration test and real-API Playwright flow that prove completion.
+
+A backend endpoint is not a finished product capability because its unit tests, CLI or deterministic Fake pass. A frontend page is not a finished capability because its Storybook, MSW or visual tests pass. The slice is done only when the production page consumes the active contract, the runtime persists the intended fact, refresh recovery succeeds and all mandatory checks pass.
+
+For the current release, delivery order and concurrency are controlled by the latest approved Decision Issue and `docs/governance/DELIVERY_ROADMAP.md`. Long-term product documents and planned contracts do not authorize implementation by themselves.
+
+Mandatory integration rules:
+
+- Production session bootstrap, authorization and server-side CSRF validation are prerequisites for any browser write-flow milestone.
+- Active OpenAPI, FastAPI runtime registration, generated TypeScript client and the current consumer must change together or through explicitly ordered blocking Issues.
+- Planned OpenAPI never enters generated clients, MSW runtime handlers or availability claims.
+- The owner of the parent slice is accountable for both implementation PRs and the final browser result, even when frontend and backend engineers are different people.
+- Shared contracts, generated clients, authentication bootstrap, artifact approval and published content releases have a single active writer.
+- A product slice cannot close while any required consumer is a placeholder, read-only shell, known-ID deep link or production-disabled action.
+- New media or downstream slices cannot bypass an unfinished upstream release gate merely because fixtures or golden handbooks exist.
+- Every current Pull Request must select exactly one `vertical-slice-required` or `vertical-slice-not-required` declaration. A Pull Request that changes production pages, API routers or active OpenAPI cannot opt out. A required slice must change one `contracts/delivery-slices/<issue>-<slice>.yaml` whose Issue matches the PR `Closes` declaration, and whose rows bind concrete registered page routes and navigation paths to active HTTP methods/paths, exact SQLAlchemy table classes, exact integration-test selectors and exact Playwright titles under `apps/web/e2e/real-api/`. The PR body unions must exactly match that manifest. `pending`, `N/A`, planned or unavailable routes, conceptual facts, service/DTO/Pydantic classes, skipped tests and intercepted or MSW browser flows fail the governance check. Real-API Playwright uses its dedicated configuration and CI workflow to start FastAPI, PostgreSQL and Redis, observe actual requests without interception and run every declared selector. Machine checks prove structural consistency and execution, while the independent reviewer remains responsible for the sufficiency of the business assertions.
+
+
 ## 4. Branch and commit rules
 
 - `main` is protected, reviewable and releasable. Never force-push it.
