@@ -49,6 +49,8 @@ Backend tests：
 
 Real API Playwright：
 
+Delivery manifest：
+
 ## 子智能体审查
 
 - [ ] `subagent-review-pending`：仅Draft PR可用；尚未完成独立审查。

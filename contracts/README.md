@@ -28,6 +28,8 @@
 - `generation-template.schema.json`：输入、风格、Prompt、输出、投影和逻辑能力的组合。
 - `builtin-generation-source.schema.json`：仓库内置业务生成源的紧凑声明合同；由确定性构建器展开为可发布内容包。
 - `golden-courseware-case.schema.json`：黄金教材、教案、三类九套、PPT、视频、音频和交付期望的跨成果测试合同。
+- `delivery-slice.schema.json`：生产页面、active API、正式持久化事实和真实测试的单行纵向交付证据合同。
+- `delivery-slices/`：按`<issue>-<slice>.yaml`保存当前纵向切片回归清单；PR正文证据并集必须与清单一致。
 - `workflow-node-generation-binding.schema.json`：v2业务节点执行类型、48节点显式拓扑、必需/可选输入、生成模板、validator descriptor、三类参考策略、Artifact/CreationPackage输出投影、质量报告和人工/策略门禁的声明式绑定目录。
 - `markdown-template-draft.schema.json`：普通Markdown导入后的可审核模板草稿。
 - `markdown-template-compilation-profile.schema.json`：已审核模板草稿编译为内容包时的显式发布配置。
@@ -50,6 +52,7 @@
 - 后端端点通过单元测试不代表业务切片完成；当前父Issue还必须提供生产页面消费、PostgreSQL事实和真实API Playwright证据。
 - Session、授权和CSRF属于写操作合同的一部分；前端Token注入不能替代服务端校验。
 - PR声明的operationId必须来自active OpenAPI标准HTTP方法；`x-*`扩展、planned operation或未被运行时和当前消费者共同使用的名称不能作为完成证据。
+- 改变生产交付边界的PR必须同时改变一份`delivery-slices/<issue>-<slice>.yaml`，使页面路由、真实导航、API方法/路径、正式事实和精确测试选择器在同一行绑定；机器只核验结构、一致性和实际执行，业务断言的充分性仍由独立评审确认。
 - 发布Release、Artifact审核、统一Job/NodeRun状态和项目写回语义只有一个活动所有者，不得由并行分支分别扩展。
 
 ## 使用规则

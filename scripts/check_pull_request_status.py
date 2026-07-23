@@ -47,6 +47,8 @@ VERTICAL_REQUIRED_FIELDS = (
     "Backend tests",
     "Real API Playwright",
 )
+DELIVERY_MANIFEST_FIELD = "Delivery manifest"
+DELIVERY_MANIFEST_PREFIX = "contracts/delivery-slices/"
 VERTICAL_BOUNDARY_PREFIXES = (
     "apps/web/src/",
     "contracts/openapi/active/",
@@ -61,7 +63,7 @@ REAL_API_PLAYWRIGHT_PREFIX = "apps/web/e2e/real-api/"
 REAL_API_PLAYWRIGHT_CONFIG = "apps/web/playwright.real-api.config.ts"
 REAL_API_PLAYWRIGHT_WORKFLOW = ".github/workflows/r1-real-api.yml"
 PLAYWRIGHT_TEST_TITLE = re.compile(
-    r"""\btest(?:\.(?:only|skip|fixme))?\s*\(\s*(?P<quote>["'])(?P<title>.*?)(?P=quote)""",
+    r"""\btest\s*\(\s*(?P<quote>["'])(?P<title>.*?)(?P=quote)""",
     re.DOTALL,
 )
 FIRST_REQUIRED_GOVERNANCE_PR = 93  # Remove under #94 after legacy PR #62 closes.
@@ -83,7 +85,7 @@ def _governance_markdown(body: str) -> str:
         if stripped.startswith("~~~"):
             fence = "~~~"
             continue
-        if line.startswith(">") or line.startswith("    "):
+        if line.startswith(">") or line.startswith("    ") or line.startswith("\t"):
             continue
         kept_lines.append(line)
     return "\n".join(kept_lines)
@@ -237,6 +239,8 @@ def _touches_vertical_boundary(
     repo_root: Path,
     base_sha: str | None,
 ) -> bool:
+    if path.startswith(DELIVERY_MANIFEST_PREFIX) and path.endswith((".yaml", ".yml")):
+        return True
     if path.startswith(VERTICAL_BOUNDARY_PREFIXES) or path in VERTICAL_BOUNDARY_PATHS:
         return True
     if not path.startswith("apps/api/") or not path.endswith(".py"):
@@ -282,6 +286,22 @@ def _safe_repo_file(repo_root: Path, relative_path: str) -> Path | None:
     return candidate
 
 
+def _decorator_name(decorator: ast.expr) -> str:
+    if isinstance(decorator, ast.Call):
+        return _decorator_name(decorator.func)
+    if isinstance(decorator, ast.Attribute):
+        owner = _decorator_name(decorator.value)
+        return f"{owner}.{decorator.attr}" if owner else decorator.attr
+    if isinstance(decorator, ast.Name):
+        return decorator.id
+    return ""
+
+
+def _is_runnable_python_test(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    blocked = {"pytest.mark.skip", "pytest.mark.skipif", "pytest.mark.xfail"}
+    return not any(_decorator_name(decorator) in blocked for decorator in node.decorator_list)
+
+
 def _python_test_selectors(path: Path) -> set[str]:
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -290,15 +310,19 @@ def _python_test_selectors(path: Path) -> set[str]:
 
     selectors: set[str] = set()
     for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith(
-            "test"
+        if (
+            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name.startswith("test")
+            and _is_runnable_python_test(node)
         ):
             selectors.add(node.name)
         elif isinstance(node, ast.ClassDef):
             for child in node.body:
-                if isinstance(
-                    child, (ast.FunctionDef, ast.AsyncFunctionDef)
-                ) and child.name.startswith("test"):
+                if (
+                    isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    and child.name.startswith("test")
+                    and _is_runnable_python_test(child)
+                ):
                     selectors.add(f"{node.name}::{child.name}")
     return selectors
 
@@ -311,23 +335,65 @@ def _playwright_test_titles(path: Path) -> set[str]:
     return {match.group("title") for match in PLAYWRIGHT_TEST_TITLE.finditer(source)}
 
 
+def _react_route_attributes(source: str) -> list[str]:
+    attributes: list[str] = []
+    start_pattern = re.compile(r"<Route\b")
+    position = 0
+    while (start := start_pattern.search(source, position)) is not None:
+        index = start.end()
+        braces = 0
+        quote: str | None = None
+        escaped = False
+        while index < len(source):
+            character = source[index]
+            if quote is not None:
+                if escaped:
+                    escaped = False
+                elif character == "\\":
+                    escaped = True
+                elif character == quote:
+                    quote = None
+            elif character in {'"', "'", "`"}:
+                quote = character
+            elif character == "{":
+                braces += 1
+            elif character == "}" and braces:
+                braces -= 1
+            elif character == ">" and braces == 0:
+                attributes.append(source[start.end() : index])
+                index += 1
+                break
+            index += 1
+        position = max(index, start.end())
+    return attributes
+
+
 def _frontend_page_routes(repo_root: Path) -> set[str] | None:
     runtime_app = repo_root / "apps/web/src/app/RuntimeApp.tsx"
     if not runtime_app.is_file():
         return None
     try:
-        route_literals = {
-            match.group("path")
-            for match in ROUTE_LITERAL.finditer(runtime_app.read_text(encoding="utf-8"))
-        }
+        source = runtime_app.read_text(encoding="utf-8")
     except (OSError, UnicodeError):
         return None
+
+    source = _strip_typescript_comments(source)
+    route_literals: set[str] = set()
+    for attributes in _react_route_attributes(source):
+        if "RuntimeUnavailablePage" in attributes or "<Navigate" in attributes:
+            continue
+        path_match = ROUTE_LITERAL.search(attributes)
+        if path_match is None:
+            continue
+        route = path_match.group("path")
+        if "*" not in route:
+            route_literals.add(route)
 
     routes = {route for route in route_literals if route.startswith("/")}
     routes.update(
         f"/app/{route}".replace("//", "/")
         for route in route_literals
-        if route and not route.startswith("/") and route != "*"
+        if route and not route.startswith("/")
     )
     return routes
 
@@ -344,29 +410,132 @@ def _persisted_model_class_names(repo_root: Path) -> set[str]:
             tree = ast.parse(path.read_text(encoding="utf-8"))
         except (OSError, UnicodeError, SyntaxError):
             continue
-        names.update(node.name for node in ast.walk(tree) if isinstance(node, ast.ClassDef))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            has_table_name = any(
+                isinstance(child, (ast.Assign, ast.AnnAssign))
+                and (
+                    any(
+                        isinstance(target, ast.Name) and target.id == "__tablename__"
+                        for target in child.targets
+                    )
+                    if isinstance(child, ast.Assign)
+                    else isinstance(child.target, ast.Name) and child.target.id == "__tablename__"
+                )
+                for child in node.body
+            )
+            if has_table_name:
+                names.add(node.name)
     return names
 
 
 def _real_api_playwright_source_error(path: Path, relative_path: str) -> str | None:
-    try:
-        source = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeError):
-        return None
-    forbidden = (
-        "installRuntimeApi",
-        "page.route(",
-        "context.route(",
-        "setupServer(",
-        'from "msw',
-        "from 'msw",
-    )
-    if any(marker in source for marker in forbidden):
-        return (
-            "vertical slice Real API Playwright uses request interception or "
-            f"test API fixtures: {relative_path}"
+    real_api_root = path.parent
+    while real_api_root.name != "real-api" and real_api_root != real_api_root.parent:
+        real_api_root = real_api_root.parent
+    sources = [path]
+    if real_api_root.name == "real-api":
+        sources = sorted(
+            {
+                candidate
+                for suffix in ("*.ts", "*.tsx")
+                for candidate in real_api_root.rglob(suffix)
+                if candidate.is_file()
+            }
         )
+    forbidden = (
+        re.compile(r"\binstallRuntimeApi\b"),
+        re.compile(r"\b(?:page|context)\s*\.\s*route\s*\("),
+        re.compile(r"\brouteFromHAR\s*\("),
+        re.compile(r"\bsetupServer\s*\("),
+        re.compile(r"""(?:from\s*["']msw|require\s*\(\s*["']msw)"""),
+        re.compile(r"\bserviceWorker\s*\.\s*register\s*\("),
+    )
+    for source_path in sources:
+        try:
+            source = source_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            continue
+        if any(pattern.search(source) for pattern in forbidden):
+            return (
+                "vertical slice Real API Playwright uses request interception or "
+                f"test API fixtures: {relative_path}"
+            )
     return None
+
+
+def _strip_typescript_comments(source: str) -> str:
+    output: list[str] = []
+    index = 0
+    quote: str | None = None
+    escaped = False
+    while index < len(source):
+        character = source[index]
+        following = source[index + 1] if index + 1 < len(source) else ""
+        if quote is not None:
+            output.append(character)
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == quote:
+                quote = None
+            index += 1
+            continue
+        if character in {'"', "'", "`"}:
+            quote = character
+            output.append(character)
+            index += 1
+            continue
+        if character == "/" and following == "/":
+            index += 2
+            while index < len(source) and source[index] not in "\r\n":
+                index += 1
+            continue
+        if character == "/" and following == "*":
+            index += 2
+            while index + 1 < len(source) and source[index : index + 2] != "*/":
+                if source[index] in "\r\n":
+                    output.append(source[index])
+                index += 1
+            index = min(index + 2, len(source))
+            continue
+        output.append(character)
+        index += 1
+    return "".join(output)
+
+
+def _workflow_has_real_api_job(document: object) -> bool:
+    if not isinstance(document, dict):
+        return False
+    jobs = document.get("jobs")
+    if not isinstance(jobs, dict):
+        return False
+    for job in jobs.values():
+        if not isinstance(job, dict):
+            continue
+        services = job.get("services")
+        if not isinstance(services, dict) or not {"postgres", "redis"} <= set(services):
+            continue
+        steps = job.get("steps")
+        if not isinstance(steps, list):
+            continue
+        commands = [
+            step.get("run", "")
+            for step in steps
+            if isinstance(step, dict) and isinstance(step.get("run"), str)
+        ]
+        command_source = "\n".join(commands)
+        starts_api = re.search(r"\buvicorn\s+apps\.api\.main:app\b", command_source)
+        migrates = re.search(r"\balembic\s+upgrade\s+head\b", command_source)
+        runs_browser = re.search(r"\btest:e2e:real-api\b", command_source)
+        runs_exact_selectors = re.search(
+            r"\bpython\s+scripts/run_delivery_slice_tests\.py\b", command_source
+        )
+        if starts_api and migrates and runs_browser and runs_exact_selectors:
+            return True
+    return False
 
 
 def _validate_real_api_playwright_harness(repo_root: Path) -> list[str]:
@@ -378,13 +547,17 @@ def _validate_real_api_playwright_harness(repo_root: Path) -> list[str]:
         )
     else:
         try:
-            config_source = config.read_text(encoding="utf-8")
+            config_source = _strip_typescript_comments(config.read_text(encoding="utf-8"))
         except (OSError, UnicodeError):
             config_source = ""
-        required_config_markers = ('"./e2e/real-api"', "VITE_API_MODE", "real")
-        if (
-            not all(marker in config_source for marker in required_config_markers)
-            or "VITE_RUNTIME_CONTRACT_TEST" in config_source
+        config_requirements = (
+            re.compile(r"""testDir\s*:\s*["']\./e2e/real-api["']"""),
+            re.compile(r"""VITE_API_MODE\s*:\s*["']real["']"""),
+            re.compile(r"""VITE_API_BASE_URL\s*:\s*["']/api/v2["']"""),
+            re.compile(r"""VITE_REAL_API_PROXY_TARGET\s*:\s*["']http://127\.0\.0\.1:8000["']"""),
+        )
+        if not all(pattern.search(config_source) for pattern in config_requirements) or re.search(
+            r"\bVITE_RUNTIME_CONTRACT_TEST\b", config_source
         ):
             errors.append(
                 "vertical slice real API Playwright config does not enforce the "
@@ -412,16 +585,10 @@ def _validate_real_api_playwright_harness(repo_root: Path) -> list[str]:
         )
     else:
         try:
-            workflow_source = workflow.read_text(encoding="utf-8")
-        except (OSError, UnicodeError):
-            workflow_source = ""
-        required_workflow_markers = (
-            "postgres",
-            "redis",
-            "apps.api.main:app",
-            "test:e2e:real-api",
-        )
-        if not all(marker in workflow_source for marker in required_workflow_markers):
+            workflow_document = yaml.safe_load(workflow.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, yaml.YAMLError):
+            workflow_document = None
+        if not _workflow_has_real_api_job(workflow_document):
             errors.append(
                 "vertical slice real API Playwright CI workflow must start "
                 "PostgreSQL, Redis and FastAPI and run test:e2e:real-api"
@@ -444,8 +611,10 @@ def _validate_declared_test(
         return [f"vertical slice declares invalid {label} path: {relative_path}"]
 
     if label == "Backend tests":
-        if not relative_path.startswith("tests/") or test_path.suffix != ".py":
-            errors.append(f"vertical slice Backend tests must use tests/**/*.py: {relative_path}")
+        if not relative_path.startswith("tests/integration/") or test_path.suffix != ".py":
+            errors.append(
+                "vertical slice Backend tests must use tests/integration/**/*.py: " + relative_path
+            )
     elif not (
         relative_path.startswith(REAL_API_PLAYWRIGHT_PREFIX)
         and (relative_path.endswith(".spec.ts") or relative_path.endswith(".spec.tsx"))
@@ -478,20 +647,230 @@ def _validate_declared_test(
 
 
 def _active_operation_ids(repo_root: Path) -> set[str] | None:
+    operations = _active_operations(repo_root)
+    return set(operations) if operations is not None else None
+
+
+def _active_operations(repo_root: Path) -> dict[str, tuple[str, str]] | None:
     contract_path = repo_root / "contracts/api-surface.openapi.yaml"
     if not contract_path.is_file():
         return None
     document = yaml.safe_load(contract_path.read_text(encoding="utf-8")) or {}
-    operation_ids: set[str] = set()
-    for path_item in document.get("paths", {}).values():
+    operations: dict[str, tuple[str, str]] = {}
+    for api_path, path_item in document.get("paths", {}).items():
         if not isinstance(path_item, dict):
             continue
         for method, operation in path_item.items():
             if str(method).lower() not in OPENAPI_HTTP_METHODS:
                 continue
             if isinstance(operation, dict) and isinstance(operation.get("operationId"), str):
-                operation_ids.add(operation["operationId"])
-    return operation_ids
+                operations[operation["operationId"]] = (str(method).upper(), str(api_path))
+    return operations
+
+
+def _closing_issue_numbers(body: str) -> set[int]:
+    return {
+        int(match.group("number"))
+        for match in re.finditer(
+            r"(?im)^\s*(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(?P<number>\d+)\s*$",
+            _governance_markdown(body),
+        )
+    }
+
+
+def _manifest_list(row: dict[str, object], field: str) -> list[str] | None:
+    value = row.get(field)
+    if (
+        not isinstance(value, list)
+        or not value
+        or not all(isinstance(item, str) and item.strip() for item in value)
+    ):
+        return None
+    return [item.strip() for item in value]
+
+
+def _validate_delivery_manifest(
+    body: str,
+    section: str,
+    declared_fields: dict[str, list[str]],
+    changed_files: set[str],
+    repo_root: Path,
+) -> list[str]:
+    values = _review_field_values(section, DELIVERY_MANIFEST_FIELD)
+    if len(values) != 1:
+        return ["vertical slice section must contain exactly one Delivery manifest field"]
+    manifest_values = _declared_values(values[0])
+    if len(manifest_values) != 1:
+        return ["vertical slice Delivery manifest must declare exactly one file"]
+    relative_path = manifest_values[0]
+    manifest_path = _safe_repo_file(repo_root, relative_path)
+    if (
+        manifest_path is None
+        or not relative_path.startswith(DELIVERY_MANIFEST_PREFIX)
+        or not relative_path.endswith((".yaml", ".yml"))
+    ):
+        return ["vertical slice declares invalid Delivery manifest path: " + relative_path]
+    if relative_path not in changed_files:
+        return ["vertical slice Delivery manifest must be changed by this pull request"]
+    if not manifest_path.is_file():
+        return ["vertical slice declares missing Delivery manifest file: " + relative_path]
+
+    try:
+        document = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError):
+        document = None
+    if not isinstance(document, dict):
+        return ["vertical slice Delivery manifest must be a YAML mapping"]
+
+    errors: list[str] = []
+    if document.get("schema_version") != 1:
+        errors.append("vertical slice Delivery manifest schema_version must equal 1")
+    issue = document.get("issue")
+    if not isinstance(issue, int) or issue <= 0:
+        errors.append("vertical slice Delivery manifest issue must be a positive integer")
+    else:
+        if issue not in _closing_issue_numbers(body):
+            errors.append("vertical slice Delivery manifest issue must match a Closes #<issue>")
+        if not PurePosixPath(relative_path).stem.startswith(f"{issue}-"):
+            errors.append("vertical slice Delivery manifest filename must start with its issue")
+
+    rows = document.get("rows")
+    if not isinstance(rows, list) or not rows:
+        errors.append("vertical slice Delivery manifest must contain at least one row")
+        return errors
+
+    manifest_fields: dict[str, set[str]] = {
+        "Page routes": set(),
+        "Active operationIds": set(),
+        "Formal facts": set(),
+        "Backend tests": set(),
+        "Real API Playwright": set(),
+    }
+    active_operations = _active_operations(repo_root) or {}
+    for index, raw_row in enumerate(rows, start=1):
+        if not isinstance(raw_row, dict):
+            errors.append(f"vertical slice Delivery manifest row {index} must be a mapping")
+            continue
+        page_route = raw_row.get("page_route")
+        navigation_path = raw_row.get("navigation_path")
+        if not isinstance(page_route, str) or PAGE_ROUTE.fullmatch(page_route) is None:
+            errors.append(f"vertical slice Delivery manifest row {index} has invalid page_route")
+        else:
+            manifest_fields["Page routes"].add(page_route)
+        if (
+            not isinstance(navigation_path, str)
+            or PAGE_ROUTE.fullmatch(navigation_path) is None
+            or ":" in navigation_path
+            or "*" in navigation_path
+        ):
+            errors.append(
+                f"vertical slice Delivery manifest row {index} has invalid navigation_path"
+            )
+
+        for manifest_key, declaration_key in (
+            ("formal_facts", "Formal facts"),
+            ("backend_tests", "Backend tests"),
+            ("real_api_playwright", "Real API Playwright"),
+        ):
+            row_values = _manifest_list(raw_row, manifest_key)
+            if row_values is None:
+                errors.append(
+                    f"vertical slice Delivery manifest row {index} requires {manifest_key}"
+                )
+            else:
+                manifest_fields[declaration_key].update(row_values)
+
+        requests = raw_row.get("api_requests")
+        if not isinstance(requests, list) or not requests:
+            errors.append(f"vertical slice Delivery manifest row {index} requires api_requests")
+            continue
+        for request in requests:
+            if not isinstance(request, dict):
+                errors.append(
+                    f"vertical slice Delivery manifest row {index} has invalid api_request"
+                )
+                continue
+            operation_id = request.get("operation_id")
+            method = request.get("method")
+            api_path = request.get("path")
+            if not all(isinstance(value, str) for value in (operation_id, method, api_path)):
+                errors.append(
+                    f"vertical slice Delivery manifest row {index} has invalid api_request"
+                )
+                continue
+            manifest_fields["Active operationIds"].add(operation_id)
+            expected = active_operations.get(operation_id)
+            actual = (method.upper(), api_path)
+            if expected != actual:
+                errors.append(
+                    "vertical slice Delivery manifest row "
+                    f"{index} api_request does not match active OpenAPI: {operation_id}"
+                )
+
+        browser_tests = _manifest_list(raw_row, "real_api_playwright") or []
+        browser_sources: list[str] = []
+        for declared_test in browser_tests:
+            test_relative_path = declared_test.partition("::")[0].strip()
+            test_path = _safe_repo_file(repo_root, test_relative_path)
+            if test_path is None or not test_path.is_file():
+                continue
+            try:
+                browser_sources.append(
+                    _strip_typescript_comments(test_path.read_text(encoding="utf-8"))
+                )
+            except (OSError, UnicodeError):
+                continue
+        combined_browser_source = "\n".join(browser_sources)
+        if isinstance(navigation_path, str) and PAGE_ROUTE.fullmatch(navigation_path):
+            goto_pattern = re.compile(
+                r"""page\s*\.\s*goto\s*\(\s*["']""" + re.escape(navigation_path) + r"""["']"""
+            )
+            if goto_pattern.search(combined_browser_source) is None:
+                errors.append(
+                    "vertical slice Delivery manifest row "
+                    f"{index} Playwright evidence does not navigate to navigation_path"
+                )
+        observation_calls = set(
+            re.findall(
+                r"\b(?:observeApiRequests|expectObservedApi)\b",
+                combined_browser_source,
+            )
+        )
+        if not {"observeApiRequests", "expectObservedApi"} <= observation_calls:
+            errors.append(
+                "vertical slice Delivery manifest row "
+                f"{index} Playwright evidence must observe and assert real API requests"
+            )
+        if isinstance(requests, list):
+            for request in requests:
+                if not isinstance(request, dict):
+                    continue
+                method = request.get("method")
+                api_path = request.get("path")
+                if isinstance(method, str) and isinstance(api_path, str):
+                    if not (
+                        re.search(
+                            rf"""(?:\bmethod\b|["']method["'])\s*:\s*["']{re.escape(method.upper())}["']""",
+                            combined_browser_source,
+                        )
+                        and re.search(
+                            rf"""(?:\bpath\b|["']path["'])\s*:\s*["']{re.escape(api_path)}["']""",
+                            combined_browser_source,
+                        )
+                    ):
+                        errors.append(
+                            "vertical slice Delivery manifest row "
+                            f"{index} Playwright evidence does not assert "
+                            f"{method.upper()} {api_path}"
+                        )
+
+    for field, manifest_values_set in manifest_fields.items():
+        declared_values_set = set(declared_fields[field])
+        if manifest_values_set != declared_values_set:
+            errors.append(
+                f"vertical slice Delivery manifest {field} union does not match the PR declaration"
+            )
+    return errors
 
 
 def validate_vertical_slice_declaration(
@@ -538,7 +917,7 @@ def validate_vertical_slice_declaration(
             "PR changes a production delivery boundary but declares vertical-slice-not-required"
         ]
     if choice == "vertical-slice-not-required":
-        return []
+        return _validate_real_api_playwright_harness(resolved_root)
 
     errors: list[str] = []
     field_values: dict[str, str] = {}
@@ -560,6 +939,16 @@ def validate_vertical_slice_declaration(
             errors.append(f"vertical slice field {label} must declare at least one value")
     if errors:
         return errors
+    if base_sha is not None:
+        errors.extend(
+            _validate_delivery_manifest(
+                body,
+                section,
+                declared_fields,
+                normalized_files,
+                resolved_root,
+            )
+        )
 
     invalid_routes = sorted(
         route for route in declared_fields["Page routes"] if PAGE_ROUTE.fullmatch(route) is None

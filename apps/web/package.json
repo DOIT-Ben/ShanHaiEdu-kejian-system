@@ -21,6 +21,7 @@
     "test:storybook:a11y": "node scripts/test-storybook-a11y.mjs",
     "test:e2e": "playwright test --workers=2",
     "test:e2e:runtime": "playwright test --config=playwright.runtime.config.ts",
+    "test:e2e:real-api": "playwright test --config=playwright.real-api.config.ts",
     "release:check": "corepack pnpm verify:api-generated && corepack pnpm format && corepack pnpm lint && corepack pnpm typecheck && corepack pnpm test && corepack pnpm build:storybook && corepack pnpm test:storybook:a11y && corepack pnpm build && corepack pnpm test:e2e --project=chromium && corepack pnpm test:e2e:runtime --project=runtime-chromium"
   },
   "dependencies": {

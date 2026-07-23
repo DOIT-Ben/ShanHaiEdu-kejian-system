@@ -115,7 +115,7 @@ R1关闭前只允许两条活动实现线：
 
 前后端保持代码所有权分离，但不再分开验收。页面、合同、后端实现、正式事实和浏览器结果必须在同一个业务切片中共同关闭。
 
-治理CI要求所有新PR明确选择`vertical-slice-required`或`vertical-slice-not-required`。修改生产页面、API路由或active OpenAPI时禁止选择退出。Required声明中的路由必须已注册到`RuntimeApp.tsx`，operationId必须来自active OpenAPI标准HTTP方法，正式事实必须是当前持久化模型类，测试必须精确到真实pytest节点和`apps/web/e2e/real-api/`中的Playwright标题。真实API浏览器测试必须使用专用配置和CI启动FastAPI、PostgreSQL与Redis；MSW和请求拦截不能作为完成证据。
+治理CI要求所有新PR明确选择`vertical-slice-required`或`vertical-slice-not-required`。修改生产页面、API路由或active OpenAPI时禁止选择退出。Required PR必须改变与`Closes #<issue>`绑定的`contracts/delivery-slices/<issue>-<slice>.yaml`，逐行绑定已注册生产路由、具体导航地址、active API方法/路径、SQLAlchemy持久化事实、后端集成测试和真实API Playwright，正文五类证据并集必须与清单完全一致。专用CI启动FastAPI、PostgreSQL与Redis，运行每个精确选择器并拒绝skip/xfail/fixme；浏览器只读观察真实请求，MSW、请求拦截、占位/通配降级路由和非持久化Pydantic类不能作为完成证据。机器门禁不替代独立评审对业务断言充分性的判断。
 
 ## 接手提示
 

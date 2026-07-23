@@ -35,6 +35,8 @@ Backend tests：
 
 Real API Playwright：
 
+Delivery manifest：
+
 ## 风险与回滚
 
 ## 截图或预览
