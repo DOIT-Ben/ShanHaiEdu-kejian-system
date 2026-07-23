@@ -58,6 +58,7 @@
     "branches": {
       "type": "array",
       "minItems": 4,
+      "maxItems": 4,
       "items": {"$ref": "#/$defs/branch"}
     },
     "change_policy": {
