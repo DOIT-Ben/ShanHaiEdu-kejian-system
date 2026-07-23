@@ -7,27 +7,26 @@
 
 ## 页面清单
 
-| 入口                                                       | Runtime 页面                 | 当前能力与 adapter 边界                                           |
-| ---------------------------------------------------------- | ---------------------------- | ----------------------------------------------------------------- |
-| `/`                                                        | `Navigate`                   | 重定向到 `/app`                                                   |
-| `/login`                                                   | `RuntimeLoginPage`           | 认证路径待 #11 决策；仅显示安全说明                               |
-| `/app`                                                     | `HomePage`                   | 项目摘要；real API 与 DEV MSW 都通过 `projectsApi`                |
-| `/app/projects`                                            | `ProjectsPage`               | 项目分页、搜索与新建入口                                          |
-| `/app/projects/new`                                        | `RuntimeNewProjectPage`      | 教材上传或无教材创建；DEV MSW 只替换网络响应                      |
-| `/app/projects/:projectId/setup?jobId=...`                 | `RuntimeProjectSetupPage`    | Job 查询/取消、SSE、轮询和刷新恢复                                |
-| `/app/projects/:projectId`                                 | `RuntimeProjectOverviewPage` | 项目、课时、制作方式和项目 SSE                                    |
-| `/app/projects/:projectId/materials/:materialId?`          | `RuntimeMaterialsPage`       | 已知 ID 时读取教材与解析；无 ID 时显示发现合同缺口                |
-| `/app/projects/:projectId/lessons`                         | `RuntimeLessonsPage`         | 课时重排、软归档、字段与分支读取/编辑                             |
-| `/app/projects/:projectId/assets`                          | `RuntimeAssetsPage`          | 分页素材读取，以及已有服务端素材绑定/解绑与幂等重试               |
-| `/app/projects/:projectId/artifacts/:artifactId`           | `RuntimeArtifactPage`        | 已知 ID 时只读状态；没有安全字段/权限合同时阻断全部写动作         |
-| `/app/projects/:projectId/jobs/:jobId`                     | `RuntimeJobPage`             | Job REST/SSE、轮询、取消与刷新恢复                                |
-| `/app/projects/:projectId/lessons/:lessonId/work/:stepKey` | `RuntimeLessonWorkbenchPage` | 读取项目/课时；缺课时/教案生成命令时显示明确阻塞                  |
-| `/app/creation`                                            | `CreationHomePage`           | 独立图片、视频、PPT 创作入口，不依赖项目                          |
-| `/app/creation/:studioPath`                                | `CreationStudioPage`         | 创建批次、保存提示词、启动生成并读取 Job；结果 GET 缺失时明确阻断 |
-| `/app/projects/:projectId/*`                               | `RuntimeUnavailablePage`     | 未接入项目子页的安全 fallback                                     |
-| `/app/tasks`                                               | `RuntimeUnavailablePage`     | 缺项目级或全局 Job 发现合同                                       |
-| `/admin/*`                                                 | `RuntimeUnavailablePage`     | 管理端尚未接入真实页面                                            |
-| `*`                                                        | `RuntimeUnavailablePage`     | 全局安全 fallback                                                 |
+| 入口                                                       | Runtime 页面                 | 当前能力与 adapter 边界                                   |
+| ---------------------------------------------------------- | ---------------------------- | --------------------------------------------------------- |
+| `/`                                                        | `Navigate`                   | 重定向到 `/app`                                           |
+| `/login`                                                   | `RuntimeLoginPage`           | 认证路径待 #11 决策；仅显示安全说明                       |
+| `/app`                                                     | `HomePage`                   | 项目摘要；real API 与 DEV MSW 都通过 `projectsApi`        |
+| `/app/projects`                                            | `ProjectsPage`               | 项目分页、搜索与新建入口                                  |
+| `/app/projects/new`                                        | `RuntimeNewProjectPage`      | 教材上传或无教材创建；DEV MSW 只替换网络响应              |
+| `/app/projects/:projectId/setup?jobId=...`                 | `RuntimeProjectSetupPage`    | Job 查询/取消、SSE、轮询和刷新恢复                        |
+| `/app/projects/:projectId`                                 | `RuntimeProjectOverviewPage` | 项目、课时、制作方式和项目 SSE                            |
+| `/app/projects/:projectId/materials/:materialId?`          | `RuntimeMaterialsPage`       | 已知 ID 时读取教材与解析；无 ID 时显示发现合同缺口        |
+| `/app/projects/:projectId/lessons`                         | `RuntimeLessonsPage`         | 课时重排、软归档、字段与分支读取/编辑                     |
+| `/app/projects/:projectId/assets`                          | `RuntimeAssetsPage`          | 分页素材读取，以及已有服务端素材绑定/解绑与幂等重试       |
+| `/app/projects/:projectId/artifacts/:artifactId`           | `RuntimeArtifactPage`        | 已知 ID 时只读状态；没有安全字段/权限合同时阻断全部写动作 |
+| `/app/projects/:projectId/jobs/:jobId`                     | `RuntimeJobPage`             | Job REST/SSE、轮询、取消与刷新恢复                        |
+| `/app/projects/:projectId/lessons/:lessonId/work/:stepKey` | `RuntimeLessonWorkbenchPage` | 读取项目/课时；缺课时/教案生成命令时显示明确阻塞          |
+| `/app/creation/*`                                          | `RuntimeUnavailablePage`     | 创作结果查询与恢复合同缺失，real/DEV 均不展示假流程       |
+| `/app/projects/:projectId/*`                               | `RuntimeUnavailablePage`     | 未接入项目子页的安全 fallback                             |
+| `/app/tasks`                                               | `RuntimeUnavailablePage`     | 缺项目级或全局 Job 发现合同                               |
+| `/admin/*`                                                 | `RuntimeUnavailablePage`     | 管理端尚未接入真实页面                                    |
+| `*`                                                        | `RuntimeUnavailablePage`     | 全局安全 fallback                                         |
 
 ## 组件清单
 
@@ -36,7 +35,7 @@
 - 工作台：`LessonWorkbenchSummary`、`WorkbenchStatusBoard`、`WorkbenchPageFrame`、`MarkdownDocument`、`MarkdownPreview`、`PptCoverArtwork`。
 - 项目：`ProjectEntryFrame`、`ProjectEntryForm`、`ProjectRow`、`ProjectLessonGrid`、`ProjectOverviewContent` 是数据源无关展示组件；页面只负责查询、提交、恢复和字段事件映射。
 - Runtime 合同组件：`MaterialDetailsPanel`、`LessonCollectionEditor`、`ArtifactWorkbench`、`ProjectAssetSlotsPanel`、`GenerationJobPanel` 只接收生成 DTO、展示状态和用户意图回调，不直接发请求或读取网络 adapter。
-- 创作组件：`CreationComposer`、`CreationSetupPanel`、`GenerationJobPanel` 与运行时边界提示由 `CreationStudioPage` 组合；`CreationResultsPanel` 只在获得真实 result 读取合同后才能承载生产结果。
+- 创作组件：`CreationComposer`、`CreationResultsPanel` 和 `CreationParameterBar` 当前只作为未路由纯组件存在，不代表 Runtime 创作页已接入。
 - 内容渲染：`ContentDefinitionRenderer` 只按传入字段定义渲染；Runtime Artifact 页在字段/权限合同缺失时不调用本地定义补位。
 
 ## Runtime 与 DEV adapter 边界
@@ -47,13 +46,13 @@ Runtime 页面只消费 `features/*/api` 的类型化客户端和 TanStack Query
 
 ## 前端状态模型
 
-| 状态层       | 责任                                                                 | 持久化                                      |
-| ------------ | -------------------------------------------------------------------- | ------------------------------------------- |
-| 服务端资源   | 项目、课时、workflow、任务、素材和产物的事实状态                     | PostgreSQL，经 REST/SSE 返回                |
-| 查询缓存     | 请求状态、失效、重试和页面读取                                       | TanStack Query，标签页内存                  |
-| UI 状态      | 抽屉、主题、侧栏、当前筛选、焦点，以及当前创作页的批次/item/Job 标识 | Zustand/React state；创作标识不承诺刷新恢复 |
-| 编辑恢复     | 新建项目表单、PDF 元数据、SHA-256、幂等意图、上传会话、Job ID        | `sessionStorage`，不保存或伪造 `File`       |
-| DEV 合同场景 | 只为同一 Runtime 页面返回确定性 OpenAPI 响应，不维护第二套业务真相   | MSW Worker 生命周期内；禁止作为生产证据     |
+| 状态层       | 责任                                                               | 持久化                                  |
+| ------------ | ------------------------------------------------------------------ | --------------------------------------- |
+| 服务端资源   | 项目、课时、workflow、任务、素材和产物的事实状态                   | PostgreSQL，经 REST/SSE 返回            |
+| 查询缓存     | 请求状态、失效、重试和页面读取                                     | TanStack Query，标签页内存              |
+| UI 状态      | 抽屉、主题、侧栏、当前筛选、焦点                                   | Zustand/React state                     |
+| 编辑恢复     | 新建项目表单、PDF 元数据、SHA-256、幂等意图、上传会话、Job ID      | `sessionStorage`，不保存或伪造 `File`   |
+| DEV 合同场景 | 只为同一 Runtime 页面返回确定性 OpenAPI 响应，不维护第二套业务真相 | MSW Worker 生命周期内；禁止作为生产证据 |
 
 合同资源状态必须分别处理，不能把不同资源的同名或近义状态合并成浏览器业务真相：
 
@@ -89,12 +88,12 @@ PPT 与视频的进行中、部分成功和完成包装目前只用于 Storybook
 1. 单元与组件：`pnpm --dir apps/web test`，变更文件先用 Vitest 定向运行。
 2. 静态门禁：format、lint、typecheck、生产构建、Storybook build 和 `test:storybook:a11y`。
 3. DEV MSW 浏览器：`contract-preview.spec.ts` 在 1440、1024、390 验证同一 Runtime 路由、基础可访问性、横向溢出、登录阻断和未声明请求拒绝；视觉回归也只访问 Runtime 路由。
-4. Runtime 浏览器：合同桩场景覆盖首页/项目概览、教材上传恢复与读取、空课时合同阻断、课时集合与分支写入、课时工作台缺少生成命令时的阻断、素材读取/绑定/解绑、Artifact 只读状态与写操作阻断、Job REST/SSE/取消/失败、项目 SSE、无教材课程锚点、独立创作批次/提示词/生成 Job，以及 CSRF 缺失安全失败；创作结果读取与刷新恢复仍由精确 GET 合同缺口阻塞。
+4. Runtime 浏览器：合同桩场景覆盖首页/项目概览、教材上传恢复与读取、空课时合同阻断、课时集合与分支写入、课时工作台缺少生成命令时的阻断、素材读取/绑定/解绑、Artifact 只读状态与写操作阻断、Job REST/SSE/取消/失败、项目 SSE、无教材课程锚点和 CSRF 缺失安全失败；创作页仍由查询合同缺口阻塞。
 5. 发布前检查构建产物不得包含 MSW Worker、本地业务运行时标识、开发凭据或合同测试入口。
 
 ## 交接阻塞
 
-真实登录/bootstrap 的端点路径尚未形成合同，由 #11 决策，前端不发明 `/auth/*`。教材缺 `GET /projects/{project_id}/materials`，Artifact 缺 `GET /projects/{project_id}/artifacts`，Generation Job 缺项目级或全局列表合同，因此这些资源只能从已知 ID 深链进入，`/app/tasks` 保持阻塞。课时合同只有 `GET/PATCH /projects/{project_id}/lessons`、`GET /lessons/{lesson_id}`、`PATCH /lessons/{lesson_id}/branches` 和只读 workflow；缺 planned `POST /node-runs/{node_run_id}/start`，课时划分与教案生成不可启动。创作入口与生成链已开放，但没有 `GET /creation-batches/{batch_id}`、`GET /creation-items/{item_id}` 或 `GET /generation-results/{result_id}`，刷新后无法恢复，完成后也无法读取候选 result ID 来预览、采用或保存。
+真实登录/bootstrap 的端点路径尚未形成合同，由 #11 决策，前端不发明 `/auth/*`。教材缺 `GET /projects/{project_id}/materials`，Artifact 缺 `GET /projects/{project_id}/artifacts`，Generation Job 缺项目级或全局列表合同，因此这些资源只能从已知 ID 深链进入，`/app/tasks` 保持阻塞。课时合同只有 `GET/PATCH /projects/{project_id}/lessons`、`GET /lessons/{lesson_id}`、`PATCH /lessons/{lesson_id}/branches` 和只读 workflow；缺 planned `POST /node-runs/{node_run_id}/start`，课时划分与教案生成不可启动。创作合同只有创建、生成、采用和保存写操作，没有 `GET /creation-batches/{batch_id}`、`GET /creation-items/{item_id}` 或 `GET /generation-results/{result_id}`，刷新后无法恢复。
 
 正式 PPT 缺 `GET /lessons/{lesson_id}/ppt`、`PATCH /ppt-pages/{page_id}`、`POST /ppt-documents/{id}/render` 与 PPTX Artifact 下载关系，由 #108/#11 跟踪。视频缺 `GET /lessons/{lesson_id}/video`、`PATCH /video-shots/{shot_id}`、`POST /video-shots/{shot_id}/select-clip`、`POST /video-projects/{id}/assemble`；交付缺 `GET/POST /projects/{project_id}/deliveries`，由 #11 跟踪。上述页面均保持安全阻塞，不用 Storybook fixture 或 DEV handler 补造生产能力。
 

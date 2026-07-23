@@ -54,16 +54,6 @@ const RuntimeLessonWorkbenchPage = lazy(() =>
     default: module.RuntimeLessonWorkbenchPage,
   })),
 );
-const CreationHomePage = lazy(() =>
-  import("@/pages/creation/CreationHomePage").then((module) => ({
-    default: module.CreationHomePage,
-  })),
-);
-const CreationStudioPage = lazy(() =>
-  import("@/pages/creation/CreationStudioPage").then((module) => ({
-    default: module.CreationStudioPage,
-  })),
-);
 const RuntimeLoginPage = lazy(() =>
   import("@/pages/runtime/RuntimeLoginPage").then((module) => ({
     default: module.RuntimeLoginPage,
@@ -94,7 +84,7 @@ export function RuntimeApp() {
           <Routes>
             <Route element={<RuntimeLoginPage />} path="/login" />
             <Route element={<RuntimeAppShell />} path="/app">
-              <Route element={<HomePage />} index />
+              <Route element={<HomePage creationAvailable={false} />} index />
               <Route element={<ProjectsPage />} path="projects" />
               <Route element={<RuntimeNewProjectPage />} path="projects/new" />
               <Route element={<RuntimeProjectSetupPage />} path="projects/:projectId/setup" />
@@ -115,8 +105,7 @@ export function RuntimeApp() {
                 path="projects/:projectId/lessons/:lessonId/work/:stepKey"
               />
               <Route element={<RuntimeUnavailablePage />} path="projects/:projectId/*" />
-              <Route element={<CreationHomePage />} path="creation" />
-              <Route element={<CreationStudioPage />} path="creation/:studioPath" />
+              <Route element={<RuntimeUnavailablePage />} path="creation/*" />
               <Route element={<RuntimeUnavailablePage />} path="tasks" />
             </Route>
             <Route

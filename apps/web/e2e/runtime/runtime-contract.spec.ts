@@ -257,31 +257,3 @@ test("真实模式可只用课程锚点创建项目且不伪造教材任务", as
   expect(api.confirmRequests).toBe(0);
   expect(api.unhandled).toEqual([]);
 });
-
-test("真实模式开放独立创作并只在结果读取缺口处阻断", async ({ page }) => {
-  await page.addInitScript(({ key }) => sessionStorage.setItem(key, "runtime-contract-csrf"), {
-    key: runtimeContractTestCsrfKey,
-  });
-  const api = await installRuntimeApi(page, {
-    completeJobAfterStream: true,
-    jobStatus: "running",
-  });
-
-  await page.goto("/app/creation");
-  await expect(page.getByRole("heading", { name: "今天想创作什么" })).toBeVisible();
-  await page.getByRole("link", { name: /画一张教学图片/ }).click();
-  await expect(page).toHaveURL(/\/app\/creation\/images$/);
-  await page.getByLabel("描述你想创作的图片").fill("画一张用百格图解释百分数的教学图片");
-  await page.getByRole("button", { name: "开始创作图片" }).click();
-
-  await expect(page.getByRole("heading", { name: "作品生成任务已完成" })).toBeVisible();
-  await expect(page.getByText(/暂时不能在这里查看、选用或保存到项目/)).toBeVisible();
-  expect(api.creationBatchRequests).toBe(1);
-  expect(api.creationPromptRequests).toBe(1);
-  expect(api.creationGenerateRequests).toBe(1);
-  expect(api.jobReads).toBeGreaterThan(0);
-  expect(api.jobStreamRequests).toBeGreaterThan(0);
-  expect(api.csrfHeaders.every((value) => value === "runtime-contract-csrf")).toBe(true);
-  expect(api.idempotencyHeaders.every(Boolean)).toBe(true);
-  expect(api.unhandled).toEqual([]);
-});

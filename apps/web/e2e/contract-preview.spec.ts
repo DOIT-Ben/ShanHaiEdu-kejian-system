@@ -54,16 +54,6 @@ for (const viewport of viewports) {
     await expect(page.getByRole("main")).not.toContainText("lesson_plan");
     await assertNoHorizontalOverflow(page);
     await assertBasicAccessibility(page);
-
-    await page.goto("/app/creation");
-    await expect(page.getByRole("heading", { name: "今天想创作什么" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /画一张教学图片/ })).toBeVisible();
-    await assertNoHorizontalOverflow(page);
-    await page.goto("/app/creation/images");
-    await expect(page.getByRole("heading", { name: "图片创作台" })).toBeVisible();
-    await expect(page.getByText("当前批次只在本次页面会话中可继续操作")).toBeVisible();
-    await assertNoHorizontalOverflow(page);
-    await assertBasicAccessibility(page);
   });
 }
 
