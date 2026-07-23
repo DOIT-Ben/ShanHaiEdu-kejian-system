@@ -39,6 +39,12 @@ def test_git_rename_parser_returns_old_and_new_paths() -> None:
     ]
 
 
+def test_git_type_change_parser_returns_protected_path() -> None:
+    output = b"T\0contracts/api-surface.openapi.yaml\0"
+
+    assert _parse_name_status(output) == ["contracts/api-surface.openapi.yaml"]
+
+
 def test_frontend_track_accepts_web_files() -> None:
     errors = validate_changed_paths(
         _leases(),
@@ -65,6 +71,14 @@ def test_frontend_track_rejects_protected_file_renamed_into_web() -> None:
     )
 
     errors = validate_changed_paths(_leases(), "frontend", renamed_paths)
+
+    assert any("contracts/api-surface.openapi.yaml" in error for error in errors)
+
+
+def test_frontend_track_rejects_protected_file_type_change() -> None:
+    changed_paths = _parse_name_status(b"T\0contracts/api-surface.openapi.yaml\0")
+
+    errors = validate_changed_paths(_leases(), "frontend", changed_paths)
 
     assert any("contracts/api-surface.openapi.yaml" in error for error in errors)
 
