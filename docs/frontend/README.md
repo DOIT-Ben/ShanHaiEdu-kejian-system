@@ -4,7 +4,7 @@
 规格版本：2.0.0
 目标：生产级独立React前端
 
-实施责任：独立前端承接方负责`apps/web`、Figma、Storybook、MSW、前端测试和真实API联调；Codex负责Issue #2中的后端平台与共享合同，不代做生产界面。前端任务以GitHub Issue #4为入口。
+实施责任：独立前端承接方负责`apps/web`、Storybook、MSW、前端测试和真实API联调；Codex负责Issue #2中的后端平台与共享合同，不代做生产界面。前端任务以GitHub Issue #4为入口。
 
 ## 1. 产品形态
 
@@ -50,4 +50,4 @@
 
 ## 4. 完成定义
 
-只有源码、Figma源文件、Storybook、Mock模式、真实API模式、自动化测试、生产构建和交接材料全部通过验收，才视为完成。截图、HTML原型和静态Mock不代表生产前端完成。
+只有源码、Storybook、视觉回归基线、Mock模式、真实API模式、自动化测试、生产构建和交接材料全部通过验收，才视为完成。截图、HTML原型和静态Mock不代表生产前端完成。
