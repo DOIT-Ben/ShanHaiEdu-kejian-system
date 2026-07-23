@@ -81,12 +81,21 @@ def test_vertical_slice_declaration_is_required_for_current_prs() -> None:
     ) == ["PR must select exactly one vertical slice declaration"]
 
 
-def test_vertical_slice_rejects_opt_out_for_production_boundary() -> None:
+def test_vertical_slice_rejects_opt_out_for_real_production_boundaries() -> None:
     body = vertical_section(f"{VERTICAL_REQUIRED_UNCHECKED}\n{VERTICAL_NOT_REQUIRED}")
+    paths = {
+        "apps/api/main.py",
+        "apps/api/projects/router.py",
+        "apps/api/node_execution/router.py",
+        "apps/web/src/pages/HomePage.tsx",
+        "apps/web/src/shared/api/client.ts",
+        "contracts/api-surface.openapi.yaml",
+    }
 
-    assert validate_vertical_slice_declaration(
-        body, {"apps/web/src/pages/HomePage.tsx"}, required=True
-    ) == ["PR changes a production delivery boundary but declares vertical-slice-not-required"]
+    for path in paths:
+        assert validate_vertical_slice_declaration(body, {path}, required=True) == [
+            "PR changes a production delivery boundary but declares vertical-slice-not-required"
+        ]
 
 
 def test_vertical_slice_requires_all_concrete_delivery_fields() -> None:
@@ -106,22 +115,71 @@ def test_vertical_slice_requires_all_concrete_delivery_fields() -> None:
     ]
 
 
-def test_vertical_slice_accepts_complete_delivery_matrix() -> None:
+def _write_vertical_slice_fixture(tmp_path) -> None:
+    contract = tmp_path / "contracts/api-surface.openapi.yaml"
+    contract.parent.mkdir(parents=True)
+    contract.write_text(
+        "openapi: 3.1.0\n"
+        "info: {title: test, version: 1.0.0}\n"
+        "paths:\n"
+        "  /projects:\n"
+        "    get: {operationId: listProjects, responses: {'200': {description: ok}}}\n"
+        "    post: {operationId: createProject, responses: {'200': {description: ok}}}\n",
+        encoding="utf-8",
+    )
+    backend_test = tmp_path / "tests/integration/test_project_api.py"
+    backend_test.parent.mkdir(parents=True)
+    backend_test.write_text("", encoding="utf-8")
+    browser_test = tmp_path / "apps/web/e2e/r1-teacher-flow.spec.ts"
+    browser_test.parent.mkdir(parents=True)
+    browser_test.write_text("", encoding="utf-8")
+
+
+def test_vertical_slice_accepts_complete_delivery_matrix(tmp_path) -> None:
+    _write_vertical_slice_fixture(tmp_path)
     body = vertical_section(
         f"{VERTICAL_REQUIRED}\n{VERTICAL_NOT_REQUIRED_UNCHECKED}",
         "Page routes: /app/projects, /app/projects/new\n"
-        "Active operationIds: listProjects, createProject\n"
+        "Active operationIds: `listProjects`, `createProject`\n"
         "Formal facts: Project\n"
-        "Backend tests: tests/integration/test_project_api.py::test_create_project\n"
-        "Real API Playwright: apps/web/e2e/r1-teacher-flow.spec.ts::creates_project\n",
+        "Backend tests: `tests/integration/test_project_api.py::test_create_project`\n"
+        "Real API Playwright: "
+        "`apps/web/e2e/r1-teacher-flow.spec.ts::creates_project`\n",
     )
 
     assert (
         validate_vertical_slice_declaration(
-            body, {"contracts/api-surface.openapi.yaml"}, required=True
+            body,
+            {"contracts/api-surface.openapi.yaml"},
+            required=True,
+            repo_root=tmp_path,
         )
         == []
     )
+
+
+def test_vertical_slice_rejects_unknown_operation_and_missing_test_files(tmp_path) -> None:
+    _write_vertical_slice_fixture(tmp_path)
+    body = vertical_section(
+        f"{VERTICAL_REQUIRED}\n{VERTICAL_NOT_REQUIRED_UNCHECKED}",
+        "Page routes: /app/projects\n"
+        "Active operationIds: `fakeOperation`\n"
+        "Formal facts: Project\n"
+        "Backend tests: `tests/integration/missing.py::test_missing`\n"
+        "Real API Playwright: `apps/web/e2e/missing.spec.ts::missing`\n",
+    )
+
+    assert validate_vertical_slice_declaration(
+        body,
+        {"apps/api/projects/router.py"},
+        required=True,
+        repo_root=tmp_path,
+    ) == [
+        "vertical slice declares unknown active operationIds: fakeOperation",
+        "vertical slice declares missing Backend tests file: tests/integration/missing.py",
+        "vertical slice declares missing Real API Playwright file: "
+        "apps/web/e2e/missing.spec.ts",
+    ]
 
 
 def test_vertical_slice_opt_out_accepts_non_boundary_change() -> None:
@@ -133,7 +191,6 @@ def test_vertical_slice_opt_out_accepts_non_boundary_change() -> None:
         )
         == []
     )
-
 
 def test_review_declaration_keeps_legacy_pr_body_compatible() -> None:
     assert validate_review_declaration("legacy PR body", BASE_SHA, HEAD_SHA) == []
