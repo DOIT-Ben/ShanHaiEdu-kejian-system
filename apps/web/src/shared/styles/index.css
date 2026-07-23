@@ -1,0 +1,205 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--sh-surface-canvas);
+  color-scheme: light;
+}
+
+html[data-theme="night"] {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--sh-ink-default);
+  background: var(--sh-surface-canvas);
+  font-family: var(--sh-font-interface);
+  font-size: 14px;
+  line-height: 1.65;
+  letter-spacing: 0;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  transition:
+    color var(--sh-duration-normal) var(--sh-ease-standard),
+    background-color var(--sh-duration-normal) var(--sh-ease-standard);
+}
+
+.sh-display-type {
+  font-family: var(--sh-font-display);
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+  letter-spacing: 0;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--sh-ink-placeholder);
+}
+
+.sh-creation-prompt:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+select,
+textarea,
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]) {
+  accent-color: var(--sh-brand-500);
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  text-decoration: none;
+}
+
+button {
+  border: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--sh-focus-ring-color);
+  outline-offset: 2px;
+}
+
+::selection {
+  color: var(--sh-ink-strong);
+  background: var(--sh-brand-100);
+}
+
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4 {
+    margin: 0;
+    color: var(--sh-ink-strong);
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+}
+
+button,
+a,
+select,
+textarea,
+input {
+  transition-timing-function: var(--sh-ease-standard);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+@media (max-width: 767px), (max-height: 560px) {
+  .sh-creation-studio .creation-preview-toolbar {
+    position: sticky;
+    top: -1px;
+    z-index: 10;
+    border-bottom: 1px solid var(--sh-line-subtle);
+    background: var(--sh-surface-soft);
+  }
+}
+
+@media (max-height: 560px) {
+  .sh-creation-studio > header {
+    min-height: 40px;
+  }
+
+  .sh-creation-studio [data-testid="creation-preview-panel"] {
+    border: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  .sh-creation-studio [data-testid="creation-composer"] {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-top: 2px;
+  }
+
+  .sh-creation-studio [data-testid="creation-composer-panel"] {
+    border-radius: var(--sh-radius-md);
+    padding: 4px;
+  }
+
+  .sh-creation-studio .sh-creation-prompt {
+    min-height: 44px;
+    padding-bottom: 6px;
+    padding-top: 6px;
+  }
+}
+
+@media (min-width: 768px) and (max-height: 560px) {
+  .sh-creation-studio .sh-creation-composer-layout {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sh-creation-studio .sh-creation-composer-layout > label {
+    min-width: 0;
+  }
+
+  .sh-creation-studio .sh-creation-composer-layout > label .sh-creation-prompt {
+    height: 44px !important;
+  }
+
+  .sh-creation-studio .sh-creation-composer-layout > div:last-child {
+    margin-top: 0;
+  }
+}
+
+/* Keep wide media inspectable while reserving the fixed composer and actions on short desktops. */
+@media (min-width: 768px) and (min-height: 680px) and (max-height: 820px) {
+  .sh-creation-studio [data-testid="creation-main-visual"][data-creation-type="video"] {
+    width: min(100%, max(360px, calc((100dvh - 484px) * 1.777778)));
+  }
+
+  .sh-creation-studio [data-testid="creation-main-visual"][data-creation-type="presentation"] {
+    width: min(100%, max(320px, calc((100dvh - 571px) * 1.777778)));
+  }
+}
+
+@keyframes sh-select-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.sh-select-content[data-state="open"] {
+  animation: sh-select-in var(--sh-duration-fast) var(--sh-ease-standard);
+  transform-origin: var(--radix-select-content-transform-origin);
+}
+
+@media (pointer: coarse) {
+  .sh-control-compact {
+    height: 2.75rem;
+    min-height: 2.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-select-content[data-state="open"] {
+    animation: none;
+  }
+}

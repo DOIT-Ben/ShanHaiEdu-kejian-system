@@ -1,0 +1,118 @@
+name: frontend-ci
+
+on:
+  pull_request:
+    paths:
+      - "apps/web/**"
+      - "contracts/api-surface.openapi.yaml"
+      - "contracts/sse-event.schema.json"
+      - "contracts/fixtures/stage0/job-progress-event.json"
+      - "contracts/generated/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/frontend-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/web/**"
+      - "contracts/api-surface.openapi.yaml"
+      - "contracts/sse-event.schema.json"
+      - "contracts/fixtures/stage0/job-progress-event.json"
+      - "contracts/generated/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/frontend-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Frontend quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          cache: pnpm
+          node-version: "22"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify generated API types
+        run: |
+          pnpm --filter @shanhaiedu/web generate:api
+          git diff --exit-code -- contracts/generated apps/web/src/generated
+
+      - name: Check formatting
+        run: pnpm --filter @shanhaiedu/web format
+
+      - name: Lint
+        run: pnpm --filter @shanhaiedu/web lint
+
+      - name: Typecheck
+        run: pnpm --filter @shanhaiedu/web typecheck
+
+      - name: Unit tests
+        run: pnpm --filter @shanhaiedu/web test
+
+      - name: Build Storybook
+        run: pnpm --filter @shanhaiedu/web build:storybook
+
+      - name: Install Chromium for accessibility checks
+        run: pnpm --filter @shanhaiedu/web exec playwright install --with-deps chromium
+
+      - name: Test Storybook accessibility
+        run: pnpm --filter @shanhaiedu/web test:storybook:a11y
+
+      - name: Build production bundle
+        run: pnpm --filter @shanhaiedu/web build
+
+  browser:
+    name: Frontend browser
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          cache: pnpm
+          node-version: "22"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm --filter @shanhaiedu/web exec playwright install --with-deps chromium
+
+      - name: Run Chromium flows
+        run: pnpm --filter @shanhaiedu/web test:e2e --project=chromium
+
+      - name: Run runtime contract flows
+        run: pnpm --filter @shanhaiedu/web test:e2e:runtime --project=runtime-chromium

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="eye-care">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f3f7ee" />
+    <meta name="description" content="山海教育课件系统教师创作台" />
+    <title>山海教育课件系统</title>
+    <script>
+      (() => {
+        const key = "shanhaiedu.theme";
+        const allowed = new Set(["eye-care", "day", "night", "atelier"]);
+        let theme = "eye-care";
+        try {
+          const saved = localStorage.getItem(key);
+          if (allowed.has(saved)) theme = saved;
+        } catch {}
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme === "night" ? "dark" : "light";
+        const colors = {
+          "eye-care": "#f3f7ee",
+          day: "#ffffff",
+          night: "#272b29",
+          atelier: "#f3f4f2",
+        };
+        document.querySelector('meta[name="theme-color"]').content = colors[theme];
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

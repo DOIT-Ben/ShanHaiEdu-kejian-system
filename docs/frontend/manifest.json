@@ -17,7 +17,6 @@
   },
   "required_deliverables": [
     "source_code",
-    "figma_source",
     "storybook",
     "mock_mode",
     "real_api_mode",
