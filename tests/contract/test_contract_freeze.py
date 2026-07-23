@@ -46,9 +46,9 @@ def test_two_lesson_fixture_rejects_cross_lesson_ppt_version() -> None:
 
 def test_two_lesson_fixture_rejects_video_course_context_leak() -> None:
     fixture = copy.deepcopy(_fixture())
-    fixture["lessons"][0]["parallel_inputs"]["video"][
-        "approved_lesson_plan_version_id"
-    ] = "ARTIFACT-LESSON-PLAN-VERSION-001"
+    fixture["lessons"][0]["parallel_inputs"]["video"]["approved_lesson_plan_version_id"] = (
+        "ARTIFACT-LESSON-PLAN-VERSION-001"
+    )
 
     errors = _check_two_lesson_fixture_data(fixture)
 
