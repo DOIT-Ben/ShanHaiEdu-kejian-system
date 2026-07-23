@@ -1,7 +1,9 @@
 # 前端设计与外包规格
 
-状态：当前唯一前端基线  
-目标：生产级React教师创作台  
+状态：当前唯一前端基线
+
+目标：生产级React教师创作台
+
 当前交付决定：[Decision #210](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/210)
 
 ## 1. 产品形态
