@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Protocol
 from uuid import UUID
@@ -104,6 +105,56 @@ class ArtifactAuthoringProvisionPort:
         )
         self._session.add(draft)
         self._session.flush()
+        artifact.current_draft_id = draft.id
+        self._touch_artifact(artifact)
+        self._session.flush()
+        return draft
+
+    def provision_initial_locked_fields(
+        self,
+        *,
+        artifact_id: UUID,
+        draft_branch: str,
+        expected_lock_version: int,
+        fields: Mapping[str, Any],
+    ) -> ArtifactDraft:
+        self._require_system()
+        artifact = self._require_artifact(artifact_id)
+        draft = self._repository.get_draft(artifact.id, draft_branch, for_update=True)
+        if (
+            draft is None
+            or draft.based_on_version_id is not None
+            or draft.lock_version != expected_lock_version
+        ):
+            raise self._conflict("The initial authoring draft changed or is unavailable.")
+        policy = self._require_policy(artifact.content_definition_version_id)
+        locked = {field.field_key for field in policy.fields if not field.editable}
+        invalid = sorted(key for key in fields if key not in locked or key in draft.content_json)
+        if not fields or invalid:
+            raise ApiError(
+                status_code=422,
+                code="AUTHORING_POLICY_VIOLATION",
+                message="Only missing locked fields can be provisioned.",
+                details={"paths": invalid},
+            )
+        content = deepcopy(draft.content_json)
+        content.update(deepcopy(dict(fields)))
+        report = self._validation.validation_report(
+            self._validation.require_artifact_definition(artifact),
+            content,
+        )
+        if not report["valid"]:
+            raise ApiError(
+                status_code=422,
+                code="INVALID_ARTIFACT",
+                message="The provisioned draft does not match the published schema.",
+            )
+        draft.content_json = content
+        draft.validation_report_json = report
+        draft.autosaved_at = utc_now()
+        draft.updated_at = utc_now()
+        draft.updated_by = self._actor.principal_id
+        draft.lock_version += 1
         artifact.current_draft_id = draft.id
         self._touch_artifact(artifact)
         self._session.flush()

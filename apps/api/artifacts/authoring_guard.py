@@ -45,11 +45,16 @@ class ArtifactAuthoringGuard:
         content: dict[str, Any],
         *,
         baseline: dict[str, Any] | None,
+        server_provisioned: bool = False,
     ) -> None:
         try:
             policy = AuthoringPolicyLoader(self._session).require_by_id(definition_id)
             if baseline is None:
-                policy.validate_create(content)
+                initial = content
+                if server_provisioned:
+                    editable_keys = {field.field_key for field in policy.fields if field.editable}
+                    initial = {key: value for key, value in content.items() if key in editable_keys}
+                policy.validate_create(initial)
             else:
                 policy.validate_update(baseline, content)
         except AuthoringPolicyUnavailable as exc:

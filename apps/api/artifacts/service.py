@@ -24,7 +24,7 @@ from apps.api.artifacts.validation import ArtifactValidation
 from apps.api.content_runtime.models import ContentDefinitionVersion
 from apps.api.database import utc_now
 from apps.api.errors import ApiError
-from apps.api.identity.context import ActorContext, ProjectAction
+from apps.api.identity.context import ActorContext, ProjectAction, system_actor
 from apps.api.ids import new_uuid7
 from apps.api.reliability.events import EventResource, EventWriter
 
@@ -252,7 +252,15 @@ class ArtifactService:
     ) -> tuple[str, dict[str, Any]]:
         definition = self._validation.require_artifact_definition(artifact)
         baseline = self._authoring.baseline(artifact, draft)
-        self._authoring.validate(definition.id, draft.content_json, baseline=baseline)
+        self._authoring.validate(
+            definition.id,
+            draft.content_json,
+            baseline=baseline,
+            server_provisioned=(
+                baseline is None
+                and draft.updated_by == system_actor(self._actor.organization_id).principal_id
+            ),
+        )
         report = self._validation.validation_report(definition, draft.content_json)
         if not report["valid"]:
             raise ApiError(
