@@ -1,0 +1,177 @@
+{
+  "$schema": "./development-leases.schema.json",
+  "lease_version": "shanhai.development-leases/v1",
+  "shared_contract_paths": [
+    "contracts/api-surface.openapi.yaml",
+    "contracts/planned-api-surface.openapi.yaml",
+    "contracts/generated/**",
+    "contracts/full-chain-freeze.json",
+    "contracts/full-chain-freeze.schema.json",
+    "contracts/page-api-fact-matrix.json",
+    "contracts/page-api-fact-matrix.schema.json",
+    "contracts/development-leases.json",
+    "contracts/development-leases.schema.json",
+    "contracts/fixtures/workflow-node-generation-bindings/**",
+    "contracts/fixtures/primary-math-courseware-package/**",
+    "workflow/builtin/primary_math_courseware/**",
+    "workflow/definition/**",
+    "apps/api/node_execution/**",
+    "apps/api/artifacts/**",
+    "apps/api/model_gateway/**"
+  ],
+  "change_process": {
+    "request": "open_contract_change",
+    "owner_update": "merge_shared_contract_first",
+    "consumer_resume": "rebase_then_continue"
+  },
+  "tracks": [
+    {
+      "track_key": "shared_contract",
+      "role": "Single writer for active/planned OpenAPI, generated client, immutable content releases, workflow binding, shared Artifact/Job semantics and freeze gates.",
+      "writable": [
+        "contracts/api-surface.openapi.yaml",
+        "contracts/planned-api-surface.openapi.yaml",
+        "contracts/generated/**",
+        "contracts/full-chain-freeze.json",
+        "contracts/full-chain-freeze.schema.json",
+        "contracts/page-api-fact-matrix.json",
+        "contracts/page-api-fact-matrix.schema.json",
+        "contracts/development-leases.json",
+        "contracts/development-leases.schema.json",
+        "contracts/fixtures/contract-freeze/**",
+        "contracts/fixtures/workflow-node-generation-bindings/**",
+        "contracts/fixtures/primary-math-courseware-package/**",
+        "workflow/builtin/primary_math_courseware/**",
+        "workflow/definition/**",
+        "apps/api/node_execution/**",
+        "apps/api/artifacts/**",
+        "apps/api/model_gateway/**",
+        "scripts/check_contract_freeze.py",
+        "tests/contract/test_contract_freeze.py",
+        "docs/governance/CONTRACT_FREEZE.md"
+      ],
+      "readonly": ["apps/web/**", "apps/api/ppt/**", "apps/api/video/**", "apps/api/lessons/**"],
+      "forbidden": [],
+      "contract_change_required": false
+    },
+    {
+      "track_key": "frontend",
+      "role": "Production UI and generated-client consumer; no server contract ownership.",
+      "writable": ["apps/web/**"],
+      "readonly": [
+        "contracts/api-surface.openapi.yaml",
+        "contracts/generated/**",
+        "contracts/full-chain-freeze.json",
+        "contracts/page-api-fact-matrix.json",
+        "contracts/fixtures/contract-freeze/**"
+      ],
+      "forbidden": [
+        "contracts/planned-api-surface.openapi.yaml",
+        "workflow/**",
+        "apps/api/**",
+        "workers/**",
+        "alembic/**"
+      ],
+      "contract_change_required": true
+    },
+    {
+      "track_key": "ppt",
+      "role": "Complete PPT internal node implementation using exact approved lesson-plan fixtures.",
+      "writable": [
+        "apps/api/ppt/**",
+        "workers/ppt/**",
+        "tests/unit/ppt/**",
+        "tests/integration/ppt/**",
+        "contracts/fixtures/parallel-inputs/ppt/**"
+      ],
+      "readonly": [
+        "contracts/api-surface.openapi.yaml",
+        "contracts/generated/**",
+        "contracts/full-chain-freeze.json",
+        "contracts/fixtures/contract-freeze/**",
+        "contracts/fixtures/workflow-node-generation-bindings/**",
+        "contracts/fixtures/primary-math-courseware-package/**"
+      ],
+      "forbidden": [
+        "apps/web/**",
+        "contracts/api-surface.openapi.yaml",
+        "contracts/planned-api-surface.openapi.yaml",
+        "contracts/generated/**",
+        "workflow/builtin/primary_math_courseware/**",
+        "workflow/definition/**",
+        "apps/api/node_execution/**",
+        "apps/api/artifacts/**",
+        "apps/api/model_gateway/**",
+        "apps/api/video/**"
+      ],
+      "contract_change_required": true
+    },
+    {
+      "track_key": "video",
+      "role": "Complete video internal node implementation using exact IntroSelection fixtures, including real TTS, subtitles, timeline and final MP4.",
+      "writable": [
+        "apps/api/video/**",
+        "workers/video/**",
+        "tests/unit/video/**",
+        "tests/integration/video/**",
+        "contracts/fixtures/parallel-inputs/video/**"
+      ],
+      "readonly": [
+        "contracts/api-surface.openapi.yaml",
+        "contracts/generated/**",
+        "contracts/full-chain-freeze.json",
+        "contracts/fixtures/contract-freeze/**",
+        "contracts/fixtures/workflow-node-generation-bindings/**",
+        "contracts/fixtures/primary-math-courseware-package/**"
+      ],
+      "forbidden": [
+        "apps/web/**",
+        "contracts/api-surface.openapi.yaml",
+        "contracts/planned-api-surface.openapi.yaml",
+        "contracts/generated/**",
+        "workflow/builtin/primary_math_courseware/**",
+        "workflow/definition/**",
+        "apps/api/node_execution/**",
+        "apps/api/artifacts/**",
+        "apps/api/model_gateway/**",
+        "apps/api/ppt/**"
+      ],
+      "contract_change_required": true
+    },
+    {
+      "track_key": "mainline",
+      "role": "Material, lesson division, lesson plan and intro runtime integration using the frozen shared contract.",
+      "writable": [
+        "apps/api/lessons/**",
+        "apps/api/uploads/**",
+        "apps/api/assets/material_evidence.py",
+        "tests/unit/lessons/**",
+        "tests/integration/mainline/**",
+        "contracts/fixtures/parallel-inputs/mainline/**"
+      ],
+      "readonly": [
+        "contracts/api-surface.openapi.yaml",
+        "contracts/generated/**",
+        "contracts/full-chain-freeze.json",
+        "contracts/page-api-fact-matrix.json",
+        "contracts/fixtures/contract-freeze/**",
+        "contracts/fixtures/workflow-node-generation-bindings/**",
+        "contracts/fixtures/primary-math-courseware-package/**"
+      ],
+      "forbidden": [
+        "apps/web/**",
+        "contracts/api-surface.openapi.yaml",
+        "contracts/planned-api-surface.openapi.yaml",
+        "contracts/generated/**",
+        "workflow/builtin/primary_math_courseware/**",
+        "workflow/definition/**",
+        "apps/api/node_execution/**",
+        "apps/api/artifacts/**",
+        "apps/api/model_gateway/**",
+        "apps/api/ppt/**",
+        "apps/api/video/**"
+      ],
+      "contract_change_required": true
+    }
+  ]
+}
