@@ -63,10 +63,6 @@ OPENAPI_HTTP_METHODS = {"get", "put", "post", "delete", "options", "head", "patc
 REAL_API_PLAYWRIGHT_PREFIX = "apps/web/e2e/real-api/"
 REAL_API_PLAYWRIGHT_CONFIG = "apps/web/playwright.real-api.config.ts"
 REAL_API_PLAYWRIGHT_WORKFLOW = ".github/workflows/r1-real-api.yml"
-PLAYWRIGHT_TEST_TITLE = re.compile(
-    r"""\btest\s*\(\s*(?P<quote>["'])(?P<title>.*?)(?P=quote)""",
-    re.DOTALL,
-)
 FIRST_REQUIRED_GOVERNANCE_PR = 93  # Remove under #94 after legacy PR #62 closes.
 
 
@@ -349,54 +345,12 @@ def _python_test_selectors(path: Path) -> set[str]:
     return selectors
 
 
-def _playwright_test_titles(path: Path) -> set[str]:
-    try:
-        source = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeError):
-        return set()
-    return {match.group("title") for match in PLAYWRIGHT_TEST_TITLE.finditer(source)}
-
-
-def _playwright_test_source(path: Path, title: str) -> str | None:
+def _playwright_test_calls(path: Path) -> dict[str, list[str]]:
     try:
         source = _strip_typescript_comments(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError):
-        return None
-    pattern = re.compile(
-        r"""\btest\s*\(\s*(?P<quote>["'])""" + re.escape(title) + r"""(?P=quote)\s*,"""
-    )
-    match = pattern.search(source)
-    if match is None:
-        return None
-    call_start = source.rfind("(", match.start(), match.end())
-    if call_start < 0:
-        return None
-    depth = 0
-    quote: str | None = None
-    escaped = False
-    for index in range(call_start, len(source)):
-        character = source[index]
-        if quote is not None:
-            if escaped:
-                escaped = False
-            elif character == "\\":
-                escaped = True
-            elif character == quote:
-                quote = None
-            continue
-        if character in {'"', "'", "`"}:
-            quote = character
-        elif character == "(":
-            depth += 1
-        elif character == ")":
-            depth -= 1
-            if depth == 0:
-                return source[match.start() : index + 1]
-    return None
-
-
-def _react_route_attributes(source: str) -> list[str]:
-    attributes: list[str] = []
+        return {}
+    calls: dict[str, list[str]] = {}
     index = 0
     quote: str | None = None
     escaped = False
@@ -414,6 +368,131 @@ def _react_route_attributes(source: str) -> list[str]:
         if character in {'"', "'", "`"}:
             quote = character
             index += 1
+            continue
+        if not source.startswith("test", index):
+            index += 1
+            continue
+        previous = source[index - 1] if index else ""
+        following_index = index + len("test")
+        following = source[following_index] if following_index < len(source) else ""
+        if (
+            previous.isalnum()
+            or previous in {"_", "$", "."}
+            or following.isalnum()
+            or following
+            in {
+                "_",
+                "$",
+            }
+        ):
+            index += len("test")
+            continue
+        while following_index < len(source) and source[following_index].isspace():
+            following_index += 1
+        if source[following_index : following_index + 1] != "(":
+            index += len("test")
+            continue
+        opening = following_index
+        title_index = opening + 1
+        while title_index < len(source) and source[title_index].isspace():
+            title_index += 1
+        title_quote = source[title_index : title_index + 1]
+        if title_quote not in {'"', "'"}:
+            index = opening + 1
+            continue
+        title_index += 1
+        title: list[str] = []
+        title_escaped = False
+        while title_index < len(source):
+            title_character = source[title_index]
+            if title_escaped:
+                title.append(title_character)
+                title_escaped = False
+            elif title_character == "\\":
+                title_escaped = True
+            elif title_character == title_quote:
+                break
+            else:
+                title.append(title_character)
+            title_index += 1
+        if title_index >= len(source):
+            break
+        after_title = title_index + 1
+        while after_title < len(source) and source[after_title].isspace():
+            after_title += 1
+        if source[after_title : after_title + 1] != ",":
+            index = after_title
+            continue
+        depth = 0
+        call_quote: str | None = None
+        call_escaped = False
+        call_end: int | None = None
+        for call_index in range(opening, len(source)):
+            call_character = source[call_index]
+            if call_quote is not None:
+                if call_escaped:
+                    call_escaped = False
+                elif call_character == "\\":
+                    call_escaped = True
+                elif call_character == call_quote:
+                    call_quote = None
+                continue
+            if call_character in {'"', "'", "`"}:
+                call_quote = call_character
+            elif call_character == "(":
+                depth += 1
+            elif call_character == ")":
+                depth -= 1
+                if depth == 0:
+                    call_end = call_index + 1
+                    break
+        if call_end is None:
+            break
+        calls.setdefault("".join(title), []).append(source[index:call_end])
+        index = call_end
+    return calls
+
+
+def _playwright_test_titles(path: Path) -> set[str]:
+    return set(_playwright_test_calls(path))
+
+
+def _playwright_test_source(path: Path, title: str) -> str | None:
+    calls = _playwright_test_calls(path).get(title, [])
+    return calls[0] if len(calls) == 1 else None
+
+
+def _react_route_tags(source: str) -> list[tuple[str, str, bool]]:
+    tags: list[tuple[str, str, bool]] = []
+    index = 0
+    quote: str | None = None
+    escaped = False
+    while index < len(source):
+        character = source[index]
+        if quote is not None:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == quote:
+                quote = None
+            index += 1
+            continue
+        if character in {'"', "'", "`"}:
+            quote = character
+            index += 1
+            continue
+        if source.startswith("</Route", index) and (
+            index + len("</Route") == len(source)
+            or not (
+                source[index + len("</Route")].isalnum() or source[index + len("</Route")] == "_"
+            )
+        ):
+            closing = source.find(">", index + len("</Route"))
+            if closing < 0:
+                break
+            tags.append(("close", "", False))
+            index = closing + 1
             continue
         if not source.startswith("<Route", index) or (
             index + len("<Route") < len(source)
@@ -443,11 +522,11 @@ def _react_route_attributes(source: str) -> list[str]:
                 braces -= 1
             elif character == ">" and braces == 0:
                 route_attributes = source[route_start + len("<Route") : index]
-                attributes.append(route_attributes)
+                tags.append(("open", route_attributes, route_attributes.rstrip().endswith("/")))
                 index += 1
                 break
             index += 1
-    return attributes
+    return tags
 
 
 def _route_has_render_attribute(attributes: str) -> bool:
@@ -506,25 +585,34 @@ def _frontend_page_routes(repo_root: Path) -> set[str] | None:
         return None
 
     source = _strip_typescript_comments(source)
-    route_literals: set[str] = set()
-    for attributes in _react_route_attributes(source):
-        if "RuntimeUnavailablePage" in attributes or "<Navigate" in attributes:
+    routes: set[str] = set()
+    route_stack: list[str | None] = []
+    for kind, attributes, self_closing in _react_route_tags(source):
+        if kind == "close":
+            if route_stack:
+                route_stack.pop()
             continue
         if not _route_has_render_attribute(attributes):
-            continue
+            is_rendered_page = False
+        else:
+            is_rendered_page = (
+                "RuntimeUnavailablePage" not in attributes and "<Navigate" not in attributes
+            )
         path_match = ROUTE_LITERAL.search(attributes)
-        if path_match is None:
-            continue
-        route = path_match.group("path")
-        if "*" not in route:
-            route_literals.add(route)
-
-    routes = {route for route in route_literals if route.startswith("/")}
-    routes.update(
-        f"/app/{route}".replace("//", "/")
-        for route in route_literals
-        if route and not route.startswith("/")
-    )
+        route_literal = path_match.group("path") if path_match is not None else ""
+        parent_route = route_stack[-1] if route_stack else None
+        if route_literal.startswith("/"):
+            full_route: str | None = route_literal
+        elif route_literal and parent_route is not None:
+            full_route = f"{parent_route.rstrip('/')}/{route_literal.lstrip('/')}"
+        elif re.search(r"\bindex(?:\s*=\s*\{\s*true\s*\})?\b", attributes):
+            full_route = parent_route
+        else:
+            full_route = parent_route
+        if is_rendered_page and full_route is not None and "*" not in full_route:
+            routes.add(full_route)
+        if not self_closing:
+            route_stack.append(full_route)
     return routes
 
 
@@ -588,8 +676,8 @@ def _real_api_playwright_source_error(path: Path, relative_path: str) -> str | N
         )
     forbidden = (
         re.compile(r"\binstallRuntimeApi\b"),
-        re.compile(r"\.\s*route\s*\("),
-        re.compile(r"""\[\s*["']route["']\s*\]\s*\("""),
+        re.compile(r"\.\s*route\b"),
+        re.compile(r"""\[\s*["']route["']\s*\]"""),
         re.compile(r"\brouteFromHAR\s*\("),
         re.compile(r"""\[\s*["']routeFromHAR["']\s*\]\s*\("""),
         re.compile(r"\bsetupServer\s*\("),

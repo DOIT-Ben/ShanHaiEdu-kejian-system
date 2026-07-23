@@ -908,6 +908,35 @@ def test_vertical_slice_rejects_missing_python_and_playwright_test_symbols(tmp_p
     ]
 
 
+def test_vertical_slice_rejects_playwright_title_inside_string(tmp_path: Path) -> None:
+    _write_vertical_slice_fixture(tmp_path)
+    browser_test = tmp_path / "apps/web/e2e/real-api/r1-teacher-flow.spec.ts"
+    browser_test.write_text(
+        "const fake = 'test(\"creates_project\", async () => {})';\n"
+        'test("different_project", async () => {});\n',
+        encoding="utf-8",
+    )
+    body = vertical_section(
+        f"{VERTICAL_REQUIRED}\n{VERTICAL_NOT_REQUIRED_UNCHECKED}",
+        "Page routes: /app/projects\n"
+        "Active operationIds: listProjects\n"
+        "Formal facts: Project\n"
+        "Backend tests: tests/integration/test_project_api.py::test_create_project\n"
+        "Real API Playwright: "
+        "apps/web/e2e/real-api/r1-teacher-flow.spec.ts::creates_project\n",
+    )
+
+    assert validate_vertical_slice_declaration(
+        body,
+        {"apps/api/projects/router.py"},
+        required=True,
+        repo_root=tmp_path,
+    ) == [
+        "vertical slice declares missing Real API Playwright selector: "
+        "apps/web/e2e/real-api/r1-teacher-flow.spec.ts::creates_project"
+    ]
+
+
 def test_vertical_slice_rejects_module_skipped_python_selector(tmp_path: Path) -> None:
     _write_vertical_slice_fixture(tmp_path)
     backend_test = tmp_path / "tests/integration/test_project_api.py"
@@ -1282,6 +1311,36 @@ def test_vertical_slice_rejects_string_redirect_and_elementless_routes(
         "vertical slice declares Page routes absent from RuntimeApp: "
         "/app/elementless, /app/fake-string, /app/redirect"
     ]
+
+
+def test_vertical_slice_preserves_nested_route_hierarchy(tmp_path: Path) -> None:
+    _write_vertical_slice_fixture(tmp_path)
+    runtime_app = tmp_path / "apps/web/src/app/RuntimeApp.tsx"
+    runtime_app.write_text(
+        '<Route element={<AppShell />} path="/app">\n'
+        '  <Route element={<ProjectsPage />} path="projects" />\n'
+        "</Route>\n"
+        '<Route element={<AdminShell />} path="/admin">\n'
+        '  <Route Component={UsersPage} path="users" />\n'
+        "</Route>\n",
+        encoding="utf-8",
+    )
+    body = vertical_section(
+        f"{VERTICAL_REQUIRED}\n{VERTICAL_NOT_REQUIRED_UNCHECKED}",
+        "Page routes: /admin/users, /app/users\n"
+        "Active operationIds: listProjects\n"
+        "Formal facts: Project\n"
+        "Backend tests: tests/integration/test_project_api.py::test_create_project\n"
+        "Real API Playwright: "
+        "apps/web/e2e/real-api/r1-teacher-flow.spec.ts::creates_project\n",
+    )
+
+    assert validate_vertical_slice_declaration(
+        body,
+        {"apps/web/src/app/RuntimeApp.tsx"},
+        required=True,
+        repo_root=tmp_path,
+    ) == ["vertical slice declares Page routes absent from RuntimeApp: /app/users"]
 
 
 def test_pull_request_template_contains_vertical_slice_contract() -> None:
