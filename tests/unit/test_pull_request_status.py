@@ -177,8 +177,7 @@ def test_vertical_slice_rejects_unknown_operation_and_missing_test_files(tmp_pat
     ) == [
         "vertical slice declares unknown active operationIds: fakeOperation",
         "vertical slice declares missing Backend tests file: tests/integration/missing.py",
-        "vertical slice declares missing Real API Playwright file: "
-        "apps/web/e2e/missing.spec.ts",
+        "vertical slice declares missing Real API Playwright file: apps/web/e2e/missing.spec.ts",
     ]
 
 
@@ -191,6 +190,7 @@ def test_vertical_slice_opt_out_accepts_non_boundary_change() -> None:
         )
         == []
     )
+
 
 def test_review_declaration_keeps_legacy_pr_body_compatible() -> None:
     assert validate_review_declaration("legacy PR body", BASE_SHA, HEAD_SHA) == []
