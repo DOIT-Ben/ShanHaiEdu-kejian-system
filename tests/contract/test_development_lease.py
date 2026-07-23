@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from scripts.check_development_lease import (
     parse_development_track,
@@ -12,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 LEASES = ROOT / "contracts/development-leases.json"
 
 
-def _leases() -> dict[str, object]:
+def _leases() -> dict[str, Any]:
     return json.loads(LEASES.read_text(encoding="utf-8"))
 
 
@@ -42,11 +43,59 @@ def test_frontend_track_rejects_active_openapi_changes() -> None:
     assert any("cannot modify" in error for error in errors)
 
 
+def test_ppt_track_accepts_real_ppt_runtime_files() -> None:
+    errors = validate_changed_paths(
+        _leases(),
+        "ppt",
+        [
+            "apps/api/ppt_runtime/service.py",
+            "apps/api/assets/pptx_writer.py",
+            "tests/integration/test_ppt_runtime.py",
+        ],
+    )
+
+    assert errors == []
+
+
+def test_video_track_accepts_real_video_runtime_files() -> None:
+    errors = validate_changed_paths(
+        _leases(),
+        "video",
+        [
+            "apps/api/video_runtime/service.py",
+            "tests/unit/video_runtime/test_service.py",
+            "tests/integration/test_video_runtime.py",
+        ],
+    )
+
+    assert errors == []
+
+
 def test_ppt_track_rejects_video_runtime_changes() -> None:
     errors = validate_changed_paths(
         _leases(),
         "ppt",
-        ["apps/api/video/runtime.py"],
+        ["apps/api/video_runtime/service.py"],
+    )
+
+    assert any("cannot modify" in error for error in errors)
+
+
+def test_video_track_rejects_ppt_runtime_changes() -> None:
+    errors = validate_changed_paths(
+        _leases(),
+        "video",
+        ["apps/api/ppt_runtime/service.py"],
+    )
+
+    assert any("cannot modify" in error for error in errors)
+
+
+def test_mainline_track_rejects_shared_node_execution_changes() -> None:
+    errors = validate_changed_paths(
+        _leases(),
+        "mainline",
+        ["apps/api/node_execution/router.py"],
     )
 
     assert any("cannot modify" in error for error in errors)
