@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 LEASE_WORKFLOW = Path(".github/workflows/development-lease.yml")
+LEASE_CHECKER = Path("scripts/check_development_lease.py")
 DUPLICATE_VIDEO_CHAIN = Path("contracts/fixtures/parallel-inputs/video/complete-chain.json")
 
 
@@ -48,6 +49,24 @@ def validate_trusted_contract_workflows(root: Path = ROOT) -> list[str]:
     for fragment in forbidden_checkout_refs:
         if fragment in text:
             errors.append(f"development lease workflow checks out untrusted PR code: {fragment}")
+
+    checker_path = root / LEASE_CHECKER
+    if not checker_path.is_file():
+        errors.append(f"missing trusted lease checker: {LEASE_CHECKER}")
+    else:
+        checker_text = checker_path.read_text(encoding="utf-8")
+        checker_fragments = {
+            "NUL-delimited name-status parsing": '"--name-status"',
+            "NUL path delimiter": '"-z"',
+            "rename detection": '"--find-renames"',
+            "copy detection": '"--find-copies"',
+            "type-change coverage": '"--diff-filter=ACMRTD"',
+        }
+        for label, fragment in checker_fragments.items():
+            if fragment not in checker_text:
+                errors.append(f"development lease checker lacks {label}")
+        if '"--name-only"' in checker_text:
+            errors.append("development lease checker must not use rename-unsafe --name-only output")
 
     if (root / DUPLICATE_VIDEO_CHAIN).exists():
         errors.append(
