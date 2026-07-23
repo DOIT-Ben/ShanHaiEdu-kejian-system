@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 from pathlib import Path
+from typing import Any
 
 from scripts.check_parallel_fixtures import (
     FIXTURE_PATH,
@@ -12,7 +13,7 @@ from scripts.check_parallel_fixtures import (
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def _fixture() -> dict[str, object]:
+def _fixture() -> dict[str, Any]:
     return json.loads((ROOT / FIXTURE_PATH.relative_to(ROOT)).read_text(encoding="utf-8"))
 
 
