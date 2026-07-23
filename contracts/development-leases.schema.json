@@ -4,8 +4,9 @@
   "title": "ShanHaiEdu Parallel Development Leases",
   "type": "object",
   "additionalProperties": false,
-  "required": ["lease_version", "shared_contract_paths", "change_process", "tracks"],
+  "required": ["$schema", "lease_version", "shared_contract_paths", "change_process", "tracks"],
   "properties": {
+    "$schema": {"const": "./development-leases.schema.json"},
     "lease_version": {"const": "shanhai.development-leases/v1"},
     "shared_contract_paths": {
       "type": "array",
