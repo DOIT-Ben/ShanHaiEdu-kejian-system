@@ -1,0 +1,216 @@
+{
+  "$schema": "./page-api-fact-matrix.schema.json",
+  "matrix_version": "shanhai.page-api-fact-matrix/v1",
+  "state_model": [
+    "not_started",
+    "ready",
+    "queued",
+    "running",
+    "provider_succeeded",
+    "failed",
+    "draft",
+    "submitted",
+    "quality_failed",
+    "awaiting_approval",
+    "approved",
+    "adopted",
+    "saved_to_project",
+    "stale",
+    "cancelled"
+  ],
+  "operations": [
+    {"operation_id": "listProjects", "availability": "active", "formal_fact_role": "Project collection"},
+    {"operation_id": "createProject", "availability": "active", "formal_fact_role": "Project creation"},
+    {"operation_id": "getProject", "availability": "active", "formal_fact_role": "Project identity and fixed ContentRelease"},
+    {"operation_id": "listProjectLessons", "availability": "active", "formal_fact_role": "Ordered LessonUnit collection"},
+    {"operation_id": "getLesson", "availability": "active", "formal_fact_role": "LessonUnit identity and enabled branches"},
+    {"operation_id": "createMaterialUploadSession", "availability": "active", "formal_fact_role": "Private material upload session"},
+    {"operation_id": "confirmMaterialUpload", "availability": "active", "formal_fact_role": "SourceMaterial and parse job"},
+    {"operation_id": "getSourceMaterialFileAsset", "availability": "active", "formal_fact_role": "Exact FileAssetVersion metadata"},
+    {"operation_id": "listMaterialParseVersions", "availability": "active", "formal_fact_role": "MaterialParseVersion history"},
+    {"operation_id": "prepareLessonDivision", "availability": "candidate_required", "formal_fact_role": "Exact approved material scope preparation", "promotion_requirement": "Must be added to active OpenAPI with runtime and contract tests before frontend integration"},
+    {"operation_id": "getProjectWorkflow", "availability": "active", "formal_fact_role": "NodeRun and branch aggregate"},
+    {"operation_id": "startNodeRun", "availability": "planned", "formal_fact_role": "NodeRun command producing GenerationJob", "promotion_requirement": "Must move from planned to active before production frontend calls it"},
+    {"operation_id": "getPromptPreview", "availability": "active", "formal_fact_role": "Editable business prompt projection only"},
+    {"operation_id": "getGenerationJob", "availability": "active", "formal_fact_role": "GenerationJob state from PostgreSQL"},
+    {"operation_id": "streamGenerationJobEvents", "availability": "active", "formal_fact_role": "Job SSE with Last-Event-ID resume"},
+    {"operation_id": "streamProjectEvents", "availability": "active", "formal_fact_role": "Project SSE with Last-Event-ID resume"},
+    {"operation_id": "listProjectArtifacts", "availability": "candidate_required", "formal_fact_role": "Lesson-scoped Artifact collection and exact version pointers", "promotion_requirement": "Must be added to active OpenAPI with project and lesson filters before frontend integration"},
+    {"operation_id": "getArtifact", "availability": "active", "formal_fact_role": "Artifact current draft and immutable version pointers"},
+    {"operation_id": "saveArtifactDraft", "availability": "active", "formal_fact_role": "Optimistic-lock draft persistence"},
+    {"operation_id": "submitArtifactVersion", "availability": "active", "formal_fact_role": "Immutable ArtifactVersion submission"},
+    {"operation_id": "reviewArtifactVersion", "availability": "active", "formal_fact_role": "Approval append and pointer transition"},
+    {"operation_id": "getLessonIntroOptions", "availability": "active", "formal_fact_role": "Approved option set, pending version and current IntroSelection"},
+    {"operation_id": "selectLessonIntroOption", "availability": "active", "formal_fact_role": "Immutable exact IntroSelection"},
+    {"operation_id": "createCreationPackage", "availability": "planned", "formal_fact_role": "Immutable node-to-creation package bridge", "promotion_requirement": "Must move from planned to active before project-source creation workflows use it"},
+    {"operation_id": "createCreationBatch", "availability": "active", "formal_fact_role": "CreationBatch from immutable package or standalone source"},
+    {"operation_id": "saveCreationPromptVersion", "availability": "active", "formal_fact_role": "Immutable editable business prompt version"},
+    {"operation_id": "generateCreationItem", "availability": "active", "formal_fact_role": "GenerationJob from exact PromptVersion"},
+    {"operation_id": "generateCreationBatch", "availability": "active", "formal_fact_role": "Batch GenerationJobs from exact PromptVersions"},
+    {"operation_id": "adoptGenerationResult", "availability": "active", "formal_fact_role": "Adoption without project write"},
+    {"operation_id": "saveAdoptionToProject", "availability": "active", "formal_fact_role": "Atomic adopted result write to fixed project slot"},
+    {"operation_id": "listProjectAssetSlots", "availability": "active", "formal_fact_role": "Lesson-scoped project asset slots and bindings"},
+    {"operation_id": "getProjectAssetPackage", "availability": "active", "formal_fact_role": "Project asset drawer aggregate"}
+  ],
+  "pages": [
+    {
+      "page_key": "projects",
+      "route": "/app/projects",
+      "scope_keys": ["project_id"],
+      "actions": [
+        {
+          "action_key": "open_or_create_project",
+          "operation_ids": ["listProjects", "createProject", "getProject"],
+          "formal_facts": ["Project", "ContentRelease binding"],
+          "exact_references": ["project_id", "content_release_id"],
+          "completion_rule": "Project exists in PostgreSQL and returns its fixed release; navigation state alone is not completion."
+        }
+      ],
+      "refresh_operations": ["getProject", "listProjectLessons", "getProjectWorkflow"]
+    },
+    {
+      "page_key": "material",
+      "route": "/app/projects/:projectId/materials/:materialId?",
+      "scope_keys": ["project_id", "job_id"],
+      "actions": [
+        {
+          "action_key": "upload_and_parse_material",
+          "operation_ids": ["createMaterialUploadSession", "confirmMaterialUpload", "getGenerationJob", "streamGenerationJobEvents", "getSourceMaterialFileAsset", "listMaterialParseVersions"],
+          "formal_facts": ["SourceMaterial", "FileAssetVersion", "MaterialParseVersion", "GenerationJob"],
+          "exact_references": ["project_id", "source_material_id", "file_asset_version_id", "material_parse_version_id"],
+          "completion_rule": "Upload confirmation starts a job; parse completion requires a persisted MaterialParseVersion and does not imply material-scope approval."
+        },
+        {
+          "action_key": "approve_material_scope",
+          "operation_ids": ["prepareLessonDivision", "getArtifact", "saveArtifactDraft", "submitArtifactVersion", "reviewArtifactVersion"],
+          "formal_facts": ["material_scope ArtifactVersion", "Approval"],
+          "exact_references": ["project_id", "source_material_id", "material_parse_version_id", "material_scope_artifact_version_id"],
+          "completion_rule": "Only the exact approved material-scope version may enter lesson division."
+        }
+      ],
+      "refresh_operations": ["getProject", "getSourceMaterialFileAsset", "listMaterialParseVersions", "getProjectWorkflow"]
+    },
+    {
+      "page_key": "lesson_division",
+      "route": "/app/projects/:projectId/lessons",
+      "scope_keys": ["project_id", "node_run_id", "job_id", "artifact_id", "artifact_version_id"],
+      "actions": [
+        {
+          "action_key": "generate_lesson_division",
+          "operation_ids": ["getProjectWorkflow", "getPromptPreview", "startNodeRun", "getGenerationJob", "streamGenerationJobEvents", "listProjectArtifacts", "getArtifact"],
+          "formal_facts": ["NodeRun", "GenerationJob", "lesson_division ArtifactVersion"],
+          "exact_references": ["project_id", "material_scope_artifact_version_id", "material_parse_version_id", "node_run_id", "artifact_version_id"],
+          "completion_rule": "Provider success is intermediate; the generated ArtifactVersion must be submitted, quality validated and approved."
+        },
+        {
+          "action_key": "review_lesson_division",
+          "operation_ids": ["saveArtifactDraft", "submitArtifactVersion", "reviewArtifactVersion", "listProjectLessons"],
+          "formal_facts": ["ArtifactVersion", "ArtifactQualityReport", "Approval", "LessonUnit collection"],
+          "exact_references": ["lesson_division_artifact_version_id", "quality_report_id", "approval_id"],
+          "completion_rule": "LessonUnit sync occurs only from the exact approved lesson-division version."
+        }
+      ],
+      "refresh_operations": ["getProjectWorkflow", "listProjectLessons", "listProjectArtifacts"]
+    },
+    {
+      "page_key": "lesson_plan",
+      "route": "/app/projects/:projectId/lessons/:lessonId/work/lesson-plan",
+      "scope_keys": ["project_id", "lesson_id", "node_run_id", "job_id", "artifact_id", "artifact_version_id"],
+      "actions": [
+        {
+          "action_key": "generate_and_approve_lesson_plan",
+          "operation_ids": ["getLesson", "getProjectWorkflow", "getPromptPreview", "startNodeRun", "getGenerationJob", "streamGenerationJobEvents", "listProjectArtifacts", "getArtifact", "saveArtifactDraft", "submitArtifactVersion", "reviewArtifactVersion"],
+          "formal_facts": ["LessonUnit", "NodeRun", "GenerationJob", "lesson_plan ArtifactVersion", "ArtifactQualityReport", "Approval"],
+          "exact_references": ["project_id", "lesson_id", "approved_lesson_division_version_id", "material_parse_version_id", "lesson_plan_artifact_version_id", "approval_id"],
+          "completion_rule": "PPT may start only from the exact approved lesson-plan ArtifactVersion for this lesson."
+        }
+      ],
+      "refresh_operations": ["getLesson", "getProjectWorkflow", "listProjectArtifacts"]
+    },
+    {
+      "page_key": "intro_options",
+      "route": "/app/projects/:projectId/lessons/:lessonId/work/intro",
+      "scope_keys": ["project_id", "lesson_id", "node_run_id", "job_id", "artifact_id", "artifact_version_id"],
+      "actions": [
+        {
+          "action_key": "generate_approve_and_select_intro",
+          "operation_ids": ["getLesson", "getProjectWorkflow", "getPromptPreview", "startNodeRun", "getGenerationJob", "streamGenerationJobEvents", "listProjectArtifacts", "getArtifact", "saveArtifactDraft", "submitArtifactVersion", "reviewArtifactVersion", "getLessonIntroOptions", "selectLessonIntroOption"],
+          "formal_facts": ["intro_option_set ArtifactVersion", "ArtifactQualityReport", "Approval", "IntroSelection"],
+          "exact_references": ["project_id", "lesson_id", "intro_option_set_artifact_version_id", "option_key", "intro_selection_id"],
+          "completion_rule": "Video may start only from one active consumable IntroSelection snapshot; recommendation alone is not selection."
+        }
+      ],
+      "refresh_operations": ["getLesson", "getProjectWorkflow", "getLessonIntroOptions", "listProjectArtifacts"]
+    },
+    {
+      "page_key": "ppt_workbench",
+      "route": "/app/projects/:projectId/lessons/:lessonId/work/ppt",
+      "scope_keys": ["project_id", "lesson_id", "node_run_id", "job_id", "artifact_id", "artifact_version_id", "creation_package_id"],
+      "actions": [
+        {
+          "action_key": "run_complete_ppt_nodes",
+          "operation_ids": ["getLesson", "getProjectWorkflow", "getPromptPreview", "startNodeRun", "getGenerationJob", "streamGenerationJobEvents", "listProjectArtifacts", "getArtifact", "saveArtifactDraft", "submitArtifactVersion", "reviewArtifactVersion"],
+          "formal_facts": ["ppt_analysis", "ppt_outline", "ppt_page_specs", "ppt_style_contract", "ppt_page_previews", "ppt_final", "Approval"],
+          "exact_references": ["lesson_id", "approved_lesson_plan_version_id", "ppt_analysis_version_id", "ppt_outline_version_id", "ppt_page_specs_version_id", "ppt_style_contract_version_id", "pptx_file_asset_version_id"],
+          "completion_rule": "The complete ordered PPT node graph must run; a generated deck preview is not final approval."
+        },
+        {
+          "action_key": "generate_and_adopt_ppt_images",
+          "operation_ids": ["createCreationPackage", "createCreationBatch", "saveCreationPromptVersion", "generateCreationItem", "generateCreationBatch", "getGenerationJob", "streamGenerationJobEvents", "adoptGenerationResult", "saveAdoptionToProject", "listProjectAssetSlots"],
+          "formal_facts": ["CreationPackage", "PromptVersion", "GenerationResult", "Adoption", "FileAssetVersion", "AssetBinding"],
+          "exact_references": ["creation_package_id", "creation_item_id", "prompt_version_id", "generation_result_id", "adoption_id", "target_slot", "file_asset_version_id"],
+          "completion_rule": "Candidate generation, adoption and project save are separate; assembly reads only adopted assets saved to fixed lesson slots."
+        }
+      ],
+      "refresh_operations": ["getLesson", "getProjectWorkflow", "listProjectArtifacts", "listProjectAssetSlots", "getProjectAssetPackage"]
+    },
+    {
+      "page_key": "video_workbench",
+      "route": "/app/projects/:projectId/lessons/:lessonId/work/video",
+      "scope_keys": ["project_id", "lesson_id", "node_run_id", "job_id", "artifact_id", "artifact_version_id", "creation_package_id"],
+      "actions": [
+        {
+          "action_key": "run_complete_video_nodes",
+          "operation_ids": ["getLesson", "getProjectWorkflow", "getPromptPreview", "startNodeRun", "getGenerationJob", "streamGenerationJobEvents", "listProjectArtifacts", "getArtifact", "saveArtifactDraft", "submitArtifactVersion", "reviewArtifactVersion", "getLessonIntroOptions"],
+          "formal_facts": ["IntroSelection", "video_master_script", "video_rough_storyboard", "video_style_contract", "video_asset_inventory", "video_fine_storyboard", "video_selected_clips", "audio_plan", "audio_tracks", "subtitles", "video_final", "ArtifactQualityReport", "Approval"],
+          "exact_references": ["lesson_id", "intro_selection_id", "video_master_script_version_id", "video_rough_storyboard_version_id", "video_style_contract_version_id", "video_fine_storyboard_version_id", "shot_id", "clip_id", "audio_file_asset_version_id", "subtitle_artifact_version_id", "final_video_file_asset_version_id"],
+          "completion_rule": "The complete video graph including real TTS, subtitles, timeline, classroom quality, technical validation and final approval is mandatory."
+        },
+        {
+          "action_key": "generate_and_adopt_video_assets_and_clips",
+          "operation_ids": ["createCreationPackage", "createCreationBatch", "saveCreationPromptVersion", "generateCreationItem", "generateCreationBatch", "getGenerationJob", "streamGenerationJobEvents", "adoptGenerationResult", "saveAdoptionToProject", "listProjectAssetSlots"],
+          "formal_facts": ["CreationPackage", "PromptVersion", "GenerationResult", "Adoption", "image FileAssetVersion", "video FileAssetVersion", "AssetBinding"],
+          "exact_references": ["creation_package_id", "prompt_version_id", "generation_result_id", "adoption_id", "shot_id", "target_slot", "file_asset_version_id"],
+          "completion_rule": "A candidate becomes a formal clip only after adoption and atomic save to the exact shot slot; one final version has one current clip per shot."
+        }
+      ],
+      "refresh_operations": ["getLesson", "getProjectWorkflow", "getLessonIntroOptions", "listProjectArtifacts", "listProjectAssetSlots", "getProjectAssetPackage"]
+    },
+    {
+      "page_key": "asset_drawer_and_delivery",
+      "route": "/app/projects/:projectId/assets",
+      "scope_keys": ["project_id", "lesson_id"],
+      "actions": [
+        {
+          "action_key": "inspect_assets_and_delivery",
+          "operation_ids": ["listProjectAssetSlots", "getProjectAssetPackage", "getProjectWorkflow", "listProjectArtifacts"],
+          "formal_facts": ["AssetSlot", "AssetBinding", "ArtifactVersion", "FileAssetVersion", "delivery package"],
+          "exact_references": ["project_id", "lesson_id", "slot_key", "artifact_version_id", "file_asset_version_id"],
+          "completion_rule": "The drawer is a read model over formal facts; it does not create a second source of truth or hide stale status."
+        }
+      ],
+      "refresh_operations": ["getProjectAssetPackage", "listProjectAssetSlots", "getProjectWorkflow", "listProjectArtifacts"]
+    }
+  ],
+  "forbidden_frontend_behaviors": [
+    "call_provider_directly",
+    "consume_planned_operation_as_active",
+    "handwrite_duplicate_business_dto",
+    "treat_provider_success_as_artifact_approval",
+    "persist_formal_business_state_in_local_storage",
+    "select_project_latest_artifact_without_lesson_and_exact_version",
+    "omit_lesson_id_from_lesson_scoped_reads_or_commands",
+    "auto_adopt_or_auto_save_candidate_without_authorized_policy_fact",
+    "invent_private_page_state_not_derived_from_backend_formal_facts"
+  ]
+}
