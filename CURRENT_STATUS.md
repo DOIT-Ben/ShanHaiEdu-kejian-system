@@ -2,7 +2,7 @@
 
 更新时间：2026-07-23
 
-验证基线：`main`；#130与PR #141、#146与PR #148、#89与PR #147、#133与PR #164、#134与PR #174、#125与PR #177、#126与PR #178、#116与PR #183、#127与PR #184、#128与PR #187、#129与PR #192、#170与PR #190及#118与PR #196已经进入当前树，Decision #185已经批准关闭；[Decision #199](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/199)、[Decision #201](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/201)与[Decision #204](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/204)把当前交付重心固定为教师可见MVP纵向闭环，并以真实短片黄金节点纠正#201中视频全部后置的范围；不可变`1.1.0`、`1.2.0`与既有项目保持不变，当前树的`1.3.0`/`1.4.0`为待显式发布的前向候选；实现事实以本文件所在提交的代码、迁移和测试为准，任务状态以链接的GitHub Issue和Pull Request为准
+验证基线：`main`；#130与PR #141、#146与PR #148、#89与PR #147、#133与PR #164、#134与PR #174、#125与PR #177、#126与PR #178、#116与PR #183、#127与PR #184、#128与PR #187、#129与PR #192、#170与PR #190及#118与PR #196已经进入当前树，Decision #185已经批准关闭；[Decision #199](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/199)、[Decision #201](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/201)与[Decision #204](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/204)把当前交付重心固定为教师可见MVP纵向闭环，并以真实短片黄金节点纠正#201中视频全部后置的范围；不可变`1.0.0`至`1.4.0`与既有项目绑定保持不变，#205只以前向`1.5.0`候选承载黄金视频节点的新输入绑定；实现事实以本文件所在提交的代码、迁移和测试为准，任务状态以链接的GitHub Issue和Pull Request为准
 
 当前阶段：阶段1后端轨道、公共基座和教材到Intro运行时已经具备，#118已补齐真实页面不能绕过的`material_scope`正式输出与教师保存路径。当前唯一出口是一个生产教师页面：选择已上传教材和物理页码，经服务端调用真实`newapi/deepseek`，展示课时划分、每课时十二部分教案和三类九套导入方案，支持编辑、局部重生成、批准、唯一选择；随后从exact已选导入方案与一个正式关键帧触发真实短片黄金节点，播放、采用并回写项目，刷新后从正式API和PostgreSQL恢复。PPT、PPTX、完整图片链、完整视频生产链、TTS、失败重试和SSE hardening均不属于首个MVP完成条件。
 
@@ -13,7 +13,7 @@
 - 后端已经具备可运行的FastAPI模块化单体、PostgreSQL、Redis、MinIO、Alembic、Worker、Outbox、SSE和幂等基座。
 - API和测试已经覆盖租户与用户边界、项目、课时与分支、上传、文件资产与不可变版本、内容发布、工作流运行、产物审核与依赖、Prompt与Context快照、教材PDF解析以及项目资产原子绑定。
 - OpenAPI、JSON Schema、生成TypeScript客户端、确定性Mock/Fake和后端CI已经进入自动门禁；文本模型网关已经完成受控真实冒烟。
-- 正式发布的`shanhai.primary_math.courseware@1.0.0`继续固定原内容、v1工作流和既有项目绑定；不可变`1.1.0`、`1.2.0`保留既有合同，当前树新增`1.3.0`/v2前向候选，为PPT装配/导出发布确定性输出、linked-file质量源和workflow gate声明。显式PostgreSQL发布可原子成为后续新项目默认，但尚未宣称生产环境已执行该发布；旧Release和既有项目绑定不会被改写。“1～5的认识”黄金Fixture已用于PPT运行时合同、事务和失败路径测试，但不代表真实文本/图片Provider或最终视觉生产完成。
+- 正式发布的`shanhai.primary_math.courseware@1.0.0`继续固定原内容、v1工作流和既有项目绑定；不可变`1.1.0`至`1.4.0`保留各自合同，当前`1.4.0`中的`video.shots.generate`仍强制依赖细分镜和视频风格，不能直接承载黄金视频节点。#205必须新增`1.5.0`前向候选，仅供新建或显式升级的MVP项目绑定；任何显式PostgreSQL发布都不得改写旧Release或既有项目绑定。“1～5的认识”黄金Fixture只提供确定性开发基线，不代表真实文本、图片或视频Provider出口。
 - 已审核的Markdown TemplateDraft可以通过显式CompilationProfile确定性编译为同一套结构化内容包合同；该能力不替代内容发布服务或模型节点执行运行时。
 - 当前可以通过自动化测试和API/CLI验证后端链路，但尚未完成浏览器到真实API的阶段1纵向演示，不得描述为阶段1产品完成。
 - 生产前端由[Issue #4](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)和唯一[PR #111](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/111)承载，#179至#182正在同一分支收口。当前Head的Frontend quality与browser检查已经通过，PR已退出Draft；仍需同步包含#118的最新`main`、收敛#201首条页面范围、通过最终Head门禁并合并。在其合并并由#11完成真实API联调前，不得把Mock闭环、交付ZIP或本地分支描述为生产前端完成。
@@ -59,7 +59,7 @@
 ## 当前工作
 
 - [Decision #199](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/199)：当前唯一产品优先级是教师可见MVP纵向闭环；已合并可靠性能力继续复用，不再提前扩张与首条用户链无关的生产级合同和故障矩阵。
-- [Decision #204](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/204)：首个MVP增加一个真实短片黄金节点；后端[Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)先连接现有正式能力，前端[Issue #206](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/206)随后完成生成、播放、采用、项目回写和刷新恢复。
+- [Decision #204](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/204)：首个MVP增加一个真实短片黄金节点；后端[Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)以前向`1.5.0`候选解除现有细分镜依赖并连接正式能力，前端[Issue #206](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/206)随后完成生成、播放、采用、项目回写和刷新恢复。
 - [Issue #4](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/4)与[PR #111](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/111)：生产前端源码与#179至#182整改的唯一载体；Frontend quality与browser已通过，下一步只解决最新`main`同步、#201/#204首条MVP链范围收敛、最终门禁与合并，不继续扩张无关页面。
 - [Decision #73](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/73)已经批准：PPT通常推荐10至20页，视频按故事和服务端价格事实推荐60至180秒，教师可以覆盖；TTS延后独立实施。
 - [Issue #48](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/48)：全流程生成节点与可配置模型I/O绑定的父任务当前为`status:in-progress`；黄金内容包`1.0.0`已正式发布，#89通用执行器已经合并。
@@ -72,7 +72,7 @@
 - 阶段1整体产品出口仍缺少生产前端的真实API联调；后端轨道通过不代表完整阶段1产品完成。
 - PR #111仍是唯一生产前端源码现场；当前Frontend quality与browser已绿，但在同步最新`main`、收敛#201页面范围、通过最终Head门禁并合并前，#11不能建立竞争`apps/web`分支。
 - #48的机器合同和黄金数据已由#89接入通用执行器，#131字段级编辑权限、#133不可变质量报告、#134批准守卫、#125课时划分、#126教案运行时、#116 Intro合同、#127方案集运行时、#128不可变选择、#129 runtime API和#170 PPT确定性运行时已完成；不得把确定性Fake或可执行PPTX装配器冒充真实Provider与完整视觉出口。
-- ShanHaiEdu已经具备Provider中立媒体基础层、Attempt租约恢复、真实视频Adapter、私有关键帧relay和受控真实smoke；当前缺口是[Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)把这些能力接入正式NodeRun、文件资产、候选采用和项目槽位，[Issue #206](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/206)再接入生产页面。CLI smoke、Fake或历史MP4均不能替代该产品闭环。
+- ShanHaiEdu已经具备Provider中立媒体基础层、Attempt租约恢复、真实视频Adapter、私有关键帧relay和受控真实smoke；当前`1.4.0`的`video.shots.generate`仍依赖`video.fine_storyboard.generate`。当前缺口是[Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)以前向`1.5.0`候选把exact `IntroSelection`与唯一正式关键帧接入正式NodeRun、文件资产、候选采用和项目槽位，[Issue #206](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/206)再接入生产页面。CLI smoke、Fake或历史MP4均不能替代该产品闭环。
 - #107、#108与#171已经正式暂停为`status:blocked`/`priority:p2`；PPT真实文本/图片、10页黄金成片、PPTX实机打开、完整视频生产链、TTS与实时价格计算均保持独立后续任务，不阻塞或占用首个MVP资源。
 - #175、#176和#189不再是#170之后的自动下一任务；它们的最终声明、逐镜头血缘和90秒全节点验收延后到首个MVP纵向闭环之后重新评估和拆分。
 
@@ -121,4 +121,4 @@
 4. 被分配的Issue和PR
 5. 与任务直接相关的模块文档、合同、代码和测试
 
-新对话先读取Decision #199、#201与#204并从最新`main`核对#4/PR #111、#11、#205和#206的实时状态；按“教案页面 -> 后端短片黄金节点 -> 页面播放/采用”推进，不自动启动#171、#108、#175、#176或#189。正式`1.0.0`、不可变`1.1.0`/`1.2.0`及既有项目绑定必须保持不变；新的`1.3.0`/`1.4.0`只由显式发布命令前向激活，不能把测试数据库发布冒充生产已执行。当前API客户端只从runtime合同生成，planned合同不可用于联调。不得从外部旧Skill恢复七部分教案、固定50秒视频、视频读取教案/PPT、第二套DTO或把TemplateDraft编译器当成模型执行运行时。
+新对话先读取Decision #199、#201与#204并从最新`main`核对#4/PR #111、#11、#205和#206的实时状态；按“教案页面 -> 后端短片黄金节点 -> 页面播放/采用”推进，不自动启动#171、#108、#175、#176或#189。正式`1.0.0`至`1.4.0`及既有项目绑定必须保持不变；#205只可新增`1.5.0`前向候选，并只通过显式发布与新建/显式升级项目激活，不能把测试数据库发布冒充生产已执行。当前API客户端只从runtime合同生成，planned合同不可用于联调。不得从外部旧Skill恢复七部分教案、固定50秒视频、视频读取教案/PPT、第二套DTO或把TemplateDraft编译器当成模型执行运行时。
