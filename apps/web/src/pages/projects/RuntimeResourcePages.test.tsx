@@ -221,6 +221,42 @@ describe("Runtime resource pages", () => {
     expect(typeof cancelRequest?.idempotencyKey).toBe("string");
   });
 
+  it("clears a lost cancel response error after REST confirms cancellation", async () => {
+    const runningJob = {
+      created_at: "2030-01-01T00:00:00Z",
+      id: jobId,
+      job_type: "parse_material",
+      progress_message: "正在整理教材",
+      progress_percent: 35,
+      project_id: projectId,
+      status: "running",
+      updated_at: "2030-01-01T00:00:01Z",
+    } as jobsApi.GenerationJobDto;
+    vi.spyOn(jobsApi, "getGenerationJob")
+      .mockResolvedValueOnce(runningJob)
+      .mockResolvedValue({
+        ...runningJob,
+        progress_message: "正在取消任务",
+        status: "cancel_requested",
+      });
+    vi.spyOn(jobsApi, "cancelGenerationJob").mockRejectedValue(new Error("response lost"));
+
+    renderRoute(
+      `/app/projects/${projectId}/jobs/${jobId}`,
+      "/app/projects/:projectId/jobs/:jobId",
+      <RuntimeJobPage />,
+    );
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "取消任务" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("任务还没有取消");
+
+    await user.click(screen.getByRole("button", { name: "刷新" }));
+    expect(await screen.findByRole("heading", { name: "正在取消任务" })).toBeVisible();
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: "重试取消" })).not.toBeInTheDocument();
+  });
+
   it("blocks a generation job that does not belong to the route project", async () => {
     const job = {
       created_at: "2030-01-01T00:00:00Z",

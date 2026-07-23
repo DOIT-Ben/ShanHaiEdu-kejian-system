@@ -1,5 +1,6 @@
 import { CheckCircle2, LoaderCircle, RefreshCw, XCircle } from "lucide-react";
 import type { GenerationJobDto } from "@/features/jobs/api/jobsApi";
+import { terminalGenerationJobStatuses } from "@/features/jobs/jobStatus";
 import { Button } from "@/shared/ui/Button";
 
 type GenerationJobPanelProps = {
@@ -13,8 +14,6 @@ type GenerationJobPanelProps = {
   progressLabel?: string;
   title?: string;
 };
-
-const terminalStatuses = new Set<GenerationJobDto["status"]>(["succeeded", "failed", "cancelled"]);
 
 function statusTitle(status: GenerationJobDto["status"]) {
   if (status === "succeeded") return "任务已经完成";
@@ -57,7 +56,7 @@ export function GenerationJobPanel({
   }
 
   const progress = Math.min(100, Math.max(0, job.progress_percent));
-  const terminal = terminalStatuses.has(job.status);
+  const terminal = terminalGenerationJobStatuses.has(job.status);
   return (
     <section className="overflow-hidden rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)]">
       <div className="grid gap-4 p-5 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">

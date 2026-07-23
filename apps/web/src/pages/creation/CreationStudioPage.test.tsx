@@ -136,6 +136,38 @@ describe("CreationStudioPage", () => {
     expect(generate).toHaveBeenCalledTimes(1);
   });
 
+  it("取消响应丢失后以 REST 对账清除过期错误", async () => {
+    mockAcceptedCreation();
+    const runningJob = {
+      created_at: "2026-07-23T00:00:00Z",
+      id: "job-1",
+      job_type: "creation",
+      progress_percent: 20,
+      progress_message: "正在生成",
+      status: "running",
+      updated_at: "2026-07-23T00:00:01Z",
+    } as jobsApi.GenerationJobDto;
+    vi.spyOn(jobsApi, "getGenerationJob")
+      .mockResolvedValueOnce(runningJob)
+      .mockResolvedValue({
+        ...runningJob,
+        progress_message: "正在取消任务",
+        status: "cancel_requested",
+      });
+    vi.spyOn(jobsApi, "cancelGenerationJob").mockRejectedValue(new Error("response lost"));
+
+    startCreation();
+
+    await screen.findByText("正在生成");
+    fireEvent.click(screen.getByRole("button", { name: "取消任务" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("任务还没有取消");
+    fireEvent.click(screen.getByRole("button", { name: "刷新" }));
+
+    await screen.findByText("正在取消任务");
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: "重试取消" })).not.toBeInTheDocument();
+  });
+
   it("未知创作类型返回创作中心", () => {
     renderStudio("/app/creation/unknown");
     expect(screen.getByText("创作中心")).toBeInTheDocument();

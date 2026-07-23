@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, BookOpen } from "lucide-react";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   cancelGenerationJob,
@@ -8,6 +8,10 @@ import {
   type GenerationJobDto,
 } from "@/features/jobs/api/jobsApi";
 import { GenerationJobPanel } from "@/features/jobs/components/GenerationJobPanel";
+import {
+  cancellationAcknowledgedJobStatuses,
+  terminalGenerationJobStatuses,
+} from "@/features/jobs/jobStatus";
 import { listProjectLessons } from "@/features/lessons/api/lessonsApi";
 import { getProject } from "@/features/projects/api/projectsApi";
 import { projectKeys } from "@/features/projects/hooks/useProjectsQuery";
@@ -16,8 +20,6 @@ import { runtimeErrorMessage } from "@/shared/api/runtimeError";
 import { useJobEvents } from "@/shared/api/useJobEvents";
 import { Button, buttonVariants } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
-
-const terminalStatuses = new Set<GenerationJobDto["status"]>(["succeeded", "failed", "cancelled"]);
 
 function setupStatusTitle(status: GenerationJobDto["status"] | undefined) {
   if (status === "succeeded") return "教材已经准备好";
@@ -47,13 +49,14 @@ export function RuntimeProjectSetupPage() {
       const job = query.state.data;
       if (job && job.project_id !== projectId) return false;
       const status = job?.status;
-      return status && terminalStatuses.has(status) ? false : 5_000;
+      return status && terminalGenerationJobStatuses.has(status) ? false : 5_000;
     },
   });
   const job = jobQuery.data;
+  const jobStatus = job?.status;
   const jobOwnedByProject = Boolean(projectId && job?.project_id === projectId);
   const jobNeedsLiveUpdates = Boolean(
-    jobOwnedByProject && job && !terminalStatuses.has(job.status),
+    jobOwnedByProject && job && !terminalGenerationJobStatuses.has(job.status),
   );
   useJobEvents(
     jobNeedsLiveUpdates ? jobId : undefined,
@@ -72,10 +75,19 @@ export function RuntimeProjectSetupPage() {
       }
       return cancelGenerationJob(input);
     },
-    onSuccess: async () => {
+    onSuccess: async (cancelledJob) => {
+      cancelIntentRef.current = null;
+      queryClient.setQueryData(["generation-jobs", jobId], cancelledJob);
       await queryClient.invalidateQueries({ queryKey: ["generation-jobs", jobId], exact: true });
     },
   });
+  const resetCancelMutation = cancelMutation.reset;
+
+  useEffect(() => {
+    if (!jobStatus || !cancellationAcknowledgedJobStatuses.has(jobStatus)) return;
+    cancelIntentRef.current = null;
+    resetCancelMutation();
+  }, [jobStatus, resetCancelMutation]);
   const requestCancellation = () => {
     if (!jobId) return;
     const currentIntent = cancelIntentRef.current;
@@ -118,7 +130,7 @@ export function RuntimeProjectSetupPage() {
     );
   }
 
-  const running = jobOwnedByProject && job && !terminalStatuses.has(job.status);
+  const running = jobOwnedByProject && job && !terminalGenerationJobStatuses.has(job.status);
   const writeReady = isCsrfTokenAvailable();
   const lessonCount = lessonsQuery.data?.lessons.length ?? 0;
   const hasLessons = lessonCount > 0;

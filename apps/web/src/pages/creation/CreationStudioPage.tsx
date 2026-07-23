@@ -24,10 +24,13 @@ import {
   initialAdvancedSettings,
   initialCreationSettings,
   studioTypeByPath,
-  terminalCreationJobStatuses,
 } from "@/features/creation-studio/runtimeState";
 import { cancelGenerationJob, getGenerationJob } from "@/features/jobs/api/jobsApi";
 import { GenerationJobPanel } from "@/features/jobs/components/GenerationJobPanel";
+import {
+  cancellationAcknowledgedJobStatuses,
+  terminalGenerationJobStatuses,
+} from "@/features/jobs/jobStatus";
 import { isCsrfTokenAvailable } from "@/shared/api/client";
 import { runtimeErrorMessage } from "@/shared/api/runtimeError";
 import { useJobEvents } from "@/shared/api/useJobEvents";
@@ -57,13 +60,12 @@ export function CreationStudioPage() {
     queryKey: jobKey,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status && terminalCreationJobStatuses.has(status) ? false : 5_000;
+      return status && terminalGenerationJobStatuses.has(status) ? false : 5_000;
     },
   });
   const job = jobQuery.data;
-  const live = Boolean(jobId && job && !terminalCreationJobStatuses.has(job.status));
+  const live = Boolean(jobId && job && !terminalGenerationJobStatuses.has(job.status));
   useJobEvents(live && jobId ? jobId : undefined);
-
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!type || !config) throw new Error("CREATION_STUDIO_NOT_FOUND");
@@ -136,11 +138,10 @@ export function CreationStudioPage() {
   const resetCancelMutation = cancelMutation.reset;
 
   useEffect(() => {
-    if (!job?.status || !terminalCreationJobStatuses.has(job.status)) return;
+    if (!job?.status || !cancellationAcknowledgedJobStatuses.has(job.status)) return;
     cancelKeyRef.current = undefined;
     resetCancelMutation();
   }, [job?.status, resetCancelMutation]);
-
   const stage = useMemo<CreationStage>(() => {
     if (createMutation.isPending) return "queued";
     if (createMutation.isError) return "failed";

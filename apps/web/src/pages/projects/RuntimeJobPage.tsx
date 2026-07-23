@@ -2,19 +2,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
-import {
-  cancelGenerationJob,
-  getGenerationJob,
-  type GenerationJobDto,
-} from "@/features/jobs/api/jobsApi";
+import { cancelGenerationJob, getGenerationJob } from "@/features/jobs/api/jobsApi";
 import { GenerationJobPanel } from "@/features/jobs/components/GenerationJobPanel";
+import {
+  cancellationAcknowledgedJobStatuses,
+  terminalGenerationJobStatuses,
+} from "@/features/jobs/jobStatus";
 import { isCsrfTokenAvailable } from "@/shared/api/client";
 import { runtimeErrorMessage } from "@/shared/api/runtimeError";
 import { useJobEvents } from "@/shared/api/useJobEvents";
 import { buttonVariants } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
-
-const terminalStatuses = new Set<GenerationJobDto["status"]>(["succeeded", "failed", "cancelled"]);
 
 export function RuntimeJobPage() {
   const { jobId, projectId } = useParams();
@@ -30,17 +28,14 @@ export function RuntimeJobPage() {
       const job = query.state.data;
       if (job && job.project_id !== projectId) return false;
       const status = job?.status;
-      return status && terminalStatuses.has(status) ? false : 5_000;
+      return status && terminalGenerationJobStatuses.has(status) ? false : 5_000;
     },
   });
   const job = jobQuery.data;
   const jobStatus = job?.status;
-  useEffect(() => {
-    if (jobStatus && terminalStatuses.has(jobStatus)) cancelIntentRef.current = undefined;
-  }, [jobStatus]);
   const jobOwnedByProject = Boolean(projectId && job?.project_id === projectId);
   const jobNeedsLiveUpdates = Boolean(
-    jobOwnedByProject && job && !terminalStatuses.has(job.status),
+    jobOwnedByProject && job && !terminalGenerationJobStatuses.has(job.status),
   );
   useJobEvents(
     jobNeedsLiveUpdates ? jobId : undefined,
@@ -62,6 +57,13 @@ export function RuntimeJobPage() {
       await queryClient.invalidateQueries({ exact: true, queryKey: jobKey });
     },
   });
+  const resetCancelMutation = cancelMutation.reset;
+
+  useEffect(() => {
+    if (!jobStatus || !cancellationAcknowledgedJobStatuses.has(jobStatus)) return;
+    cancelIntentRef.current = undefined;
+    resetCancelMutation();
+  }, [jobStatus, resetCancelMutation]);
 
   if (!projectId || !jobId) return null;
 
@@ -107,7 +109,10 @@ export function RuntimeJobPage() {
             onRefresh={() => void jobQuery.refetch()}
           />
         )}
-        {!writeReady && jobOwnedByProject && job && !terminalStatuses.has(job.status) ? (
+        {!writeReady &&
+        jobOwnedByProject &&
+        job &&
+        !terminalGenerationJobStatuses.has(job.status) ? (
           <p
             className="mt-4 rounded-[var(--sh-radius-sm)] bg-[var(--sh-warning-soft)] p-3 text-sm text-[var(--sh-warning)]"
             role="status"

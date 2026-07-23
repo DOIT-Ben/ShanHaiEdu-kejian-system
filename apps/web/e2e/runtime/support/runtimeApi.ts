@@ -247,6 +247,7 @@ export async function installRuntimeApi(page: Page, options: RuntimeApiOptions =
     baseArtifact,
   ) as unknown as components["schemas"]["Artifact"];
   let currentBinding = structuredClone(baseBinding) as components["schemas"]["AssetBinding"];
+  let cancelAccepted = false;
   const state: RuntimeApiState = {
     artifactApprovals: 0,
     artifactReads: 0,
@@ -664,8 +665,9 @@ export async function installRuntimeApi(page: Page, options: RuntimeApiOptions =
 
     if (method === "GET" && path === `/api/v2/generation-jobs/${jobId}`) {
       state.jobReads += 1;
-      const status =
-        options.completeJobAfterStream && state.jobStreamRequests > 0
+      const status = cancelAccepted
+        ? "cancel_requested"
+        : options.completeJobAfterStream && state.jobStreamRequests > 0
           ? "succeeded"
           : (options.jobStatus ?? "succeeded");
       await json(
@@ -697,6 +699,7 @@ export async function installRuntimeApi(page: Page, options: RuntimeApiOptions =
       state.jobCancelRequests += 1;
       state.jobCancelIdempotencyHeaders.push(request.headers()["idempotency-key"] ?? "");
       if (options.failFirstJobCancelAfterAccept && state.jobCancelRequests === 1) {
+        cancelAccepted = true;
         await route.abort("failed");
         return;
       }

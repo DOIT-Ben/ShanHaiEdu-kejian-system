@@ -82,6 +82,27 @@ describe("RuntimeProjectSetupPage", () => {
     );
   });
 
+  it("取消响应丢失后以 REST 对账清除过期错误", async () => {
+    vi.mocked(jobsApi.getGenerationJob)
+      .mockResolvedValueOnce(runningJob)
+      .mockResolvedValue({
+        ...runningJob,
+        progress_message: "正在取消任务",
+        status: "cancel_requested",
+      });
+    vi.spyOn(jobsApi, "cancelGenerationJob").mockRejectedValue(new Error("response lost"));
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "取消任务" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("任务还没有取消");
+
+    await user.click(screen.getByRole("button", { name: "刷新" }));
+    await screen.findByText("正在取消任务");
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: "重试取消" })).not.toBeInTheDocument();
+  });
+
   it("向辅助技术公开教材处理进度", async () => {
     renderPage();
 

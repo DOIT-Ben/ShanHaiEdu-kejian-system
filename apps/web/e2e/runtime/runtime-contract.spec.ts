@@ -213,7 +213,7 @@ test("真实模式在任务事件后重新读取 REST 终态并停止订阅", as
   expect(api.unhandled).toEqual([]);
 });
 
-test("真实模式在取消响应丢失后复用原幂等意图", async ({ page }) => {
+test("真实模式在取消响应丢失后以 REST 对账服务端受理结果", async ({ page }) => {
   await page.addInitScript(({ key }) => sessionStorage.setItem(key, "runtime-contract-csrf"), {
     key: runtimeContractTestCsrfKey,
   });
@@ -225,12 +225,14 @@ test("真实模式在取消响应丢失后复用原幂等意图", async ({ page 
   await page.goto(`/app/projects/${projectId}/jobs/${jobId}`);
   await page.getByRole("button", { name: "取消任务" }).click();
   await expect(page.getByRole("alert")).toContainText("网络连接失败");
-  await page.getByRole("button", { name: "重试取消" }).click();
+  await page.getByRole("button", { name: "刷新" }).click();
 
-  await expect.poll(() => api.jobCancelRequests).toBe(2);
-  expect(api.jobCancelIdempotencyHeaders).toHaveLength(2);
+  await expect(page.getByRole("heading", { name: "正在取消任务" })).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "重试取消" })).toHaveCount(0);
+  expect(api.jobCancelRequests).toBe(1);
+  expect(api.jobCancelIdempotencyHeaders).toHaveLength(1);
   expect(api.jobCancelIdempotencyHeaders[0]).toBeTruthy();
-  expect(api.jobCancelIdempotencyHeaders[1]).toBe(api.jobCancelIdempotencyHeaders[0]);
   expect(api.unhandled).toEqual([]);
 });
 

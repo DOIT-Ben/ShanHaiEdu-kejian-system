@@ -1,12 +1,5 @@
 import type { CreationAdvancedSettings } from "@/features/creation-studio/CreationAdvancedPanel";
 import type { CreationSettings, StudioType } from "@/features/creation-studio/model";
-import type { GenerationJobDto } from "@/features/jobs/api/jobsApi";
-
-export const terminalCreationJobStatuses = new Set<GenerationJobDto["status"]>([
-  "succeeded",
-  "failed",
-  "cancelled",
-]);
 
 export const studioTypeByPath: Record<string, StudioType> = {
   images: "image",
