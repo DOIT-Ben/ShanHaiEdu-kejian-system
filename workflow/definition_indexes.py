@@ -75,7 +75,7 @@ def _build_output_definition_index(
     output_entries: dict[str, WorkflowOutputDefinitionBinding] = {}
     identity_declarations: list[tuple[str, str, str]] = []
     for node in nodes:
-        if node.execution_kind != "model_generation":
+        if "output_persistence" not in node.binding:
             continue
         binding, persistence, artifact = _read_output_persistence(node)
         _validate_artifact_identity(node, artifact, identity_declarations)
@@ -183,7 +183,7 @@ def _read_output_definition_refs(
     node: WorkflowNodeDefinition,
     binding: Mapping[str, Any],
     artifact: Mapping[str, Any],
-) -> tuple[str, str]:
+) -> tuple[str, str | None]:
     content_ref = as_mapping(artifact.get("content_definition_ref"))
     generation_ref = as_mapping(binding.get("generation_template_ref"))
     if content_ref is None:
@@ -196,13 +196,20 @@ def _read_output_definition_refs(
             f"model node {node.node_key} must map output persistence to exactly one contract",
             code="WORKFLOW_OUTPUT_CONTRACT_AMBIGUOUS",
         )
-    if generation_ref is None or generation_ref.get("kind") != "generation_template":
+    content_key = require_text(content_ref, "item_key")
+    generation_key: str | None = None
+    if node.execution_kind == "model_generation":
+        if generation_ref is None or generation_ref.get("kind") != "generation_template":
+            raise WorkflowDefinitionError(
+                f"model node {node.node_key} has an invalid generation template ref",
+                code="WORKFLOW_OUTPUT_INDEX_INVALID",
+            )
+        generation_key = require_text(generation_ref, "item_key")
+    elif generation_ref is not None:
         raise WorkflowDefinitionError(
-            f"model node {node.node_key} has an invalid generation template ref",
+            f"deterministic node {node.node_key} cannot bind a generation template",
             code="WORKFLOW_OUTPUT_INDEX_INVALID",
         )
-    content_key = require_text(content_ref, "item_key")
-    generation_key = require_text(generation_ref, "item_key")
     if content_ref.get("kind") != "content_definition":
         raise WorkflowDefinitionError(
             f"output definition kind is invalid for {node.node_key}",
@@ -215,7 +222,7 @@ def _output_binding(
     node: WorkflowNodeDefinition,
     artifact: Mapping[str, Any],
     content_key: str,
-    generation_key: str,
+    generation_key: str | None,
     quality: QualityBinding,
     nodes: tuple[WorkflowNodeDefinition, ...],
 ) -> WorkflowOutputDefinitionBinding:
@@ -235,8 +242,25 @@ def _output_binding(
         quality_validator_refs=quality[2],
         quality_gate_node_key=quality[3],
         quality_requirement_mode=quality[4],
+        quality_source_binding=_quality_source_binding(node),
         approval_completion=completion,
     )
+
+
+def _quality_source_binding(node: WorkflowNodeDefinition) -> str | None:
+    binding = as_mapping(node.binding)
+    persistence = as_mapping(binding.get("output_persistence")) if binding is not None else None
+    value = persistence.get("quality_source_binding") if persistence is not None else None
+    if value is not None:
+        return require_text_value(value, "quality_source_binding")
+    completion = persistence.get("approval_completion") if persistence is not None else None
+    if (
+        completion is not None
+        and any(ref.startswith("artifact:") for ref in node.output_contract_refs)
+        and not any(ref.startswith("asset:") for ref in node.output_contract_refs)
+    ):
+        return "artifact"
+    return None
 
 
 def _approval_completion(

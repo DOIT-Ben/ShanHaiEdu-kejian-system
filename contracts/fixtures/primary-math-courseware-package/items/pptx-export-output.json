@@ -1,0 +1,92 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "pptx.export.output",
+    "name": "可编辑PPTX导出输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "pptx.export.output",
+    "title": "可编辑PPTX导出输出",
+    "description": "绑定确定性装配、真实PPTX文件版本和完整性事实的不可变输出。",
+    "definition_role": "artifact",
+    "fields": [
+      {
+        "field_key": "implementation_version",
+        "label": "导出实现版本",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "assembly_artifact_version_id",
+        "label": "装配Artifact版本",
+        "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "source_page_spec_version_id",
+        "label": "页面规格版本",
+        "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "file_asset_version_id",
+        "label": "PPTX文件版本",
+        "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "mime_type",
+        "label": "PPTX MIME",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "size_bytes",
+        "label": "PPTX字节数",
+        "type": "number",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "sha256",
+        "label": "PPTX哈希",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "page_count",
+        "label": "页数",
+        "type": "number",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "background_file_asset_version_ids",
+        "label": "背景文件版本集合",
+        "type": "list",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "min_items": 1,
+        "max_items": 60
+      }
+    ]
+  }
+}

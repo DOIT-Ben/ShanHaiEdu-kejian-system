@@ -22,6 +22,10 @@ class FakeObjectStorage:
         self._objects: dict[tuple[str, str], ObjectMetadata] = {}
         self._payloads: dict[tuple[str, str], bytes] = {}
 
+    @property
+    def object_count(self) -> int:
+        return len(self._objects)
+
     def create_presigned_put(
         self,
         *,

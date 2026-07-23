@@ -2,7 +2,7 @@
   "api_version": "shanhai.workflow-node-generation-binding/v2",
   "catalog_key": "primary_math.courseware",
   "workflow_key": "primary_math.courseware",
-  "semantic_version": "1.2.0",
+  "semantic_version": "1.3.0",
   "nodes": [
     {
       "node_key": "material.file_validate",
@@ -295,7 +295,8 @@
           "kind": "lesson_unit_sync",
           "collection_pointer": "/lesson_units",
           "stable_key_field": "lesson_unit_key"
-        }
+        },
+        "quality_source_binding": "artifact"
       }
     },
     {
@@ -596,7 +597,8 @@
         "approval_completion": {
           "kind": "workflow_gate",
           "source_input_ref": "artifact:lesson_plan"
-        }
+        },
+        "quality_source_binding": "artifact"
       }
     },
     {
@@ -947,7 +949,8 @@
         "approval_completion": {
           "kind": "workflow_gate",
           "source_input_ref": "artifact:intro_option_set"
-        }
+        },
+        "quality_source_binding": "artifact"
       }
     },
     {
@@ -2400,7 +2403,33 @@
         "ppt.pages.generate",
         "ppt.body_assets.generate"
       ],
-      "entrypoint": false
+      "entrypoint": false,
+      "output_persistence": {
+        "artifact": {
+          "identity": {
+            "strategy": "lesson_unit_singleton",
+            "artifact_key_prefix": "ppt-page-previews"
+          },
+          "artifact_type": "ppt_page_previews",
+          "branch_key": "ppt",
+          "content_definition_ref": {
+            "item_key": "ppt.pages.assemble.output",
+            "kind": "content_definition"
+          },
+          "content": {
+            "source": "output",
+            "pointer": ""
+          },
+          "relations": [
+            {
+              "source_binding": "artifact:ppt_page_specs",
+              "relation_type": "derives_from",
+              "binding_key": "upstream.artifact.ppt_page_specs",
+              "impact_scope": {"mode": "all"}
+            }
+          ]
+        }
+      }
     },
     {
       "node_key": "pptx.export",
@@ -2466,7 +2495,44 @@
       "dependencies": [
         "ppt.pages.assemble"
       ],
-      "entrypoint": false
+      "entrypoint": false,
+      "output_persistence": {
+        "artifact": {
+          "identity": {
+            "strategy": "lesson_unit_singleton",
+            "artifact_key_prefix": "ppt-final"
+          },
+          "artifact_type": "ppt_final",
+          "branch_key": "ppt",
+          "content_definition_ref": {
+            "item_key": "pptx.export.output",
+            "kind": "content_definition"
+          },
+          "content": {
+            "source": "output",
+            "pointer": ""
+          },
+          "relations": [
+            {
+              "source_binding": "artifact:ppt_page_previews",
+              "relation_type": "derives_from",
+              "binding_key": "upstream.artifact.ppt_page_previews",
+              "impact_scope": {"mode": "all"}
+            },
+            {
+              "source_binding": "artifact:ppt_page_specs",
+              "relation_type": "derives_from",
+              "binding_key": "upstream.artifact.ppt_page_specs",
+              "impact_scope": {"mode": "all"}
+            }
+          ]
+        },
+        "quality_source_binding": "linked_file_asset",
+        "approval_completion": {
+          "kind": "workflow_gate",
+          "source_input_ref": "asset:pptx"
+        }
+      }
     },
     {
       "node_key": "ppt.final.validate",

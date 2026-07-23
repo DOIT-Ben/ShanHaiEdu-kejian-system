@@ -102,7 +102,21 @@
 
 整页图片可用于快速预览，但不能作为默认最终页。装配后前端展示与实际 PPTX 同源的页面预览，教师可直接修改文字、替换图片、调整位置或重新生成单页。
 
-## 9. 验收
+## 9. 当前确定性运行时
+
+前向内容包候选`shanhai.primary_math.courseware@1.3.0`为`ppt.pages.assemble`和`pptx.export`发布确定性输出合同；`1.0.0`、`1.1.0`、`1.2.0`及既有项目绑定保持不变。候选包包含113个内容项、24个ContentDefinition和48个工作流节点，只有执行显式发布命令后才会成为后续新项目的默认版本。
+
+`ppt.pages.assemble`从项目固定Release读取正式页规格，并要求每页恰好绑定一个同课时、已扫描、不可变的背景`FileAssetVersion`。运行时按版本ID、对象位置、MIME、字节数、尺寸和SHA-256回读对象，使用#169的纯渲染核心形成包含可编辑文字与图形的装配结果，再把实现版本、页规格版本、逐页背景版本和内容哈希保存为不可变`ppt_page_previews` ArtifactVersion。
+
+装配按页执行。单页失败时只把已完成连续前缀的受限Manifest事实写入失败Attempt，并同时绑定冻结request hash和完整性哈希；相同请求重试可跳过这些已验证页。恢复事实被改写、属于其他请求、存在跳页/乱序或与exact背景版本不一致时必须拒绝，不得以错误缓存继续装配。
+
+`pptx.export`只接受同一执行快照中的装配Artifact、页规格和背景版本，输出真实PPTX字节，并在对象存储完成staging上传、不可变final copy与元数据回读后，原子写入PPTX `FileAssetVersion`、`ppt_final` ArtifactVersion、来源关系、Attempt/Usage、NodeRun终态和事件。取消、租约丢失、重复投递或数据库回滚不能提交过期结果；final对象已经产生但事务未确认时必须补偿删除。页规格返修只重新装配和导出，不改写既有背景文件事实。
+
+最终质量源由发布合同显式声明为`linked_file_asset`。`ppt.final.validate`生成的QualityReport必须与PPTX文件版本、SHA-256、项目/课时、Release、Workflow、validator集合和validate NodeRun完全一致；批准仍作用于当前submitted `ppt_final` ArtifactVersion，并由唯一Approval guard完成workflow gate，不建立PPT专用状态机。
+
+以上能力是确定性运行时与事务闭环，不是完整PPT阶段出口。它允许普通CI使用确定性输入验证真实PPTX文件和失败路径，但不代表文本或图片节点已调用真实Provider。完整的“1～5的认识”10页链路、真实文本与图片、PowerPoint/WPS打开和最终质量批准由[Issue #171](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/171)验收。
+
+## 10. 验收
 
 - 教学范围、顺序和例题逻辑与批准教案/教材一致；
 - 每页一个教学任务且有明确主视觉；

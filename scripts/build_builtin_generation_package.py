@@ -235,6 +235,22 @@ def _build_node_items(
     return files, manifest_items
 
 
+def _build_deterministic_output_item(output: Mapping[str, Any]) -> dict[str, Any]:
+    output_key = cast(str, output["output_key"])
+    return _item(
+        "content_definition",
+        output_key,
+        cast(str, output["title"]),
+        {
+            "definition_key": output_key,
+            "title": output["title"],
+            "description": output["description"],
+            "definition_role": output["definition_role"],
+            "fields": output["fields"],
+        },
+    )
+
+
 def build_package(source_path: Path, output_root: Path, *, contracts_root: Path) -> None:
     """Build and validate a deterministic package into an empty output directory."""
 
@@ -253,6 +269,7 @@ def build_package(source_path: Path, output_root: Path, *, contracts_root: Path)
     package = cast(Mapping[str, Any], source["package"])
     style_keys: set[str] = set()
     node_keys: set[str] = set()
+    content_definition_keys: set[str] = set()
     files: list[dict[str, Any]] = []
     manifest_items: list[dict[str, Any]] = []
 
@@ -276,6 +293,10 @@ def build_package(source_path: Path, output_root: Path, *, contracts_root: Path)
         if key in node_keys:
             raise ValueError(f"duplicate generation template: {key}")
         node_keys.add(key)
+        output_key = f"{key}.output"
+        if output_key in content_definition_keys:
+            raise ValueError(f"duplicate content definition: {output_key}")
+        content_definition_keys.add(output_key)
         unknown_styles = set(cast(list[str], node.get("style_preset_refs", []))) - style_keys
         if unknown_styles:
             raise ValueError(f"{key} references unknown styles: {sorted(unknown_styles)}")
@@ -286,6 +307,21 @@ def build_package(source_path: Path, output_root: Path, *, contracts_root: Path)
         files.extend(node_files)
         manifest_items.extend(node_manifest_items)
         entrypoints.append(key)
+
+    for output in cast(list[dict[str, Any]], source.get("deterministic_outputs", [])):
+        output_key = cast(str, output["output_key"])
+        if output_key in content_definition_keys:
+            raise ValueError(f"duplicate content definition: {output_key}")
+        content_definition_keys.add(output_key)
+        item = _build_deterministic_output_item(output)
+        base_key = output_key.removesuffix(".output")
+        _append_item(
+            items=files,
+            manifest_items=manifest_items,
+            item=item,
+            filename=_safe_filename(base_key, "output"),
+            contracts_root=contracts_root,
+        )
 
     for file in files:
         _write_json(output_root / cast(str, file["path"]), cast(dict[str, Any], file["value"]))

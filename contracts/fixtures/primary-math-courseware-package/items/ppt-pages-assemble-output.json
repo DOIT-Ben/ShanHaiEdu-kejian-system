@@ -1,0 +1,147 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "ppt.pages.assemble.output",
+    "name": "PPT页面装配输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "ppt.pages.assemble.output",
+    "title": "PPT页面装配输出",
+    "description": "锁定逐页规格、每页唯一背景版本和可编辑元素的确定性装配事实。",
+    "definition_role": "artifact",
+    "fields": [
+      {
+        "field_key": "implementation_version",
+        "label": "装配实现版本",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "content_hash",
+        "label": "装配内容哈希",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "source_page_spec_version_id",
+        "label": "页面规格版本",
+        "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "source_page_spec_set_key",
+        "label": "页面规格集标识",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false
+      },
+      {
+        "field_key": "page_count",
+        "label": "页数",
+        "type": "number",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "validation_rules": [
+          {
+            "equals_repeatable_count": "pages"
+          }
+        ]
+      },
+      {
+        "field_key": "pages",
+        "label": "页面装配事实",
+        "type": "list",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "min_items": 1,
+        "max_items": 60,
+        "children": [
+          {
+            "field_key": "page_key",
+            "label": "页面标识",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "position",
+            "label": "页序",
+            "type": "number",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "background_file_asset_version_id",
+            "label": "背景文件版本",
+            "type": "reference",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "background_sha256",
+            "label": "背景哈希",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "background_media_type",
+            "label": "背景MIME",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "background_size_bytes",
+            "label": "背景字节数",
+            "type": "number",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "background_width",
+            "label": "背景宽度",
+            "type": "number",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "background_height",
+            "label": "背景高度",
+            "type": "number",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "elements",
+            "label": "可编辑元素",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      }
+    ]
+  }
+}

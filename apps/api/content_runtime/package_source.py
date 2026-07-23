@@ -116,23 +116,37 @@ def _validate_catalog_content_definitions(
     manifest_entries: Mapping[str, dict[str, Any]],
 ) -> None:
     for node in cast(list[dict[str, Any]], catalog["nodes"]):
-        if node["execution_kind"] != "model_generation":
+        persistence = node.get("output_persistence")
+        if not isinstance(persistence, dict):
             continue
-        template_key = cast(str, node["generation_template_ref"]["item_key"])
-        template = items.get(template_key)
-        if template is None or manifest_entries[template_key]["kind"] != "generation_template":
-            raise ContentPublicationConflict(
-                f"generation template is missing from the published package: {template_key}"
-            )
-        spec = cast(dict[str, Any], template.get("spec", {}))
-        output_ref = spec.get("output_definition_ref")
-        artifact_ref = node["output_persistence"]["artifact"]["content_definition_ref"]
-        if output_ref != artifact_ref:
-            raise ContentPublicationConflict(
-                f"artifact output definition disagrees with generation template: {node['node_key']}"
-            )
+        persistence_values = cast(Mapping[str, object], persistence)
+        artifact = cast(Mapping[str, object], persistence_values["artifact"])
+        artifact_ref = cast(Mapping[str, object], artifact["content_definition_ref"])
+        if node["execution_kind"] == "model_generation":
+            template_key = cast(str, node["generation_template_ref"]["item_key"])
+            template = items.get(template_key)
+            manifest_entry = manifest_entries.get(template_key)
+            if (
+                template is None
+                or manifest_entry is None
+                or manifest_entry["kind"] != "generation_template"
+            ):
+                raise ContentPublicationConflict(
+                    f"generation template is missing from the published package: {template_key}"
+                )
+            spec = cast(dict[str, Any], template.get("spec", {}))
+            if spec.get("output_definition_ref") != artifact_ref:
+                raise ContentPublicationConflict(
+                    "artifact output definition disagrees with generation template: "
+                    f"{node['node_key']}"
+                )
         output_key = cast(str, artifact_ref["item_key"])
-        if output_key not in items or manifest_entries[output_key]["kind"] != "content_definition":
+        output_entry = manifest_entries.get(output_key)
+        if (
+            output_key not in items
+            or output_entry is None
+            or output_entry["kind"] != "content_definition"
+        ):
             raise ContentPublicationConflict(
                 f"content definition is missing from the published package: {output_key}"
             )

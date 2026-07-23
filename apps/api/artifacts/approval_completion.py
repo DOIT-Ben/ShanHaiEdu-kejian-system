@@ -119,6 +119,7 @@ def _apply_declared_completion(
             gate_node_key=output.quality_gate_node_key,
             branch_key=output.producer_branch_key,
             source_input_ref=output.approval_completion.source_input_ref,
+            quality_source_binding=output.quality_source_binding,
         )
         return None
     if output.approval_completion.kind != "lesson_unit_sync":
@@ -176,6 +177,7 @@ def retire_declared_approval_gate(
         gate_node_key=output.quality_gate_node_key,
         branch_key=output.producer_branch_key,
         source_input_ref=output.approval_completion.source_input_ref,
+        quality_source_binding=output.quality_source_binding,
     )
     WorkflowArtifactApprovalPort(session, actor).retire_if_present(
         command,
@@ -194,6 +196,7 @@ def _complete_artifact_gate(
     gate_node_key: str | None,
     branch_key: str,
     source_input_ref: str | None,
+    quality_source_binding: str | None,
 ) -> None:
     command = _gate_command(
         artifact,
@@ -203,6 +206,7 @@ def _complete_artifact_gate(
         gate_node_key=gate_node_key,
         branch_key=branch_key,
         source_input_ref=source_input_ref,
+        quality_source_binding=quality_source_binding,
     )
     WorkflowArtifactApprovalPort(session, actor).complete(command)
 
@@ -216,19 +220,39 @@ def _gate_command(
     gate_node_key: str | None,
     branch_key: str,
     source_input_ref: str | None,
+    quality_source_binding: str | None,
 ) -> ArtifactApprovalGateCommand:
     if artifact.lesson_unit_id is None or gate_node_key is None or source_input_ref is None:
         raise _invalid("The lesson-scoped approval gate declaration is incomplete.")
+    source_type, source_version_id = _gate_source(version, quality_source_binding)
     return ArtifactApprovalGateCommand(
         project_id=artifact.project_id,
         lesson_unit_id=artifact.lesson_unit_id,
-        artifact_version_id=version.id,
+        source_type=source_type,
+        source_version_id=source_version_id,
         content_release_id=content_release_id,
         workflow_definition_version_id=workflow_definition_version_id,
         gate_node_key=gate_node_key,
         branch_key=branch_key,
         source_input_ref=source_input_ref,
     )
+
+
+def _gate_source(
+    version: ArtifactVersion,
+    quality_source_binding: str | None,
+) -> tuple[str, UUID]:
+    if quality_source_binding == "artifact":
+        return "artifact", version.id
+    if quality_source_binding == "linked_file_asset":
+        value = version.content_json.get("file_asset_version_id")
+        try:
+            if type(value) is not str:
+                raise ValueError("file version text is required")
+            return "asset", UUID(value)
+        except ValueError as exc:
+            raise _invalid("The linked approval file identity is invalid.") from exc
+    raise _invalid("The approval quality source binding is invalid.")
 
 
 def _invalid(message: str) -> ApiError:

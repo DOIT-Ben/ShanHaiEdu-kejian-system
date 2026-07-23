@@ -75,7 +75,7 @@ def test_schema_and_complete_primary_math_catalog_are_valid() -> None:
 
     node_keys = {node["node_key"] for node in catalog["nodes"]}
     assert catalog["api_version"] == "shanhai.workflow-node-generation-binding/v2"
-    assert catalog["semantic_version"] == "1.2.0"
+    assert catalog["semantic_version"] == "1.3.0"
     assert len(node_keys) == 48
     assert {
         "project": 7,
@@ -96,9 +96,14 @@ def test_schema_and_complete_primary_math_catalog_are_valid() -> None:
         {"execution_scope", "branch_key", "entrypoint", "dependencies"} <= node.keys()
         for node in catalog["nodes"]
     )
-    assert sum("output_persistence" in node for node in catalog["nodes"]) == 22
+    assert sum("output_persistence" in node for node in catalog["nodes"]) == 24
     assert all(
-        ("output_persistence" in node) == (node["execution_kind"] == "model_generation")
+        ("output_persistence" in node)
+        == (
+            node["execution_kind"] == "model_generation"
+            or node.get("executor_ref")
+            in {"executor.ppt.pages_assemble", "executor.ppt.pptx_export"}
+        )
         for node in catalog["nodes"]
     )
     assert {
@@ -119,7 +124,7 @@ def test_schema_and_complete_primary_math_catalog_are_valid() -> None:
     }.issubset(node_keys)
     assert validated.catalog == catalog
     assert len(validated.content_hash) == 64
-    assert len(validated.indexes.output_definition_index) == 22
+    assert len(validated.indexes.output_definition_index) == 24
     lesson_plan_index = validated.indexes.output_definition_index["lesson_plan.generate.output"]
     assert lesson_plan_index.producer_node_key == "lesson_plan.generate"
     assert lesson_plan_index.quality_validate_node_key == "lesson_plan.validate"
@@ -463,7 +468,7 @@ def test_output_persistence_forbids_implicit_or_extra_targets() -> None:
     node_by_key(catalog, "lesson_plan.validate")["output_persistence"] = copy.deepcopy(
         node_by_key(catalog, "lesson_plan.generate")["output_persistence"]
     )
-    assert_rejected(catalog, "NODE_BINDING_SCHEMA_INVALID")
+    assert_rejected(catalog, "NODE_BINDING_DETERMINISTIC_OUTPUT_INVALID")
 
     catalog = load_catalog()
     relation = node_by_key(catalog, "lesson_plan.generate")["output_persistence"]["artifact"][
@@ -763,7 +768,7 @@ def test_catalog_hash_is_deterministic_for_semantically_identical_objects() -> N
     assert first_validated.canonical_json == second_validated.canonical_json
     assert first_validated.content_hash == second_validated.content_hash
     assert first_validated.content_hash == (
-        "9e988bcaf97b063dd4ad11e28d6e4e687c411c549628909f12f5cb1be20204c8"
+        "f3cd43a907eaf5d3b11c3d16352cbeae542a46a7ea2c9706c96f74cfbc576cc6"
     )
 
 

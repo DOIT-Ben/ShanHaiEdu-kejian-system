@@ -12,6 +12,11 @@
       "type": "array",
       "items": {"$ref": "#/$defs/style"}
     },
+    "deterministic_outputs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/deterministicOutput"}
+    },
     "nodes": {
       "type": "array",
       "minItems": 1,
@@ -203,6 +208,22 @@
         "description": {"type": "string"},
         "definition_role": {"enum": ["artifact", "prompt_components", "intermediate"]},
         "fields": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/contentField"}}
+      }
+    },
+    "deterministicOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["output_key", "title", "description", "definition_role", "fields"],
+      "properties": {
+        "output_key": {"$ref": "#/$defs/key"},
+        "title": {"type": "string", "minLength": 1},
+        "description": {"type": "string"},
+        "definition_role": {"enum": ["artifact", "prompt_components", "intermediate"]},
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/contentField"}
+        }
       }
     },
     "prompt": {

@@ -2,9 +2,9 @@
   "format_version": "1.0",
   "package_key": "shanhai.primary_math.courseware",
   "name": "小学数学标准课件生产内容包",
-  "semantic_version": "1.2.0",
+  "semantic_version": "1.3.0",
   "runtime_constraint": ">=0.1.0 <1.0.0",
-  "change_summary": "前向修正导入方案返修的同一Artifact supersedes血缘，并声明通用workflow gate批准终态；旧Release与既有项目绑定保持不变。",
+  "change_summary": "前向发布PPT页面装配与PPTX导出的确定性输出定义，并保持旧Release与既有项目绑定不变。",
   "dependencies": [],
   "items": [
     {
@@ -783,6 +783,20 @@
       "path": "items/video-classroom-quality-evaluate-generation.json",
       "schema_id": "https://shanhaiedu.local/contracts/generation-template.schema.json",
       "sha256": "0ea05749c4564b518c40c4fd727082ea421fb9ad03064537557cf69408748bde"
+    },
+    {
+      "item_key": "ppt.pages.assemble.output",
+      "kind": "content_definition",
+      "path": "items/ppt-pages-assemble-output.json",
+      "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
+      "sha256": "1d6bb3a42f2cac9a389fb7d0ca64d6c14a8695f8bb8edd64357ead1d8e0be67c"
+    },
+    {
+      "item_key": "pptx.export.output",
+      "kind": "content_definition",
+      "path": "items/pptx-export-output.json",
+      "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
+      "sha256": "b4458f608a6fe9e7118ca559b66b7385e733f73c152302e055c54d32435c507f"
     }
   ],
   "entrypoints": [
