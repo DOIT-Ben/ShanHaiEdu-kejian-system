@@ -8,10 +8,14 @@ on:
       - "apps/api/**"
       - "apps/web/**"
       - "contracts/api-surface.openapi.yaml"
+      - "contracts/delivery-slice.schema.json"
+      - "contracts/delivery-slices/**"
       - "contracts/generated/**"
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
+      - "scripts/run_delivery_slice_tests.py"
+      - "tests/integration/**"
       - "uv.lock"
   push:
     branches:
@@ -22,10 +26,14 @@ on:
       - "apps/api/**"
       - "apps/web/**"
       - "contracts/api-surface.openapi.yaml"
+      - "contracts/delivery-slice.schema.json"
+      - "contracts/delivery-slices/**"
       - "contracts/generated/**"
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
+      - "scripts/run_delivery_slice_tests.py"
+      - "tests/integration/**"
       - "uv.lock"
 
 permissions:
@@ -98,7 +106,10 @@ jobs:
         run: uv run alembic upgrade head
 
       - name: Generate ephemeral controlled access code
-        run: echo "SHANHAI_R1_ACCESS_CODE=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+        run: |
+          value="$(openssl rand -hex 32)"
+          echo "::add-mask::$value"
+          echo "SHANHAI_R1_ACCESS_CODE=$value" >> "$GITHUB_ENV"
 
       - name: Install Chromium
         run: pnpm --filter @shanhaiedu/web exec playwright install --with-deps chromium

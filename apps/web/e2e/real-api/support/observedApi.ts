@@ -10,7 +10,9 @@ export interface ObservedApiRequest {
   path: string;
 }
 
-export function observeApiRequests(page: Page): ObservedApiRequest[] {
+export type ObservedApiRequests = () => readonly ObservedApiRequest[];
+
+export function observeApiRequests(page: Page): ObservedApiRequests {
   const observed: ObservedApiRequest[] = [];
   page.on("request", (request) => {
     const url = new URL(request.url());
@@ -20,17 +22,31 @@ export function observeApiRequests(page: Page): ObservedApiRequest[] {
       path: url.pathname.slice("/api/v2".length) || "/",
     });
   });
-  return observed;
+  return () => observed.map((request) => ({ ...request }));
+}
+
+function pathMatchesTemplate(actualPath: string, pathTemplate: string): boolean {
+  const templateSegments = pathTemplate.split("/");
+  const actualSegments = actualPath.split("/");
+  if (templateSegments.length !== actualSegments.length) return false;
+  return templateSegments.every(
+    (segment, index) =>
+      (/^\{[^{}]+\}$/.test(segment) && Boolean(actualSegments[index])) ||
+      segment === actualSegments[index],
+  );
 }
 
 export function expectObservedApi(
-  observed: ObservedApiRequest[],
+  getObserved: ObservedApiRequests,
   expected: ExpectedApiRequest[],
 ): void {
   for (const request of expected) {
-    expect(observed).toContainEqual({
-      method: request.method.toUpperCase(),
-      path: request.path,
-    });
+    expect(
+      getObserved().some(
+        (observed) =>
+          observed.method === request.method.toUpperCase() &&
+          pathMatchesTemplate(observed.path, request.path),
+      ),
+    ).toBe(true);
   }
 }

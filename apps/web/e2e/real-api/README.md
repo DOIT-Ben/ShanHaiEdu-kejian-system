@@ -8,4 +8,4 @@
 
 测试使用`../../playwright.real-api.config.ts`和根工作流`.github/workflows/r1-real-api.yml`。任何PR声明本目录中的测试时，必须填写文件路径和精确Playwright标题；本README不是完成证据。
 
-每个测试通过`support/observedApi.ts`只读监听浏览器真实请求，并在完成教师操作后用`expectObservedApi`断言清单声明的方法与路径。监听器不得响应、改写或拦截请求。
+每个测试通过`support/observedApi.ts`只读监听浏览器真实请求，并在完成教师操作后用`expectObservedApi`读取不可变快照，断言清单声明的方法与路径。清单路径允许使用OpenAPI的`{parameter}`模板，运行时必须匹配到真实非空路径段。监听器不得响应、改写或拦截请求。

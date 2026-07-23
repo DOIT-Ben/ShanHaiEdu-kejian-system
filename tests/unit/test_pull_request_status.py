@@ -137,8 +137,16 @@ def test_vertical_slice_requires_all_concrete_delivery_fields() -> None:
 
 
 def _write_vertical_slice_fixture(tmp_path) -> None:
+    schema = tmp_path / "contracts/delivery-slice.schema.json"
+    schema.parent.mkdir(parents=True)
+    schema.write_text(
+        (Path(__file__).resolve().parents[2] / "contracts/delivery-slice.schema.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
     contract = tmp_path / "contracts/api-surface.openapi.yaml"
-    contract.parent.mkdir(parents=True)
+    contract.parent.mkdir(parents=True, exist_ok=True)
     contract.write_text(
         "openapi: 3.1.0\n"
         "info: {title: test, version: 1.0.0}\n"
@@ -151,17 +159,18 @@ def _write_vertical_slice_fixture(tmp_path) -> None:
     runtime_app = tmp_path / "apps/web/src/app/RuntimeApp.tsx"
     runtime_app.parent.mkdir(parents=True)
     runtime_app.write_text(
-        '<Route path="/login" />\n'
-        '<Route path="/app">\n'
-        '  <Route path="projects" />\n'
-        '  <Route path="projects/new" />\n'
+        '<Route element={<LoginPage />} path="/login" />\n'
+        '<Route element={<AppShell />} path="/app">\n'
+        '  <Route element={<ProjectsPage />} path="projects" />\n'
+        '  <Route element={<NewProjectPage />} path="projects/new" />\n'
         "</Route>\n",
         encoding="utf-8",
     )
     models = tmp_path / "apps/api/projects/models.py"
     models.parent.mkdir(parents=True)
     models.write_text(
-        'class Project:\n    __tablename__ = "projects"\n',
+        "from apps.api.database import Base\n\n"
+        'class Project(Base):\n    __tablename__ = "projects"\n',
         encoding="utf-8",
     )
     backend_test = tmp_path / "tests/integration/test_project_api.py"
@@ -188,11 +197,11 @@ def _write_vertical_slice_fixture(tmp_path) -> None:
     )
     real_api_config = tmp_path / "apps/web/playwright.real-api.config.ts"
     real_api_config.write_text(
-        'export default { testDir: "./e2e/real-api", '
+        'export default defineConfig({ testDir: "./e2e/real-api", '
         'use: { baseURL: "http://127.0.0.1:4177" }, '
         'webServer: { env: { VITE_API_MODE: "real", '
         'VITE_API_BASE_URL: "/api/v2", '
-        'VITE_REAL_API_PROXY_TARGET: "http://127.0.0.1:8000" } } };\n',
+        'VITE_REAL_API_PROXY_TARGET: "http://127.0.0.1:8000" } } });\n',
         encoding="utf-8",
     )
     package_json = tmp_path / "apps/web/package.json"
@@ -204,6 +213,19 @@ def _write_vertical_slice_fixture(tmp_path) -> None:
     real_api_workflow = tmp_path / ".github/workflows/r1-real-api.yml"
     real_api_workflow.parent.mkdir(parents=True)
     real_api_workflow.write_text(
+        "on:\n"
+        "  pull_request:\n"
+        "    paths:\n"
+        "      - contracts/delivery-slice.schema.json\n"
+        "      - contracts/delivery-slices/**\n"
+        "      - scripts/run_delivery_slice_tests.py\n"
+        "      - tests/integration/**\n"
+        "  push:\n"
+        "    paths:\n"
+        "      - contracts/delivery-slice.schema.json\n"
+        "      - contracts/delivery-slices/**\n"
+        "      - scripts/run_delivery_slice_tests.py\n"
+        "      - tests/integration/**\n"
         "jobs:\n"
         "  real-api:\n"
         "    services:\n"
@@ -211,6 +233,11 @@ def _write_vertical_slice_fixture(tmp_path) -> None:
         "      redis: {image: redis:7}\n"
         "    steps:\n"
         "      - run: alembic upgrade head\n"
+        "      - run: |\n"
+        '          value="$(openssl rand -hex 32)"\n'
+        '          echo "::add-mask::$value"\n'
+        '          echo "SHANHAI_R1_ACCESS_CODE=$value" >> "$GITHUB_ENV"\n'
+        "      - run: pnpm --filter @shanhaiedu/web exec playwright install chromium\n"
         "      - run: uvicorn apps.api.main:app &\n"
         "      - run: pnpm --filter @shanhaiedu/web test:e2e:real-api\n"
         "      - run: python scripts/run_delivery_slice_tests.py\n",
@@ -371,6 +398,130 @@ def test_vertical_slice_rejects_manifest_union_and_openapi_mismatch(tmp_path: Pa
     assert (
         "vertical slice Delivery manifest Page routes union does not match the PR declaration"
     ) in errors
+
+
+def test_vertical_slice_rejects_manifest_schema_extra_properties(tmp_path: Path) -> None:
+    _write_vertical_slice_fixture(tmp_path)
+    manifest = tmp_path / "contracts/delivery-slices/211-projects.yaml"
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8")
+        .replace("issue: 211\n", "issue: 211\nunexpected_root: true\n")
+        .replace(
+            "  - page_route: /app/projects\n",
+            "  - page_route: /app/projects\n    unexpected_row: true\n",
+            1,
+        ),
+        encoding="utf-8",
+    )
+    body = "Closes #211\n\n" + vertical_section(
+        f"{VERTICAL_REQUIRED}\n{VERTICAL_NOT_REQUIRED_UNCHECKED}",
+        "Page routes: /app/projects, /app/projects/new\n"
+        "Active operationIds: `listProjects`, `createProject`\n"
+        "Formal facts: Project\n"
+        "Backend tests: `tests/integration/test_project_api.py::test_create_project`\n"
+        "Real API Playwright: "
+        "`apps/web/e2e/real-api/r1-teacher-flow.spec.ts::creates_project`\n"
+        "Delivery manifest: contracts/delivery-slices/211-projects.yaml\n",
+    )
+
+    errors = validate_vertical_slice_declaration(
+        body,
+        {
+            "contracts/api-surface.openapi.yaml",
+            "contracts/delivery-slices/211-projects.yaml",
+        },
+        required=True,
+        repo_root=tmp_path,
+        base_sha=BASE_SHA,
+    )
+
+    assert any(
+        error.startswith("vertical slice Delivery manifest violates its JSON Schema")
+        for error in errors
+    )
+
+
+def test_vertical_slice_rejects_navigation_path_mismatch(tmp_path: Path) -> None:
+    _write_vertical_slice_fixture(tmp_path)
+    manifest = tmp_path / "contracts/delivery-slices/211-projects.yaml"
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8").replace(
+            "    navigation_path: /app/projects\n",
+            "    navigation_path: /app/projects/new\n",
+            1,
+        ),
+        encoding="utf-8",
+    )
+    body = "Closes #211\n\n" + vertical_section(
+        f"{VERTICAL_REQUIRED}\n{VERTICAL_NOT_REQUIRED_UNCHECKED}",
+        "Page routes: /app/projects, /app/projects/new\n"
+        "Active operationIds: `listProjects`, `createProject`\n"
+        "Formal facts: Project\n"
+        "Backend tests: `tests/integration/test_project_api.py::test_create_project`\n"
+        "Real API Playwright: "
+        "`apps/web/e2e/real-api/r1-teacher-flow.spec.ts::creates_project`\n"
+        "Delivery manifest: contracts/delivery-slices/211-projects.yaml\n",
+    )
+
+    errors = validate_vertical_slice_declaration(
+        body,
+        {
+            "contracts/api-surface.openapi.yaml",
+            "contracts/delivery-slices/211-projects.yaml",
+        },
+        required=True,
+        repo_root=tmp_path,
+        base_sha=BASE_SHA,
+    )
+
+    assert (
+        "vertical slice Delivery manifest row 1 navigation_path does not match page_route"
+    ) in errors
+
+
+def test_vertical_slice_checks_only_selected_playwright_test_body(tmp_path: Path) -> None:
+    _write_vertical_slice_fixture(tmp_path)
+    browser_test = tmp_path / "apps/web/e2e/real-api/r1-teacher-flow.spec.ts"
+    browser_test.write_text(
+        'import { test } from "@playwright/test";\n'
+        "function unusedEvidence(page: any) {\n"
+        "  const observed = observeApiRequests(page);\n"
+        '  page.goto("/app/projects");\n'
+        '  page.goto("/app/projects/new");\n'
+        "  expectObservedApi(observed, [\n"
+        '    { method: "GET", path: "/projects" },\n'
+        '    { method: "POST", path: "/projects" },\n'
+        "  ]);\n"
+        "}\n"
+        'test("creates_project", async () => {});\n',
+        encoding="utf-8",
+    )
+    body = "Closes #211\n\n" + vertical_section(
+        f"{VERTICAL_REQUIRED}\n{VERTICAL_NOT_REQUIRED_UNCHECKED}",
+        "Page routes: /app/projects, /app/projects/new\n"
+        "Active operationIds: `listProjects`, `createProject`\n"
+        "Formal facts: Project\n"
+        "Backend tests: `tests/integration/test_project_api.py::test_create_project`\n"
+        "Real API Playwright: "
+        "`apps/web/e2e/real-api/r1-teacher-flow.spec.ts::creates_project`\n"
+        "Delivery manifest: contracts/delivery-slices/211-projects.yaml\n",
+    )
+
+    errors = validate_vertical_slice_declaration(
+        body,
+        {
+            "contracts/api-surface.openapi.yaml",
+            "contracts/delivery-slices/211-projects.yaml",
+        },
+        required=True,
+        repo_root=tmp_path,
+        base_sha=BASE_SHA,
+    )
+
+    assert any("does not navigate to navigation_path" in error for error in errors)
+    assert any("must observe and assert real API requests" in error for error in errors)
+    assert any("does not assert GET /projects" in error for error in errors)
+    assert any("does not assert POST /projects" in error for error in errors)
 
 
 def test_vertical_slice_rejects_unknown_operation_and_missing_test_files(tmp_path) -> None:
@@ -536,7 +687,10 @@ def test_vertical_slice_rejects_pydantic_class_in_models_module_as_formal_fact(
     models = tmp_path / "apps/api/model_gateway/models.py"
     models.parent.mkdir(parents=True)
     models.write_text(
-        "from pydantic import BaseModel\n\nclass Box(BaseModel):\n    value: str\n",
+        "from pydantic import BaseModel\n\n"
+        "class Box(BaseModel):\n"
+        '    __tablename__ = "boxes"\n'
+        "    value: str\n",
         encoding="utf-8",
     )
     body = vertical_section(
@@ -555,6 +709,35 @@ def test_vertical_slice_rejects_pydantic_class_in_models_module_as_formal_fact(
         required=True,
         repo_root=tmp_path,
     ) == ["vertical slice declares Formal facts absent from persisted model classes: Box"]
+
+
+def test_vertical_slice_rejects_nested_database_model_as_formal_fact(tmp_path: Path) -> None:
+    _write_vertical_slice_fixture(tmp_path)
+    models = tmp_path / "apps/api/projects/models.py"
+    models.write_text(
+        "from apps.api.database import Base\n\n"
+        "def build_model():\n"
+        "    class HiddenProject(Base):\n"
+        '        __tablename__ = "hidden_projects"\n'
+        "    return HiddenProject\n",
+        encoding="utf-8",
+    )
+    body = vertical_section(
+        f"{VERTICAL_REQUIRED}\n{VERTICAL_NOT_REQUIRED_UNCHECKED}",
+        "Page routes: /app/projects\n"
+        "Active operationIds: listProjects\n"
+        "Formal facts: HiddenProject\n"
+        "Backend tests: tests/integration/test_project_api.py::test_create_project\n"
+        "Real API Playwright: "
+        "apps/web/e2e/real-api/r1-teacher-flow.spec.ts::creates_project\n",
+    )
+
+    assert validate_vertical_slice_declaration(
+        body,
+        {"apps/web/src/pages/ProjectsPage.tsx"},
+        required=True,
+        repo_root=tmp_path,
+    ) == ["vertical slice declares Formal facts absent from persisted model classes: HiddenProject"]
 
 
 def test_vertical_slice_ignores_declarations_inside_fenced_code(tmp_path) -> None:
@@ -725,6 +908,69 @@ def test_vertical_slice_rejects_missing_python_and_playwright_test_symbols(tmp_p
     ]
 
 
+def test_vertical_slice_rejects_module_skipped_python_selector(tmp_path: Path) -> None:
+    _write_vertical_slice_fixture(tmp_path)
+    backend_test = tmp_path / "tests/integration/test_project_api.py"
+    backend_test.write_text(
+        "import pytest\n\n"
+        'pytestmark = pytest.mark.skip(reason="not executable")\n\n'
+        "def test_create_project():\n"
+        "    pass\n",
+        encoding="utf-8",
+    )
+    body = vertical_section(
+        f"{VERTICAL_REQUIRED}\n{VERTICAL_NOT_REQUIRED_UNCHECKED}",
+        "Page routes: /app/projects\n"
+        "Active operationIds: listProjects\n"
+        "Formal facts: Project\n"
+        "Backend tests: tests/integration/test_project_api.py::test_create_project\n"
+        "Real API Playwright: "
+        "apps/web/e2e/real-api/r1-teacher-flow.spec.ts::creates_project\n",
+    )
+
+    assert validate_vertical_slice_declaration(
+        body,
+        {"apps/api/projects/router.py"},
+        required=True,
+        repo_root=tmp_path,
+    ) == [
+        "vertical slice declares missing Backend tests selector: "
+        "tests/integration/test_project_api.py::test_create_project"
+    ]
+
+
+def test_vertical_slice_rejects_class_xfailed_python_selector(tmp_path: Path) -> None:
+    _write_vertical_slice_fixture(tmp_path)
+    backend_test = tmp_path / "tests/integration/test_project_api.py"
+    backend_test.write_text(
+        "import pytest\n\n"
+        '@pytest.mark.xfail(reason="not executable")\n'
+        "class TestProjects:\n"
+        "    def test_create_project(self):\n"
+        "        pass\n",
+        encoding="utf-8",
+    )
+    body = vertical_section(
+        f"{VERTICAL_REQUIRED}\n{VERTICAL_NOT_REQUIRED_UNCHECKED}",
+        "Page routes: /app/projects\n"
+        "Active operationIds: listProjects\n"
+        "Formal facts: Project\n"
+        "Backend tests: tests/integration/test_project_api.py::TestProjects::test_create_project\n"
+        "Real API Playwright: "
+        "apps/web/e2e/real-api/r1-teacher-flow.spec.ts::creates_project\n",
+    )
+
+    assert validate_vertical_slice_declaration(
+        body,
+        {"apps/api/projects/router.py"},
+        required=True,
+        repo_root=tmp_path,
+    ) == [
+        "vertical slice declares missing Backend tests selector: "
+        "tests/integration/test_project_api.py::TestProjects::test_create_project"
+    ]
+
+
 def test_vertical_slice_rejects_intercepted_playwright_as_real_api_evidence(tmp_path) -> None:
     _write_vertical_slice_fixture(tmp_path)
     browser_test = tmp_path / "apps/web/e2e/real-api/r1-teacher-flow.spec.ts"
@@ -823,6 +1069,46 @@ def test_vertical_slice_rejects_interception_in_imported_playwright_helper(
     ]
 
 
+def test_vertical_slice_rejects_computed_interception_in_external_js_helper(
+    tmp_path: Path,
+) -> None:
+    _write_vertical_slice_fixture(tmp_path)
+    browser_test = tmp_path / "apps/web/e2e/real-api/r1-teacher-flow.spec.ts"
+    browser_test.write_text(
+        'import { installApi } from "../support/external-api.mjs";\n'
+        'import { test } from "@playwright/test";\n'
+        'test("creates_project", async ({ page }) => installApi(page));\n',
+        encoding="utf-8",
+    )
+    helper = tmp_path / "apps/web/e2e/support/external-api.mjs"
+    helper.parent.mkdir(parents=True)
+    helper.write_text(
+        "export async function installApi(browserPage) {\n"
+        '  await browserPage["route"]("**/api/**", () => undefined);\n'
+        "}\n",
+        encoding="utf-8",
+    )
+    body = vertical_section(
+        f"{VERTICAL_REQUIRED}\n{VERTICAL_NOT_REQUIRED_UNCHECKED}",
+        "Page routes: /app/projects\n"
+        "Active operationIds: listProjects\n"
+        "Formal facts: Project\n"
+        "Backend tests: tests/integration/test_project_api.py::test_create_project\n"
+        "Real API Playwright: "
+        "apps/web/e2e/real-api/r1-teacher-flow.spec.ts::creates_project\n",
+    )
+
+    assert validate_vertical_slice_declaration(
+        body,
+        {"apps/web/src/pages/ProjectsPage.tsx"},
+        required=True,
+        repo_root=tmp_path,
+    ) == [
+        "vertical slice Real API Playwright uses request interception or "
+        "test API fixtures: apps/web/e2e/real-api/r1-teacher-flow.spec.ts"
+    ]
+
+
 def test_vertical_slice_requires_real_api_playwright_harness(tmp_path) -> None:
     _write_vertical_slice_fixture(tmp_path)
     (tmp_path / "apps/web/playwright.real-api.config.ts").unlink()
@@ -856,7 +1142,11 @@ def test_vertical_slice_rejects_comment_only_real_api_harness(tmp_path: Path) ->
     _write_vertical_slice_fixture(tmp_path)
     config = tmp_path / "apps/web/playwright.real-api.config.ts"
     config.write_text(
-        '// testDir: "./e2e/real-api"\n// VITE_API_MODE: "real"\nexport default {};\n',
+        'const unused = defineConfig({ testDir: "./e2e/real-api", '
+        'webServer: { env: { VITE_API_MODE: "real", '
+        'VITE_API_BASE_URL: "/api/v2", '
+        'VITE_REAL_API_PROXY_TARGET: "http://127.0.0.1:8000" } } });\n'
+        "export default {};\n",
         encoding="utf-8",
     )
     workflow = tmp_path / ".github/workflows/r1-real-api.yml"
@@ -890,6 +1180,44 @@ def test_vertical_slice_rejects_comment_only_real_api_harness(tmp_path: Path) ->
     ]
 
 
+def test_vertical_slice_requires_semantic_workflow_commands_and_triggers(
+    tmp_path: Path,
+) -> None:
+    _write_vertical_slice_fixture(tmp_path)
+    workflow = tmp_path / ".github/workflows/r1-real-api.yml"
+    valid_source = workflow.read_text(encoding="utf-8")
+    body = vertical_section(
+        f"{VERTICAL_REQUIRED}\n{VERTICAL_NOT_REQUIRED_UNCHECKED}",
+        "Page routes: /app/projects\n"
+        "Active operationIds: listProjects\n"
+        "Formal facts: Project\n"
+        "Backend tests: tests/integration/test_project_api.py::test_create_project\n"
+        "Real API Playwright: "
+        "apps/web/e2e/real-api/r1-teacher-flow.spec.ts::creates_project\n",
+    )
+    invalid_variants = (
+        valid_source.replace(
+            "pnpm --filter @shanhaiedu/web exec playwright install chromium",
+            "echo playwright install chromium",
+        ),
+        valid_source.replace('echo "::add-mask::$value"\n', ""),
+        valid_source.replace("      - tests/integration/**\n", "", 1),
+    )
+
+    for invalid_source in invalid_variants:
+        workflow.write_text(invalid_source, encoding="utf-8")
+        errors = validate_vertical_slice_declaration(
+            body,
+            {"apps/web/src/pages/ProjectsPage.tsx"},
+            required=True,
+            repo_root=tmp_path,
+        )
+        assert (
+            "vertical slice real API Playwright CI workflow must start "
+            "PostgreSQL, Redis and FastAPI and run test:e2e:real-api"
+        ) in errors
+
+
 def test_vertical_slice_rejects_commented_or_unavailable_runtime_routes(
     tmp_path: Path,
 ) -> None:
@@ -919,6 +1247,41 @@ def test_vertical_slice_rejects_commented_or_unavailable_runtime_routes(
         required=True,
         repo_root=tmp_path,
     ) == ["vertical slice declares Page routes absent from RuntimeApp: /app/creation/*, /app/fake"]
+
+
+def test_vertical_slice_rejects_string_redirect_and_elementless_routes(
+    tmp_path: Path,
+) -> None:
+    _write_vertical_slice_fixture(tmp_path)
+    runtime_app = tmp_path / "apps/web/src/app/RuntimeApp.tsx"
+    runtime_app.write_text(
+        "const example = '<Route element={<Fake />} path=\"fake-string\" />';\n"
+        '<Route element={<AppShell />} path="/app">\n'
+        '  <Route path="elementless" />\n'
+        '  <Route path="redirect"><Navigate to="/app" /></Route>\n'
+        '  <Route Component={ProjectsPage} path="good" />\n'
+        "</Route>\n",
+        encoding="utf-8",
+    )
+    body = vertical_section(
+        f"{VERTICAL_REQUIRED}\n{VERTICAL_NOT_REQUIRED_UNCHECKED}",
+        "Page routes: /app/fake-string, /app/elementless, /app/redirect, /app/good\n"
+        "Active operationIds: listProjects\n"
+        "Formal facts: Project\n"
+        "Backend tests: tests/integration/test_project_api.py::test_create_project\n"
+        "Real API Playwright: "
+        "apps/web/e2e/real-api/r1-teacher-flow.spec.ts::creates_project\n",
+    )
+
+    assert validate_vertical_slice_declaration(
+        body,
+        {"apps/web/src/app/RuntimeApp.tsx"},
+        required=True,
+        repo_root=tmp_path,
+    ) == [
+        "vertical slice declares Page routes absent from RuntimeApp: "
+        "/app/elementless, /app/fake-string, /app/redirect"
+    ]
 
 
 def test_pull_request_template_contains_vertical_slice_contract() -> None:
