@@ -43,12 +43,10 @@ VERTICAL_REQUIRED_FIELDS = (
     "Real API Playwright",
 )
 VERTICAL_BOUNDARY_PREFIXES = (
-    "apps/web/src/pages/",
-    "apps/web/src/api/",
-    "apps/web/src/runtime/",
-    "apps/api/routers/",
+    "apps/web/src/",
     "contracts/openapi/active/",
 )
+VERTICAL_BOUNDARY_PATHS = ("contracts/api-surface.openapi.yaml",)
 FIRST_REQUIRED_GOVERNANCE_PR = 93  # Remove under #94 after legacy PR #62 closes.
 
 
@@ -162,6 +160,21 @@ def validate_size_declaration(
     if not exceeds_raw_trigger and choices[0] != "pr-size-within-limit":
         return ["PR declares a required review map but does not exceed the raw size trigger"]
     return []
+
+
+def _touches_vertical_boundary(path: str) -> bool:
+    return (
+        path.startswith(VERTICAL_BOUNDARY_PREFIXES)
+        or path in VERTICAL_BOUNDARY_PATHS
+        or (
+            path.startswith("apps/api/")
+            and (
+                path.endswith("/router.py")
+                or path.endswith("/routers.py")
+                or "/routers/" in path
+            )
+        )
+    )
 
 
 def validate_vertical_slice_declaration(
