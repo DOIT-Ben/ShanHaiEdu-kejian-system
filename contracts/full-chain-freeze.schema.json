@@ -5,6 +5,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "$schema",
     "contract_version",
     "contract_key",
     "status",
@@ -15,6 +16,7 @@
     "change_policy"
   ],
   "properties": {
+    "$schema": {"const": "./full-chain-freeze.schema.json"},
     "contract_version": {
       "const": "shanhai.full-chain-freeze/v1"
     },
