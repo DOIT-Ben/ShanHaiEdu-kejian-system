@@ -3,21 +3,21 @@
   "fixture_key": "primary-math.numbers-1-to-5.two-lessons",
   "purpose": "Provide stable exact upstream inputs for parallel mainline, PPT, complete-video and frontend development without pretending that real providers have run.",
   "project": {
-    "organization_id": "ORG-FREEZE-001",
-    "project_id": "PROJECT-FREEZE-001",
-    "content_release_id": "RELEASE-PRIMARY-MATH-140",
+    "organization_id": "00000000-0000-4000-8000-000000000001",
+    "project_id": "00000000-0000-4000-8000-000000000002",
+    "content_release_id": "00000000-0000-4000-8000-000000000003",
     "content_release_version": "1.4.0",
-    "workflow_definition_version_id": "WORKFLOW-PRIMARY-MATH-140",
-    "source_material_id": "MATERIAL-NUMBERS-001",
-    "material_parse_version_id": "MATERIAL-PARSE-NUMBERS-001",
+    "workflow_definition_version_id": "00000000-0000-4000-8000-000000000004",
+    "source_material_id": "00000000-0000-4000-8000-000000000005",
+    "material_parse_version_id": "00000000-0000-4000-8000-000000000006",
     "material_evidence_hash": "1111111111111111111111111111111111111111111111111111111111111111",
-    "material_scope_artifact_version_id": "MATERIAL-SCOPE-VERSION-001",
-    "lesson_division_artifact_version_id": "LESSON-DIVISION-VERSION-001",
-    "lesson_division_approval_id": "LESSON-DIVISION-APPROVAL-001"
+    "material_scope_artifact_version_id": "00000000-0000-4000-8000-000000000007",
+    "lesson_division_artifact_version_id": "00000000-0000-4000-8000-000000000008",
+    "lesson_division_approval_id": "00000000-0000-4000-8000-000000000009"
   },
   "lessons": [
     {
-      "lesson_id": "LESSON-FREEZE-001",
+      "lesson_id": "00000000-0000-4000-8000-000000000101",
       "lesson_unit_key": "LESSON-001",
       "position": 1,
       "title": "1～3的数量感知与对应",
@@ -28,10 +28,10 @@
         "must_not_preteach": ["数字4和5的规范书写", "比较大小", "第几", "加法", "减法"]
       },
       "lesson_plan": {
-        "artifact_id": "ARTIFACT-LESSON-PLAN-001",
-        "artifact_version_id": "ARTIFACT-LESSON-PLAN-VERSION-001",
+        "artifact_id": "00000000-0000-4000-8000-000000000111",
+        "artifact_version_id": "00000000-0000-4000-8000-000000000121",
         "content_hash": "2222222222222222222222222222222222222222222222222222222222222222",
-        "approval_id": "APPROVAL-LESSON-PLAN-001",
+        "approval_id": "00000000-0000-4000-8000-000000000131",
         "approval_status": "approved",
         "sections": [
           "teaching_content",
@@ -49,12 +49,12 @@
         ]
       },
       "intro": {
-        "artifact_id": "ARTIFACT-INTRO-001",
-        "artifact_version_id": "ARTIFACT-INTRO-VERSION-001",
+        "artifact_id": "00000000-0000-4000-8000-000000000141",
+        "artifact_version_id": "00000000-0000-4000-8000-000000000151",
         "content_hash": "3333333333333333333333333333333333333333333333333333333333333333",
-        "approval_id": "APPROVAL-INTRO-001",
+        "approval_id": "00000000-0000-4000-8000-000000000161",
         "approval_status": "approved",
-        "selection_id": "INTRO-SELECTION-001",
+        "selection_id": "00000000-0000-4000-8000-000000000171",
         "selected_option_key": "INTRO-INDEPENDENT-001",
         "selection_snapshot": {
           "knowledge_point": "1～3的数量感知与对应",
@@ -70,19 +70,19 @@
       },
       "parallel_inputs": {
         "ppt": {
-          "project_id": "PROJECT-FREEZE-001",
-          "lesson_id": "LESSON-FREEZE-001",
-          "approved_lesson_plan_version_id": "ARTIFACT-LESSON-PLAN-VERSION-001",
+          "project_id": "00000000-0000-4000-8000-000000000002",
+          "lesson_id": "00000000-0000-4000-8000-000000000101",
+          "approved_lesson_plan_version_id": "00000000-0000-4000-8000-000000000121",
           "lesson_plan_content_hash": "2222222222222222222222222222222222222222222222222222222222222222",
-          "material_parse_version_id": "MATERIAL-PARSE-NUMBERS-001",
-          "material_scope_artifact_version_id": "MATERIAL-SCOPE-VERSION-001",
+          "material_parse_version_id": "00000000-0000-4000-8000-000000000006",
+          "material_scope_artifact_version_id": "00000000-0000-4000-8000-000000000007",
           "ppt_preferences": {"aspect_ratio": "16:9", "preferred_page_count": 10, "style_key": "style.primary_math.paper_clay"}
         },
         "video": {
-          "project_id": "PROJECT-FREEZE-001",
-          "lesson_id": "LESSON-FREEZE-001",
-          "intro_selection_id": "INTRO-SELECTION-001",
-          "intro_option_set_version_id": "ARTIFACT-INTRO-VERSION-001",
+          "project_id": "00000000-0000-4000-8000-000000000002",
+          "lesson_id": "00000000-0000-4000-8000-000000000101",
+          "intro_selection_id": "00000000-0000-4000-8000-000000000171",
+          "intro_option_set_version_id": "00000000-0000-4000-8000-000000000151",
           "selected_option_key": "INTRO-INDEPENDENT-001",
           "selected_option_snapshot_hash": "4444444444444444444444444444444444444444444444444444444444444444",
           "video_preferences": {"aspect_ratio": "16:9", "duration_seconds": 90, "language": "zh-CN", "style_key": "style.primary_math.paper_clay", "voice_style": "亲切、清晰、自然", "speech_rate": 0.95}
@@ -90,7 +90,7 @@
       }
     },
     {
-      "lesson_id": "LESSON-FREEZE-002",
+      "lesson_id": "00000000-0000-4000-8000-000000000102",
       "lesson_unit_key": "LESSON-002",
       "position": 2,
       "title": "数字4、5的认读与规范书写",
@@ -101,10 +101,10 @@
         "must_not_preteach": ["比较大小", "第几", "分与合", "加法", "减法", "0的认识"]
       },
       "lesson_plan": {
-        "artifact_id": "ARTIFACT-LESSON-PLAN-002",
-        "artifact_version_id": "ARTIFACT-LESSON-PLAN-VERSION-002",
+        "artifact_id": "00000000-0000-4000-8000-000000000112",
+        "artifact_version_id": "00000000-0000-4000-8000-000000000122",
         "content_hash": "5555555555555555555555555555555555555555555555555555555555555555",
-        "approval_id": "APPROVAL-LESSON-PLAN-002",
+        "approval_id": "00000000-0000-4000-8000-000000000132",
         "approval_status": "approved",
         "sections": [
           "teaching_content",
@@ -122,12 +122,12 @@
         ]
       },
       "intro": {
-        "artifact_id": "ARTIFACT-INTRO-002",
-        "artifact_version_id": "ARTIFACT-INTRO-VERSION-002",
+        "artifact_id": "00000000-0000-4000-8000-000000000142",
+        "artifact_version_id": "00000000-0000-4000-8000-000000000152",
         "content_hash": "6666666666666666666666666666666666666666666666666666666666666666",
-        "approval_id": "APPROVAL-INTRO-002",
+        "approval_id": "00000000-0000-4000-8000-000000000162",
         "approval_status": "approved",
-        "selection_id": "INTRO-SELECTION-002",
+        "selection_id": "00000000-0000-4000-8000-000000000172",
         "selected_option_key": "INTRO-APPLICATION-002",
         "selection_snapshot": {
           "knowledge_point": "数字4、5的认读与规范书写",
@@ -143,19 +143,19 @@
       },
       "parallel_inputs": {
         "ppt": {
-          "project_id": "PROJECT-FREEZE-001",
-          "lesson_id": "LESSON-FREEZE-002",
-          "approved_lesson_plan_version_id": "ARTIFACT-LESSON-PLAN-VERSION-002",
+          "project_id": "00000000-0000-4000-8000-000000000002",
+          "lesson_id": "00000000-0000-4000-8000-000000000102",
+          "approved_lesson_plan_version_id": "00000000-0000-4000-8000-000000000122",
           "lesson_plan_content_hash": "5555555555555555555555555555555555555555555555555555555555555555",
-          "material_parse_version_id": "MATERIAL-PARSE-NUMBERS-001",
-          "material_scope_artifact_version_id": "MATERIAL-SCOPE-VERSION-001",
+          "material_parse_version_id": "00000000-0000-4000-8000-000000000006",
+          "material_scope_artifact_version_id": "00000000-0000-4000-8000-000000000007",
           "ppt_preferences": {"aspect_ratio": "16:9", "preferred_page_count": 10, "style_key": "style.primary_math.paper_clay"}
         },
         "video": {
-          "project_id": "PROJECT-FREEZE-001",
-          "lesson_id": "LESSON-FREEZE-002",
-          "intro_selection_id": "INTRO-SELECTION-002",
-          "intro_option_set_version_id": "ARTIFACT-INTRO-VERSION-002",
+          "project_id": "00000000-0000-4000-8000-000000000002",
+          "lesson_id": "00000000-0000-4000-8000-000000000102",
+          "intro_selection_id": "00000000-0000-4000-8000-000000000172",
+          "intro_option_set_version_id": "00000000-0000-4000-8000-000000000152",
           "selected_option_key": "INTRO-APPLICATION-002",
           "selected_option_snapshot_hash": "7777777777777777777777777777777777777777777777777777777777777777",
           "video_preferences": {"aspect_ratio": "16:9", "duration_seconds": 90, "language": "zh-CN", "style_key": "style.primary_math.paper_clay", "voice_style": "亲切、清晰、自然", "speech_rate": 0.95}
