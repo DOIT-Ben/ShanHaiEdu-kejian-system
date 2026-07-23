@@ -89,17 +89,36 @@ jobs:
           tests/contract/test_parallel_fixtures.py
           tests/contract/test_trusted_contract_workflows.py
 
-      - name: Lint contract governance Python
-        run: >-
-          uv run ruff check
-          scripts/check_contract_freeze.py
-          scripts/check_development_lease.py
-          scripts/check_parallel_fixtures.py
-          scripts/check_trusted_contract_workflows.py
-          tests/contract/test_contract_freeze.py
-          tests/contract/test_development_lease.py
-          tests/contract/test_parallel_fixtures.py
-          tests/contract/test_trusted_contract_workflows.py
+      - name: Capture contract governance lint result
+        run: |
+          set +e
+          uv run ruff check \
+            scripts/check_contract_freeze.py \
+            scripts/check_development_lease.py \
+            scripts/check_parallel_fixtures.py \
+            scripts/check_trusted_contract_workflows.py \
+            tests/contract/test_contract_freeze.py \
+            tests/contract/test_development_lease.py \
+            tests/contract/test_parallel_fixtures.py \
+            tests/contract/test_trusted_contract_workflows.py \
+            > contract-governance-lint.txt 2>&1
+          status=$?
+          printf '%s\n' "$status" > contract-governance-lint.status
+          cat contract-governance-lint.txt
+          exit 0
+
+      - name: Upload contract governance lint diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-governance-lint
+          path: |
+            contract-governance-lint.txt
+            contract-governance-lint.status
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Reject contract governance lint errors
+        run: test "$(cat contract-governance-lint.status)" = "0"
 
       - name: Validate full-chain freeze
         run: |
