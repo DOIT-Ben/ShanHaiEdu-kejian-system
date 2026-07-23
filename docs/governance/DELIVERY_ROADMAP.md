@@ -160,6 +160,8 @@ PPT首个纵向切片：
 
 缺少任一项时，任务不能进入`in-progress`。前端不得猜接口，后端不得新增没有当前消费者的业务端点来代替页面结果。
 
+PR中的页面路由必须已经注册到`apps/web/src/app/RuntimeApp.tsx`；正式事实必须是当前持久化模型文件中的精确类名，不能使用服务或DTO类；后端和Playwright证据必须填写存在的精确测试选择器。真实API测试固定放在`apps/web/e2e/real-api/`，由`apps/web/playwright.real-api.config.ts`、`test:e2e:real-api`和`.github/workflows/r1-real-api.yml`运行。
+
 ## 7. 合并门禁
 
 业务PR转Ready和合并前必须同时满足：
@@ -169,7 +171,7 @@ PPT首个纵向切片：
 - 生成TypeScript客户端无漂移；
 - 生产页面实际消费正式API；
 - PostgreSQL集成、租户、权限和必要安全负测通过；
-- 真实API Playwright覆盖关键链路和刷新恢复；
+- 真实API Playwright通过专用配置与CI启动FastAPI、PostgreSQL和Redis，覆盖关键链路和刷新恢复；MSW、请求拦截和浏览器伪造会话不构成该证据；
 - 普通CI Fake与里程碑真实Provider证据分别成立；
 - `CURRENT_STATUS.md`更新为最终事实；
 - 独立只读子智能体审查绑定最终base/head，P0/P1清零；

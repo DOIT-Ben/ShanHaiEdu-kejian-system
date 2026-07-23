@@ -49,6 +49,7 @@
 - 前端消费者不得通过手写DTO、未声明字段、静态Mock或known-ID深链绕过缺失合同。
 - 后端端点通过单元测试不代表业务切片完成；当前父Issue还必须提供生产页面消费、PostgreSQL事实和真实API Playwright证据。
 - Session、授权和CSRF属于写操作合同的一部分；前端Token注入不能替代服务端校验。
+- PR声明的operationId必须来自active OpenAPI标准HTTP方法；`x-*`扩展、planned operation或未被运行时和当前消费者共同使用的名称不能作为完成证据。
 - 发布Release、Artifact审核、统一Job/NodeRun状态和项目写回语义只有一个活动所有者，不得由并行分支分别扩展。
 
 ## 使用规则
