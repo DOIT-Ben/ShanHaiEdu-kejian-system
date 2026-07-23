@@ -524,6 +524,53 @@ def test_vertical_slice_checks_only_selected_playwright_test_body(tmp_path: Path
     assert any("does not assert POST /projects" in error for error in errors)
 
 
+def test_vertical_slice_rejects_dead_evidence_inside_selected_test(tmp_path: Path) -> None:
+    _write_vertical_slice_fixture(tmp_path)
+    browser_test = tmp_path / "apps/web/e2e/real-api/r1-teacher-flow.spec.ts"
+    browser_test.write_text(
+        'import { test } from "@playwright/test";\n'
+        'test("creates_project", async ({ page }) => {\n'
+        "  function unusedEvidence() {\n"
+        "    const observed = observeApiRequests(page);\n"
+        '    page.goto("/app/projects");\n'
+        '    page.goto("/app/projects/new");\n'
+        "    expectObservedApi(observed, [\n"
+        '      { method: "GET", path: "/projects" },\n'
+        '      { method: "POST", path: "/projects" },\n'
+        "    ]);\n"
+        "  }\n"
+        "  if (false) unusedEvidence();\n"
+        "});\n",
+        encoding="utf-8",
+    )
+    body = "Closes #211\n\n" + vertical_section(
+        f"{VERTICAL_REQUIRED}\n{VERTICAL_NOT_REQUIRED_UNCHECKED}",
+        "Page routes: /app/projects, /app/projects/new\n"
+        "Active operationIds: `listProjects`, `createProject`\n"
+        "Formal facts: Project\n"
+        "Backend tests: `tests/integration/test_project_api.py::test_create_project`\n"
+        "Real API Playwright: "
+        "`apps/web/e2e/real-api/r1-teacher-flow.spec.ts::creates_project`\n"
+        "Delivery manifest: contracts/delivery-slices/211-projects.yaml\n",
+    )
+
+    errors = validate_vertical_slice_declaration(
+        body,
+        {
+            "contracts/api-surface.openapi.yaml",
+            "contracts/delivery-slices/211-projects.yaml",
+        },
+        required=True,
+        repo_root=tmp_path,
+        base_sha=BASE_SHA,
+    )
+
+    assert any("does not navigate to navigation_path" in error for error in errors)
+    assert any("must observe and assert real API requests" in error for error in errors)
+    assert any("does not assert GET /projects" in error for error in errors)
+    assert any("does not assert POST /projects" in error for error in errors)
+
+
 def test_vertical_slice_rejects_unknown_operation_and_missing_test_files(tmp_path) -> None:
     _write_vertical_slice_fixture(tmp_path)
     body = vertical_section(
@@ -1104,12 +1151,12 @@ def test_vertical_slice_rejects_computed_interception_in_external_js_helper(
     _write_vertical_slice_fixture(tmp_path)
     browser_test = tmp_path / "apps/web/e2e/real-api/r1-teacher-flow.spec.ts"
     browser_test.write_text(
-        'import { installApi } from "../support/external-api.mjs";\n'
+        'import { installApi } from "../../../../test-support/external-api.mjs";\n'
         'import { test } from "@playwright/test";\n'
         'test("creates_project", async ({ page }) => installApi(page));\n',
         encoding="utf-8",
     )
-    helper = tmp_path / "apps/web/e2e/support/external-api.mjs"
+    helper = tmp_path / "test-support/external-api.mjs"
     helper.parent.mkdir(parents=True)
     helper.write_text(
         "export async function installApi(browserPage) {\n"
@@ -1209,6 +1256,88 @@ def test_vertical_slice_rejects_comment_only_real_api_harness(tmp_path: Path) ->
     ]
 
 
+def test_vertical_slice_rejects_required_config_text_in_metadata_string(
+    tmp_path: Path,
+) -> None:
+    _write_vertical_slice_fixture(tmp_path)
+    config = tmp_path / "apps/web/playwright.real-api.config.ts"
+    config.write_text(
+        "export default defineConfig({\n"
+        '  testDir: "./e2e/fake",\n'
+        "  metadata: {\n"
+        '    evidence: \'testDir: "./e2e/real-api"; VITE_API_MODE: "real"; '
+        'VITE_API_BASE_URL: "/api/v2"; '
+        'VITE_REAL_API_PROXY_TARGET: "http://127.0.0.1:8000"\',\n'
+        "  },\n"
+        "  webServer: { env: {} },\n"
+        "});\n",
+        encoding="utf-8",
+    )
+    body = vertical_section(
+        f"{VERTICAL_REQUIRED}\n{VERTICAL_NOT_REQUIRED_UNCHECKED}",
+        "Page routes: /app/projects\n"
+        "Active operationIds: listProjects\n"
+        "Formal facts: Project\n"
+        "Backend tests: tests/integration/test_project_api.py::test_create_project\n"
+        "Real API Playwright: "
+        "apps/web/e2e/real-api/r1-teacher-flow.spec.ts::creates_project\n",
+    )
+
+    errors = validate_vertical_slice_declaration(
+        body,
+        {"apps/web/src/pages/ProjectsPage.tsx"},
+        required=True,
+        repo_root=tmp_path,
+    )
+
+    assert (
+        "vertical slice real API Playwright config does not enforce the "
+        "real-api directory and real mode"
+    ) in errors
+
+
+def test_vertical_slice_rejects_duplicate_active_config_properties(
+    tmp_path: Path,
+) -> None:
+    _write_vertical_slice_fixture(tmp_path)
+    config = tmp_path / "apps/web/playwright.real-api.config.ts"
+    config.write_text(
+        "export default defineConfig({\n"
+        '  testDir: "./e2e/real-api",\n'
+        '  testDir: "./e2e/fake",\n'
+        "  webServer: {\n"
+        "    env: {\n"
+        '      VITE_API_MODE: "real",\n'
+        '      VITE_API_BASE_URL: "/api/v2",\n'
+        '      VITE_REAL_API_PROXY_TARGET: "http://127.0.0.1:8000",\n'
+        "    },\n"
+        "  },\n"
+        "});\n",
+        encoding="utf-8",
+    )
+    body = vertical_section(
+        f"{VERTICAL_REQUIRED}\n{VERTICAL_NOT_REQUIRED_UNCHECKED}",
+        "Page routes: /app/projects\n"
+        "Active operationIds: listProjects\n"
+        "Formal facts: Project\n"
+        "Backend tests: tests/integration/test_project_api.py::test_create_project\n"
+        "Real API Playwright: "
+        "apps/web/e2e/real-api/r1-teacher-flow.spec.ts::creates_project\n",
+    )
+
+    errors = validate_vertical_slice_declaration(
+        body,
+        {"apps/web/src/pages/ProjectsPage.tsx"},
+        required=True,
+        repo_root=tmp_path,
+    )
+
+    assert (
+        "vertical slice real API Playwright config does not enforce the "
+        "real-api directory and real mode"
+    ) in errors
+
+
 def test_vertical_slice_requires_semantic_workflow_commands_and_triggers(
     tmp_path: Path,
 ) -> None:
@@ -1231,6 +1360,22 @@ def test_vertical_slice_requires_semantic_workflow_commands_and_triggers(
         ),
         valid_source.replace('echo "::add-mask::$value"\n', ""),
         valid_source.replace("      - tests/integration/**\n", "", 1),
+        valid_source.replace(
+            "      - run: alembic upgrade head\n",
+            "      - run: false && alembic upgrade head\n",
+        ),
+        valid_source.replace(
+            "      - run: uvicorn apps.api.main:app &\n",
+            "      - run: exit 0; uvicorn apps.api.main:app &\n",
+        ),
+        valid_source.replace(
+            "      - run: uvicorn apps.api.main:app &\n",
+            "      - run: |\n          exit 0\n          uvicorn apps.api.main:app &\n",
+        ),
+        valid_source.replace(
+            "      - run: pnpm --filter @shanhaiedu/web test:e2e:real-api\n",
+            "      - run: true || pnpm --filter @shanhaiedu/web test:e2e:real-api\n",
+        ),
     )
 
     for invalid_source in invalid_variants:
@@ -1288,13 +1433,16 @@ def test_vertical_slice_rejects_string_redirect_and_elementless_routes(
         '<Route element={<AppShell />} path="/app">\n'
         '  <Route path="elementless" />\n'
         '  <Route path="redirect"><Navigate to="/app" /></Route>\n'
+        '  <Route Component={Navigate} path="component-redirect" />\n'
+        '  <Route element={<Router.Navigate to="/app" />} path="member-redirect" />\n'
         '  <Route Component={ProjectsPage} path="good" />\n'
         "</Route>\n",
         encoding="utf-8",
     )
     body = vertical_section(
         f"{VERTICAL_REQUIRED}\n{VERTICAL_NOT_REQUIRED_UNCHECKED}",
-        "Page routes: /app/fake-string, /app/elementless, /app/redirect, /app/good\n"
+        "Page routes: /app/fake-string, /app/elementless, /app/redirect, "
+        "/app/component-redirect, /app/member-redirect, /app/good\n"
         "Active operationIds: listProjects\n"
         "Formal facts: Project\n"
         "Backend tests: tests/integration/test_project_api.py::test_create_project\n"
@@ -1309,7 +1457,8 @@ def test_vertical_slice_rejects_string_redirect_and_elementless_routes(
         repo_root=tmp_path,
     ) == [
         "vertical slice declares Page routes absent from RuntimeApp: "
-        "/app/elementless, /app/fake-string, /app/redirect"
+        "/app/component-redirect, /app/elementless, /app/fake-string, "
+        "/app/member-redirect, /app/redirect"
     ]
 
 

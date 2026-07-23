@@ -462,6 +462,104 @@ def _playwright_test_source(path: Path, title: str) -> str | None:
     return calls[0] if len(calls) == 1 else None
 
 
+def _top_level_playwright_callback_mask(source: str) -> str:
+    arrow_index: int | None = None
+    quote: str | None = None
+    escaped = False
+    index = 0
+    while index < len(source):
+        character = source[index]
+        if quote is not None:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == quote:
+                quote = None
+            index += 1
+            continue
+        if character in {'"', "'", "`"}:
+            quote = character
+            index += 1
+            continue
+        if source[index : index + 2] == "=>":
+            arrow_index = index
+            break
+        index += 1
+    if arrow_index is None:
+        return " " * len(source)
+
+    callback_opening = source.find("{", arrow_index + 2)
+    if callback_opening < 0:
+        return " " * len(source)
+    mask = [" "] * len(source)
+    depth = 0
+    quote = None
+    escaped = False
+    for index in range(callback_opening, len(source)):
+        character = source[index]
+        if quote is not None:
+            if depth == 1:
+                mask[index] = character
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == quote:
+                quote = None
+            continue
+        if character in {'"', "'", "`"}:
+            quote = character
+            if depth == 1:
+                mask[index] = character
+            continue
+        if character == "{":
+            depth += 1
+            continue
+        if character == "}":
+            depth -= 1
+            if depth <= 0:
+                break
+            continue
+        if depth == 1:
+            mask[index] = character
+    top_level = "".join(mask)
+    if "=>" in top_level or re.search(
+        r"\bif\s*\(\s*false\s*\)|\bfalse\s*&&",
+        top_level,
+    ):
+        return " " * len(source)
+    return top_level
+
+
+def _parenthesized_call_source(source: str, call_start: int) -> str | None:
+    opening = source.find("(", call_start)
+    if opening < 0:
+        return None
+    depth = 0
+    quote: str | None = None
+    escaped = False
+    for index in range(opening, len(source)):
+        character = source[index]
+        if quote is not None:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == quote:
+                quote = None
+            continue
+        if character in {'"', "'", "`"}:
+            quote = character
+        elif character == "(":
+            depth += 1
+        elif character == ")":
+            depth -= 1
+            if depth == 0:
+                return source[call_start : index + 1]
+    return None
+
+
 def _react_route_tags(source: str) -> list[tuple[str, str, bool]]:
     tags: list[tuple[str, str, bool]] = []
     index = 0
@@ -575,6 +673,20 @@ def _route_has_render_attribute(attributes: str) -> bool:
     return False
 
 
+def _route_renders_redirect(attributes: str) -> bool:
+    qualified_navigate = r"(?:[A-Za-z_$][A-Za-z0-9_$]*\s*\.\s*)*Navigate"
+    return bool(
+        re.search(
+            rf"\belement\s*=\s*\{{\s*<\s*{qualified_navigate}\b",
+            attributes,
+        )
+        or re.search(
+            rf"\bComponent\s*=\s*\{{\s*{qualified_navigate}\s*\}}",
+            attributes,
+        )
+    )
+
+
 def _frontend_page_routes(repo_root: Path) -> set[str] | None:
     runtime_app = repo_root / "apps/web/src/app/RuntimeApp.tsx"
     if not runtime_app.is_file():
@@ -596,7 +708,8 @@ def _frontend_page_routes(repo_root: Path) -> set[str] | None:
             is_rendered_page = False
         else:
             is_rendered_page = (
-                "RuntimeUnavailablePage" not in attributes and "<Navigate" not in attributes
+                "RuntimeUnavailablePage" not in attributes
+                and not _route_renders_redirect(attributes)
             )
         path_match = ROUTE_LITERAL.search(attributes)
         route_literal = path_match.group("path") if path_match is not None else ""
@@ -660,7 +773,11 @@ def _persisted_model_class_names(repo_root: Path) -> set[str]:
     return names
 
 
-def _real_api_playwright_source_error(path: Path, relative_path: str) -> str | None:
+def _real_api_playwright_source_error(
+    path: Path,
+    relative_path: str,
+    repo_root: Path,
+) -> str | None:
     real_api_root = path.parent
     while real_api_root.name != "real-api" and real_api_root != real_api_root.parent:
         real_api_root = real_api_root.parent
@@ -685,9 +802,7 @@ def _real_api_playwright_source_error(path: Path, relative_path: str) -> str | N
         re.compile(r"\bserviceWorker\s*\.\s*register\s*\("),
         re.compile(r"""\bserviceWorker\s*\[\s*["']register["']\s*\]\s*\("""),
     )
-    web_root = (
-        real_api_root.parent.parent.resolve() if real_api_root.name == "real-api" else path.parent
-    )
+    allowed_root = repo_root.resolve()
     import_pattern = re.compile(r"""(?:\bfrom\s*|\bimport\s*\(\s*)["'](?P<target>\.[^"']+)["']""")
     pending = list(sources)
     visited: set[Path] = set()
@@ -724,7 +839,7 @@ def _real_api_playwright_source_error(path: Path, relative_path: str) -> str | N
             )
             for candidate in candidates:
                 try:
-                    candidate.relative_to(web_root)
+                    candidate.relative_to(allowed_root)
                 except ValueError:
                     continue
                 if candidate.is_file() and candidate not in visited:
@@ -803,13 +918,173 @@ def _exported_define_config(source: str) -> str | None:
     return None
 
 
+def _typescript_object_property(
+    source: str,
+    name: str,
+    *,
+    depth: int = 1,
+) -> tuple[str, str] | None:
+    index = 0
+    braces = 0
+    quote: str | None = None
+    escaped = False
+    while index < len(source):
+        character = source[index]
+        if quote is not None:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == quote:
+                quote = None
+            index += 1
+            continue
+        if character in {'"', "'", "`"}:
+            quote = character
+            index += 1
+            continue
+        if character == "{":
+            braces += 1
+            index += 1
+            continue
+        if character == "}":
+            braces -= 1
+            index += 1
+            continue
+        if braces != depth or not (character.isalpha() or character in {"_", "$"}):
+            index += 1
+            continue
+        start = index
+        index += 1
+        while index < len(source) and (source[index].isalnum() or source[index] in {"_", "$"}):
+            index += 1
+        if source[start:index] != name:
+            continue
+        value_index = index
+        while value_index < len(source) and source[value_index].isspace():
+            value_index += 1
+        if source[value_index : value_index + 1] != ":":
+            continue
+        value_index += 1
+        while value_index < len(source) and source[value_index].isspace():
+            value_index += 1
+        value_start = source[value_index : value_index + 1]
+        if value_start in {'"', "'"}:
+            value_index += 1
+            value: list[str] = []
+            value_escaped = False
+            while value_index < len(source):
+                value_character = source[value_index]
+                if value_escaped:
+                    value.append(value_character)
+                    value_escaped = False
+                elif value_character == "\\":
+                    value_escaped = True
+                elif value_character == value_start:
+                    return "string", "".join(value)
+                else:
+                    value.append(value_character)
+                value_index += 1
+            return None
+        if value_start != "{":
+            return None
+        object_depth = 0
+        object_quote: str | None = None
+        object_escaped = False
+        for object_index in range(value_index, len(source)):
+            object_character = source[object_index]
+            if object_quote is not None:
+                if object_escaped:
+                    object_escaped = False
+                elif object_character == "\\":
+                    object_escaped = True
+                elif object_character == object_quote:
+                    object_quote = None
+                continue
+            if object_character in {'"', "'", "`"}:
+                object_quote = object_character
+            elif object_character == "{":
+                object_depth += 1
+            elif object_character == "}":
+                object_depth -= 1
+                if object_depth == 0:
+                    return "object", source[value_index : object_index + 1]
+        return None
+    return None
+
+
+def _typescript_object_property_count(source: str, name: str, *, depth: int = 1) -> int:
+    count = 0
+    index = 0
+    braces = 0
+    quote: str | None = None
+    escaped = False
+    while index < len(source):
+        character = source[index]
+        if quote is not None:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == quote:
+                quote = None
+            index += 1
+            continue
+        if character in {'"', "'", "`"}:
+            quote = character
+            index += 1
+            continue
+        if character == "{":
+            braces += 1
+            index += 1
+            continue
+        if character == "}":
+            braces -= 1
+            index += 1
+            continue
+        if braces != depth or not (character.isalpha() or character in {"_", "$"}):
+            index += 1
+            continue
+        start = index
+        index += 1
+        while index < len(source) and (source[index].isalnum() or source[index] in {"_", "$"}):
+            index += 1
+        if source[start:index] != name:
+            continue
+        following = index
+        while following < len(source) and source[following].isspace():
+            following += 1
+        if source[following : following + 1] == ":":
+            count += 1
+    return count
+
+
 def _workflow_executes(command_source: str, pattern: re.Pattern[str]) -> bool:
+    reachable = True
     for line in command_source.splitlines():
         command = line.strip()
+        if command == "__R1_STEP_BOUNDARY__":
+            reachable = True
+            continue
+        if not reachable:
+            continue
         if not command or command.startswith(("#", "echo ", "printf ")):
             continue
-        if pattern.search(command):
-            return True
+        if re.fullmatch(r"(?:exit|return)\s+0\s*;?", command):
+            reachable = False
+            continue
+        match = pattern.search(command)
+        if match is None:
+            continue
+        prefix = command[: match.start()]
+        if re.search(
+            r"(?:^|[;&|]\s*)(?:false\b|exit\s+0\b|return\s+0\b).*?(?:&&|;)",
+            prefix,
+        ):
+            continue
+        if re.search(r"\btrue\s*\|\|", prefix):
+            continue
+        return True
     return False
 
 
@@ -848,7 +1123,7 @@ def _workflow_has_real_api_job(document: object) -> bool:
             for step in steps
             if isinstance(step, dict) and isinstance(step.get("run"), str)
         ]
-        command_source = "\n".join(commands)
+        command_source = "\n__R1_STEP_BOUNDARY__\n".join(commands)
         starts_api = _workflow_executes(
             command_source,
             re.compile(r"(?:^|\s)(?:uv\s+run\s+)?uvicorn\s+apps\.api\.main:app\b"),
@@ -899,14 +1174,27 @@ def _validate_real_api_playwright_harness(repo_root: Path) -> list[str]:
         except (OSError, UnicodeError):
             config_source = ""
         exported_config = _exported_define_config(config_source) or ""
-        config_requirements = (
-            re.compile(r"""testDir\s*:\s*["']\./e2e/real-api["']"""),
-            re.compile(r"""VITE_API_MODE\s*:\s*["']real["']"""),
-            re.compile(r"""VITE_API_BASE_URL\s*:\s*["']/api/v2["']"""),
-            re.compile(r"""VITE_REAL_API_PROXY_TARGET\s*:\s*["']http://127\.0\.0\.1:8000["']"""),
-        )
-        if not all(pattern.search(exported_config) for pattern in config_requirements) or re.search(
-            r"\bVITE_RUNTIME_CONTRACT_TEST\b", exported_config
+        test_dir = _typescript_object_property(exported_config, "testDir")
+        web_server = _typescript_object_property(exported_config, "webServer")
+        web_server_source = web_server[1] if web_server and web_server[0] == "object" else ""
+        web_server_env = _typescript_object_property(web_server_source, "env")
+        env_source = web_server_env[1] if web_server_env and web_server_env[0] == "object" else ""
+        required_env = {
+            "VITE_API_MODE": "real",
+            "VITE_API_BASE_URL": "/api/v2",
+            "VITE_REAL_API_PROXY_TARGET": "http://127.0.0.1:8000",
+        }
+        if (
+            _typescript_object_property_count(exported_config, "testDir") != 1
+            or _typescript_object_property_count(exported_config, "webServer") != 1
+            or _typescript_object_property_count(web_server_source, "env") != 1
+            or test_dir != ("string", "./e2e/real-api")
+            or any(
+                _typescript_object_property_count(env_source, key) != 1
+                or _typescript_object_property(env_source, key) != ("string", value)
+                for key, value in required_env.items()
+            )
+            or _typescript_object_property_count(env_source, "VITE_RUNTIME_CONTRACT_TEST") != 0
         ):
             errors.append(
                 "vertical slice real API Playwright config does not enforce the "
@@ -987,7 +1275,7 @@ def _validate_declared_test(
         selectors = _python_test_selectors(test_path)
     else:
         selectors = _playwright_test_titles(test_path)
-        source_error = _real_api_playwright_source_error(test_path, relative_path)
+        source_error = _real_api_playwright_source_error(test_path, relative_path, repo_root)
         if source_error is not None:
             errors.append(source_error)
     if selector not in selectors:
@@ -1206,36 +1494,48 @@ def _validate_delivery_manifest(
             selected_source = _playwright_test_source(test_path, selector.strip())
             if selected_source is not None:
                 browser_sources.append(selected_source)
-        combined_browser_source = "\n".join(browser_sources)
+        top_level_sources = [
+            _top_level_playwright_callback_mask(source) for source in browser_sources
+        ]
+        combined_top_level_source = "\n".join(top_level_sources)
         if isinstance(navigation_path, str) and PAGE_ROUTE.fullmatch(navigation_path):
             goto_pattern = re.compile(
                 r"""page\s*\.\s*goto\s*\(\s*["']""" + re.escape(navigation_path) + r"""["']"""
             )
-            if goto_pattern.search(combined_browser_source) is None:
+            if goto_pattern.search(combined_top_level_source) is None:
                 errors.append(
                     "vertical slice Delivery manifest row "
                     f"{index} Playwright evidence does not navigate to navigation_path"
                 )
-        observed_variable = re.search(
-            r"\bconst\s+(?P<name>[A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*"
-            r"observeApiRequests\s*\(\s*page\s*\)",
-            combined_browser_source,
-        )
-        has_observation_assertion = (
-            observed_variable is not None
-            and re.search(
-                r"\bexpectObservedApi\s*\(\s*"
-                + re.escape(observed_variable.group("name"))
-                + r"\s*,",
-                combined_browser_source,
-            )
-            is not None
-        )
+        assertion_sources: list[str] = []
+        for source, top_level_source in zip(
+            browser_sources,
+            top_level_sources,
+            strict=True,
+        ):
+            for observed_variable in re.finditer(
+                r"\bconst\s+(?P<name>[A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*"
+                r"observeApiRequests\s*\(\s*page\s*\)",
+                top_level_source,
+            ):
+                assertion = re.search(
+                    r"\bexpectObservedApi\s*\(\s*"
+                    + re.escape(observed_variable.group("name"))
+                    + r"\s*,",
+                    top_level_source,
+                )
+                if assertion is None:
+                    continue
+                assertion_source = _parenthesized_call_source(source, assertion.start())
+                if assertion_source is not None:
+                    assertion_sources.append(assertion_source)
+        has_observation_assertion = bool(assertion_sources)
         if not has_observation_assertion:
             errors.append(
                 "vertical slice Delivery manifest row "
                 f"{index} Playwright evidence must observe and assert real API requests"
             )
+        combined_assertion_source = "\n".join(assertion_sources)
         if isinstance(requests, list):
             for request in requests:
                 if not isinstance(request, dict):
@@ -1246,11 +1546,11 @@ def _validate_delivery_manifest(
                     if not (
                         re.search(
                             rf"""(?:\bmethod\b|["']method["'])\s*:\s*["']{re.escape(method.upper())}["']""",
-                            combined_browser_source,
+                            combined_assertion_source,
                         )
                         and re.search(
                             rf"""(?:\bpath\b|["']path["'])\s*:\s*["']{re.escape(api_path)}["']""",
-                            combined_browser_source,
+                            combined_assertion_source,
                         )
                     ):
                         errors.append(
