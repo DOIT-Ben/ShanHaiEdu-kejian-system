@@ -40,7 +40,7 @@ const creativeEntries = [
     variant: 1,
   },
   {
-    available: false,
+    available: true,
     detail: "从封面、知识页到练习完整制作",
     icon: Presentation,
     label: "教学 PPT",
@@ -282,10 +282,7 @@ export function HomePage({
 }) {
   const projectQuery = useProjectsQuery();
   const projects = sortByRecentActivity(projectQuery.data ?? []);
-  const currentProject =
-    projects.length === 1
-      ? projects[0]
-      : (projects.find(hasWorkflowSummary) ?? (creationAvailable ? projects[0] : undefined));
+  const currentProject = projects.length === 1 ? projects[0] : projects.find(hasWorkflowSummary);
   const needsProjectChoice = projects.length > 1 && !currentProject;
   const continueTo = currentProject ? `/app/projects/${currentProject.id}` : "/app/projects";
   const attentionTarget = attentionItems[0]?.to;

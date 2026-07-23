@@ -110,7 +110,7 @@ export function GenerationJobPanel({
           className="border-t border-[var(--sh-line-subtle)] px-5 py-3 text-sm text-[var(--sh-danger)]"
           role="alert"
         >
-          任务没有完成。请刷新状态；如果问题持续，请返回项目后重试。
+          任务没有完成。请刷新状态；如果问题持续，请稍后重试。
         </p>
       ) : null}
       {errorMessage ? (

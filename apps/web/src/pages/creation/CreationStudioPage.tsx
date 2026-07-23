@@ -2,10 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
-import {
-  CreationAdvancedPanel,
-  type CreationAdvancedSettings,
-} from "@/features/creation-studio/CreationAdvancedPanel";
+import { CreationAdvancedPanel } from "@/features/creation-studio/CreationAdvancedPanel";
 import { CreationComposer } from "@/features/creation-studio/CreationComposer";
 import {
   CreationResultUnavailableNotice,
@@ -18,53 +15,22 @@ import {
   generateCreationItem,
   saveCreationPromptVersion,
 } from "@/features/creation-studio/api/creationApi";
-import type { CreationSettings, CreationStage, StudioType } from "@/features/creation-studio/model";
+import type { CreationStage } from "@/features/creation-studio/model";
 import { studioRegistry } from "@/features/creation-studio/registry";
 import {
-  cancelGenerationJob,
-  getGenerationJob,
-  type GenerationJobDto,
-} from "@/features/jobs/api/jobsApi";
+  CreationItemUnavailableError,
+  type GenerationIntent,
+  generationProfile,
+  initialAdvancedSettings,
+  initialCreationSettings,
+  studioTypeByPath,
+  terminalCreationJobStatuses,
+} from "@/features/creation-studio/runtimeState";
+import { cancelGenerationJob, getGenerationJob } from "@/features/jobs/api/jobsApi";
 import { GenerationJobPanel } from "@/features/jobs/components/GenerationJobPanel";
 import { isCsrfTokenAvailable } from "@/shared/api/client";
 import { runtimeErrorMessage } from "@/shared/api/runtimeError";
 import { useJobEvents } from "@/shared/api/useJobEvents";
-
-const terminalStatuses = new Set<GenerationJobDto["status"]>(["succeeded", "failed", "cancelled"]);
-
-const studioTypeByPath: Record<string, StudioType> = {
-  images: "image",
-  presentations: "presentation",
-  videos: "video",
-};
-
-const initialSettings: CreationSettings = {
-  candidateCount: "3",
-  duration: "8",
-  model: "balanced",
-  ratio: "16:9",
-  referenceName: "",
-  style: "illustration",
-};
-
-const initialAdvancedSettings: CreationAdvancedSettings = {
-  composition: "主体清晰，留出课堂讲解空间",
-  negativePrompt: "水印、乱码、无关装饰",
-  referenceStrength: 50,
-};
-
-type GenerationIntent = {
-  batchKey: string;
-  fingerprint: string;
-  generateKey: string;
-  promptKey: string;
-};
-
-function generationProfile(model: string) {
-  if (model === "detail") return "quality" as const;
-  if (model === "fast") return "speed" as const;
-  return "balanced" as const;
-}
 
 export function CreationStudioPage() {
   const { studioPath } = useParams();
@@ -76,7 +42,7 @@ export function CreationStudioPage() {
   const [description, setDescription] = useState("");
   const [promptOpen, setPromptOpen] = useState(false);
   const [settings, setSettings] = useState(() => ({
-    ...initialSettings,
+    ...initialCreationSettings,
     ratio: type === "image" ? "4:3" : "16:9",
   }));
   const [itemId, setItemId] = useState<string>();
@@ -91,16 +57,12 @@ export function CreationStudioPage() {
     queryKey: jobKey,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status && terminalStatuses.has(status) ? false : 5_000;
+      return status && terminalCreationJobStatuses.has(status) ? false : 5_000;
     },
   });
   const job = jobQuery.data;
-  const live = Boolean(jobId && job && !terminalStatuses.has(job.status));
+  const live = Boolean(jobId && job && !terminalCreationJobStatuses.has(job.status));
   useJobEvents(live && jobId ? jobId : undefined);
-
-  useEffect(() => {
-    if (job?.status && terminalStatuses.has(job.status)) cancelKeyRef.current = undefined;
-  }, [job?.status]);
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -122,7 +84,7 @@ export function CreationStudioPage() {
           input: { source_kind: "standalone", studio_type: type, title: config.entryTitle },
         });
         currentItemId = batch.items[0]?.id;
-        if (!currentItemId) throw new Error("CREATION_BATCH_WITHOUT_ITEM");
+        if (!currentItemId) throw new CreationItemUnavailableError();
         setItemId(currentItemId);
       }
       const prompt = await saveCreationPromptVersion({
@@ -171,23 +133,33 @@ export function CreationStudioPage() {
       queryClient.setQueryData(jobKey, cancelledJob);
     },
   });
+  const resetCancelMutation = cancelMutation.reset;
+
+  useEffect(() => {
+    if (!job?.status || !terminalCreationJobStatuses.has(job.status)) return;
+    cancelKeyRef.current = undefined;
+    resetCancelMutation();
+  }, [job?.status, resetCancelMutation]);
 
   const stage = useMemo<CreationStage>(() => {
     if (createMutation.isPending) return "queued";
-    if (createMutation.isError || jobQuery.isError || job?.status === "failed") return "failed";
+    if (createMutation.isError) return "failed";
     if (jobId && !job) return "queued";
+    if (job?.status === "failed") return "failed";
     if (job?.status === "cancelled") return "cancelled";
     if (job?.status === "created" || job?.status === "queued") return "queued";
     if (job?.status === "running" || job?.status === "cancel_requested") return "running";
     if (job?.status === "succeeded") return "ready";
     return "draft";
-  }, [createMutation.isError, createMutation.isPending, job, jobId, jobQuery.isError]);
+  }, [createMutation.isError, createMutation.isPending, job, jobId]);
 
   if (!type || !config) return <Navigate replace to="/app/creation" />;
 
   const writeReady = isCsrfTokenAvailable();
   const errorMessage = createMutation.isError
-    ? runtimeErrorMessage(createMutation.error, "创作任务没有开始，请检查网络后重试。")
+    ? createMutation.error instanceof CreationItemUnavailableError
+      ? "独立创作暂时无法生成作品，请稍后再试。"
+      : runtimeErrorMessage(createMutation.error, "创作任务没有开始，请检查网络后重试。")
     : jobQuery.isError
       ? runtimeErrorMessage(jobQuery.error, "任务状态暂时无法读取，请刷新后重试。")
       : cancelMutation.isError

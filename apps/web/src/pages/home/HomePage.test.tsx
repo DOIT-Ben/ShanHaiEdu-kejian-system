@@ -126,16 +126,20 @@ describe("HomePage", () => {
       isLoading: false,
     } as unknown as ReturnType<typeof useProjectsQuery>);
 
-    renderHome({ creationAvailable: false });
+    renderHome();
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("选择今天要继续的项目");
+    expect(screen.getByRole("link", { name: "进入创作中心" })).toHaveAttribute(
+      "href",
+      "/app/creation",
+    );
     expect(screen.getByText("暂无可显示的待确认或失败任务")).toBeVisible();
     expect(screen.getByText("完成并保存的作品会出现在这里。")).toBeVisible();
     expect(screen.queryByText("果汁标签观察图")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "查看任务" })).not.toBeInTheDocument();
   });
 
-  it("没有项目时明确引导创建，PPT 入口只说明后续开放", () => {
+  it("没有项目时明确引导创建并开放独立 PPT 创作入口", () => {
     mockUseProjectsQuery.mockReturnValue({
       data: [],
       isError: false,
@@ -149,7 +153,9 @@ describe("HomePage", () => {
       "/app/projects/new",
     );
     expect(screen.getByRole("img", { name: "等待开始备课的温暖书桌" })).toBeInTheDocument();
-    expect(screen.getByText("后续开放")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /完成一套课堂课件/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /完成一套课堂课件/ })).toHaveAttribute(
+      "href",
+      "/app/creation/presentations",
+    );
   });
 });

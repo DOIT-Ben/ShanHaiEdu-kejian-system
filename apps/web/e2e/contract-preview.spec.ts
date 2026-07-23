@@ -61,7 +61,11 @@ for (const viewport of viewports) {
     await assertNoHorizontalOverflow(page);
     await page.goto("/app/creation/images");
     await expect(page.getByRole("heading", { name: "图片创作台" })).toBeVisible();
-    await expect(page.getByText("当前批次只在本次页面会话中可继续操作")).toBeVisible();
+    await expect(page.getByText(/当前暂时无法生成或恢复作品/)).toBeVisible();
+    await page.getByLabel("描述你想创作的图片").fill("画一张用百格图解释百分数的教学图片");
+    await page.getByRole("button", { name: "开始创作图片" }).click();
+    await expect(page.getByText("独立创作暂时无法生成作品，请稍后再试。")).toBeVisible();
+    await expect(page.getByText("创作任务", { exact: true })).toHaveCount(0);
     await assertNoHorizontalOverflow(page);
     await assertBasicAccessibility(page);
   });

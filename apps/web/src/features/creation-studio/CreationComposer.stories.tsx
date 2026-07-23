@@ -6,7 +6,7 @@ import type { CreationSettings } from "@/features/creation-studio/model";
 
 const settings: CreationSettings = {
   candidateCount: "3",
-  duration: "8",
+  duration: "10",
   model: "balanced",
   ratio: "1:1",
   referenceName: "",

@@ -545,7 +545,7 @@ export const handlers = [
             studio_type: input.studio_type,
             title: input.title,
             status: "draft",
-            items: [{ id: itemId, item_key: "item-01", title: input.title, status: "draft" }],
+            items: [],
           };
     const body = {
       data,

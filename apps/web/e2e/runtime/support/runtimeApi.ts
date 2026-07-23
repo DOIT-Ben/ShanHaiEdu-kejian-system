@@ -238,7 +238,6 @@ async function json(route: Route, body: unknown, status = 200, headers?: Record<
 }
 
 export async function installRuntimeApi(page: Page, options: RuntimeApiOptions = {}) {
-  let creationJobStarted = false;
   let currentProject = {
     ...baseProject,
     execution_mode: baseProject.execution_mode as "guided" | "automatic",
@@ -356,14 +355,7 @@ export async function installRuntimeApi(page: Page, options: RuntimeApiOptions =
         envelope(
           {
             id: "01960000-0000-7000-8000-000000000501",
-            items: [
-              {
-                id: "01960000-0000-7000-8000-000000000502",
-                item_key: "item-01",
-                status: "draft",
-                title: body.title,
-              },
-            ],
+            items: [],
             source_kind: body.source_kind,
             status: "draft",
             studio_type: body.studio_type,
@@ -372,56 +364,6 @@ export async function installRuntimeApi(page: Page, options: RuntimeApiOptions =
           "req_creation_batch",
         ),
         201,
-      );
-      return;
-    }
-
-    if (
-      method === "POST" &&
-      path === "/api/v2/creation-items/01960000-0000-7000-8000-000000000502/prompt-versions"
-    ) {
-      state.creationPromptRequests += 1;
-      const body = request.postDataJSON() as {
-        business_prompt: string;
-        generation_profile: "balanced" | "quality" | "speed";
-        output_spec: Record<string, unknown>;
-        reference_asset_version_ids: string[];
-      };
-      await json(
-        route,
-        envelope(
-          {
-            ...body,
-            content_hash: "runtime-creation-prompt",
-            created_at: now,
-            creation_item_id: "01960000-0000-7000-8000-000000000502",
-            id: "01960000-0000-7000-8000-000000000503",
-            version_no: 1,
-          },
-          "req_creation_prompt",
-        ),
-        201,
-      );
-      return;
-    }
-
-    if (
-      method === "POST" &&
-      path === "/api/v2/creation-items/01960000-0000-7000-8000-000000000502/generate"
-    ) {
-      state.creationGenerateRequests += 1;
-      creationJobStarted = true;
-      await json(
-        route,
-        envelope(
-          {
-            events_url: `/api/v2/generation-jobs/${jobId}/events/stream`,
-            job_id: jobId,
-            status: "queued",
-          },
-          "req_creation_generate",
-        ),
-        202,
       );
       return;
     }
@@ -731,15 +673,13 @@ export async function installRuntimeApi(page: Page, options: RuntimeApiOptions =
         envelope(
           {
             id: jobId,
-            project_id: creationJobStarted ? null : projectId,
-            job_type: creationJobStarted ? "creation" : "parse_material",
+            project_id: projectId,
+            job_type: "parse_material",
             status,
             progress_percent: status === "succeeded" ? 100 : 48,
             progress_message:
               status === "succeeded"
-                ? creationJobStarted
-                  ? "作品生成任务已完成"
-                  : "教材已经整理完成"
+                ? "教材已经整理完成"
                 : status === "failed"
                   ? "教材处理没有完成"
                   : "正在整理教材内容",
