@@ -23,8 +23,8 @@ def _load_leases(root: Path = ROOT) -> dict[str, Any]:
 
 
 def parse_development_track(body: str) -> str | None:
-    match = TRACK_PATTERN.search(body)
-    return match.group(1) if match else None
+    matches = TRACK_PATTERN.findall(body)
+    return matches[0] if len(matches) == 1 else None
 
 
 def _matches(path: str, pattern: str) -> bool:
@@ -59,11 +59,42 @@ def validate_changed_paths(
     return errors
 
 
+def _decode_git_path(value: bytes) -> str:
+    return value.decode("utf-8", errors="surrogateescape")
+
+
+def _parse_name_status(output: bytes) -> list[str]:
+    tokens = output.split(b"\0")
+    paths: list[str] = []
+    index = 0
+    while index < len(tokens):
+        status_token = tokens[index]
+        index += 1
+        if not status_token:
+            break
+        status = status_token.decode("ascii", errors="strict")
+        if status.startswith(("R", "C")):
+            if index + 1 >= len(tokens):
+                raise ValueError(f"malformed git rename/copy output for status {status}")
+            paths.append(_decode_git_path(tokens[index]))
+            paths.append(_decode_git_path(tokens[index + 1]))
+            index += 2
+            continue
+        if index >= len(tokens):
+            raise ValueError(f"malformed git diff output for status {status}")
+        paths.append(_decode_git_path(tokens[index]))
+        index += 1
+    return paths
+
+
 def _changed_paths(base_sha: str, head_sha: str, root: Path = ROOT) -> list[str]:
     command = [
         "git",
         "diff",
-        "--name-only",
+        "--name-status",
+        "-z",
+        "--find-renames",
+        "--find-copies",
         "--diff-filter=ACMRD",
         f"{base_sha}...{head_sha}",
     ]
@@ -72,9 +103,8 @@ def _changed_paths(base_sha: str, head_sha: str, root: Path = ROOT) -> list[str]
         cwd=root,
         check=True,
         capture_output=True,
-        text=True,
     )
-    return [line.strip() for line in completed.stdout.splitlines() if line.strip()]
+    return _parse_name_status(completed.stdout)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -94,13 +124,23 @@ def main() -> int:
     body = os.environ.get(args.body_env, "")
     track_key = parse_development_track(body)
     if track_key is None:
-        print("error: pull request body must contain `development-track: <track>`", file=sys.stderr)
+        print(
+            "error: pull request body must contain exactly one `development-track: <track>`",
+            file=sys.stderr,
+        )
         return 1
 
     try:
         changed_paths = _changed_paths(args.base, args.head)
         errors = validate_changed_paths(_load_leases(), track_key, changed_paths)
-    except (json.JSONDecodeError, KeyError, OSError, subprocess.CalledProcessError) as exc:
+    except (
+        json.JSONDecodeError,
+        KeyError,
+        OSError,
+        UnicodeDecodeError,
+        ValueError,
+        subprocess.CalledProcessError,
+    ) as exc:
         print(f"error: development lease validation failed: {exc}", file=sys.stderr)
         return 1
 
@@ -109,7 +149,7 @@ def main() -> int:
             print(f"error: {error}", file=sys.stderr)
         return 1
 
-    print(f"development lease checks passed for {track_key}: {len(changed_paths)} changed paths")
+    print(f"development lease checks passed for {track_key}: {len(set(changed_paths))} paths")
     return 0
 
 
