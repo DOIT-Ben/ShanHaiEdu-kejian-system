@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from typing import Any
 
 from scripts.check_development_lease import (
+    _changed_paths,
     _parse_name_status,
     parse_development_track,
     validate_changed_paths,
@@ -16,6 +18,17 @@ LEASES = ROOT / "contracts/development-leases.json"
 
 def _leases() -> dict[str, Any]:
     return json.loads(LEASES.read_text(encoding="utf-8"))
+
+
+def _git(root: Path, *args: str) -> str:
+    completed = subprocess.run(
+        ["git", *args],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.strip()
 
 
 def test_parse_development_track_from_pr_body() -> None:
@@ -36,6 +49,31 @@ def test_git_rename_parser_returns_old_and_new_paths() -> None:
     assert _parse_name_status(output) == [
         "contracts/api-surface.openapi.yaml",
         "apps/web/api.yaml",
+    ]
+
+
+def test_real_git_rename_returns_old_and_new_paths(tmp_path: Path) -> None:
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.email", "contract-test@example.invalid")
+    _git(tmp_path, "config", "user.name", "Contract Test")
+    source = tmp_path / "contracts/api-surface.openapi.yaml"
+    source.parent.mkdir(parents=True)
+    source.write_text("openapi: 3.1.0\n", encoding="utf-8")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-m", "base")
+    base_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+    target = tmp_path / "apps/web/api-surface.openapi.yaml"
+    target.parent.mkdir(parents=True)
+    _git(tmp_path, "mv", str(source.relative_to(tmp_path)), str(target.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "-m", "rename")
+    head_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+    changed_paths = _changed_paths(base_sha, head_sha, tmp_path)
+
+    assert changed_paths == [
+        "contracts/api-surface.openapi.yaml",
+        "apps/web/api-surface.openapi.yaml",
     ]
 
 
