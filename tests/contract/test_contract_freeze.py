@@ -57,9 +57,7 @@ def test_two_lesson_fixture_rejects_video_course_context_leak() -> None:
 
 def test_two_lesson_fixture_rejects_duplicate_intro_selection() -> None:
     fixture = copy.deepcopy(_fixture())
-    fixture["lessons"][1]["intro"]["selection_id"] = fixture["lessons"][0]["intro"][
-        "selection_id"
-    ]
+    fixture["lessons"][1]["intro"]["selection_id"] = fixture["lessons"][0]["intro"]["selection_id"]
 
     errors = _check_two_lesson_fixture_data(fixture)
 
