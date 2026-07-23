@@ -63,6 +63,7 @@ def compile_node_prompt(
     context_items: tuple[ContextItem, ...],
     request_id: str,
     user_id: UUID | None,
+    user_revision: str | None = None,
 ) -> CompiledNodePrompt:
     validate_execution_boundary(definition, execution)
     contract = _resolve_contract(definition, prompt_template)
@@ -83,6 +84,7 @@ def compile_node_prompt(
             provider_format=_PROVIDER_FORMAT,
             user_edit_mode="replace_editable_layer",
             user_edit_max_chars=contract.edit_max_chars,
+            user_revision=user_revision,
         )
     except PromptRuntimeError as exc:
         raise NodePromptPlanError(exc.code, str(exc)) from exc

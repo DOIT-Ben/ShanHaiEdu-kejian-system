@@ -156,6 +156,42 @@ def test_compiles_hidden_schema_and_declared_context_into_one_request() -> None:
     assert plan.context.bindings[0]["source"] == "source.approved_version"
 
 
+def test_teacher_revision_replaces_only_the_editable_business_layer() -> None:
+    baseline = compile_node_prompt(
+        definition=definition(),
+        execution=execution(),
+        prompt_template=prompt_template(),
+        output_schema=OUTPUT_SCHEMA,
+        context_items=(context_item(),),
+        request_id="node-execution:baseline",
+        user_id=USER_ID,
+    )
+    revised = compile_node_prompt(
+        definition=definition(),
+        execution=execution(),
+        prompt_template=prompt_template(),
+        output_schema=OUTPUT_SCHEMA,
+        context_items=(context_item(),),
+        request_id="node-execution:revised",
+        user_id=USER_ID,
+        user_revision="Use one classroom-ready counting activity.",
+    )
+
+    assert revised.prompt.user_diff == {
+        "mode": "replace_editable_layer",
+        "replacement": "Use one classroom-ready counting activity.",
+    }
+    assert revised.prompt.preview.editable_prompt.startswith(
+        "Use one classroom-ready counting activity."
+    )
+    assert "Generate the published output." not in revised.request.prompt
+    baseline_locked = [layer for layer in baseline.prompt.layers if layer["locked"]]
+    revised_locked = [layer for layer in revised.prompt.layers if layer["locked"]]
+    assert revised_locked == baseline_locked
+    assert revised.prompt.request_schema == baseline.prompt.request_schema
+    assert revised.context == baseline.context
+
+
 def test_rejects_context_not_declared_by_the_published_policy() -> None:
     with pytest.raises(NodePromptPlanError) as caught:
         compile_node_prompt(

@@ -38,14 +38,14 @@ def _assert_rejected(catalog: dict[str, Any], code: str) -> None:
     assert caught.value.code == code
 
 
-def test_release_1_3_publishes_both_ppt_deterministic_outputs() -> None:
+def test_current_release_preserves_both_ppt_deterministic_outputs() -> None:
     catalog = _object(CATALOG_PATH)
     source = _object(SOURCE_PATH)
     package = validate_content_package(PACKAGE_PATH, contracts_root=CONTRACTS)
     registered = BUILTIN_WORKFLOW_REGISTRY.load(catalog)
 
-    assert catalog["semantic_version"] == "1.3.0"
-    assert source["package"]["semantic_version"] == "1.3.0"
+    assert catalog["semantic_version"] == "1.4.0"
+    assert source["package"]["semantic_version"] == "1.4.0"
     assert {item["output_key"] for item in source["deterministic_outputs"]} == {
         "ppt.pages.assemble.output",
         "pptx.export.output",
@@ -113,7 +113,7 @@ def test_release_1_3_publishes_both_ppt_deterministic_outputs() -> None:
         "source_input_ref": "asset:pptx",
     }
 
-    assert len(registered.output_definition_index) == 24
+    assert len(registered.output_definition_index) == 25
     assemble_index = registered.output_definition_index["ppt.pages.assemble.output"]
     export_index = registered.output_definition_index["pptx.export.output"]
     assert assemble_index.producer_node_key == "ppt.pages.assemble"

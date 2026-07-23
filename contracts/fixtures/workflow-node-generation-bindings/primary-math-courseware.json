@@ -2,7 +2,7 @@
   "api_version": "shanhai.workflow-node-generation-binding/v2",
   "catalog_key": "primary_math.courseware",
   "workflow_key": "primary_math.courseware",
-  "semantic_version": "1.3.0",
+  "semantic_version": "1.4.0",
   "nodes": [
     {
       "node_key": "material.file_validate",
@@ -178,6 +178,25 @@
       "entrypoint": false,
       "quality_requirement": {
         "mode": "none"
+      },
+      "output_persistence": {
+        "artifact": {
+          "identity": {
+            "strategy": "project_singleton",
+            "artifact_key": "material-scope"
+          },
+          "artifact_type": "material_scope",
+          "branch_key": "project",
+          "content_definition_ref": {
+            "item_key": "material.scope_review.output",
+            "kind": "content_definition"
+          },
+          "content": {
+            "source": "output",
+            "pointer": ""
+          },
+          "relations": []
+        }
       }
     },
     {
