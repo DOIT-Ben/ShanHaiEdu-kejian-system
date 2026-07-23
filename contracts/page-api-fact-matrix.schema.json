@@ -4,8 +4,9 @@
   "title": "ShanHaiEdu Page API Formal Fact Matrix",
   "type": "object",
   "additionalProperties": false,
-  "required": ["matrix_version", "state_model", "operations", "pages", "forbidden_frontend_behaviors"],
+  "required": ["$schema", "matrix_version", "state_model", "operations", "pages", "forbidden_frontend_behaviors"],
   "properties": {
+    "$schema": {"const": "./page-api-fact-matrix.schema.json"},
     "matrix_version": {"const": "shanhai.page-api-fact-matrix/v1"},
     "state_model": {
       "type": "array",
