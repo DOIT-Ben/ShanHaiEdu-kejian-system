@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from scripts.check_development_lease import (
+    _parse_name_status,
     parse_development_track,
     validate_changed_paths,
 )
@@ -21,6 +22,24 @@ def test_parse_development_track_from_pr_body() -> None:
     body = "## Scope\n\ndevelopment-track: `shared_contract`\n"
 
     assert parse_development_track(body) == "shared_contract"
+
+
+def test_duplicate_development_track_declarations_are_rejected() -> None:
+    body = (
+        "development-track: `frontend`\n"
+        "development-track: `shared_contract`\n"
+    )
+
+    assert parse_development_track(body) is None
+
+
+def test_git_rename_parser_returns_old_and_new_paths() -> None:
+    output = b"R050\0contracts/api-surface.openapi.yaml\0apps/web/api.yaml\0"
+
+    assert _parse_name_status(output) == [
+        "contracts/api-surface.openapi.yaml",
+        "apps/web/api.yaml",
+    ]
 
 
 def test_frontend_track_accepts_web_files() -> None:
@@ -41,6 +60,16 @@ def test_frontend_track_rejects_active_openapi_changes() -> None:
     )
 
     assert any("cannot modify" in error for error in errors)
+
+
+def test_frontend_track_rejects_protected_file_renamed_into_web() -> None:
+    renamed_paths = _parse_name_status(
+        b"R050\0contracts/api-surface.openapi.yaml\0apps/web/api.yaml\0"
+    )
+
+    errors = validate_changed_paths(_leases(), "frontend", renamed_paths)
+
+    assert any("contracts/api-surface.openapi.yaml" in error for error in errors)
 
 
 def test_ppt_track_accepts_real_ppt_runtime_files() -> None:
