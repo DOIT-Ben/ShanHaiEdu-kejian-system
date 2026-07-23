@@ -10,7 +10,7 @@
     "contracts:lint": "redocly lint contracts/api-surface.openapi.yaml && redocly lint contracts/planned-api-surface.openapi.yaml",
     "contracts:surface": "uv run python scripts/check_api_surface.py",
     "contracts:schema": "ajv compile --spec=draft2020 -c ajv-formats -s 'contracts/*.schema.json'",
-    "contracts:freeze": "ajv validate --spec=draft2020 -c ajv-formats -s contracts/full-chain-freeze.schema.json -d contracts/full-chain-freeze.json && ajv validate --spec=draft2020 -c ajv-formats -s contracts/page-api-fact-matrix.schema.json -d contracts/page-api-fact-matrix.json && ajv validate --spec=draft2020 -c ajv-formats -s contracts/development-leases.schema.json -d contracts/development-leases.json && uv run python scripts/check_contract_freeze.py && uv run python scripts/check_parallel_fixtures.py",
+    "contracts:freeze": "ajv validate --spec=draft2020 -c ajv-formats -s contracts/full-chain-freeze.schema.json -d contracts/full-chain-freeze.json && ajv validate --spec=draft2020 -c ajv-formats -s contracts/page-api-fact-matrix.schema.json -d contracts/page-api-fact-matrix.json && ajv validate --spec=draft2020 -c ajv-formats -s contracts/development-leases.schema.json -d contracts/development-leases.json && uv run python scripts/check_contract_freeze.py && uv run python scripts/check_parallel_fixtures.py && uv run python scripts/check_trusted_contract_workflows.py",
     "contracts:bundle": "redocly bundle contracts/api-surface.openapi.yaml -o contracts/generated/openapi.bundle.yaml",
     "contracts:generate": "pnpm contracts:bundle && openapi-typescript contracts/generated/openapi.bundle.yaml -o contracts/generated/typescript/schema.ts",
     "contracts:typecheck": "tsc -p tsconfig.contracts.json --noEmit",
