@@ -10,6 +10,7 @@ trap cleanup_readonly_git_index EXIT
 pnpm contracts:lint
 pnpm contracts:surface
 pnpm contracts:schema
+pnpm contracts:freeze
 pnpm contracts:generate
 pnpm contracts:typecheck
 pnpm contracts:test
