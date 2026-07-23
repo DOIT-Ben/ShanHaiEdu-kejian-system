@@ -171,9 +171,7 @@ def validate_vertical_slice_declaration(
     required: bool = False,
 ) -> list[str]:
     normalized_files = {path.replace("\\", "/") for path in changed_files}
-    touches_boundary = any(
-        path.startswith(VERTICAL_BOUNDARY_PREFIXES) for path in normalized_files
-    )
+    touches_boundary = any(path.startswith(VERTICAL_BOUNDARY_PREFIXES) for path in normalized_files)
 
     if VERTICAL_MARKER.search(body) is None:
         if required:
