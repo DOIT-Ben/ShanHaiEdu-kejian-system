@@ -53,9 +53,11 @@
         "package.json",
         "scripts/check_contract_freeze.py",
         "scripts/check_development_lease.py",
+        "scripts/check_parallel_fixtures.py",
         "scripts/check_contracts.sh",
         "tests/contract/test_contract_freeze.py",
         "tests/contract/test_development_lease.py",
+        "tests/contract/test_parallel_fixtures.py",
         "docs/governance/CONTRACT_FREEZE.md"
       ],
       "readonly": ["apps/web/**", "apps/api/ppt/**", "apps/api/video/**", "apps/api/lessons/**"],
