@@ -5,6 +5,7 @@ from scripts.check_pull_request_status import (
     validate_review_declaration,
     validate_size_declaration,
     validate_status_declaration,
+    validate_vertical_slice_declaration,
 )
 
 REQUIRED = "- [x] `status-update-required`: status changed"
@@ -20,6 +21,10 @@ SIZE_WITHIN = "- [x] `pr-size-within-limit`: within limit"
 SIZE_MAP_REQUIRED = "- [x] `pr-size-review-map-required`: map required"
 SIZE_WITHIN_UNCHECKED = "- [ ] `pr-size-within-limit`: within limit"
 SIZE_MAP_UNCHECKED = "- [ ] `pr-size-review-map-required`: map required"
+VERTICAL_REQUIRED = "- [x] `vertical-slice-required`: product slice"
+VERTICAL_NOT_REQUIRED = "- [x] `vertical-slice-not-required`: internal-only change"
+VERTICAL_REQUIRED_UNCHECKED = "- [ ] `vertical-slice-required`: product slice"
+VERTICAL_NOT_REQUIRED_UNCHECKED = "- [ ] `vertical-slice-not-required`: internal-only change"
 
 
 def review_section(
@@ -64,6 +69,76 @@ def test_status_declaration_requires_exactly_one_choice() -> None:
     assert validate_status_declaration(f"{REQUIRED}\n{NOT_REQUIRED}", set()) == [
         "PR must select exactly one CURRENT_STATUS freshness declaration"
     ]
+
+
+
+def vertical_section(declarations: str, fields: str = "") -> str:
+    return (
+        "## 纵向切片交付\n\n"
+        f"{declarations}\n\n"
+        f"{fields}\n\n"
+        "## 子智能体审查"
+    )
+
+
+def test_vertical_slice_declaration_is_required_for_current_prs() -> None:
+    assert validate_vertical_slice_declaration(
+        "legacy body", {"docs/README.md"}, required=True
+    ) == ["PR must select exactly one vertical slice declaration"]
+
+
+def test_vertical_slice_rejects_opt_out_for_production_boundary() -> None:
+    body = vertical_section(
+        f"{VERTICAL_REQUIRED_UNCHECKED}\n{VERTICAL_NOT_REQUIRED}"
+    )
+
+    assert validate_vertical_slice_declaration(
+        body, {"apps/web/src/pages/HomePage.tsx"}, required=True
+    ) == [
+        "PR changes a production delivery boundary but declares vertical-slice-not-required"
+    ]
+
+
+def test_vertical_slice_requires_all_concrete_delivery_fields() -> None:
+    body = vertical_section(
+        f"{VERTICAL_REQUIRED}\n{VERTICAL_NOT_REQUIRED_UNCHECKED}",
+        "Page routes: /app/projects\n"
+        "Active operationIds: listProjects\n"
+        "Formal facts: Project\n"
+        "Backend tests: pending\n",
+    )
+
+    assert validate_vertical_slice_declaration(
+        body, {"apps/api/routers/projects.py"}, required=True
+    ) == [
+        "vertical slice field Backend tests must be concrete",
+        "vertical slice section must contain exactly one Real API Playwright field",
+    ]
+
+
+def test_vertical_slice_accepts_complete_delivery_matrix() -> None:
+    body = vertical_section(
+        f"{VERTICAL_REQUIRED}\n{VERTICAL_NOT_REQUIRED_UNCHECKED}",
+        "Page routes: /app/projects, /app/projects/new\n"
+        "Active operationIds: listProjects, createProject\n"
+        "Formal facts: Project\n"
+        "Backend tests: tests/integration/test_project_api.py::test_create_project\n"
+        "Real API Playwright: apps/web/e2e/r1-teacher-flow.spec.ts::creates_project\n",
+    )
+
+    assert validate_vertical_slice_declaration(
+        body, {"contracts/openapi/active/openapi.yaml"}, required=True
+    ) == []
+
+
+def test_vertical_slice_opt_out_accepts_non_boundary_change() -> None:
+    body = vertical_section(
+        f"{VERTICAL_REQUIRED_UNCHECKED}\n{VERTICAL_NOT_REQUIRED}"
+    )
+
+    assert validate_vertical_slice_declaration(
+        body, {"docs/governance/DELIVERY_ROADMAP.md"}, required=True
+    ) == []
 
 
 def test_review_declaration_keeps_legacy_pr_body_compatible() -> None:
