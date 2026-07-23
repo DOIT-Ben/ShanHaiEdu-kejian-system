@@ -93,10 +93,32 @@ def test_material_scope_reaches_approved_version_through_artifact_interfaces(
         )
         assert provisioned.validation_report_json["valid"] is True
 
-        version = service.submit(
+        edited_content = {
+            **provisioned.content_json,
+            "duration_minutes": 45,
+        }
+        with pytest.raises(ApiError) as locked_field_change:
+            service.save_draft(
+                artifact.id,
+                "main",
+                expected_lock_version=provisioned.lock_version,
+                content={**edited_content, "page_end": 6},
+                request_id="issue-118-material-scope-locked-change",
+            )
+        assert locked_field_change.value.code == "AUTHORING_POLICY_VIOLATION"
+
+        saved = service.save_draft(
             artifact.id,
             "main",
             expected_lock_version=provisioned.lock_version,
+            content=edited_content,
+            request_id="issue-118-material-scope-save",
+        )
+
+        version = service.submit(
+            artifact.id,
+            "main",
+            expected_lock_version=saved.lock_version,
             source_kind="manual",
             request_id="issue-118-material-scope-submit",
         )
@@ -108,9 +130,6 @@ def test_material_scope_reaches_approved_version_through_artifact_interfaces(
         )
 
         assert approval.artifact_version_id == version.id
-        assert version.content_json == {
-            **draft.content_json,
-            **locked_fields,
-        }
+        assert version.content_json == edited_content
         assert artifact.current_approved_version_id == version.id
         assert artifact.status == "approved"

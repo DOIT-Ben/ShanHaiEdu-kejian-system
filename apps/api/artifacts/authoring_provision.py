@@ -11,6 +11,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from apps.api.artifacts.authoring_guard import ArtifactAuthoringGuard
 from apps.api.artifacts.domain import canonical_content_hash
 from apps.api.artifacts.models import Artifact, ArtifactDraft, ArtifactVersion
 from apps.api.artifacts.repository import ArtifactRepository
@@ -149,6 +150,7 @@ class ArtifactAuthoringProvisionPort:
                 code="INVALID_ARTIFACT",
                 message="The provisioned draft does not match the published schema.",
             )
+        ArtifactAuthoringGuard.record_initial_locked_fields(report, fields)
         draft.content_json = content
         draft.validation_report_json = report
         draft.autosaved_at = utc_now()

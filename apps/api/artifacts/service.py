@@ -24,7 +24,7 @@ from apps.api.artifacts.validation import ArtifactValidation
 from apps.api.content_runtime.models import ContentDefinitionVersion
 from apps.api.database import utc_now
 from apps.api.errors import ApiError
-from apps.api.identity.context import ActorContext, ProjectAction, system_actor
+from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.ids import new_uuid7
 from apps.api.reliability.events import EventResource, EventWriter
 
@@ -103,9 +103,13 @@ class ArtifactService:
         draft = self._require_draft(artifact.id, draft_branch, expected_lock_version)
         definition = self._validation.require_artifact_definition(artifact)
         baseline = self._authoring.baseline(artifact, draft)
+        if baseline is None:
+            baseline = self._authoring.initial_locked_fields(draft)
         self._authoring.validate(definition.id, content, baseline=baseline)
         draft.content_json = content
-        draft.validation_report_json = self._validation.validation_report(definition, content)
+        report = self._validation.validation_report(definition, content)
+        self._authoring.preserve_initial_locked_fields(draft.validation_report_json, report)
+        draft.validation_report_json = report
         draft.autosaved_at = utc_now()
         self._touch(draft)
         artifact.current_draft_id = draft.id
@@ -252,15 +256,9 @@ class ArtifactService:
     ) -> tuple[str, dict[str, Any]]:
         definition = self._validation.require_artifact_definition(artifact)
         baseline = self._authoring.baseline(artifact, draft)
-        self._authoring.validate(
-            definition.id,
-            draft.content_json,
-            baseline=baseline,
-            server_provisioned=(
-                baseline is None
-                and draft.updated_by == system_actor(self._actor.organization_id).principal_id
-            ),
-        )
+        if baseline is None:
+            baseline = self._authoring.initial_locked_fields(draft)
+        self._authoring.validate(definition.id, draft.content_json, baseline=baseline)
         report = self._validation.validation_report(definition, draft.content_json)
         if not report["valid"]:
             raise ApiError(
