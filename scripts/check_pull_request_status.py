@@ -29,6 +29,26 @@ MARKDOWN_H2_SECTION = re.compile(
     r"^##[ \t]+.*?(?=^##[ \t]+|\Z)",
     re.MULTILINE | re.DOTALL,
 )
+VERTICAL_MARKER = re.compile(r"`vertical-slice-(?:required|not-required)`")
+VERTICAL_DECLARATION = re.compile(
+    r"^-\s*\[(?P<checked>[ xX])\]\s*"
+    r"`(?P<choice>vertical-slice-(?:required|not-required))`",
+    re.MULTILINE,
+)
+VERTICAL_REQUIRED_FIELDS = (
+    "Page routes",
+    "Active operationIds",
+    "Formal facts",
+    "Backend tests",
+    "Real API Playwright",
+)
+VERTICAL_BOUNDARY_PREFIXES = (
+    "apps/web/src/pages/",
+    "apps/web/src/api/",
+    "apps/web/src/runtime/",
+    "apps/api/routers/",
+    "contracts/openapi/active/",
+)
 FIRST_REQUIRED_GOVERNANCE_PR = 93  # Remove under #94 after legacy PR #62 closes.
 
 
