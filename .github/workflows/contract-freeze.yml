@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/contract-freeze.yml"
+      - ".github/workflows/development-lease.yml"
       - "contracts/full-chain-freeze.json"
       - "contracts/full-chain-freeze.schema.json"
       - "contracts/page-api-fact-matrix.json"
@@ -17,12 +18,15 @@ on:
       - "contracts/api-surface.openapi.yaml"
       - "contracts/planned-api-surface.openapi.yaml"
       - "scripts/check_contract_freeze.py"
+      - "scripts/check_development_lease.py"
       - "tests/contract/test_contract_freeze.py"
+      - "tests/contract/test_development_lease.py"
   push:
     branches:
       - main
     paths:
       - ".github/workflows/contract-freeze.yml"
+      - ".github/workflows/development-lease.yml"
       - "contracts/full-chain-freeze.json"
       - "contracts/full-chain-freeze.schema.json"
       - "contracts/page-api-fact-matrix.json"
@@ -36,7 +40,9 @@ on:
       - "contracts/api-surface.openapi.yaml"
       - "contracts/planned-api-surface.openapi.yaml"
       - "scripts/check_contract_freeze.py"
+      - "scripts/check_development_lease.py"
       - "tests/contract/test_contract_freeze.py"
+      - "tests/contract/test_development_lease.py"
 
 permissions:
   contents: read
@@ -63,14 +69,27 @@ jobs:
       - name: Install locked dependencies
         run: uv sync --frozen
 
-      - name: Check freeze Python formatting
-        run: uv run ruff format --check scripts/check_contract_freeze.py tests/contract/test_contract_freeze.py
+      - name: Check contract governance Python formatting
+        run: >-
+          uv run ruff format --check
+          scripts/check_contract_freeze.py
+          scripts/check_development_lease.py
+          tests/contract/test_contract_freeze.py
+          tests/contract/test_development_lease.py
 
-      - name: Lint freeze Python
-        run: uv run ruff check scripts/check_contract_freeze.py tests/contract/test_contract_freeze.py
+      - name: Lint contract governance Python
+        run: >-
+          uv run ruff check
+          scripts/check_contract_freeze.py
+          scripts/check_development_lease.py
+          tests/contract/test_contract_freeze.py
+          tests/contract/test_development_lease.py
 
       - name: Validate full-chain freeze
         run: uv run python scripts/check_contract_freeze.py
 
-      - name: Run freeze regression tests
-        run: uv run pytest tests/contract/test_contract_freeze.py
+      - name: Run contract governance regression tests
+        run: >-
+          uv run pytest
+          tests/contract/test_contract_freeze.py
+          tests/contract/test_development_lease.py
