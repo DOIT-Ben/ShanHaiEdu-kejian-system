@@ -7,8 +7,8 @@ const host = "127.0.0.1";
 const port = 6007;
 const origin = `http://${host}:${String(port)}`;
 const desktopViewport = { height: 900, name: "desktop-1440", width: 1440 };
-const expectedCoreStoryCount = 88;
-const expectedStoryCount = 120;
+const expectedCoreStoryCount = 94;
+const expectedStoryCount = 126;
 const coreViewports = [
   desktopViewport,
   { height: 768, name: "tablet-1024", width: 1024 },

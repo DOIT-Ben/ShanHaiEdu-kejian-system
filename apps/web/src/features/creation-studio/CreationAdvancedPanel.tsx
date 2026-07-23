@@ -12,11 +12,13 @@ export function CreationAdvancedPanel({
   embedded = false,
   onChange,
   onClose,
+  referenceControlsAvailable = true,
   settings,
 }: {
   embedded?: boolean;
   onChange: (settings: Partial<CreationAdvancedSettings>) => void;
   onClose?: () => void;
+  referenceControlsAvailable?: boolean;
   settings: CreationAdvancedSettings;
 }) {
   const firstFieldRef = useRef<HTMLTextAreaElement>(null);
@@ -68,29 +70,31 @@ export function CreationAdvancedPanel({
             value={settings.negativePrompt}
           />
         </label>
-        <label
-          className={
-            embedded
-              ? "block rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-soft)] p-3"
-              : "block"
-          }
-        >
-          <span className="flex items-center justify-between gap-3 text-sm font-semibold">
-            参考图相似程度
-            <output className="font-normal text-[var(--sh-ink-muted)]">
-              {settings.referenceStrength}%
-            </output>
-          </span>
-          <input
-            aria-label="参考图相似程度"
-            className="mt-3 w-full accent-[var(--sh-brand-500)]"
-            max="100"
-            min="0"
-            onChange={(event) => onChange({ referenceStrength: event.target.valueAsNumber })}
-            type="range"
-            value={settings.referenceStrength}
-          />
-        </label>
+        {referenceControlsAvailable ? (
+          <label
+            className={
+              embedded
+                ? "block rounded-[var(--sh-radius-sm)] bg-[var(--sh-surface-soft)] p-3"
+                : "block"
+            }
+          >
+            <span className="flex items-center justify-between gap-3 text-sm font-semibold">
+              参考图相似程度
+              <output className="font-normal text-[var(--sh-ink-muted)]">
+                {settings.referenceStrength}%
+              </output>
+            </span>
+            <input
+              aria-label="参考图相似程度"
+              className="mt-3 w-full accent-[var(--sh-brand-500)]"
+              max="100"
+              min="0"
+              onChange={(event) => onChange({ referenceStrength: event.target.valueAsNumber })}
+              type="range"
+              value={settings.referenceStrength}
+            />
+          </label>
+        ) : null}
       </div>
     </aside>
   );

@@ -39,12 +39,14 @@ export function CreationComposer({
   config,
   description,
   descriptionLabel,
+  disabled = false,
   onAdvancedOpenChange,
   onDescriptionChange,
   onGenerate,
   onImageEdit,
   onPromptReview,
   onSettingsChange,
+  referenceUploadAvailable = true,
   settings,
   stage,
   type,
@@ -54,12 +56,14 @@ export function CreationComposer({
   config: StudioConfig;
   description: string;
   descriptionLabel: string;
+  disabled?: boolean;
   onAdvancedOpenChange: (open: boolean) => void;
   onDescriptionChange: (description: string) => void;
   onGenerate: () => void;
   onImageEdit?: () => void;
   onPromptReview: () => void;
   onSettingsChange: (settings: Partial<CreationSettings>) => void;
+  referenceUploadAvailable?: boolean;
   settings: CreationSettings;
   stage: CreationStage;
   type: StudioType;
@@ -70,7 +74,7 @@ export function CreationComposer({
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
   const settingsPanelRef = useRef<HTMLDivElement>(null);
   const settingsTriggerRef = useRef<HTMLButtonElement>(null);
-  const running = stage === "queued" || stage === "running";
+  const running = disabled || stage === "queued" || stage === "running";
   const inputLabel = stage === "draft" ? descriptionLabel : "创作要求";
   const generateLabel = generationLabel(type, stage, config.primaryLabel);
   const canGenerate = !running && description.trim().length > 0;
@@ -245,7 +249,7 @@ export function CreationComposer({
               tabIndex={-1}
               type="file"
             />
-            {referenceButton("min-w-0 max-w-[min(46vw,190px)]")}
+            {referenceUploadAvailable ? referenceButton("min-w-0 max-w-[min(46vw,190px)]") : null}
             {type === "image" ? (
               <Select
                 ariaLabel="图片比例"
