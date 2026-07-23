@@ -87,7 +87,7 @@ def test_registry_loads_the_published_catalog_with_one_deterministic_order() -> 
     intro = registered.node_by_key["intro.generate_options"]
     assert intro.optional_input_contract_refs == ("artifact:intro_option_set_source",)
     assert intro.binding["optional_input_contract_refs"] == ("artifact:intro_option_set_source",)
-    assert len(registered.output_definition_index) == 22
+    assert len(registered.output_definition_index) == 24
     assert registered.output_definition_index is registered.indexes.output_definition_index
     assert {
         producer.node_key for producer in registered.producers_by_contract["asset:image_candidates"]
@@ -96,6 +96,27 @@ def test_registry_loads_the_published_catalog_with_one_deterministic_order() -> 
         "video.style_master.image.generate",
     }
     assert registered.require_output_projection() is None
+
+
+def test_registry_preserves_pre_1_3_artifact_quality_source_semantics() -> None:
+    catalog = load_catalog()
+    catalog["semantic_version"] = "1.2.0"
+    gated_artifacts = (
+        "lesson.division.generate",
+        "lesson_plan.generate",
+        "intro.generate_options",
+    )
+    for node_key in gated_artifacts:
+        node = next(node for node in catalog["nodes"] if node["node_key"] == node_key)
+        node["output_persistence"].pop("quality_source_binding")
+
+    registered = BUILTIN_WORKFLOW_REGISTRY.load(catalog)
+
+    assert all(
+        output.quality_source_binding == "artifact"
+        for output in registered.output_definition_index.values()
+        if output.producer_node_key in gated_artifacts
+    )
 
 
 def test_registry_rejects_optional_inputs_outside_declared_inputs() -> None:
@@ -344,7 +365,7 @@ def test_registry_rejects_output_persistence_on_a_deterministic_node() -> None:
     with pytest.raises(WorkflowDefinitionError) as caught:
         BUILTIN_WORKFLOW_REGISTRY.load(catalog)
 
-    assert caught.value.code == "WORKFLOW_EXECUTION_KIND_INVALID"
+    assert caught.value.code == "WORKFLOW_DETERMINISTIC_OUTPUT_INVALID"
 
 
 def test_registry_builds_an_immutable_validator_descriptor_index() -> None:

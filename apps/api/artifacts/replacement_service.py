@@ -80,6 +80,7 @@ class ArtifactReplacementService:
         replacement: ArtifactVersion,
         *,
         node_run_id: UUID,
+        carry_incoming_dependencies: bool = True,
     ) -> None:
         if previous_version_id is None:
             return
@@ -99,7 +100,8 @@ class ArtifactReplacementService:
             previous,
             fixed_release=fixed_release,
         )
-        self._carry_incoming_dependencies(previous.id, replacement.id)
+        if carry_incoming_dependencies:
+            self._carry_incoming_dependencies(previous.id, replacement.id)
 
     def submit_generated(
         self,

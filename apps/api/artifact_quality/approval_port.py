@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from apps.api.artifact_quality.contracts import QualitySourceType
 from apps.api.artifact_quality.repository import ArtifactQualityReportRepository
 from apps.api.identity.context import ActorContext
 
@@ -18,7 +19,9 @@ class QualityApprovalEvidence:
     organization_id: UUID
     project_id: UUID
     lesson_unit_id: UUID | None
+    source_type: QualitySourceType
     source_artifact_version_id: UUID | None
+    source_file_asset_version_id: UUID | None
     source_content_hash: str
     content_release_id: UUID
     workflow_definition_version_id: UUID
@@ -37,13 +40,14 @@ class ArtifactQualityApprovalEvidenceReader:
         self,
         *,
         project_id: UUID,
+        source_type: QualitySourceType,
         source_version_id: UUID,
         workflow_definition_version_id: UUID,
         validator_set_hash: str,
     ) -> QualityApprovalEvidence | None:
         report = self._repository.get_exact(
             project_id=project_id,
-            source_type="artifact",
+            source_type=source_type,
             source_version_id=source_version_id,
             workflow_definition_version_id=workflow_definition_version_id,
             validator_set_hash=validator_set_hash,
@@ -55,7 +59,9 @@ class ArtifactQualityApprovalEvidenceReader:
             organization_id=report.organization_id,
             project_id=report.project_id,
             lesson_unit_id=report.lesson_unit_id,
+            source_type=cast(QualitySourceType, report.source_type),
             source_artifact_version_id=report.source_artifact_version_id,
+            source_file_asset_version_id=report.source_file_asset_version_id,
             source_content_hash=report.source_content_hash,
             content_release_id=report.content_release_id,
             workflow_definition_version_id=report.workflow_definition_version_id,
