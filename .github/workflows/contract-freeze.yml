@@ -19,8 +19,10 @@ on:
       - "contracts/planned-api-surface.openapi.yaml"
       - "scripts/check_contract_freeze.py"
       - "scripts/check_development_lease.py"
+      - "scripts/check_parallel_fixtures.py"
       - "tests/contract/test_contract_freeze.py"
       - "tests/contract/test_development_lease.py"
+      - "tests/contract/test_parallel_fixtures.py"
   push:
     branches:
       - main
@@ -41,8 +43,10 @@ on:
       - "contracts/planned-api-surface.openapi.yaml"
       - "scripts/check_contract_freeze.py"
       - "scripts/check_development_lease.py"
+      - "scripts/check_parallel_fixtures.py"
       - "tests/contract/test_contract_freeze.py"
       - "tests/contract/test_development_lease.py"
+      - "tests/contract/test_parallel_fixtures.py"
 
 permissions:
   contents: read
@@ -74,22 +78,29 @@ jobs:
           uv run ruff format --check
           scripts/check_contract_freeze.py
           scripts/check_development_lease.py
+          scripts/check_parallel_fixtures.py
           tests/contract/test_contract_freeze.py
           tests/contract/test_development_lease.py
+          tests/contract/test_parallel_fixtures.py
 
       - name: Lint contract governance Python
         run: >-
           uv run ruff check
           scripts/check_contract_freeze.py
           scripts/check_development_lease.py
+          scripts/check_parallel_fixtures.py
           tests/contract/test_contract_freeze.py
           tests/contract/test_development_lease.py
+          tests/contract/test_parallel_fixtures.py
 
       - name: Validate full-chain freeze
-        run: uv run python scripts/check_contract_freeze.py
+        run: |
+          uv run python scripts/check_contract_freeze.py
+          uv run python scripts/check_parallel_fixtures.py
 
       - name: Run contract governance regression tests
         run: >-
           uv run pytest
           tests/contract/test_contract_freeze.py
           tests/contract/test_development_lease.py
+          tests/contract/test_parallel_fixtures.py
