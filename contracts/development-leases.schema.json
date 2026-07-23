@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shanhaiedu.local/contracts/development-leases.schema.json",
+  "title": "ShanHaiEdu Parallel Development Leases",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["lease_version", "shared_contract_paths", "change_process", "tracks"],
+  "properties": {
+    "lease_version": {"const": "shanhai.development-leases/v1"},
+    "shared_contract_paths": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/pathPattern"}
+    },
+    "change_process": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request", "owner_update", "consumer_resume"],
+      "properties": {
+        "request": {"const": "open_contract_change"},
+        "owner_update": {"const": "merge_shared_contract_first"},
+        "consumer_resume": {"const": "rebase_then_continue"}
+      }
+    },
+    "tracks": {
+      "type": "array",
+      "minItems": 4,
+      "items": {"$ref": "#/$defs/track"}
+    }
+  },
+  "$defs": {
+    "pathPattern": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*\\.\\.)(?!.*\\\\).+$"
+    },
+    "track": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["track_key", "role", "writable", "readonly", "forbidden", "contract_change_required"],
+      "properties": {
+        "track_key": {"enum": ["shared_contract", "frontend", "ppt", "video", "mainline"]},
+        "role": {"type": "string", "minLength": 1},
+        "writable": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/pathPattern"}
+        },
+        "readonly": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/pathPattern"}
+        },
+        "forbidden": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/pathPattern"}
+        },
+        "contract_change_required": {"type": "boolean"}
+      }
+    }
+  }
+}
