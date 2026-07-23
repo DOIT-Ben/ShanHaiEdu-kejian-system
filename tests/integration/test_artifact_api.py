@@ -57,6 +57,11 @@ async def test_artifact_draft_submit_and_approval_api_matches_contract(
             assert_contract_response(created, operation_id="createArtifact", status="201")
             artifact_id = created.json()["data"]["id"]
 
+            listed = await client.get(f"/api/v2/projects/{project_id}/artifacts")
+            assert listed.status_code == 200, listed.text
+            assert_contract_response(listed, operation_id="listProjectArtifacts", status="200")
+            assert [item["id"] for item in listed.json()["data"]["items"]] == [artifact_id]
+
             detail = await client.get(f"/api/v2/artifacts/{artifact_id}")
             assert detail.status_code == 200, detail.text
             assert detail.headers["ETag"] == 'W/"1"'

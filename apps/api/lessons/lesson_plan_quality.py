@@ -10,6 +10,7 @@ from apps.api.artifact_quality.contracts import (
     ValidatorOutcome,
     ValidatorRef,
 )
+from apps.api.assets.material_evidence import material_evidence_keys
 from apps.api.lessons.lesson_plan import LessonPlanBusinessValidator
 from apps.api.lessons.lesson_plan_domain import (
     ApprovedLessonPlanScope,
@@ -178,16 +179,7 @@ def _exact_lesson(division: Mapping[str, Any], lesson_key: str) -> Mapping[str, 
 
 
 def _material_evidence_keys(material: Mapping[str, Any]) -> set[str]:
-    raw = material.get("material_evidence")
-    if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes, bytearray)):
-        return set()
-    return {
-        cast(str, cast(Mapping[str, Any], item).get("evidence_key"))
-        for item in cast(Sequence[object], raw)
-        if isinstance(item, Mapping)
-        and isinstance(cast(Mapping[str, Any], item).get("evidence_key"), str)
-        and cast(str, cast(Mapping[str, Any], item).get("evidence_key")).strip()
-    }
+    return material_evidence_keys(material)
 
 
 def _strings(value: object) -> tuple[str, ...]:

@@ -6,6 +6,8 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
+from apps.api.assets.material_evidence import material_evidence_keys
+
 
 def coverage_findings(
     content: Mapping[str, Any],
@@ -141,17 +143,7 @@ def _material_evidence_keys(
     supporting_inputs: Mapping[str, Mapping[str, Any]],
 ) -> set[str]:
     material = supporting_inputs.get("content:material_evidence")
-    evidence = None if material is None else material.get("material_evidence")
-    if not isinstance(evidence, Sequence) or isinstance(evidence, (str, bytes, bytearray)):
-        return set()
-    keys: set[str] = set()
-    for item in cast(Sequence[object], evidence):
-        if not isinstance(item, Mapping):
-            continue
-        key = cast(Mapping[str, Any], item).get("evidence_key")
-        if isinstance(key, str) and key.strip():
-            keys.add(key)
-    return keys
+    return set() if material is None else material_evidence_keys(material)
 
 
 def _valid_teacher_constraints(scope: Mapping[str, Any]) -> bool:

@@ -348,6 +348,21 @@ paths:
                 $ref: '#/components/schemas/IntroSelectionEnvelope'
         '4XX':
           $ref: '#/components/responses/Error'
+  /projects/{project_id}/materials:
+    get:
+      summary: 查询项目已上传教材
+      operationId: listProjectMaterials
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Newest-first project material summaries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceMaterialListEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
   /projects/{project_id}/materials/uploads:
     post:
       summary: 创建教材私有直传会话
@@ -439,7 +454,38 @@ paths:
                 $ref: '#/components/schemas/WorkflowEnvelope'
         '4XX':
           $ref: '#/components/responses/Error'
+  /projects/{project_id}/lesson-division-runs:
+    post:
+      summary: 以教师选择的教材物理页准备课时划分
+      operationId: prepareLessonDivision
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PrepareLessonDivisionRequest'}
+      responses:
+        '201':
+          description: Approved material scope and lesson-division node runs prepared
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LessonDivisionPreparationEnvelope'}
+        '4XX': {$ref: '#/components/responses/Error'}
   /projects/{project_id}/artifacts:
+    get:
+      summary: 查询项目内容产物
+      operationId: listProjectArtifacts
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Current project artifact states
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ArtifactListEnvelope'}
+        '4XX': {$ref: '#/components/responses/Error'}
     post:
       summary: 创建项目内容产物及活动草稿
       operationId: createArtifact
@@ -550,6 +596,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PromptPreviewEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /node-runs/{node_run_id}/start:
+    post:
+      summary: 使用现有运行时执行文本生成节点
+      operationId: startNodeRun
+      parameters:
+        - $ref: '#/components/parameters/NodeRunId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartNodeRunRequest'
+      responses:
+        '200':
+          description: Existing node execution committed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeExecutionEnvelope'
         '4XX':
           $ref: '#/components/responses/Error'
   /creation-batches:
@@ -1316,6 +1384,30 @@ components:
         etag: {type: string, minLength: 1, maxLength: 255}
         size_bytes: {type: integer, minimum: 1}
         sha256: {type: string, pattern: '^[a-f0-9]{64}$'}
+    SourceMaterial:
+      type: object
+      additionalProperties: false
+      required: [id, original_filename, mime_type, upload_status, confirmed_at]
+      properties:
+        id: {type: string, format: uuid}
+        original_filename: {type: string, minLength: 1, maxLength: 255}
+        mime_type: {type: string, minLength: 1, maxLength: 255}
+        upload_status: {enum: [pending_upload, confirmed, rejected]}
+        confirmed_at: {type: [string, 'null'], format: date-time}
+    SourceMaterialListEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: {$ref: '#/components/schemas/SourceMaterial'}
+        request_id: {type: string, minLength: 1}
     FileAssetVersion:
       type: object
       additionalProperties: false
@@ -1562,6 +1654,71 @@ components:
             - {type: 'null'}
         started_at: {type: [string, 'null'], format: date-time}
         finished_at: {type: [string, 'null'], format: date-time}
+    PrepareLessonDivisionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - material_id
+        - material_parse_version_id
+        - page_start
+        - page_end
+      properties:
+        material_id: {type: string, format: uuid}
+        material_parse_version_id: {type: string, format: uuid}
+        page_start: {type: integer, minimum: 1}
+        page_end: {type: integer, minimum: 1}
+        duration_minutes: {type: integer, minimum: 30, maximum: 60, default: 40}
+        requested_lesson_count: {type: [integer, 'null'], minimum: 1, maximum: 20}
+        special_requirements: {type: string, maxLength: 4000, default: ''}
+    LessonDivisionPreparation:
+      type: object
+      additionalProperties: false
+      required:
+        - material_scope_artifact_id
+        - material_scope_version_id
+        - generate_node_run_id
+        - validate_node_run_id
+        - gate_node_run_id
+      properties:
+        material_scope_artifact_id: {type: string, format: uuid}
+        material_scope_version_id: {type: string, format: uuid}
+        generate_node_run_id: {type: string, format: uuid}
+        validate_node_run_id: {type: string, format: uuid}
+        gate_node_run_id: {type: string, format: uuid}
+    LessonDivisionPreparationEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/LessonDivisionPreparation'}
+        request_id: {type: string, minLength: 1}
+    StartNodeRunRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        user_revision: {type: [string, 'null'], minLength: 1, maxLength: 20000}
+    NodeExecutionResult:
+      type: object
+      additionalProperties: false
+      required:
+        - node_run_id
+        - artifact_version_id
+        - creation_package_id
+        - attempt_id
+        - usage_id
+      properties:
+        node_run_id: {type: string, format: uuid}
+        artifact_version_id: {type: string, format: uuid}
+        creation_package_id: {type: [string, 'null'], format: uuid}
+        attempt_id: {type: [string, 'null'], format: uuid}
+        usage_id: {type: [string, 'null'], format: uuid}
+    NodeExecutionEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/NodeExecutionResult'}
+        request_id: {type: string, minLength: 1}
     WorkflowRun:
       type: object
       additionalProperties: false
@@ -2172,6 +2329,20 @@ components:
       required: [data, request_id]
       properties:
         data: {$ref: '#/components/schemas/Artifact'}
+        request_id: {type: string, minLength: 1}
+    ArtifactListEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: {$ref: '#/components/schemas/Artifact'}
         request_id: {type: string, minLength: 1}
     ArtifactDraftEnvelope:
       type: object

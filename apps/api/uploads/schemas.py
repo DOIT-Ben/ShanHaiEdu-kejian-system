@@ -39,3 +39,20 @@ class ConfirmUploadRequest(BaseModel):
     etag: str = Field(min_length=1, max_length=255)
     size_bytes: int = Field(gt=0)
     sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class SourceMaterialRead(BaseModel):
+    id: UUID
+    original_filename: str
+    mime_type: str
+    upload_status: Literal["pending_upload", "confirmed", "rejected"]
+    confirmed_at: datetime | None
+
+
+class SourceMaterialListData(BaseModel):
+    items: list[SourceMaterialRead]
+
+
+class SourceMaterialListEnvelope(BaseModel):
+    data: SourceMaterialListData
+    request_id: str
