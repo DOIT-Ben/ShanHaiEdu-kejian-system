@@ -14,9 +14,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-TRACK_PATTERN = re.compile(
-    r"(?im)^\s*development-track:\s*`?([a-z][a-z0-9_]*)`?\s*$"
-)
+TRACK_PATTERN = re.compile(r"(?im)^\s*development-track:\s*`?([a-z][a-z0-9_]*)`?\s*$")
 
 
 def _load_leases(root: Path = ROOT) -> dict[str, Any]:
@@ -113,7 +111,12 @@ def main() -> int:
     try:
         changed_paths = _changed_paths(args.base, args.head)
         errors = validate_changed_paths(_load_leases(), track_key, changed_paths)
-    except (json.JSONDecodeError, KeyError, OSError, subprocess.CalledProcessError) as exc:
+    except (
+        json.JSONDecodeError,
+        KeyError,
+        OSError,
+        subprocess.CalledProcessError,
+    ) as exc:
         print(f"error: development lease validation failed: {exc}", file=sys.stderr)
         return 1
 
