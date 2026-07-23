@@ -141,16 +141,24 @@ def validate_parallel_fixture(root: Path = ROOT) -> list[str]:
         ppt_input = lesson.get("parallel_inputs", {}).get("ppt", {})
         video_input = lesson.get("parallel_inputs", {}).get("video", {})
         expected_project_id = project.get("project_id")
-        if ppt_input.get("project_id") != expected_project_id or ppt_input.get("lesson_id") != lesson_id:
+        if (
+            ppt_input.get("project_id") != expected_project_id
+            or ppt_input.get("lesson_id") != lesson_id
+        ):
             errors.append(f"{prefix}.parallel_inputs.ppt scope does not match its owner lesson")
         if ppt_input.get("approved_lesson_plan_version_id") != plan_version:
             errors.append(f"{prefix}.parallel_inputs.ppt does not use the owner lesson plan")
-        if video_input.get("project_id") != expected_project_id or video_input.get("lesson_id") != lesson_id:
+        if (
+            video_input.get("project_id") != expected_project_id
+            or video_input.get("lesson_id") != lesson_id
+        ):
             errors.append(f"{prefix}.parallel_inputs.video scope does not match its owner lesson")
         if video_input.get("intro_selection_id") != selection_id:
             errors.append(f"{prefix}.parallel_inputs.video does not use the owner IntroSelection")
         if video_input.get("intro_option_set_version_id") != intro_version:
-            errors.append(f"{prefix}.parallel_inputs.video does not use the owner option-set version")
+            errors.append(
+                f"{prefix}.parallel_inputs.video does not use the owner option-set version"
+            )
         _require_hash(
             errors,
             f"{prefix}.parallel_inputs.video.selected_option_snapshot_hash",
@@ -158,7 +166,9 @@ def validate_parallel_fixture(root: Path = ROOT) -> list[str]:
         )
         leaked_fields = VIDEO_FORBIDDEN_FIELDS.intersection(video_input)
         if leaked_fields:
-            errors.append(f"{prefix}.parallel_inputs.video leaks forbidden fields: {sorted(leaked_fields)}")
+            errors.append(
+                f"{prefix}.parallel_inputs.video leaks forbidden fields: {sorted(leaked_fields)}"
+            )
 
     _check_mainline_projection(errors, lesson_by_id, mainline_example)
     _check_ppt_projection(errors, lesson_by_id, ppt_example)
