@@ -2,17 +2,17 @@
   "source_fixture": "contracts/fixtures/contract-freeze/primary-math-two-lessons.json",
   "inputs": [
     {
-      "project_id": "PROJECT-FREEZE-001",
-      "lesson_id": "LESSON-FREEZE-001",
-      "intro_selection_id": "INTRO-SELECTION-001",
-      "intro_option_set_version_id": "ARTIFACT-INTRO-VERSION-001",
+      "project_id": "00000000-0000-4000-8000-000000000002",
+      "lesson_id": "00000000-0000-4000-8000-000000000101",
+      "intro_selection_id": "00000000-0000-4000-8000-000000000171",
+      "intro_option_set_version_id": "00000000-0000-4000-8000-000000000151",
       "selected_option_key": "INTRO-INDEPENDENT-001"
     },
     {
-      "project_id": "PROJECT-FREEZE-001",
-      "lesson_id": "LESSON-FREEZE-002",
-      "intro_selection_id": "INTRO-SELECTION-002",
-      "intro_option_set_version_id": "ARTIFACT-INTRO-VERSION-002",
+      "project_id": "00000000-0000-4000-8000-000000000002",
+      "lesson_id": "00000000-0000-4000-8000-000000000102",
+      "intro_selection_id": "00000000-0000-4000-8000-000000000172",
+      "intro_option_set_version_id": "00000000-0000-4000-8000-000000000152",
       "selected_option_key": "INTRO-APPLICATION-002"
     }
   ],
