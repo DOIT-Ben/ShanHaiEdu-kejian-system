@@ -1,0 +1,15 @@
+{
+  "source_fixture": "contracts/fixtures/contract-freeze/primary-math-two-lessons.json",
+  "handoffs": [
+    {
+      "lesson_id": "LESSON-FREEZE-001",
+      "ppt_input": "ARTIFACT-LESSON-PLAN-VERSION-001",
+      "video_input": "INTRO-SELECTION-001"
+    },
+    {
+      "lesson_id": "LESSON-FREEZE-002",
+      "ppt_input": "ARTIFACT-LESSON-PLAN-VERSION-002",
+      "video_input": "INTRO-SELECTION-002"
+    }
+  ]
+}
