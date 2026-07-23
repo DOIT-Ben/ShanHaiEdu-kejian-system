@@ -111,12 +111,7 @@ def main() -> int:
     try:
         changed_paths = _changed_paths(args.base, args.head)
         errors = validate_changed_paths(_load_leases(), track_key, changed_paths)
-    except (
-        json.JSONDecodeError,
-        KeyError,
-        OSError,
-        subprocess.CalledProcessError,
-    ) as exc:
+    except (json.JSONDecodeError, KeyError, OSError, subprocess.CalledProcessError) as exc:
         print(f"error: development lease validation failed: {exc}", file=sys.stderr)
         return 1
 
