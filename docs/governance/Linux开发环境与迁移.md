@@ -352,7 +352,7 @@ bash infra/dev/compose.sh exec workspace bash infra/dev/verify.sh
 
 ```bash
 bash infra/dev/compose.sh exec workspace bash
-bash infra/dev/compose.sh exec workspace uv run uvicorn apps.api.main:app --host 0.0.0.0 --port 8000
+bash infra/dev/compose.sh exec workspace uv run uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --no-proxy-headers
 ```
 
 停止容器但保留开发数据卷：

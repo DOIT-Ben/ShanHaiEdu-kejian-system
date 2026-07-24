@@ -28,7 +28,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `uv run uvicorn apps.api.main:app --host 127.0.0.1 --port ${String(apiPort)}`,
+      command: `uv run uvicorn apps.api.main:app --host 127.0.0.1 --port ${String(apiPort)} --no-proxy-headers`,
       cwd: repositoryRoot,
       env: {
         ...process.env,

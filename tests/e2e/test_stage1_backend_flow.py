@@ -120,6 +120,7 @@ def start_live_api(app) -> tuple[uvicorn.Server, threading.Thread, str]:
             port=port,
             log_level="error",
             lifespan="off",
+            proxy_headers=False,
         )
     )
     thread = threading.Thread(target=server.run, name="stage1-e2e-api", daemon=True)
