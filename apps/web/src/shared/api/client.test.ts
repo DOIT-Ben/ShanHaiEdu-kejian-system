@@ -96,7 +96,10 @@ describe("typed api client", () => {
 
   it("业务请求收到 401 时通知 Session Provider 立即失效", async () => {
     const onUnauthorized = vi.fn();
-    configureUnauthorizedHandler(onUnauthorized);
+    configureUnauthorizedHandler({
+      captureEpoch: () => 7,
+      invalidateIfCurrent: onUnauthorized,
+    });
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
@@ -115,12 +118,15 @@ describe("typed api client", () => {
     );
 
     await apiClient.GET("/projects");
-    expect(onUnauthorized).toHaveBeenCalledOnce();
+    expect(onUnauthorized).toHaveBeenCalledWith(7);
   });
 
   it("Session 生命周期请求的 401 只交给 Provider 按世代处理", async () => {
     const onUnauthorized = vi.fn();
-    configureUnauthorizedHandler(onUnauthorized);
+    configureUnauthorizedHandler({
+      captureEpoch: () => 7,
+      invalidateIfCurrent: onUnauthorized,
+    });
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(

@@ -41,6 +41,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const [status, setStatus] = useState<SessionStatus>("loading");
   const sessionRef = useRef<CurrentSession | null>(null);
   const operationEpochRef = useRef(0);
+  const sessionEpochRef = useRef(0);
 
   const beginOperation = useCallback(() => {
     operationEpochRef.current += 1;
@@ -53,6 +54,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   );
 
   const updateSession = useCallback((next: CurrentSession | null) => {
+    sessionEpochRef.current += 1;
     sessionRef.current = next;
     setSession(next);
     setStatus(next ? "authenticated" : "anonymous");
@@ -110,7 +112,12 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     configureCsrfTokenProvider(() => sessionRef.current?.csrf_token);
-    configureUnauthorizedHandler(markAnonymous);
+    configureUnauthorizedHandler({
+      captureEpoch: () => sessionEpochRef.current,
+      invalidateIfCurrent: (epoch) => {
+        if (epoch === sessionEpochRef.current) markAnonymous();
+      },
+    });
     void refresh().catch(() => undefined);
     return () => {
       configureCsrfTokenProvider(null);

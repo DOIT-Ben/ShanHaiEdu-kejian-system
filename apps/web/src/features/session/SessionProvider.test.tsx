@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SessionProvider, useSession } from "@/features/session/SessionProvider";
-import { ApiError, isCsrfTokenAvailable } from "@/shared/api/client";
+import { ApiError, apiClient, isCsrfTokenAvailable } from "@/shared/api/client";
 
 const apiMocks = vi.hoisted(() => ({
   createTeacherSession: vi.fn(),
@@ -26,6 +26,26 @@ const currentSession = {
   session_id: "01960000-0000-7000-8000-000000000004",
 };
 
+const replacementSession = {
+  ...currentSession,
+  principal: { ...currentSession.principal, display_name: "李老师" },
+  session_id: "01960000-0000-7000-8000-000000000005",
+};
+
+function authenticationRequiredResponse() {
+  return new Response(
+    JSON.stringify({
+      error: {
+        code: "AUTHENTICATION_REQUIRED",
+        message: "Authentication is required.",
+        retryable: false,
+      },
+      request_id: "req-stale-business",
+    }),
+    { headers: { "Content-Type": "application/json" }, status: 401 },
+  );
+}
+
 function SessionProbe() {
   const { login, logout, session, status } = useSession();
   return (
@@ -45,6 +65,7 @@ function SessionProbe() {
 describe("SessionProvider", () => {
   afterEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("从真实 API 恢复会话、提供 CSRF，并在登出后清空", async () => {
@@ -103,5 +124,37 @@ describe("SessionProvider", () => {
 
     await waitFor(() => expect(screen.getByText("authenticated")).toBeVisible());
     expect(screen.getByText("王老师")).toBeVisible();
+  });
+
+  it("忽略旧会话业务请求在新登录后返回的迟到 401", async () => {
+    let resolveBusinessRequest: (response: Response) => void = () => undefined;
+    const fetchMock = vi.fn().mockReturnValue(
+      new Promise<Response>((resolve) => {
+        resolveBusinessRequest = resolve;
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    apiMocks.getCurrentSession.mockResolvedValue(currentSession);
+    apiMocks.createTeacherSession.mockResolvedValue(replacementSession);
+    const user = userEvent.setup();
+
+    render(
+      <SessionProvider>
+        <SessionProbe />
+      </SessionProvider>,
+    );
+
+    expect(await screen.findByText("王老师")).toBeVisible();
+    const staleBusinessRequest = apiClient.GET("/projects");
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+
+    await user.click(screen.getByRole("button", { name: "login" }));
+    expect(await screen.findByText("李老师")).toBeVisible();
+
+    resolveBusinessRequest(authenticationRequiredResponse());
+    await staleBusinessRequest;
+
+    await waitFor(() => expect(screen.getByText("authenticated")).toBeVisible());
+    expect(screen.getByText("李老师")).toBeVisible();
   });
 });

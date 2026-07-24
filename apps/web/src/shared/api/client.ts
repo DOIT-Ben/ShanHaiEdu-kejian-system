@@ -21,7 +21,15 @@ export class ApiError extends Error {
 }
 
 type CsrfTokenProvider = () => string | null | undefined;
-type UnauthorizedHandler = () => void;
+type UnauthorizedHandler = {
+  captureEpoch: () => number;
+  invalidateIfCurrent: (epoch: number) => void;
+};
+
+type RequestAuthorizationContext = {
+  handler: UnauthorizedHandler;
+  epoch: number;
+};
 
 type MiddlewareManagedHeader<Header> = Omit<Header, "X-CSRF-Token"> &
   Partial<Pick<Header, Extract<keyof Header, "X-CSRF-Token">>>;
@@ -50,6 +58,7 @@ type OpenApiResult<T> = {
 
 let csrfTokenProvider: CsrfTokenProvider | null = null;
 let unauthorizedHandler: UnauthorizedHandler | null = null;
+const requestAuthorizationContexts = new WeakMap<Request, RequestAuthorizationContext>();
 
 /** Installs the CSRF token reader supplied by the real authentication bootstrap. */
 export function configureCsrfTokenProvider(provider: CsrfTokenProvider | null) {
@@ -170,13 +179,23 @@ const requestMiddleware: Middleware = {
   onRequest({ request }) {
     request.headers.set("Accept", "application/json");
     addCsrfToken(request);
+    const handler = unauthorizedHandler;
+    if (handler) {
+      requestAuthorizationContexts.set(request, {
+        epoch: handler.captureEpoch(),
+        handler,
+      });
+    }
     return request;
   },
 };
 
 const responseMiddleware: Middleware = {
   onResponse({ request, response }) {
-    if (response.status === 401 && !isSessionLifecycleRequest(request)) unauthorizedHandler?.();
+    if (response.status === 401 && !isSessionLifecycleRequest(request)) {
+      const context = requestAuthorizationContexts.get(request);
+      context?.handler.invalidateIfCurrent(context.epoch);
+    }
     return response;
   },
 };
