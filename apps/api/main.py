@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session, sessionmaker
@@ -76,6 +78,7 @@ def create_app(
     app.include_router(jobs_router)
     app.include_router(workflows_router)
     _include_health_routes(app, resolved_settings, readiness_provider)
+    _configure_openapi_security_contract(app)
     return app
 
 
@@ -134,6 +137,53 @@ def _include_health_routes(
             status_code=200 if report.ready else 503,
             content={"data": report.as_dict(), "request_id": request.state.request_id},
         )
+
+
+def _configure_openapi_security_contract(app: FastAPI) -> None:
+    generated_openapi = app.openapi
+
+    def openapi_with_session_security() -> dict[str, Any]:
+        schema = generated_openapi()
+        components = cast(dict[str, Any], schema.setdefault("components", {}))
+        security_schemes = cast(dict[str, Any], components.setdefault("securitySchemes", {}))
+        security_schemes["BrowserOrigin"] = {
+            "type": "apiKey",
+            "in": "header",
+            "name": "Origin",
+            "description": (
+                "Browser-controlled request origin. User agents attach this header; "
+                "application callers must not synthesize it from user input."
+            ),
+        }
+        security_schemes["CsrfToken"] = {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "description": (
+                "Server-issued token bound to the current session and injected by the web client."
+            ),
+        }
+        schema["security"] = [{"cookieAuth": []}]
+        paths = cast(dict[str, dict[str, Any]], schema.get("paths", {}))
+        for path_item in paths.values():
+            for method, operation_value in path_item.items():
+                if not isinstance(operation_value, dict):
+                    continue
+                operation = cast(dict[str, Any], operation_value)
+                operation_id = operation.get("operationId")
+                if operation_id in {"getLiveness", "getReadiness"}:
+                    operation["security"] = []
+                elif operation_id == "createSession":
+                    operation["security"] = [{"BrowserOrigin": []}]
+                elif method in {"post", "put", "patch", "delete"}:
+                    operation["security"] = [
+                        {"BrowserOrigin": [], "CsrfToken": [], "cookieAuth": []}
+                    ]
+                elif method in {"get", "head", "options"}:
+                    operation["security"] = [{"cookieAuth": []}]
+        return schema
+
+    app.openapi = openapi_with_session_security
 
 
 app = create_app()

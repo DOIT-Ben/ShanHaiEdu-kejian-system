@@ -105,7 +105,7 @@ class DatabaseSessionService:
                 if throttle is not None:
                     database.delete(throttle)
                 identity = self._load_configured_identity(database)
-                rotated_from = self._find_active_session(database, existing_token, now)
+                rotated_from = self._lock_active_session(database, existing_token, now)
                 if rotated_from is not None:
                     rotated_from.revoked_at = now
                 raw_token = token_urlsafe(48)
@@ -138,15 +138,13 @@ class DatabaseSessionService:
 
     def resolve_snapshot(self, session_token: str) -> SessionSnapshot | None:
         now = utc_now()
-        with self._factory() as database, database.begin():
+        with self._factory() as database:
             persisted = self._find_active_session(database, session_token, now)
             if persisted is None:
                 return None
             identity = self._load_session_identity(database, persisted)
             if identity is None:
-                persisted.revoked_at = now
                 return None
-            persisted.last_seen_at = now
             return self._snapshot(persisted, identity)
 
     def require_snapshot(self, session_token: str | None) -> SessionSnapshot:
@@ -160,7 +158,7 @@ class DatabaseSessionService:
             raise authentication_required()
         now = utc_now()
         with self._factory() as database, database.begin():
-            persisted = self._find_active_session(database, session_token, now)
+            persisted = self._lock_active_session(database, session_token, now)
             if persisted is None:
                 raise authentication_required()
             persisted.revoked_at = now
@@ -202,20 +200,28 @@ class DatabaseSessionService:
         database: OrmSession,
         raw_token: str | None,
         now: datetime,
+        *,
+        for_update: bool = False,
     ) -> Session | None:
         if not raw_token:
             return None
-        persisted = database.scalar(
-            select(Session)
-            .where(Session.token_hash == self._token_hash(raw_token))
-            .with_for_update()
-        )
+        statement = select(Session).where(Session.token_hash == self._token_hash(raw_token))
+        if for_update:
+            statement = statement.with_for_update()
+        persisted = database.scalar(statement)
         if persisted is None or persisted.revoked_at is not None:
             return None
         if persisted.expires_at <= now:
-            persisted.revoked_at = now
             return None
         return persisted
+
+    def _lock_active_session(
+        self,
+        database: OrmSession,
+        raw_token: str | None,
+        now: datetime,
+    ) -> Session | None:
+        return self._find_active_session(database, raw_token, now, for_update=True)
 
     def _load_configured_identity(self, database: OrmSession) -> _IdentityRow:
         row = self._load_identity(database, self._principal_id)

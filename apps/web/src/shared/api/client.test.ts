@@ -94,7 +94,7 @@ describe("typed api client", () => {
     expect(request.headers.has("X-CSRF-Token")).toBe(false);
   });
 
-  it("收到 401 时通知 Session Provider 立即失效", async () => {
+  it("业务请求收到 401 时通知 Session Provider 立即失效", async () => {
     const onUnauthorized = vi.fn();
     configureUnauthorizedHandler(onUnauthorized);
     vi.stubGlobal(
@@ -114,8 +114,32 @@ describe("typed api client", () => {
       ),
     );
 
-    await apiClient.GET("/auth/session");
+    await apiClient.GET("/projects");
     expect(onUnauthorized).toHaveBeenCalledOnce();
+  });
+
+  it("Session 生命周期请求的 401 只交给 Provider 按世代处理", async () => {
+    const onUnauthorized = vi.fn();
+    configureUnauthorizedHandler(onUnauthorized);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            error: {
+              code: "AUTHENTICATION_REQUIRED",
+              message: "Authentication is required.",
+              retryable: false,
+            },
+            request_id: "req-session-auth",
+          },
+          { status: 401 },
+        ),
+      ),
+    );
+
+    await apiClient.GET("/auth/session");
+    expect(onUnauthorized).not.toHaveBeenCalled();
   });
 
   it("保留 credentials、幂等键、If-Match、CSRF 与 ETag", async () => {

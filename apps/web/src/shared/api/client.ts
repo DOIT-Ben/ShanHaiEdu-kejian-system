@@ -108,7 +108,10 @@ function isWriteMethod(method: string) {
 }
 
 function isSessionBootstrapRequest(request: Request) {
-  if (request.method.toUpperCase() !== "POST") return false;
+  return request.method.toUpperCase() === "POST" && isSessionLifecycleRequest(request);
+}
+
+function isSessionLifecycleRequest(request: Request) {
   const baseUrl = new URL(resolveBaseUrl(apiConfig.baseUrl));
   const expectedPath = `${baseUrl.pathname.replace(/\/$/, "")}/auth/session`;
   const requestUrl = new URL(request.url);
@@ -153,8 +156,8 @@ const requestMiddleware: Middleware = {
 };
 
 const responseMiddleware: Middleware = {
-  onResponse({ response }) {
-    if (response.status === 401) unauthorizedHandler?.();
+  onResponse({ request, response }) {
+    if (response.status === 401 && !isSessionLifecycleRequest(request)) unauthorizedHandler?.();
     return response;
   },
 };

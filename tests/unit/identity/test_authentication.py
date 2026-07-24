@@ -43,14 +43,17 @@ def test_runtime_openapi_declares_cookie_security_on_protected_routes() -> None:
     assert scheme["in"] == "cookie"
     assert scheme["name"] == "shanhai_session"
 
-    for operation_id in (
+    write_operations = {
         "createProject",
-        "listProjects",
-        "getProject",
         "createMaterialUploadSession",
         "confirmMaterialUpload",
-        "getGenerationJob",
         "cancelGenerationJob",
+    }
+    for operation_id in (
+        *write_operations,
+        "listProjects",
+        "getProject",
+        "getGenerationJob",
         "streamGenerationJobEvents",
         "streamProjectEvents",
     ):
@@ -60,4 +63,9 @@ def test_runtime_openapi_declares_cookie_security_on_protected_routes() -> None:
             for operation in path_item.values()
             if operation.get("operationId") == operation_id
         )
-        assert operation["security"] == [{"cookieAuth": []}]
+        expected = (
+            [{"BrowserOrigin": [], "CsrfToken": [], "cookieAuth": []}]
+            if operation_id in write_operations
+            else [{"cookieAuth": []}]
+        )
+        assert operation["security"] == expected

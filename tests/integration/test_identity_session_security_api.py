@@ -210,6 +210,10 @@ async def test_expired_session_is_rejected(migrated_database_url: str) -> None:
             expired = await client.get("/api/v2/auth/session")
         assert expired.status_code == 401
         assert expired.json()["error"]["code"] == "AUTHENTICATION_REQUIRED"
+        with factory() as session:
+            persisted = session.scalar(select(IdentitySession))
+            assert persisted is not None
+            assert persisted.revoked_at is None
     finally:
         app.state.database_engine.dispose()
 
@@ -261,6 +265,10 @@ async def test_session_rejects_cross_tenant_facts(migrated_database_url: str) ->
             tampered = await client.get("/api/v2/auth/session")
         assert tampered.status_code == 401
         assert tampered.json()["error"]["code"] == "AUTHENTICATION_REQUIRED"
+        with factory() as session:
+            persisted = session.scalar(select(IdentitySession))
+            assert persisted is not None
+            assert persisted.revoked_at is None
     finally:
         app.state.database_engine.dispose()
 

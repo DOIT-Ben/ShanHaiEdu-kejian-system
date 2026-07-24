@@ -123,6 +123,43 @@ async def test_current_session_returns_public_principal_and_csrf(
             restarted.state.database_engine.dispose()
 
 
+async def test_safe_session_reads_do_not_mutate_persisted_session(
+    migrated_database_url: str,
+) -> None:
+    access_code = token_urlsafe(32)
+    settings = runtime_settings(
+        migrated_database_url,
+        access_code=access_code,
+        csrf_secret=token_urlsafe(48),
+    )
+    app = create_app(settings=settings)
+    seed_teacher(app)
+    factory = build_session_factory(app.state.database_engine)
+    try:
+        client, _ = session_client(app)
+        async with client:
+            created = await login(client, access_code)
+            assert created.status_code == 201, created.text
+            with factory() as session:
+                persisted = session.scalar(select(IdentitySession))
+                assert persisted is not None
+                initial_last_seen_at = persisted.last_seen_at
+                assert persisted.revoked_at is None
+
+            first = await client.get("/api/v2/auth/session")
+            second = await client.get("/api/v2/auth/session")
+
+        assert first.status_code == 200, first.text
+        assert second.status_code == 200, second.text
+        with factory() as session:
+            persisted = session.scalar(select(IdentitySession))
+            assert persisted is not None
+            assert persisted.last_seen_at == initial_last_seen_at
+            assert persisted.revoked_at is None
+    finally:
+        app.state.database_engine.dispose()
+
+
 async def test_logout_revokes_session(migrated_database_url: str) -> None:
     access_code = token_urlsafe(32)
     settings = runtime_settings(

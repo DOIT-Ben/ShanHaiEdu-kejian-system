@@ -7,10 +7,14 @@ const diffResult = spawnSync("git", ["diff", "--name-only", "HEAD", "--", ...gen
   cwd: repositoryRoot,
   encoding: "utf8",
 });
-const untrackedResult = spawnSync("git", ["ls-files", "--others", "--", ...generatedPaths], {
-  cwd: repositoryRoot,
-  encoding: "utf8",
-});
+const untrackedResult = spawnSync(
+  "git",
+  ["ls-files", "--others", "--exclude-standard", "--", ...generatedPaths],
+  {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+  },
+);
 
 if (
   diffResult.error ||

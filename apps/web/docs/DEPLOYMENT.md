@@ -58,6 +58,26 @@ VITE_RELEASE_VERSION=<发布标识>
 
 不要把 `.env.local`、真实教材、签名上传或下载地址、服务密钥、DEV fixture 或开发凭据复制到产物目录。浏览器不得持有模型 Provider 密钥。
 
+后端 Session 启动配置必须通过部署环境或 Secret Manager 注入，不能进入前端构建参数。Pydantic 使用 `SHANHAI_` 前缀读取以下变量；数组必须是 JSON，布尔值使用 `true`/`false`：
+
+```text
+SHANHAI_SESSION_ACCESS_CODE=<至少24字符的受控秘密>
+SHANHAI_SESSION_CSRF_SECRET=<至少32字符的随机秘密>
+SHANHAI_SESSION_TEACHER_PRINCIPAL_ID=01960000-0000-7000-8000-000000000002
+SHANHAI_SESSION_ALLOWED_ORIGINS=["https://teacher.example.edu"]
+SHANHAI_SESSION_COOKIE_SECURE=true
+SHANHAI_SESSION_TTL_SECONDS=3600
+SHANHAI_SESSION_LOGIN_MAX_FAILURES=5
+SHANHAI_SESSION_LOGIN_WINDOW_SECONDS=300
+SHANHAI_SESSION_TRUSTED_PROXY_HOSTS=["10.0.0.0/8","192.0.2.10"]
+```
+
+- `SHANHAI_SESSION_ACCESS_CODE`、`SHANHAI_SESSION_CSRF_SECRET`、`SHANHAI_SESSION_TEACHER_PRINCIPAL_ID` 和 `SHANHAI_SESSION_ALLOWED_ORIGINS` 必须同时配置；生产环境缺少任一项会拒绝启动。
+- `SHANHAI_SESSION_ALLOWED_ORIGINS` 只接受精确 HTTP(S) origin，不接受路径、查询、凭据或通配符；多域名以 JSON 数组逐项列出。
+- 生产环境 `SHANHAI_SESSION_COOKIE_SECURE` 必须保持 `true`；仅本地明文 HTTP 联调可显式设为 `false`。
+- `SHANHAI_SESSION_TTL_SECONDS` 范围为 300–604800；`SHANHAI_SESSION_LOGIN_MAX_FAILURES` 范围为 1–100，`SHANHAI_SESSION_LOGIN_WINDOW_SECONDS` 范围为 10–3600 秒。
+- `SHANHAI_SESSION_TRUSTED_PROXY_HOSTS` 只列部署方控制的代理 IP 或 CIDR。边缘代理必须覆盖而不是追加来自公网的 `X-Forwarded-For`，未列入该数组的直连来源不会被信任。
+
 ## 发布前置条件
 
 进入生产部署前必须同时满足：

@@ -40,6 +40,17 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<CurrentSession | null>(null);
   const [status, setStatus] = useState<SessionStatus>("loading");
   const sessionRef = useRef<CurrentSession | null>(null);
+  const operationEpochRef = useRef(0);
+
+  const beginOperation = useCallback(() => {
+    operationEpochRef.current += 1;
+    return operationEpochRef.current;
+  }, []);
+
+  const isCurrentOperation = useCallback(
+    (epoch: number) => operationEpochRef.current === epoch,
+    [],
+  );
 
   const updateSession = useCallback((next: CurrentSession | null) => {
     sessionRef.current = next;
@@ -47,12 +58,18 @@ export function SessionProvider({ children }: PropsWithChildren) {
     setStatus(next ? "authenticated" : "anonymous");
   }, []);
 
-  const markAnonymous = useCallback(() => updateSession(null), [updateSession]);
+  const markAnonymous = useCallback(() => {
+    beginOperation();
+    updateSession(null);
+  }, [beginOperation, updateSession]);
 
   const refresh = useCallback(async () => {
+    const epoch = beginOperation();
     try {
-      updateSession(await getCurrentSession());
+      const next = await getCurrentSession();
+      if (isCurrentOperation(epoch)) updateSession(next);
     } catch (reason) {
+      if (!isCurrentOperation(epoch)) return;
       if (isAnonymousSessionError(reason)) {
         markAnonymous();
         return;
@@ -60,30 +77,36 @@ export function SessionProvider({ children }: PropsWithChildren) {
       setStatus("unavailable");
       throw reason;
     }
-  }, [markAnonymous, updateSession]);
+  }, [beginOperation, isCurrentOperation, markAnonymous, updateSession]);
 
   const login = useCallback(
-    async (accessCode: string) => updateSession(await createTeacherSession(accessCode)),
-    [updateSession],
+    async (accessCode: string) => {
+      const epoch = beginOperation();
+      const next = await createTeacherSession(accessCode);
+      if (isCurrentOperation(epoch)) updateSession(next);
+    },
+    [beginOperation, isCurrentOperation, updateSession],
   );
 
   const logout = useCallback(async () => {
+    const epoch = beginOperation();
     const current = sessionRef.current;
     if (current === null) {
-      markAnonymous();
+      if (isCurrentOperation(epoch)) updateSession(null);
       return;
     }
     try {
       await deleteCurrentSession(current.csrf_token);
-      markAnonymous();
+      if (isCurrentOperation(epoch)) updateSession(null);
     } catch (reason) {
+      if (!isCurrentOperation(epoch)) return;
       if (isAnonymousSessionError(reason)) {
         markAnonymous();
         return;
       }
       throw reason;
     }
-  }, [markAnonymous]);
+  }, [beginOperation, isCurrentOperation, markAnonymous, updateSession]);
 
   useEffect(() => {
     configureCsrfTokenProvider(() => sessionRef.current?.csrf_token);
