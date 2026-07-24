@@ -1,8 +1,8 @@
 # 当前项目状态
 
-当前阶段：阶段1教师可见R1纵向链已经从最新`main`建立#11唯一分支，正在创建Draft PR；Contract Change尚未确认。
+当前阶段：阶段1教师可见R1纵向链已经进入#11唯一Draft PR的Contract Change审计；业务实现尚未开始。
 > 最后核验：2026-07-25。
-> 当前唯一P0：[Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)；在Draft PR创建和任务标签校准前保持`status:blocked`。
+> 当前唯一P0：[Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)，状态为`status:in-progress`。
 
 ## 当前可演示成果
 
@@ -25,8 +25,8 @@
 
 ## 当前工作
 
-- 历史竞争PR已经全部关闭；当前没有开放的R1业务实现PR。
-- [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)是唯一业务主线；`feat/11-real-teacher-r1`已经从最新`origin/main`建立，当前只创建新的Draft PR并核对Contract Change，不恢复PR #208或其分支。
+- 历史竞争PR已经全部关闭；[PR #222](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/222)是当前唯一R1业务Draft PR。
+- [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)是唯一业务主线；`feat/11-real-teacher-r1`已经从最新`origin/main`建立，当前只核对Contract Change，不恢复PR #208或其分支。
 - #11的第一个原子动作是先确认最小Contract Change：`startNodeRun`返回`202 AcceptedJob`并绑定现有Job/Worker/SSE；教材范围合法修订及质量阶段到`reviewArtifactVersion`的正式HTTP顺序必须同时明确，合同未确认前不得自造接口。
 
 ## 当前阻塞
@@ -34,12 +34,12 @@
 - 当前没有已知的Session/CSRF实现阻塞；#211已经合并、关闭并从最新`main`复验。
 - 当前没有竞争修改Session、active OpenAPI、生成客户端或`apps/web`公共入口的开放业务PR；#208、#209、#212和#215均已关闭。
 - 阶段1完整教师R1纵向链尚未验收；教材列表与范围修订、异步节点启动、质量/批准HTTP闭环、生产页面消费者、真实文本Provider和R1 real API Playwright仍是#11待实现事实。
-- #11的Draft PR和最小Contract Change入口尚未建立；在此之前不开始业务实现、PPT、图片、视频、TTS或新的治理框架，也不竞争修改active OpenAPI、生成客户端、Artifact/Job公共合同、Workflow Binding、Model Gateway或前端公共Session入口。
+- #11的最小Contract Change尚未确认；在此之前不开始业务实现、PPT、图片、视频、TTS或新的治理框架，也不竞争修改active OpenAPI、生成客户端、Artifact/Job公共合同、Workflow Binding、Model Gateway或前端公共Session入口。
 
 ## 下一个阶段出口
 
-1. 为`feat/11-real-teacher-r1`创建新的Draft PR，将Issue #11转回`status:in-progress`。
-2. 先在#11/#210确认异步`startNodeRun`、教材范围修订和质量/批准HTTP顺序的最小Contract Change，再同步active OpenAPI、FastAPI和生成客户端。
+1. 在#11/#210确认异步`startNodeRun`、教材范围修订和质量/批准HTTP顺序的最小Contract Change。
+2. 先补失败合同测试，再同步active OpenAPI、FastAPI和生成客户端。
 3. 只推进“真实登录 -> 项目 -> 教材与物理页 -> 课时划分 -> LessonUnit -> 十二部分教案 -> 三类九套 -> 批准 -> 唯一IntroSelection -> 刷新恢复”的生产页面、PostgreSQL、Job/Worker/SSE、真实Provider和real API Playwright闭环。
 4. 以PostgreSQL集成测试、real API Playwright、delivery slice和受控真实文本Provider验收完整R1；在此之前不恢复媒体线。
 
@@ -48,4 +48,4 @@
 1. 先读`README.md`、`AGENTS.md`、`docs/governance/项目记忆与接手索引.md`和本文件。
 2. #217和PR #219已经完成并清理；不要从旧PR恢复实现，也不要把历史矩阵当作可直接合并的代码。
 3. #211的当前运行证据以`main`中的代码、迁移、测试、active OpenAPI和`contracts/delivery-slices/211-runtime-auth.yaml`为准；PR #216保留合并前CI与独立审查证据。
-4. PR #208已经关闭且不得恢复；#11唯一分支已经绑定最新`origin/main`，Draft PR创建前不得开始业务实现。
+4. PR #208已经关闭且不得恢复；PR #222当前只包含任务状态同步，Contract Change确认前不得开始业务实现。
