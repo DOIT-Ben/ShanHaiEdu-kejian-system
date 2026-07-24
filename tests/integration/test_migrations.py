@@ -54,6 +54,8 @@ EXPECTED_TABLES = {
     "generation_attempts",
     "generation_attempt_counters",
     "idempotency_records",
+    "identity_session_login_throttles",
+    "identity_sessions",
     "intro_selections",
     "lesson_branch_configs",
     "lesson_units",
@@ -230,7 +232,7 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
         column["name"] for column in database_inspector.get_columns("node_execution_leases")
     }
     assert {"node_run_id", "owner_token", "lease_expires_at"}.issubset(lease_columns)
-    assert ScriptDirectory.from_config(config).get_current_head() == "k5f6a7b8c910"
+    assert ScriptDirectory.from_config(config).get_current_head() == "l6g7h8i9j012"
     previous = os.environ.get("SHANHAI_DATABASE_URL")
     os.environ["SHANHAI_DATABASE_URL"] = postgres_database_url
     try:

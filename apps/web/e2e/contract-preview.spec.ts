@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import axe from "axe-core";
+import { loginAsTeacher } from "./support/auth";
 
 const projectId = "01960000-0000-7000-8000-000000000001";
 const lessonId = "01960000-0000-7000-8000-000000000101";
@@ -8,14 +9,6 @@ const viewports = [
   { height: 768, width: 1024 },
   { height: 844, width: 390 },
 ] as const;
-
-async function enterWorkspace(page: Page) {
-  await page.goto("/login");
-  await expect(page.getByRole("heading", { name: "使用学校账户进入" })).toBeVisible();
-  await page.getByRole("link", { name: "返回课堂工作区" }).click();
-  await expect(page).toHaveURL(/\/app\/projects$/);
-  await expect(page.getByRole("heading", { name: "我的项目" })).toBeVisible();
-}
 
 async function assertNoHorizontalOverflow(page: Page) {
   const dimensions = await page.evaluate(() => ({
@@ -41,15 +34,15 @@ for (const viewport of viewports) {
     page,
   }) => {
     await page.setViewportSize(viewport);
-    await enterWorkspace(page);
+    await loginAsTeacher(page, "/app/projects");
     await expect(page.getByTestId("project-row").first()).toContainText("认识百分数");
     await assertNoHorizontalOverflow(page);
 
-    await page.goto(`/app/projects/${projectId}`);
+    await loginAsTeacher(page, `/app/projects/${projectId}`);
     await expect(page.getByRole("heading", { name: "认识百分数" }).first()).toBeVisible();
     await assertNoHorizontalOverflow(page);
 
-    await page.goto(`/app/projects/${projectId}/lessons/${lessonId}/work/lesson_plan`);
+    await loginAsTeacher(page, `/app/projects/${projectId}/lessons/${lessonId}/work/lesson_plan`);
     await expect(page.getByText("百分数的意义", { exact: true }).first()).toBeVisible();
     await expect(page.getByRole("main")).not.toContainText("lesson_plan");
     await assertNoHorizontalOverflow(page);
@@ -57,17 +50,20 @@ for (const viewport of viewports) {
   });
 }
 
-test("登录缺口保持安全阻断且不展示开发账号", async ({ page }) => {
+test("登录页只通过受控访问码建立合同预览会话", async ({ page }) => {
   await page.goto("/login");
-  await expect(page.getByRole("heading", { name: "使用学校账户进入" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "进入山海教育" })).toBeVisible();
   await expect(page.getByLabel("账号")).toHaveCount(0);
   await expect(page.getByLabel("密码")).toHaveCount(0);
   await expect(page.getByText(/demo|test|mock/i)).toHaveCount(0);
   await assertBasicAccessibility(page);
+  await page.getByLabel("学校访问码").fill("placeholder-contract-access-code");
+  await page.getByRole("button", { name: "登录" }).click();
+  await expect(page).toHaveURL(/\/app\/projects$/);
 });
 
 test("未覆盖的 Runtime API 请求被合同预览严格拒绝", async ({ page }) => {
-  await enterWorkspace(page);
+  await loginAsTeacher(page, "/app/projects");
   const result = await page.evaluate(async () => {
     try {
       const response = await fetch("/api/v2/not-in-runtime-contract");

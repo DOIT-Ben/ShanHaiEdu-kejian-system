@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from uuid import UUID
 
 import pytest
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 
 from apps.api.database import sqlalchemy_url
 from apps.api.settings import Settings
@@ -76,6 +77,25 @@ def test_production_requires_object_storage_credentials() -> None:
             object_storage_endpoint=None,
             object_storage_access_key=None,
             object_storage_secret_key=None,
+        )
+
+
+def test_production_rejects_insecure_session_cookie_configuration() -> None:
+    with pytest.raises(ValidationError, match="session cookies must remain secure"):
+        Settings(
+            _env_file=None,
+            environment="production",
+            database_url="postgresql://database.example/shanhai",
+            redis_url="redis://redis.example/0",
+            object_storage_health_url="https://storage.example/health/ready",
+            object_storage_endpoint="storage.example",
+            object_storage_access_key=SecretStr("test-only-access-key"),
+            object_storage_secret_key=SecretStr("test-only-secret-key"),
+            session_access_code=SecretStr("x" * 24),
+            session_csrf_secret=SecretStr("y" * 32),
+            session_teacher_principal_id=UUID("01960000-0000-7000-8000-000000000001"),
+            session_allowed_origins=["https://teacher.example"],
+            session_cookie_secure=False,
         )
 
 

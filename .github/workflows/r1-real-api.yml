@@ -1,0 +1,112 @@
+name: r1-real-api
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r1-real-api-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtime-auth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16.14-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+        env:
+          POSTGRES_USER: shanhai
+          POSTGRES_PASSWORD: shanhai-ci-only
+          POSTGRES_DB: shanhai_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U shanhai -d shanhai_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+      redis:
+        image: redis:7.4.9-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      SHANHAI_DATABASE_URL: postgresql://shanhai:shanhai-ci-only@127.0.0.1:5432/shanhai_test
+      SHANHAI_E2E_API_BASE_URL: http://127.0.0.1:58080/api/v2
+      SHANHAI_E2E_API_PORT: "58080"
+      SHANHAI_E2E_WEB_PORT: "44177"
+      SHANHAI_SESSION_ALLOWED_ORIGINS: '["http://127.0.0.1:44177"]'
+      VITE_API_BASE_URL: http://127.0.0.1:58080/api/v2
+      VITE_API_MODE: real
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.10.6"
+          enable-cache: true
+          python-version: "3.12"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: |
+          uv sync --frozen
+          pnpm install --frozen-lockfile
+          pnpm --dir apps/web exec playwright install --with-deps chromium
+
+      - name: Generate ephemeral authentication configuration
+        shell: python
+        run: |
+          import os
+          import secrets
+          import uuid
+
+          access_code = secrets.token_urlsafe(32)
+          values = {
+              "SHANHAI_E2E_ACCESS_CODE": access_code,
+              "SHANHAI_E2E_TEACHER_MEMBER_ID": str(uuid.uuid4()),
+              "SHANHAI_E2E_TEACHER_USER_ID": str(uuid.uuid4()),
+              "SHANHAI_SESSION_ACCESS_CODE": access_code,
+              "SHANHAI_SESSION_CSRF_SECRET": secrets.token_urlsafe(48),
+              "SHANHAI_SESSION_TEACHER_PRINCIPAL_ID": str(uuid.uuid4()),
+          }
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as output:
+              for name, value in values.items():
+                  print(f"::add-mask::{value}")
+                  output.write(f"{name}={value}\n")
+
+      - name: Migrate and seed the controlled teacher
+        run: |
+          uv run alembic upgrade head
+          uv run python scripts/seed_runtime_auth_e2e.py
+
+      - name: Build the production frontend
+        run: pnpm --dir apps/web build
+
+      - name: Run exact delivery slice selectors
+        run: uv run python scripts/run_delivery_slice_tests.py
+
+      - name: Verify the migration cycle
+        run: uv run pytest tests/integration/test_migrations.py::test_empty_database_upgrade_downgrade_upgrade

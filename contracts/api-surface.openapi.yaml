@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ShanHaiEdu Core Integration Surface
-  version: 3.0.0
+  version: 3.1.0
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
@@ -47,6 +47,65 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReadinessEnvelope'
         '4XX':
+          $ref: '#/components/responses/Error'
+  /auth/session:
+    post:
+      summary: 使用受控访问码建立教师会话
+      operationId: createSession
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+      responses:
+        '201':
+          description: Session created and returned in a Secure HttpOnly cookie
+          headers:
+            Set-Cookie:
+              schema: {type: string}
+            Cache-Control:
+              schema: {type: string, const: no-store}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+    get:
+      summary: 恢复当前教师会话
+      operationId: getCurrentSession
+      responses:
+        '200':
+          description: Current public principal, expiry and bound CSRF token
+          headers:
+            Cache-Control:
+              schema: {type: string, const: no-store}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+    delete:
+      summary: 撤销当前教师会话
+      operationId: deleteSession
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: Session revoked and cookie expired
+          headers:
+            Cache-Control:
+              schema: {type: string, const: no-store}
+        '4XX':
+          $ref: '#/components/responses/Error'
+        '503':
           $ref: '#/components/responses/Error'
   /projects:
     get:
@@ -794,6 +853,14 @@ components:
         Server-issued Secure HttpOnly session resolved through the authentication adapter.
         Organization and user identity headers are not accepted.
   parameters:
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 64
+        maxLength: 64
     ProjectId:
       name: project_id
       in: path
@@ -903,6 +970,49 @@ components:
           schema:
             $ref: '#/components/schemas/AcceptedJobEnvelope'
   schemas:
+    CreateSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [access_code]
+      properties:
+        access_code:
+          type: string
+          minLength: 1
+          maxLength: 512
+          writeOnly: true
+    SessionPrincipal:
+      type: object
+      additionalProperties: false
+      required:
+        - principal_id
+        - user_id
+        - organization_id
+        - display_name
+        - organization_name
+        - organization_role
+      properties:
+        principal_id: {type: string, format: uuid}
+        user_id: {type: string, format: uuid}
+        organization_id: {type: string, format: uuid}
+        display_name: {type: string, minLength: 1, maxLength: 160}
+        organization_name: {type: string, minLength: 1, maxLength: 160}
+        organization_role: {enum: [owner, admin, member]}
+    CurrentSession:
+      type: object
+      additionalProperties: false
+      required: [session_id, principal, expires_at, csrf_token]
+      properties:
+        session_id: {type: string, format: uuid}
+        principal: {$ref: '#/components/schemas/SessionPrincipal'}
+        expires_at: {type: string, format: date-time}
+        csrf_token: {type: string, minLength: 64, maxLength: 64}
+    SessionEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/CurrentSession'}
+        request_id: {type: string, minLength: 1}
     IntroOptionSet:
       $ref: './intro-option-set.schema.json'
     IntroOption:

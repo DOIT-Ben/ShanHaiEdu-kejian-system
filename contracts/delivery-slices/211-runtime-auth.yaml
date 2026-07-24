@@ -1,0 +1,42 @@
+schema_version: 1
+issue: 211
+rows:
+  - page_route: /login
+    navigation_path: /login
+    api_requests:
+      - operation_id: createSession
+        method: POST
+        path: /api/v2/auth/session
+      - operation_id: createProject
+        method: POST
+        path: /api/v2/projects
+    formal_facts: [User, Organization, Principal, Session, Project]
+    backend_tests:
+      - tests/integration/test_identity_session_api.py::test_create_session_sets_secure_cookie_and_rotates_id
+    real_api_playwright:
+      - apps/web/e2e/real-api/runtime-auth.spec.ts::login_creates_project_with_real_api
+  - page_route: /app
+    navigation_path: /app/projects
+    api_requests:
+      - operation_id: getCurrentSession
+        method: GET
+        path: /api/v2/auth/session
+    formal_facts: [User, Organization, Principal, Session]
+    backend_tests:
+      - tests/integration/test_identity_session_api.py::test_current_session_returns_public_principal_and_csrf
+    real_api_playwright:
+      - apps/web/e2e/real-api/runtime-auth.spec.ts::refresh_restores_session
+  - page_route: /app
+    navigation_path: /app/projects
+    api_requests:
+      - operation_id: deleteSession
+        method: DELETE
+        path: /api/v2/auth/session
+      - operation_id: createProject
+        method: POST
+        path: /api/v2/projects
+    formal_facts: [User, Organization, Principal, Session, Project]
+    backend_tests:
+      - tests/integration/test_identity_session_api.py::test_logout_revokes_session
+    real_api_playwright:
+      - apps/web/e2e/real-api/runtime-auth.spec.ts::logout_blocks_writes

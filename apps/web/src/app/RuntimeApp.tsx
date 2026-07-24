@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { RouteErrorBoundary } from "@/app/AppErrorBoundary";
+import { SessionProvider } from "@/features/session/SessionProvider";
 import { RuntimeAppShell } from "@/layouts/RuntimeAppShell";
 
 const HomePage = lazy(() =>
@@ -79,44 +80,46 @@ function RuntimeLoading() {
 export function RuntimeApp() {
   return (
     <BrowserRouter>
-      <RouteErrorBoundary>
-        <Suspense fallback={<RuntimeLoading />}>
-          <Routes>
-            <Route element={<RuntimeLoginPage />} path="/login" />
-            <Route element={<RuntimeAppShell />} path="/app">
-              <Route element={<HomePage creationAvailable={false} />} index />
-              <Route element={<ProjectsPage />} path="projects" />
-              <Route element={<RuntimeNewProjectPage />} path="projects/new" />
-              <Route element={<RuntimeProjectSetupPage />} path="projects/:projectId/setup" />
-              <Route element={<RuntimeProjectOverviewPage />} path="projects/:projectId" />
+      <SessionProvider>
+        <RouteErrorBoundary>
+          <Suspense fallback={<RuntimeLoading />}>
+            <Routes>
+              <Route element={<RuntimeLoginPage />} path="/login" />
+              <Route element={<RuntimeAppShell />} path="/app">
+                <Route element={<HomePage creationAvailable={false} />} index />
+                <Route element={<ProjectsPage />} path="projects" />
+                <Route element={<RuntimeNewProjectPage />} path="projects/new" />
+                <Route element={<RuntimeProjectSetupPage />} path="projects/:projectId/setup" />
+                <Route element={<RuntimeProjectOverviewPage />} path="projects/:projectId" />
+                <Route
+                  element={<RuntimeMaterialsPage />}
+                  path="projects/:projectId/materials/:materialId?"
+                />
+                <Route element={<RuntimeLessonsPage />} path="projects/:projectId/lessons" />
+                <Route element={<RuntimeAssetsPage />} path="projects/:projectId/assets" />
+                <Route
+                  element={<RuntimeArtifactPage />}
+                  path="projects/:projectId/artifacts/:artifactId"
+                />
+                <Route element={<RuntimeJobPage />} path="projects/:projectId/jobs/:jobId" />
+                <Route
+                  element={<RuntimeLessonWorkbenchPage />}
+                  path="projects/:projectId/lessons/:lessonId/work/:stepKey"
+                />
+                <Route element={<RuntimeUnavailablePage />} path="projects/:projectId/*" />
+                <Route element={<RuntimeUnavailablePage />} path="creation/*" />
+                <Route element={<RuntimeUnavailablePage />} path="tasks" />
+              </Route>
               <Route
-                element={<RuntimeMaterialsPage />}
-                path="projects/:projectId/materials/:materialId?"
+                element={<RuntimeUnavailablePage title="管理工作区暂未开放" />}
+                path="/admin/*"
               />
-              <Route element={<RuntimeLessonsPage />} path="projects/:projectId/lessons" />
-              <Route element={<RuntimeAssetsPage />} path="projects/:projectId/assets" />
-              <Route
-                element={<RuntimeArtifactPage />}
-                path="projects/:projectId/artifacts/:artifactId"
-              />
-              <Route element={<RuntimeJobPage />} path="projects/:projectId/jobs/:jobId" />
-              <Route
-                element={<RuntimeLessonWorkbenchPage />}
-                path="projects/:projectId/lessons/:lessonId/work/:stepKey"
-              />
-              <Route element={<RuntimeUnavailablePage />} path="projects/:projectId/*" />
-              <Route element={<RuntimeUnavailablePage />} path="creation/*" />
-              <Route element={<RuntimeUnavailablePage />} path="tasks" />
-            </Route>
-            <Route
-              element={<RuntimeUnavailablePage title="管理工作区暂未开放" />}
-              path="/admin/*"
-            />
-            <Route element={<Navigate replace to="/app" />} path="/" />
-            <Route element={<RuntimeUnavailablePage title="页面暂未开放" />} path="*" />
-          </Routes>
-        </Suspense>
-      </RouteErrorBoundary>
+              <Route element={<Navigate replace to="/app" />} path="/" />
+              <Route element={<RuntimeUnavailablePage title="页面暂未开放" />} path="*" />
+            </Routes>
+          </Suspense>
+        </RouteErrorBoundary>
+      </SessionProvider>
     </BrowserRouter>
   );
 }

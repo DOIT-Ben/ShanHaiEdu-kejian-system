@@ -21,6 +21,7 @@ export class ApiError extends Error {
 }
 
 type CsrfTokenProvider = () => string | null | undefined;
+type UnauthorizedHandler = () => void;
 
 type OpenApiResult<T> = {
   data?: T;
@@ -29,10 +30,15 @@ type OpenApiResult<T> = {
 };
 
 let csrfTokenProvider: CsrfTokenProvider | null = null;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
 
 /** Installs the CSRF token reader supplied by the real authentication bootstrap. */
 export function configureCsrfTokenProvider(provider: CsrfTokenProvider | null) {
   csrfTokenProvider = provider;
+}
+
+export function configureUnauthorizedHandler(handler: UnauthorizedHandler | null) {
+  unauthorizedHandler = handler;
 }
 
 function readCsrfToken() {
@@ -101,6 +107,14 @@ function isWriteMethod(method: string) {
   return normalized !== "GET" && normalized !== "HEAD" && normalized !== "OPTIONS";
 }
 
+function isSessionBootstrapRequest(request: Request) {
+  if (request.method.toUpperCase() !== "POST") return false;
+  const baseUrl = new URL(resolveBaseUrl(apiConfig.baseUrl));
+  const expectedPath = `${baseUrl.pathname.replace(/\/$/, "")}/auth/session`;
+  const requestUrl = new URL(request.url);
+  return requestUrl.origin === baseUrl.origin && requestUrl.pathname === expectedPath;
+}
+
 function csrfTokenUnavailableError() {
   return new ApiError({
     error: {
@@ -113,7 +127,7 @@ function csrfTokenUnavailableError() {
 }
 
 function addCsrfToken(request: Request) {
-  if (!isWriteMethod(request.method)) return;
+  if (!isWriteMethod(request.method) || isSessionBootstrapRequest(request)) return;
 
   const suppliedToken = request.headers.get("X-CSRF-Token")?.trim();
   if (suppliedToken) {
@@ -135,6 +149,13 @@ const requestMiddleware: Middleware = {
     request.headers.set("Accept", "application/json");
     addCsrfToken(request);
     return request;
+  },
+};
+
+const responseMiddleware: Middleware = {
+  onResponse({ response }) {
+    if (response.status === 401) unauthorizedHandler?.();
+    return response;
   },
 };
 
@@ -165,7 +186,7 @@ export const apiClient = createClient<paths>({
   fetch: authenticatedFetch,
 });
 
-apiClient.use(requestMiddleware);
+apiClient.use(requestMiddleware, responseMiddleware);
 
 export function unwrapApiResult<T>(result: OpenApiResult<T>): T {
   if (!result.response.ok) {
@@ -184,4 +205,12 @@ export function unwrapApiResultWithResponse<T>(result: OpenApiResult<T>): ApiRes
     body: unwrapApiResult(result),
     etag: result.response.headers.get("ETag") ?? undefined,
   };
+}
+
+export function unwrapEmptyApiResult(result: OpenApiResult<unknown>): void {
+  if (!result.response.ok) {
+    throw new ApiError(
+      isApiErrorBody(result.error) ? result.error : fallbackError(result.response),
+    );
+  }
 }

@@ -17,7 +17,6 @@ export default defineConfig({
     env: {
       VITE_API_BASE_URL: "/api/v2",
       VITE_API_MODE: "real",
-      VITE_RUNTIME_CONTRACT_TEST: "1",
     },
     reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === "1",
     timeout: 120_000,

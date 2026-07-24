@@ -20,7 +20,7 @@
 | 路由                                                       | 页面/布局                      | 当前真实能力                                                        |
 | ---------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------- |
 | `/`                                                        | `Navigate`                     | 重定向到 `/app`                                                     |
-| `/login`                                                   | `RuntimeLoginPage`             | 认证说明页；无登录提交接口                                          |
+| `/login`                                                   | `RuntimeLoginPage`             | 受控访问码调用真实 Session API；不保存浏览器身份                    |
 | `/app`                                                     | `RuntimeAppShell` + `HomePage` | 品牌首页、真实项目摘要；创作入口禁用                                |
 | `/app/projects`                                            | `ProjectsPage`                 | 分页查询项目、前端搜索、新建入口                                    |
 | `/app/projects/new`                                        | `RuntimeNewProjectPage`        | 教材 PDF 三段式上传或无教材课程锚点创建                             |
@@ -38,7 +38,7 @@
 | `/admin/*`                                                 | `RuntimeUnavailablePage`       | 管理端尚未接入真实页面                                              |
 | `*`                                                        | `RuntimeUnavailablePage`       | 全局安全 fallback，不推导或伪造业务资源                             |
 
-`RuntimeAppShell` 不创建浏览器会话或伪造用户身份。它假定服务端已经通过 HttpOnly Cookie 建立会话；当前 runtime 合同没有登录、当前用户或退出端点，因此认证 bootstrap 仍是显式缺口。
+`SessionProvider` 在应用启动时调用 `GET /auth/session` 恢复 HttpOnly Cookie 对应的公共教师、组织、Session 和 CSRF 状态；`RuntimeAppShell` 只消费该状态并在匿名时返回 `/login`。浏览器不读取 Cookie，不用 `localStorage` 或 `sessionStorage` 伪造身份。
 
 ## DEV MSW 合同适配器
 
@@ -62,6 +62,7 @@
 
 | 领域           | runtime 合同端点                                                                                                                                                                               | 前端入口                                            | 页面接入状态                                                                      |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------- |
+| 教师会话       | `POST/GET/DELETE /auth/session`                                                                                                                                                                | `features/session/api/sessionApi.ts`                | 登录、启动恢复、CSRF 内存注入和退出撤销已接入                                     |
 | 项目           | `GET/POST /projects`；`GET /projects/{project_id}`                                                                                                                                             | `features/projects/api/projectsApi.ts`              | 列表、创建、详情已接入 Runtime 页面                                               |
 | 制作方式       | `GET/PATCH /projects/{project_id}/automation-policy`                                                                                                                                           | `features/projects/api/automationPolicyApi.ts`      | 项目概览已接入，写入使用 ETag/`If-Match`                                          |
 | 教材           | `POST /projects/{project_id}/materials/uploads`；对象存储直传；`POST /projects/{project_id}/materials/{material_id}/confirm`                                                                   | `features/materials/api/materialsApi.ts`            | 上传三段式链已接入新建项目页                                                      |
@@ -77,7 +78,7 @@
 | Generation Job | `GET /generation-jobs/{job_id}`；`POST /generation-jobs/{job_id}/cancel`                                                                                                                       | `features/jobs/api/jobsApi.ts`                      | 教材 setup 与独立 Job 深链已接入                                                  |
 | SSE            | `GET /projects/{project_id}/events/stream`；`GET /generation-jobs/{job_id}/events/stream`                                                                                                      | `shared/api/useProjectEvents.ts`、`useJobEvents.ts` | Runtime 项目资源页与 Job/setup 页用于 REST 对账                                   |
 
-`shared/api/client.ts` 统一使用 `credentials: include`、标准成功/错误信封和网络错误映射。写操作由各 feature 客户端显式携带 `Idempotency-Key`；并发编辑读取响应 ETag，并在修改时发送 `If-Match`。CSRF header 必须由真实认证 bootstrap 提供；真实模式没有 token 时，客户端会在 fetch 前安全失败，页面同时禁用新建、取消任务和制作方式写操作。
+`shared/api/client.ts` 统一使用 `credentials: include`、标准成功/错误信封和网络错误映射。只有 `createSession` 可在没有既有 CSRF 时启动；其余写操作从 `SessionProvider` 读取当前 Session 绑定的 CSRF，并由各 feature 客户端显式携带 `Idempotency-Key`。真实模式没有 token 时，客户端会在 fetch 前安全失败。
 
 `POST /generation-results/{result_id}/save-to-project` 在 active OpenAPI 中已标记 deprecated。新前端故意不封装该旧入口，只使用“采用候选”与“把 adoption 原子写回项目”两个独立事实端点。
 
@@ -87,7 +88,6 @@
 
 | 能力                    | 当前精确端点/操作                                                                                                                                                                                                                                                      | 缺失操作与页面阻塞                                                                                                                                                                                               | 跟踪      |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| 真实认证                | active OpenAPI 没有认证路径                                                                                                                                                                                                                                            | 登录、当前用户、刷新、退出和 CSRF bootstrap 的路径待 #11 决策；`/login` 只能显示说明，`RuntimeAppShell` 不能建立或恢复用户会话                                                                                   | #11       |
 | 教材发现                | 已有已知 material ID 的文件与解析结果读取                                                                                                                                                                                                                              | 缺 `GET /projects/{project_id}/materials`；项目页无法发现教材记录，教材页只能从已知 ID 深链进入                                                                                                                  | #11       |
 | Job 发现                | `GET /generation-jobs/{job_id}` 与 Job SSE                                                                                                                                                                                                                             | 缺项目级或全局 Generation Job 列表，具体路径待 #11 决策；`/app/tasks` 与项目任务入口无法从项目事实恢复                                                                                                           | #11       |
 | 课时与教案生成          | `GET/PATCH /projects/{project_id}/lessons`、`GET /lessons/{lesson_id}`、`PATCH /lessons/{lesson_id}/branches`、`GET /projects/{project_id}/workflow`                                                                                                                   | 缺 planned `POST /node-runs/{node_run_id}/start`；课时划分、教案生成与课时工作台节点启动均不可达                                                                                                                 | #11       |
@@ -119,7 +119,7 @@
 
 当前标签页会在 `sessionStorage` 保存表单、文件元数据与 SHA-256、三段幂等意图、项目 ID、上传会话、ETag 和 Job ID。浏览器刷新后不会伪造或恢复 `File` 对象，而是请用户重新选择同一份 PDF，再从已保存的服务端阶段继续。签名上传地址在确认前过期时，前端保留项目并轮换上传与确认意图，重新建立上传会话；若确认请求已经发出，则先保留原上传会话、ETag 和确认幂等键重试，让服务端回放可能已经成功的 Job。只有服务端明确返回 `UPLOAD_REJECTED` 后，前端才轮换上传与确认意图。
 
-这条链已经完成前端实现和确定性测试，但尚未在真实认证、反向代理、对象存储和后端部署组合环境中完成浏览器端到端验收，不能据此宣布阶段1联调或生产闭环完成。
+这条链已经完成前端实现和确定性测试；#211 的真实 API 门禁已覆盖登录后无教材创建项目，但尚未覆盖反向代理、对象存储直传和完整教材到教案组合环境，不能据此宣布阶段1联调或生产闭环完成。
 
 ## SSE 恢复语义
 
@@ -131,10 +131,10 @@
 
 ## 尚未完成的生产边界
 
-- runtime OpenAPI 尚无真实登录、当前用户、刷新和退出合同，CSRF token provider 也尚未安装；
+- 三个 Session operationId 和 `SessionProvider` 已接入；生产仍需从受控环境注入映射、HTTPS Cookie、允许 Origin 与可信代理配置并复验；
 - 课时/教案生成、创作结果查询恢复、正式 PPTX、最终视频和交付合同仍是 #11/#108 的页面阻塞；
 - 即使通用 Workflow、Artifact、素材槽位、创作写操作和 Job 客户端已接入部分 Runtime 界面，完整业务流程仍需真实认证和浏览器验收；
 - 后端目前只有 Provider 中立媒体合同和确定性 Fake，真实图片/视频 Adapter 与受控冒烟不属于当前前端已完成能力；
 - DEV 合同 fixture、静态素材和视觉预览只能验证版式与前端映射，不能作为真实生成、下载或原子写回的验收证据。
 
-独立的 `playwright.runtime.config.ts` 以 real adapter 启动同一个 `RuntimeApp`。`runtime-contract.spec.ts` 使用合同级确定性网络桩覆盖首页/项目概览、CSRF 缺失安全阻断、教材上传刷新恢复与读取、空课时合同阻断、课时集合与分支写入、课时工作台缺少生成命令时的阻断、素材槽位/素材包读取与绑定/解绑、Artifact 只读状态与写操作阻断、Job REST/SSE/取消/失败、项目 SSE 和无教材创建；事件到达后都以 REST 终态对账，资源进入终态后停止订阅，创作页面仍由查询合同缺口阻塞。默认 `playwright.config.ts` 以 DEV MSW adapter 运行 `contract-preview.spec.ts`，在 1440、1024 和 390 宽度验证同一 Runtime 路由、基础可访问性、无横向溢出、登录安全阻断和未声明请求拒绝；视觉回归也只访问 Runtime 路由。两套测试由前端 CI 分别执行，不共享浏览器业务状态。
+独立的 `playwright.runtime.config.ts` 继续用合同级确定性网络桩覆盖既有 Runtime 资源场景；默认 `playwright.config.ts` 用 DEV MSW adapter 做多视口和未声明请求检查。`playwright.real-api.config.ts` 不加载 MSW 或浏览器拦截，启动真实 FastAPI/PostgreSQL 与生产预览，逐项验证登录并创建项目、刷新恢复同一 Session、退出后旧 CSRF 写入返回 401。

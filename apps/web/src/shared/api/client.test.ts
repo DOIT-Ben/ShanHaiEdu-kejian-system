@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   apiClient,
   configureCsrfTokenProvider,
+  configureUnauthorizedHandler,
   isCsrfTokenAvailable,
   unwrapApiResult,
   unwrapApiResultWithResponse,
@@ -22,6 +23,7 @@ function jsonResponse(body: unknown, init: ResponseInit = {}) {
 describe("typed api client", () => {
   afterEach(() => {
     configureCsrfTokenProvider(null);
+    configureUnauthorizedHandler(null);
     (apiConfig as { mode: string }).mode = originalApiMode;
     vi.unstubAllGlobals();
   });
@@ -56,6 +58,64 @@ describe("typed api client", () => {
     });
     expect(isCsrfTokenAvailable()).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("只允许 createSession 在没有 CSRF 时启动真实会话", async () => {
+    (apiConfig as { mode: string }).mode = "real";
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(
+        {
+          data: {
+            csrf_token: "placeholder-server-csrf-token",
+            expires_at: "2026-07-24T00:00:00Z",
+            principal: {
+              display_name: "王老师",
+              organization_id: "01960000-0000-7000-8000-000000000001",
+              organization_name: "山海小学",
+              organization_role: "member",
+              principal_id: "01960000-0000-7000-8000-000000000002",
+              user_id: "01960000-0000-7000-8000-000000000003",
+            },
+            session_id: "01960000-0000-7000-8000-000000000004",
+          },
+          request_id: "req-session",
+        },
+        { status: 201 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    unwrapApiResult(
+      await apiClient.POST("/auth/session", { body: { access_code: "controlled-code" } }),
+    );
+
+    const request = fetchMock.mock.calls[0]?.[0] as Request;
+    expect(request.credentials).toBe("include");
+    expect(request.headers.has("X-CSRF-Token")).toBe(false);
+  });
+
+  it("收到 401 时通知 Session Provider 立即失效", async () => {
+    const onUnauthorized = vi.fn();
+    configureUnauthorizedHandler(onUnauthorized);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            error: {
+              code: "AUTHENTICATION_REQUIRED",
+              message: "Authentication is required.",
+              retryable: false,
+            },
+            request_id: "req-auth",
+          },
+          { status: 401 },
+        ),
+      ),
+    );
+
+    await apiClient.GET("/auth/session");
+    expect(onUnauthorized).toHaveBeenCalledOnce();
   });
 
   it("保留 credentials、幂等键、If-Match、CSRF 与 ETag", async () => {

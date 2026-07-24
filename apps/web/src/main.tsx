@@ -14,21 +14,7 @@ async function enableMocking() {
   await startContractMocking();
 }
 
-async function enableRuntimeContractTest() {
-  if (
-    !import.meta.env.DEV ||
-    apiConfig.mode !== "real" ||
-    import.meta.env.VITE_RUNTIME_CONTRACT_TEST !== "1"
-  ) {
-    return;
-  }
-  const { enableRuntimeContractTestCsrf } =
-    await import("@/shared/api/runtimeContractTestBootstrap.development");
-  enableRuntimeContractTestCsrf();
-}
-
 await enableMocking();
-await enableRuntimeContractTest();
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {

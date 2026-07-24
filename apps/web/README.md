@@ -9,7 +9,7 @@
 
 当前工程只有一个 `RuntimeApp` 路由与页面树。real 模式连接真实 API；Vite 开发环境且 `VITE_API_MODE=mock` 时，`main.tsx` 只动态启用 MSW 合同 adapter，为相同页面提供确定性响应。缺失能力不会切换到第二套页面、浏览器状态机或本地假成功。
 
-真实模式已经实现“创建项目 → 计算教材 SHA-256 → 创建上传会话 → 直传对象存储 → 确认上传 → 查询并订阅生成任务 → 读取已有课时或明确阻断 → 查看项目”的前端纵向链。该结论只表示前端代码和确定性测试已经覆盖这条链；真实认证、部署环境联调和完整业务页面尚未完成，因此当前仍不是生产发布版本。
+真实模式已经实现“受控访问码登录 → PostgreSQL Session/CSRF 启动 → 创建项目”，并支持刷新恢复同一会话和退出撤销；现有“计算教材 SHA-256 → 创建上传会话 → 直传对象存储 → 确认上传 → 查询并订阅生成任务 → 读取已有课时或明确阻断 → 查看项目”页面链继续复用同一真实会话。专用真实 API Playwright 只验收登录、创建项目、刷新和登出失效；部署环境联调和完整业务页面尚未完成，因此当前仍不是生产发布版本。
 
 ## 技术栈
 
@@ -35,7 +35,7 @@ corepack pnpm --filter @shanhaiedu/web generate:api
 corepack pnpm --filter @shanhaiedu/web dev
 ```
 
-浏览器访问 `http://localhost:5173/app`。DEV 合同 adapter 不创建浏览器认证或 `localStorage` 业务状态；登录合同缺失会与 real 模式一样显示安全阻断。
+浏览器访问 `http://localhost:5173/app`。DEV 合同 adapter 不创建浏览器认证，也不使用 `localStorage` 或 `sessionStorage` 伪造身份；生产登录只在 real 模式通过 `/auth/session` 三个 active API 建立、恢复和撤销。
 
 连接真实 API 时显式切换网络 adapter：
 
@@ -71,9 +71,10 @@ corepack pnpm --filter @shanhaiedu/web test:storybook:a11y
 corepack pnpm --filter @shanhaiedu/web build
 corepack pnpm --filter @shanhaiedu/web test:e2e --project=chromium
 corepack pnpm --filter @shanhaiedu/web test:e2e:runtime --project=runtime-chromium
+corepack pnpm --filter @shanhaiedu/web test:e2e:real-api --project=real-api-chromium
 ```
 
-也可以运行 `corepack pnpm --filter @shanhaiedu/web release:check` 执行 OpenAPI 生成无漂移与全部前端门禁。Runtime Playwright 使用独立配置和 real adapter；合同级确定性网络桩验证首页/项目概览、项目与 Job SSE、教材上传刷新恢复、教材读取、空课时合同阻断、课时集合与分支编辑、课时工作台阻断、素材绑定/解绑、Artifact 只读状态与写操作阻断、Job 取消/失败、无教材创建与 CSRF 安全阻断。默认 Playwright 使用 DEV MSW adapter，在 1440、1024 和 390 宽度验证同一 Runtime 路由、基础可访问性、登录阻断和未声明请求拒绝。两套 Playwright 不会共用浏览器业务状态。
+也可以运行 `corepack pnpm --filter @shanhaiedu/web release:check` 执行 OpenAPI 生成无漂移与既有前端门禁。Runtime Playwright 使用合同级确定性网络桩验证首页/项目概览、项目与 Job SSE、教材上传刷新恢复、教材读取、空课时合同阻断、课时集合与分支编辑、课时工作台阻断、素材绑定/解绑、Artifact 只读状态与写操作阻断、Job 取消/失败、无教材创建与 CSRF 安全阻断。默认 Playwright 使用 DEV MSW adapter 做多视口与未声明请求检查；`playwright.real-api.config.ts` 则只连接真实 FastAPI 和 PostgreSQL，验证登录、创建项目、刷新恢复和登出后写入 401，禁止 MSW 或浏览器拦截替代。
 
 Storybook 门禁会对全部 story 在 1440 宽度运行 axe WCAG 2A/AA、横向溢出、用户文案与运行时异常检查，并拒绝错误壳或空渲染根；标记为 `core-viewport` 的核心 story 还会实际切换浏览器 viewport，在 1024 和 390 宽度重复检查。
 
@@ -82,16 +83,17 @@ Storybook 门禁会对全部 story 在 1440 宽度运行 axe WCAG 2A/AA、横向
 - `App.tsx` 始终只懒加载 `RuntimeApp`，页面、路由和用户意图没有第二份实现；
 - `main.tsx` 仅在 `import.meta.env.DEV` 且 API 模式为 `mock` 时动态启用 MSW；生产构建不会注册或引用 Worker；
 - 生产构建检查会拒绝 MSW Worker、本地业务运行时标识、开发凭据和缺失的静态素材引用；
-- `RuntimeApp` 使用 Cookie 请求、标准错误包、`Idempotency-Key`、ETag/`If-Match` 和可注入的 CSRF token 读取器；真实模式没有 token 时写请求在 fetch 前安全失败，相关按钮保持禁用；
+- `RuntimeApp` 的 `SessionProvider` 通过三个 active Session API 恢复当前教师和组织，只在内存提供当前 CSRF token；API 客户端使用 Cookie、标准错误包、`Idempotency-Key`、ETag/`If-Match`，没有 token 时写请求在 fetch 前安全失败；
 - 项目与 Job SSE 只使对应 TanStack Query 快照失效并重新读取 REST 真相，不在浏览器内拼装业务对象；
 - DEV MSW handlers 只提供 OpenAPI 合同场景，不维护第二套业务真相；其通过结果不构成真实 API 联调证据。
 
-`pnpm build`只证明类型、打包和生产内容边界通过，不代表真实认证、后端环境或媒体 Provider 已经完成生产验收。
+`pnpm build`只证明类型、打包和生产内容边界通过，不代表 Session 配置、HTTPS/反向代理、后端环境或媒体 Provider 已经完成生产验收。
 
 ## 已实现的真实数据层
 
 前端已经基于根级 runtime OpenAPI 实现以下类型化客户端：
 
+- 受控教师 Session 创建、当前 Session 恢复和退出撤销；
 - 项目列表、项目详情、创建项目和 `AutomationPolicy` 读取/更新；
 - 教材上传会话、对象存储直传、上传确认、源文件资产和解析版本读取；
 - 课时集合、单课时、分支读取/更新，以及项目 Workflow 读取；
@@ -108,9 +110,9 @@ Storybook 门禁会对全部 story 在 1440 宽度运行 axe WCAG 2A/AA、横向
 
 `RuntimeApp` 当前开放品牌首页、项目列表、新建项目、教材任务进度、项目概览、教材/解析深链、课时集合编辑、素材槽位、Artifact/Job 深链，以及读取项目和单课时数据的课时工作台。课时工作台没有课时/教案生成命令时会明确显示进度不可用，不会启动浏览器假任务。创作中心、完整成果发现与查询、项目任务、交付和管理端尚未形成可恢复的真实流程，未接入路由保持安全不可用。
 
-真实认证的登录、当前用户、刷新、退出和 CSRF bootstrap 路径尚未形成合同，由 #11 决策。教材缺 `GET /projects/{project_id}/materials`，Artifact 缺 `GET /projects/{project_id}/artifacts`，Job 缺项目级或全局列表；`GET/PATCH /projects/{project_id}/lessons`、`GET /lessons/{lesson_id}` 与 `GET /projects/{project_id}/workflow` 也缺 planned `POST /node-runs/{node_run_id}/start`，不能启动课时划分、教案或节点生成。创作合同提供创建/生成/采用/保存写操作，但缺 `GET /creation-batches/{batch_id}`、`GET /creation-items/{item_id}` 与 `GET /generation-results/{result_id}`，刷新后无法恢复候选结果。正式 PPT 缺 `GET /lessons/{lesson_id}/ppt`、`PATCH /ppt-pages/{page_id}`、`POST /ppt-documents/{id}/render` 和 PPTX 下载关系；视频缺 `GET /lessons/{lesson_id}/video`、`PATCH /video-shots/{shot_id}`、`POST /video-shots/{shot_id}/select-clip`、`POST /video-projects/{id}/assemble`；交付缺 `GET/POST /projects/{project_id}/deliveries`。上述服务端合同缺口由 #11 跟踪，PPT 专项同时关联 #108；浏览器不得用 DEV fixture、定时器或本地对象补造这些事实。
+身份启动合同已经固定为 `POST/GET/DELETE /auth/session`，由 #211 提供真实 Cookie、当前教师/组织、CSRF 内存注入、刷新恢复和退出失效。剩余 R1 缺口仍包括教材 `GET /projects/{project_id}/materials`、Artifact `GET /projects/{project_id}/artifacts`、Job 项目级或全局列表，以及可达的节点启动与异步生成链；这些只由 #11 从最新 `main` 接续。创作结果查询、正式 PPT、完整视频和交付合同继续暂停，浏览器不得用 DEV fixture、定时器或本地对象补造这些事实。
 
-前端目前只依赖服务端已有 Cookie，并未建立生产认证 bootstrap，因此真实写操作在没有 CSRF token 时会保持禁用。后端真实图片/视频 Provider Adapter 与受控冒烟也尚未完成，前端素材和 DEV fixture 预览不能冒充真实媒体生成结果。
+前端不保存 Session Cookie、access code 或 CSRF 到浏览器持久存储；`SessionProvider` 只保留服务端返回的公共会话快照与 CSRF 内存值。没有有效 Session/CSRF 时真实写操作保持禁用或安全失败；前端素材和 DEV fixture 预览不能冒充真实媒体生成结果。
 
 ## 目录结构
 

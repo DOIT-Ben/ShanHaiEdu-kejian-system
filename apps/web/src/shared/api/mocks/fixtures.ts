@@ -20,15 +20,32 @@ export const contractIds = {
   lessonId: "01960000-0000-7000-8000-000000000101",
   materialId: "01970000-0000-7000-8000-000000000302",
   nodeRunId: "01970000-0000-7000-8000-000000000204",
+  organizationId: "01970000-0000-7000-8000-000000000602",
   parseVersionId: "01970000-0000-7000-8000-000000000403",
+  principalId: "01970000-0000-7000-8000-000000000603",
   projectId: "01960000-0000-7000-8000-000000000001",
   promptVersionId: "01970000-0000-7000-8000-000000000802",
   sourceDivisionVersionId: "01970000-0000-7000-8000-000000000102",
+  sessionId: "01970000-0000-7000-8000-000000000604",
   uploadSessionId: "01970000-0000-7000-8000-000000000303",
   userId: "01970000-0000-7000-8000-000000000601",
   workflowDefinitionVersionId: "01970000-0000-7000-8000-000000000201",
   workflowRunId: "01970000-0000-7000-8000-000000000203",
 } as const;
+
+export const contractSession = {
+  session_id: contractIds.sessionId,
+  principal: {
+    principal_id: contractIds.principalId,
+    user_id: contractIds.userId,
+    organization_id: contractIds.organizationId,
+    display_name: "王老师",
+    organization_name: "山海小学",
+    organization_role: "member",
+  },
+  expires_at: "2099-12-31T23:59:59Z",
+  csrf_token: "placeholder".padEnd(64, "0"),
+} satisfies Schema<"CurrentSession">;
 
 export const contractProject = {
   id: contractIds.projectId,

@@ -150,8 +150,7 @@ for (const viewport of viewports) {
 
   test(`首页 ${widthLabel}px 任务顺序与横向边界`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
-    await loginAsTeacher(page);
-    await page.goto("/app");
+    await loginAsTeacher(page, "/app");
     await waitForStablePage(page);
 
     await expect(page.getByRole("heading", { level: 1, name: "认识百分数" })).toBeVisible();
@@ -170,8 +169,7 @@ for (const viewport of viewports) {
 
   test(`项目列表 ${widthLabel}px 可扫描且无页面溢出`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
-    await loginAsTeacher(page);
-    await page.goto("/app/projects");
+    await loginAsTeacher(page, "/app/projects");
     await expect(page.getByRole("heading", { level: 1, name: "我的项目" })).toBeVisible();
     await expect(page.getByRole("searchbox", { name: "搜索项目" })).toBeVisible();
     const list = page.getByRole("list");
@@ -185,8 +183,7 @@ for (const viewport of viewports) {
 
   test(`课时工作台 ${widthLabel}px 保留项目课时上下文`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
-    await loginAsTeacher(page);
-    await page.goto(`/app/projects/${projectId}/lessons/${lessonId}/work/lesson_plan`);
+    await loginAsTeacher(page, `/app/projects/${projectId}/lessons/${lessonId}/work/lesson_plan`);
     await expect(page.getByRole("heading", { name: "百分数的意义" }).first()).toBeVisible();
     const main = page.getByRole("main");
     await expect(main).toContainText("认识百分数");
@@ -201,7 +198,7 @@ for (const viewport of viewports) {
 test("首页项目读取中的明确加载态", async ({ page }, testInfo) => {
   await page.setViewportSize({ height: 800, width: 1280 });
   await holdProjectListRequest(page);
-  await page.goto("/app");
+  await loginAsTeacher(page, "/app");
   await expect(page.getByRole("heading", { level: 1, name: "正在读取课堂项目" })).toBeVisible();
   await expect(page.getByText("正在读取项目", { exact: true })).toBeVisible();
   await waitForStablePage(page);
@@ -212,7 +209,7 @@ test("首页项目读取中的明确加载态", async ({ page }, testInfo) => {
 test("项目列表读取中的明确加载态", async ({ page }, testInfo) => {
   await page.setViewportSize({ height: 800, width: 1280 });
   await holdProjectListRequest(page);
-  await page.goto("/app/projects");
+  await loginAsTeacher(page, "/app/projects");
   await expect(page.getByRole("heading", { level: 1, name: "我的项目" })).toBeVisible();
   await expect(page.getByRole("status", { name: "正在读取项目" })).toBeVisible();
   await waitForStablePage(page);
@@ -222,8 +219,7 @@ test("项目列表读取中的明确加载态", async ({ page }, testInfo) => {
 
 test("项目列表搜索无结果时保持清晰空态", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await loginAsTeacher(page);
-  await page.goto("/app/projects");
+  await loginAsTeacher(page, "/app/projects");
   await page.getByRole("searchbox", { name: "搜索项目" }).fill("不存在的课堂项目");
   await expect(page.getByText("没有找到匹配的项目，请调整搜索词。", { exact: true })).toBeVisible();
   await assertPageFrame(page);
@@ -233,7 +229,7 @@ test("项目列表搜索无结果时保持清晰空态", async ({ page }, testIn
 test("项目列表服务异常时保留可读错误反馈", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.setExtraHTTPHeaders({ "X-Contract-Scenario": "error" });
-  await page.goto("/app/projects");
+  await loginAsTeacher(page, "/app/projects");
   await expect(
     page.getByText("项目列表暂时无法加载，请检查网络后重试。", { exact: true }),
   ).toBeVisible({
