@@ -2,7 +2,7 @@
 
 当前阶段：阶段1教师可见R1纵向链的生产身份启动门禁。
 > 最后核验：2026-07-24。
-> 当前唯一P0：[Issue #211](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/211)；实现载体为[Draft PR #216](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/216)。
+> 当前唯一P0：[Issue #211](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/211)；实现载体为[PR #216](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/216)。
 
 ## 当前可演示成果
 
@@ -24,20 +24,20 @@
 
 ## 当前工作
 
-- PR #216仍是Draft；#211实现和本文件当前状态已经提交并推送，PR正文已同步输入、输出、验收、验证和回退证据。
-- 当前分支已修复纯审计reviewer提出的OpenAPI CSRF P2，等待修复HEAD的CI和同一reviewer精确base/head复核，尚未转Ready或合并。
-- 最终base/head必须由未参与实现的同一只读reviewer审查；任何修复导致HEAD变化时，由同一reviewer复核并重新绑定。
+- PR #216的#211实现和本文件当前状态已经提交并推送，PR正文已同步输入、输出、验收、验证和回退证据；当前尚未合并。
+- 分支已关闭独立reviewer提出的全部finding；最终候选HEAD的CI和审查必须在合并前保持通过。
+- 最终base/head必须由未参与实现的同一只读reviewer审查；任何修复导致HEAD变化时，由同一reviewer复核并重新绑定，不能沿用旧HEAD批准。
 
 ## 当前阻塞
 
 - `main`在PR #216合并前没有生产Session/CSRF启动闭环，因此不能把分支验证结果声明为已发布能力。
-- 当前没有已知实现阻塞；剩余门禁是独立审查、最新HEAD CI、Squash Merge及合并后复验。
+- 当前没有已知实现阻塞；剩余出口是保持最终HEAD独立审查和CI有效、Squash Merge及合并后复验。
 - #211合并前，Issue #11 / PR #208、PPT、视频和新治理工作全部暂停，不得竞争active OpenAPI、生成客户端或公共Session入口。
 
 ## 下一个阶段出口
 
-1. 由未参与实现的只读reviewer审查精确`origin/main...HEAD`；关闭全部P0/P1，处置P2/P3，并在最终HEAD重新绑定批准证据。
-2. CI全绿后将PR转Ready并Squash Merge，关闭#211，删除任务分支和隔离worktree，从最新`main`复验关键Session/CSRF和delivery门禁。
+1. 最终候选HEAD保持CI全绿和同一只读reviewer精确`origin/main...HEAD`批准；任何HEAD变化必须重新验证并重新绑定。
+2. 将PR转Ready后由维护者Squash Merge，关闭#211，删除任务分支和隔离worktree，从最新`main`复验关键Session/CSRF和delivery门禁。
 3. 只有#211进入最新`main`后，才审查PR #208并形成复用、覆盖、失效、重写和删除矩阵，恢复唯一R1纵向链。
 
 ## 接手提示
