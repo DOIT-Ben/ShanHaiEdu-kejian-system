@@ -15,7 +15,7 @@
 
 - #211分支已实现`POST /api/v2/auth/session`（`createSession`）、`GET /api/v2/auth/session`（`getCurrentSession`）和`DELETE /api/v2/auth/session`（`deleteSession`）。
 - 已同步SQLAlchemy Session模型、Alembic迁移、active OpenAPI、生成的TypeScript客户端、FastAPI路由、前端Session Provider、后端集成测试、真实API Playwright和`contracts/delivery-slices/211-runtime-auth.yaml`。
-- 已验证11个PostgreSQL Session/CSRF集成测试全部通过，Alembic空库upgrade/downgrade/upgrade通过。
+- 已验证12个PostgreSQL Session/CSRF集成测试全部通过，包含受信代理追加链不能通过伪造最左地址绕过登录限流；Alembic空库upgrade/downgrade/upgrade通过。
 - 合同生成前后哈希一致；OpenAPI lint、runtime surface、JSON Schema、TypeScript合同类型、对`origin/main`兼容性和仓库策略门禁通过。合同测试为226 passed；两个本机条件skip分别是Windows无符号链接权限和未注入数据库的stage0资源用例，后者已在PostgreSQL环境另行1 passed。
 - 前端format、lint、typecheck、61个文件中的229个单测和生产build全部通过。
 - delivery slice已通过精确3个backend selector和3个real API browser selector；每个selector均要求恰好一个通过并拒绝skip、xfail、xpass和flaky。

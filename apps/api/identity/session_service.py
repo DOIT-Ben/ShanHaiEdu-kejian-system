@@ -189,8 +189,13 @@ class DatabaseSessionService:
         direct = self._canonical_ip(direct_host) or "unknown"
         if not self._is_trusted_proxy(direct) or not forwarded_for:
             return direct
-        candidate = self._canonical_ip(forwarded_for.split(",", 1)[0].strip())
-        return candidate or direct
+        for forwarded_host in reversed(forwarded_for.split(",")):
+            candidate = self._canonical_ip(forwarded_host.strip())
+            if candidate is None:
+                return direct
+            if not self._is_trusted_proxy(candidate):
+                return candidate
+        return direct
 
     def _find_active_session(
         self,

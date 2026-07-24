@@ -146,6 +146,45 @@ async def test_untrusted_forwarded_ip_cannot_bypass_rate_limit(
         app.state.database_engine.dispose()
 
 
+async def test_trusted_proxy_appended_client_ip_cannot_bypass_rate_limit(
+    migrated_database_url: str,
+) -> None:
+    access_code = token_urlsafe(32)
+    app = create_app(
+        settings=runtime_settings(
+            migrated_database_url,
+            access_code=access_code,
+            csrf_secret=token_urlsafe(48),
+        )
+    )
+    seed_teacher(app)
+    try:
+        client, _ = session_client(app)
+        async with client:
+            for index in range(3):
+                rejected = await client.post(
+                    "/api/v2/auth/session",
+                    headers={
+                        "Origin": APP_ORIGIN,
+                        "X-Forwarded-For": f"203.0.113.{index + 1}, 198.51.100.20",
+                    },
+                    json={"access_code": token_urlsafe(16)},
+                )
+                assert rejected.status_code == 401
+            limited = await client.post(
+                "/api/v2/auth/session",
+                headers={
+                    "Origin": APP_ORIGIN,
+                    "X-Forwarded-For": "203.0.113.99, 198.51.100.20",
+                },
+                json={"access_code": access_code},
+            )
+        assert limited.status_code == 429
+        assert limited.json()["error"]["code"] == "LOGIN_RATE_LIMITED"
+    finally:
+        app.state.database_engine.dispose()
+
+
 async def test_expired_session_is_rejected(migrated_database_url: str) -> None:
     access_code = token_urlsafe(32)
     app = create_app(
