@@ -3,21 +3,21 @@
   "kind": "input_definition",
   "metadata": {
     "key": "video.shots.generate.input",
-    "name": "逐镜头候选视频生成输入",
+    "name": "课堂导入短片候选生成输入",
     "domain": "primary_math",
     "locale": "zh-CN"
   },
   "spec": {
     "definition_key": "video.shots.generate.input",
-    "title": "逐镜头候选视频生成输入",
-    "description": "输入一个shot合同、视频风格、候选数及必需关键帧与连续性参考。",
+    "title": "课堂导入短片候选生成输入",
+    "description": "输入exact导入选择、唯一正式关键帧、固定6秒时长、单候选和发布内固定风格。",
     "fields": [
       {
-        "field_key": "shot_spec_ref",
-        "label": "细分镜shot",
+        "field_key": "selected_intro_ref",
+        "label": "已选导入方案",
         "value_type": "reference",
         "required": true,
-        "source": "system",
+        "source": "context",
         "visibility": "hidden",
         "widget": "textarea"
       },
@@ -26,42 +26,32 @@
         "label": "候选数量",
         "value_type": "number",
         "required": true,
-        "source": "teacher",
-        "visibility": "primary",
+        "source": "system",
+        "visibility": "hidden",
         "widget": "number",
-        "default_value": 2,
+        "default_value": 1,
         "validation": {
           "minimum": 1,
-          "maximum": 4
+          "maximum": 1
         }
       },
       {
-        "field_key": "shot_generation_quality",
-        "label": "逻辑质量档位",
-        "value_type": "enum",
+        "field_key": "shot_duration_seconds",
+        "label": "短片时长",
+        "value_type": "number",
         "required": true,
-        "source": "teacher",
-        "visibility": "secondary",
-        "widget": "select",
-        "default_value": "balanced",
-        "options": [
-          {
-            "value": "fast",
-            "label": "快速"
-          },
-          {
-            "value": "balanced",
-            "label": "均衡"
-          },
-          {
-            "value": "quality",
-            "label": "高质量"
-          }
-        ]
+        "source": "system",
+        "visibility": "hidden",
+        "widget": "number",
+        "default_value": 6,
+        "validation": {
+          "minimum": 6,
+          "maximum": 6
+        }
       },
       {
         "field_key": "shot_reference_assets",
-        "label": "关键帧与连续性参考",
+        "label": "唯一关键帧",
         "value_type": "asset",
         "required": true,
         "source": "system",
@@ -69,13 +59,17 @@
         "widget": "asset_picker"
       },
       {
-        "field_key": "shot_style_contract_ref",
-        "label": "视频风格合同",
+        "field_key": "shot_style_preset",
+        "label": "固定视频风格",
         "value_type": "reference",
         "required": true,
         "source": "system",
         "visibility": "hidden",
-        "widget": "textarea"
+        "widget": "style_picker",
+        "default_value": "style.primary_math.paper_clay",
+        "allowed_item_kinds": [
+          "style_preset"
+        ]
       }
     ]
   }

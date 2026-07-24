@@ -3,14 +3,14 @@
   "kind": "generation_template",
   "metadata": {
     "key": "video.shots.generate",
-    "name": "逐镜头候选视频生成",
+    "name": "课堂导入短片候选生成",
     "domain": "primary_math",
     "locale": "zh-CN"
   },
   "spec": {
     "template_key": "video.shots.generate",
-    "title": "逐镜头候选视频生成",
-    "description": "按细分镜逐shot生成候选视频，候选通过校验、采用并保存后才形成正式clip。",
+    "title": "课堂导入短片候选生成",
+    "description": "从exact导入选择和教师明确选择的唯一关键帧生成一个6秒级候选短片，教师采用并保存后才写回项目。",
     "model_capability": "video.image_to_video.6s_30s",
     "input_definition_ref": {
       "item_key": "video.shots.generate.input",

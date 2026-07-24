@@ -3,13 +3,13 @@
   "kind": "projection_template",
   "metadata": {
     "key": "video.shots.generate.projection",
-    "name": "逐镜头候选视频生成教师投影",
+    "name": "课堂导入短片候选生成教师投影",
     "domain": "primary_math",
     "locale": "zh-CN"
   },
   "spec": {
     "projection_key": "video.shots.generate.projection",
-    "title": "逐镜头候选视频生成教师投影",
+    "title": "课堂导入短片候选生成教师投影",
     "source_definition_ref": {
       "item_key": "video.shots.generate.output",
       "kind": "content_definition"

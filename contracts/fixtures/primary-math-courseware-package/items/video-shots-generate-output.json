@@ -3,13 +3,13 @@
   "kind": "content_definition",
   "metadata": {
     "key": "video.shots.generate.output",
-    "name": "逐镜头候选视频生成输出",
+    "name": "课堂导入短片候选生成输出",
     "domain": "primary_math",
     "locale": "zh-CN"
   },
   "spec": {
     "definition_key": "video.shots.generate.output",
-    "title": "逐镜头候选视频生成输出",
+    "title": "课堂导入短片候选生成输出",
     "description": "一个shot的候选结果、技术文件事实和业务质量标记。",
     "definition_role": "artifact",
     "fields": [
