@@ -1,6 +1,6 @@
 # 当前项目状态
 
-当前阶段：阶段1教师可见R1纵向链进入开放PR收敛与唯一入口重建。
+当前阶段：阶段1教师可见R1纵向链的历史PR已经收敛，#217进入最终状态同步与唯一入口确认。
 > 最后核验：2026-07-24。
 > 当前唯一P0：[Issue #217](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/217)。
 
@@ -16,31 +16,35 @@
 - SQLAlchemy Session模型、Alembic迁移、Session绑定CSRF、前端Session Provider、PostgreSQL集成测试、真实API Playwright和`contracts/delivery-slices/211-runtime-auth.yaml`已经同步进入`main`。
 - PR #216最终Head的前端、后端、合同、PostgreSQL、真实浏览器和仓库治理CI全部通过；同一独立只读reviewer绑定最终base/head，P0/P1/P2/P3均为0。
 - 合并后复验在干净`origin/main` worktree运行，生产前端build通过；delivery slice精确通过3个backend selector和3个real API browser selector，零skip、xfail、xpass和flaky，测试进程及监听端口均已清理。
+- [PR #212](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/212)已经完成相对`main`的26文件价值矩阵；现行runner、delivery schema和真实API门禁均以`main`为准，旧通用治理控制面零提取，PR及分支已经关闭清理。
+- [PR #209](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/209)已经完成独有价值审计并标记为historical video WIP；未完成的视频runtime零代码提取，PR及分支已经关闭清理，不恢复视频开发。
+- [PR #215](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/215)保持关闭；对应Issue、远端/本地分支和worktree均已核验无残留，没有重新审计或恢复其治理合同。
+- [PR #208](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/208)已经完成27文件的复用、覆盖、失效、重写和删除矩阵；同步`startNodeRun`、不存在的审核路径、固定Artifact key和跨模块ORM不能进入主线，决定关闭旧PR并从最新`main`重建，旧分支已经清理。
 
 ## 当前工作
 
 - [Issue #217](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/217)只负责收敛开放PR和重建唯一R1入口，不新增业务功能或治理框架。
-- [PR #212](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/212)仍为开放Draft，必须相对最新`main`形成文件级价值矩阵，只允许最小提取确实不可缺少且未被覆盖的内容，否则关闭。
-- [PR #209](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/209)仍为开放Draft，只审计独有价值后标记为historical video WIP并关闭，不恢复视频开发。
-- [PR #208](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/208)仍为开放Draft，必须先形成复用、覆盖、失效、重写和删除矩阵，再决定重整或从最新`main`重建；当前不得继续实现。
-- [PR #215](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/215)已经关闭；#217只核验其远端分支和本地现场清理状态，不重新审计内容。
+- 历史竞争PR已经全部关闭；#217当前只剩最小状态同步、同一既有只读reviewer的最终复核、合并关闭和任务分支清理。
+- [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)在#217关闭前保持`status:blocked`；随后唯一允许的实现入口是从当时最新`origin/main`创建`feat/11-real-teacher-r1`和一个新的Draft PR，不恢复PR #208或其分支。
+- #11的第一个原子动作是先确认最小Contract Change：`startNodeRun`返回`202 AcceptedJob`并绑定现有Job/Worker/SSE；教材范围合法修订及质量阶段到`reviewArtifactVersion`的正式HTTP顺序必须同时明确，合同未确认前不得自造接口。
 
 ## 当前阻塞
 
 - 当前没有已知的Session/CSRF实现阻塞；#211已经合并、关闭并从最新`main`复验。
-- 阶段1完整教师R1纵向链尚未验收。PR #208、#209和#212仍占用历史口径，必须由#217先确认独有价值并收口，不能直接恢复任何旧分支开发。
-- #217完成前，不开始#208实现、PPT、图片、视频、TTS或新的治理框架，也不竞争修改active OpenAPI、生成客户端、Artifact/Job公共合同、Workflow Binding、Model Gateway或前端公共Session入口。
+- 当前没有竞争修改Session、active OpenAPI、生成客户端或`apps/web`公共入口的开放业务PR；#208、#209、#212和#215均已关闭。
+- 阶段1完整教师R1纵向链尚未验收；教材列表与范围修订、异步节点启动、质量/批准HTTP闭环、生产页面消费者、真实文本Provider和R1 real API Playwright仍是#11待实现事实。
+- #217完成前，不开始#11实现、PPT、图片、视频、TTS或新的治理框架，也不竞争修改active OpenAPI、生成客户端、Artifact/Job公共合同、Workflow Binding、Model Gateway或前端公共Session入口。
 
 ## 下一个阶段出口
 
-1. 对PR #212形成文件级价值矩阵，决定最小提取或废弃并关闭旧PR。
-2. 对PR #209只核验独有价值，记录historical video WIP结论并关闭；核验PR #215已关闭且分支现场已清理。
-3. 对PR #208形成复用、覆盖、失效、重写和删除矩阵，明确重整旧PR或关闭后从最新`main`重建。
-4. #217收口后，唯一业务主线回到Issue #11，并且只使用一个来自最新`main`的短分支和Draft PR推进真实教师R1纵向链。
+1. 合并#217的最小状态同步，由同一既有只读reviewer绑定最终base/head；随后关闭#217并删除其分支和worktree。
+2. 从最新`origin/main`创建`feat/11-real-teacher-r1`和新的Draft PR，将Issue #11转回`status:in-progress`。
+3. 先在#11/#210确认异步`startNodeRun`、教材范围修订和质量/批准HTTP顺序的最小Contract Change，再同步active OpenAPI、FastAPI和生成客户端。
+4. 只推进“真实登录 -> 项目 -> 教材与物理页 -> 课时划分 -> LessonUnit -> 十二部分教案 -> 三类九套 -> 批准 -> 唯一IntroSelection -> 刷新恢复”的生产页面、PostgreSQL、Job/Worker/SSE、真实Provider和real API Playwright闭环。
 
 ## 接手提示
 
 1. 先读`README.md`、`AGENTS.md`、`docs/governance/项目记忆与接手索引.md`和本文件。
-2. 当前任务只接受#217的只读价值审计、PR关闭清理和唯一R1入口决定；不要从旧PR恢复实现。
+2. 当前任务只接受#217的状态同步、最终只读复核和关闭清理；不要从旧PR恢复实现。
 3. #211的当前运行证据以`main`中的代码、迁移、测试、active OpenAPI和`contracts/delivery-slices/211-runtime-auth.yaml`为准；PR #216保留合并前CI与独立审查证据。
-4. PR #208只有在#217矩阵完成并明确处置后才能恢复，且必须从最新`main`核对接口与正式事实。
+4. PR #208已经关闭且不得恢复；#11必须在#217关闭后从最新`main`建立新的唯一短分支和Draft PR。
