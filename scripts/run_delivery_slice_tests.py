@@ -140,6 +140,38 @@ def _reported_specs(report: object) -> list[tuple[str, str]]:
     return found
 
 
+def _reported_tests(report: object) -> list[object]:
+    if not isinstance(report, dict):
+        return []
+    found: list[object] = []
+    pending = list(report.get("suites", [])) if isinstance(report.get("suites"), list) else []
+    while pending:
+        suite = pending.pop()
+        if not isinstance(suite, dict):
+            continue
+        if isinstance(suite.get("suites"), list):
+            pending.extend(suite["suites"])
+        specs = suite.get("specs", []) if isinstance(suite.get("specs"), list) else []
+        for spec in specs:
+            if isinstance(spec, dict) and isinstance(spec.get("tests"), list):
+                found.extend(spec["tests"])
+    return found
+
+
+def _browser_test_passed(test: object) -> bool:
+    if not isinstance(test, dict):
+        return False
+    results = test.get("results")
+    return (
+        test.get("expectedStatus") == "passed"
+        and test.get("status") == "expected"
+        and isinstance(results, list)
+        and len(results) == 1
+        and isinstance(results[0], dict)
+        and results[0].get("status") == "passed"
+    )
+
+
 def _browser_report_passed(
     report: object,
     *,
@@ -151,8 +183,11 @@ def _browser_report_passed(
     stats = report.get("stats", {})
     if not isinstance(stats, dict):
         return False
+    reported_tests = _reported_tests(report)
     return (
         _reported_specs(report) == [(expected_file, expected_title)]
+        and len(reported_tests) == 1
+        and _browser_test_passed(reported_tests[0])
         and stats.get("expected", 0) == 1
         and stats.get("skipped", 0) == 0
         and stats.get("unexpected", 0) == 0

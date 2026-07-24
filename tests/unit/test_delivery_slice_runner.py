@@ -22,6 +22,10 @@ SELECTOR = "apps/web/e2e/real-api/session.spec.ts::restores session"
 
 def _browser_report(
     specs: list[tuple[str, str]] | None = None,
+    *,
+    expected_status: str = "passed",
+    test_status: str = "expected",
+    result_status: str = "passed",
     **stats: int,
 ) -> dict[str, object]:
     report_stats = {
@@ -35,7 +39,17 @@ def _browser_report(
         "suites": [
             {
                 "specs": [
-                    {"file": file_name, "title": title}
+                    {
+                        "file": file_name,
+                        "title": title,
+                        "tests": [
+                            {
+                                "expectedStatus": expected_status,
+                                "status": test_status,
+                                "results": [{"status": result_status}],
+                            }
+                        ],
+                    }
                     for file_name, title in specs or [("session.spec.ts", "restores session")]
                 ]
             }
@@ -167,6 +181,18 @@ def test_browser_report_rejects_multiple_or_wrong_specs(specs: list[tuple[str, s
 def test_browser_report_rejects_skipped_or_flaky(outcome: str) -> None:
     assert not _browser_report_passed(
         _browser_report(**{outcome: 1}),
+        expected_file="session.spec.ts",
+        expected_title="restores session",
+    )
+
+
+def test_browser_report_rejects_expected_failure() -> None:
+    assert not _browser_report_passed(
+        _browser_report(
+            expected_status="failed",
+            test_status="expected",
+            result_status="failed",
+        ),
         expected_file="session.spec.ts",
         expected_title="restores session",
     )

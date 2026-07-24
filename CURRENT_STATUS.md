@@ -19,7 +19,7 @@
 - 合同生成前后哈希一致；OpenAPI lint、runtime surface、JSON Schema、TypeScript合同类型、对`origin/main`兼容性和仓库策略门禁通过。合同测试为226 passed；两个本机条件skip分别是Windows无符号链接权限和未注入数据库的stage0资源用例，后者已在PostgreSQL环境另行1 passed。
 - 前端format、lint、typecheck、61个文件中的229个单测和生产build全部通过。
 - delivery slice已通过精确3个backend selector和3个real API browser selector；每个selector均要求恰好一个通过并拒绝skip、xfail、xpass和flaky。
-- delivery runner定向测试为12 passed，覆盖Windows pnpm shim、独立JSON报告、错误spec、skip/flaky以及backend/browser子进程超时。
+- delivery runner定向测试为13 passed，覆盖Windows pnpm shim、独立JSON报告、错误spec、skip/xfail/flaky以及backend/browser子进程超时。
 - 全树Ruff、Pyright、tracked secret scan和`git diff --check`通过。
 
 ## 当前工作
