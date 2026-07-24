@@ -24,9 +24,9 @@
 
 ## 当前工作
 
-- PR #216仍是Draft；当前已验证工作树尚未提交和推送，远端检查仍绑定旧占位HEAD，不能作为本轮实现证据。
-- 下一步是完成base-to-working-tree安全自审，精确暂存#211文件并排除本机`AGENTS.md`改动，然后提交、推送和更新PR证据。
-- 推送后的最终base/head必须由未参与实现的同一只读reviewer审查；任何修复导致HEAD变化时，由同一reviewer复核并重新绑定。
+- PR #216仍是Draft；#211实现和本文件当前状态已经提交并推送，PR正文已同步输入、输出、验收、验证和回退证据。
+- 当前分支等待最新HEAD的CI和精确base/head独立审查，尚未转Ready或合并。
+- 最终base/head必须由未参与实现的同一只读reviewer审查；任何修复导致HEAD变化时，由同一reviewer复核并重新绑定。
 
 ## 当前阻塞
 
@@ -36,11 +36,9 @@
 
 ## 下一个阶段出口
 
-1. 精确暂存#211范围，确认cached文件列表不含`AGENTS.md`，提交并推送`feat/211-runtime-auth`。
-2. 更新Draft PR #216的输入、输出、验收、验证证据和回退方式。
-3. 由未参与实现的只读reviewer审查精确`origin/main...HEAD`；关闭全部P0/P1，处置P2/P3，并在最终HEAD重新绑定批准证据。
-4. CI全绿后将PR转Ready并Squash Merge，关闭#211，删除任务分支和隔离worktree，从最新`main`复验关键Session/CSRF和delivery门禁。
-5. 只有#211进入最新`main`后，才审查PR #208并形成复用、覆盖、失效、重写和删除矩阵，恢复唯一R1纵向链。
+1. 由未参与实现的只读reviewer审查精确`origin/main...HEAD`；关闭全部P0/P1，处置P2/P3，并在最终HEAD重新绑定批准证据。
+2. CI全绿后将PR转Ready并Squash Merge，关闭#211，删除任务分支和隔离worktree，从最新`main`复验关键Session/CSRF和delivery门禁。
+3. 只有#211进入最新`main`后，才审查PR #208并形成复用、覆盖、失效、重写和删除矩阵，恢复唯一R1纵向链。
 
 ## 接手提示
 
