@@ -9,7 +9,7 @@
 
 前端只有一个 `RuntimeApp` 页面与路由树。real 模式连接真实 API；DEV 模式只动态启用 MSW 网络 adapter。构建边界检查会拒绝 MSW Worker、本地业务运行时标识、开发凭据和缺失静态素材。
 
-当前源码由 Open Draft PR [#111](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/111) 承载，尚未合并或获得发布批准。真实模式已经实现项目、教材三段式上传、Generation Job/项目 SSE、课时读取/编辑、项目概览，以及教材、素材、Artifact 和 Job 资源页；但真实认证、资源发现、生成/交付合同和部署环境端到端联调仍未完成，因此 `dist` 目前只能作为候选构建产物，不能宣称生产发布完成。
+生产前端基线已由 PR #111 进入 `main`；#211 在其上增加真实 Session/CSRF 启动闭环。真实模式已经实现受控登录、刷新恢复、退出撤销、项目创建，以及既有教材上传和资源页面，但资源发现、R1 生成链、生产 HTTPS/反向代理和部署环境端到端联调仍未完成，因此 `dist` 只能作为候选构建产物。
 
 ## 构建验证
 
@@ -27,6 +27,7 @@ corepack pnpm --filter @shanhaiedu/web test:storybook:a11y
 corepack pnpm --filter @shanhaiedu/web build
 corepack pnpm --filter @shanhaiedu/web test:e2e --project=chromium
 corepack pnpm --filter @shanhaiedu/web test:e2e:runtime --project=runtime-chromium
+corepack pnpm --filter @shanhaiedu/web test:e2e:real-api --project=real-api-chromium
 ```
 
 也可以运行：
@@ -43,7 +44,7 @@ corepack pnpm --filter @shanhaiedu/web release:check
 - 不包含已知本地业务运行时标识和开发凭据；
 - 文本产物中的 `/assets/...` 引用都有对应构建文件。
 
-它不能证明真实认证、API 可用性、对象存储 CORS、SSE 反向代理、真实媒体 Provider、监控或业务页面已经通过生产验收。
+它不能证明生产 Session 配置、API 可用性、对象存储 CORS、SSE 反向代理、真实媒体 Provider、监控或业务页面已经通过生产验收。
 
 ## 环境配置
 
@@ -57,12 +58,32 @@ VITE_RELEASE_VERSION=<发布标识>
 
 不要把 `.env.local`、真实教材、签名上传或下载地址、服务密钥、DEV fixture 或开发凭据复制到产物目录。浏览器不得持有模型 Provider 密钥。
 
+后端 Session 启动配置必须通过部署环境或 Secret Manager 注入，不能进入前端构建参数。Pydantic 使用 `SHANHAI_` 前缀读取以下变量；数组必须是 JSON，布尔值使用 `true`/`false`：
+
+```text
+SHANHAI_SESSION_ACCESS_CODE=<至少24字符的受控秘密>
+SHANHAI_SESSION_CSRF_SECRET=<至少32字符的随机秘密>
+SHANHAI_SESSION_TEACHER_PRINCIPAL_ID=01960000-0000-7000-8000-000000000002
+SHANHAI_SESSION_ALLOWED_ORIGINS=["https://teacher.example.edu"]
+SHANHAI_SESSION_COOKIE_SECURE=true
+SHANHAI_SESSION_TTL_SECONDS=3600
+SHANHAI_SESSION_LOGIN_MAX_FAILURES=5
+SHANHAI_SESSION_LOGIN_WINDOW_SECONDS=300
+SHANHAI_SESSION_TRUSTED_PROXY_HOSTS=["10.0.0.0/8","192.0.2.10"]
+```
+
+- `SHANHAI_SESSION_ACCESS_CODE`、`SHANHAI_SESSION_CSRF_SECRET`、`SHANHAI_SESSION_TEACHER_PRINCIPAL_ID` 和 `SHANHAI_SESSION_ALLOWED_ORIGINS` 必须同时配置；生产环境缺少任一项会拒绝启动。
+- `SHANHAI_SESSION_ALLOWED_ORIGINS` 只接受精确 HTTP(S) origin，不接受路径、查询、凭据或通配符；多域名以 JSON 数组逐项列出。
+- 生产环境 `SHANHAI_SESSION_COOKIE_SECURE` 必须保持 `true`；仅本地明文 HTTP 联调可显式设为 `false`。
+- `SHANHAI_SESSION_TTL_SECONDS` 范围为 300–604800；`SHANHAI_SESSION_LOGIN_MAX_FAILURES` 范围为 1–100，`SHANHAI_SESSION_LOGIN_WINDOW_SECONDS` 范围为 10–3600 秒。
+- `SHANHAI_SESSION_TRUSTED_PROXY_HOSTS` 只列部署方控制的代理 IP 或 CIDR。边缘代理必须覆盖而不是追加来自公网的 `X-Forwarded-For`，未列入该数组的直连来源不会被信任。
+
 ## 发布前置条件
 
 进入生产部署前必须同时满足：
 
-1. PR #111 完成前端门禁、独立审查和合并，部署只从受保护的可发布提交构建；
-2. 服务端提供并验证真实认证 bootstrap、当前用户、退出、Cookie、CSRF 和权限合同，前端安装 `configureCsrfTokenProvider`；
+1. #211 完成门禁、独立审查并进入受保护 `main`，部署只从该可发布提交构建；
+2. 部署环境注入受控 access code 到教师 Principal 的映射、CSRF secret、精确 Origin 和可信代理配置，并保持生产 Cookie 为 `Secure`；
 3. 项目创建、上传会话、对象存储直传、上传确认、Job REST/SSE、课时、项目概览和当前资源页在目标环境完成浏览器端到端联调；
 4. 服务端补齐教材/Artifact/Job 项目级发现、Artifact 可编辑字段权限、课时/教案生成、创作结果查询、正式 PPTX、最终视频和交付合同；DEV MSW 结果不能代替真实联调；
 5. 真实图片/视频能力上线前，服务端媒体 Adapter、供应商状态映射和受控真实冒烟单独通过；前端静态素材不作为 Provider 验收；
@@ -77,7 +98,7 @@ VITE_RELEASE_VERSION=<发布标识>
 - 代理必须支持流式响应，关闭 SSE 缓冲并保留 `Last-Event-ID`；
 - 对象存储上传地址必须允许合同返回的 method、required headers 和 ETag 暴露；
 - Cookie 保持 `Secure`、`HttpOnly` 和适当的 `SameSite`；
-- 服务端认证 bootstrap 提供 CSRF token，由前端以内存读取器注入 `X-CSRF-Token`；未完成该合同前不得开放 Cookie 写操作；
+- 三个 Session API 响应使用 `Cache-Control: no-store`；前端只在内存读取 CSRF 并注入 `X-CSRF-Token`，不得写入 Web Storage；
 - 静态哈希资源设置长期缓存，`index.html` 不使用长期不可变缓存；
 - 保留上一版静态产物和发布标识，以便快速回滚。
 
@@ -85,8 +106,8 @@ VITE_RELEASE_VERSION=<发布标识>
 
 当前 Runtime 范围至少检查：
 
-1. `/app`、`/app/projects`、`/app/projects/new` 和项目详情可直接打开、刷新和返回；
-2. 未认证、无权限、会话过期和 CSRF 缺失均安全失败，不出现 DEV fixture 假成功；
+1. `/login` 通过真实 API 建立会话，`/app/projects` 刷新后恢复同一 Session，退出后返回 `/login`；
+2. 未认证、已撤销、会话过期、错误 Origin 和 CSRF 缺失/错误均安全失败，不出现 DEV fixture 假成功；
 3. 项目创建后能够完成教材 SHA-256、上传会话、对象存储 PUT、ETag 与确认请求；
 4. setup 页面刷新后可凭 `jobId` 恢复 Job REST 快照，SSE 中断后携带 `Last-Event-ID` 重连；
 5. 409/`EVENT_HISTORY_EXPIRED` 会清除游标并重新读取 REST 快照，任务取消和失败不会显示为成功；

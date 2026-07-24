@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ShanHaiEdu Core Integration Surface
-  version: 3.0.0
+  version: 3.1.0
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
@@ -48,6 +48,70 @@ paths:
                 $ref: '#/components/schemas/ReadinessEnvelope'
         '4XX':
           $ref: '#/components/responses/Error'
+  /auth/session:
+    post:
+      summary: 使用受控访问码建立教师会话
+      operationId: createSession
+      security:
+        - BrowserOrigin: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+      responses:
+        '201':
+          description: Session created and returned in a Secure HttpOnly cookie
+          headers:
+            Set-Cookie:
+              schema: {type: string}
+            Cache-Control:
+              schema: {type: string, const: no-store}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+    get:
+      summary: 恢复当前教师会话
+      operationId: getCurrentSession
+      responses:
+        '200':
+          description: Current public principal, expiry and bound CSRF token
+          headers:
+            Cache-Control:
+              schema: {type: string, const: no-store}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+    delete:
+      summary: 撤销当前教师会话
+      operationId: deleteSession
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: Session revoked and cookie expired
+          headers:
+            Cache-Control:
+              schema: {type: string, const: no-store}
+        '4XX':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
   /projects:
     get:
       summary: 查询项目列表
@@ -67,8 +131,13 @@ paths:
     post:
       summary: 创建单知识点项目
       operationId: createProject
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       requestBody:
         required: true
         content:
@@ -123,10 +192,15 @@ paths:
     patch:
       summary: 调整项目自动化策略
       operationId: updateProjectAutomationPolicy
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       parameters:
         - $ref: '#/components/parameters/ProjectId'
         - $ref: '#/components/parameters/IfMatch'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       requestBody:
         required: true
         content:
@@ -195,9 +269,14 @@ paths:
     post:
       summary: 幂等绑定、追加或替换项目资产
       operationId: bindProjectAsset
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       parameters:
         - $ref: '#/components/parameters/AssetSlotId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       requestBody:
         required: true
         content:
@@ -214,9 +293,14 @@ paths:
     post:
       summary: 幂等停用项目资产绑定并保留历史
       operationId: unbindProjectAsset
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       parameters:
         - $ref: '#/components/parameters/AssetBindingId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       responses:
         '200':
           description: Asset binding deactivated without deleting history
@@ -245,10 +329,15 @@ paths:
     patch:
       summary: 原子更新、重排或归档项目课时
       operationId: updateProjectLessons
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       parameters:
         - $ref: '#/components/parameters/ProjectId'
         - $ref: '#/components/parameters/IfMatch'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       requestBody:
         required: true
         content:
@@ -289,10 +378,15 @@ paths:
     patch:
       summary: 更新课时分支开关
       operationId: updateLessonBranches
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       parameters:
         - $ref: '#/components/parameters/LessonId'
         - $ref: '#/components/parameters/IfMatch'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       requestBody:
         required: true
         content:
@@ -330,9 +424,14 @@ paths:
     post:
       summary: 教师选择一个已批准课堂导入方案
       operationId: selectLessonIntroOption
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       parameters:
         - $ref: '#/components/parameters/LessonId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       requestBody:
         required: true
         content:
@@ -352,9 +451,14 @@ paths:
     post:
       summary: 创建教材私有直传会话
       operationId: createMaterialUploadSession
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       parameters:
         - $ref: '#/components/parameters/ProjectId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       requestBody:
         required: true
         content:
@@ -374,10 +478,15 @@ paths:
     post:
       summary: 确认教材对象并创建后台任务
       operationId: confirmMaterialUpload
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       parameters:
         - $ref: '#/components/parameters/ProjectId'
         - $ref: '#/components/parameters/MaterialId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       requestBody:
         required: true
         content:
@@ -443,9 +552,14 @@ paths:
     post:
       summary: 创建项目内容产物及活动草稿
       operationId: createArtifact
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       parameters:
         - $ref: '#/components/parameters/ProjectId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       requestBody:
         required: true
         content:
@@ -478,11 +592,16 @@ paths:
     put:
       summary: 乐观锁自动保存活动草稿
       operationId: saveArtifactDraft
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       parameters:
         - $ref: '#/components/parameters/ArtifactId'
         - $ref: '#/components/parameters/DraftBranch'
         - $ref: '#/components/parameters/IfMatch'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       requestBody:
         required: true
         content:
@@ -502,10 +621,15 @@ paths:
     post:
       summary: 从活动草稿提交不可变版本
       operationId: submitArtifactVersion
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       parameters:
         - $ref: '#/components/parameters/ArtifactId'
         - $ref: '#/components/parameters/IfMatch'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       requestBody:
         required: true
         content:
@@ -522,9 +646,14 @@ paths:
     post:
       summary: 追加产物版本审核动作
       operationId: reviewArtifactVersion
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       parameters:
         - $ref: '#/components/parameters/ArtifactVersionId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       requestBody:
         required: true
         content:
@@ -556,11 +685,16 @@ paths:
     post:
       summary: 创建通用创作批次
       operationId: createCreationBatch
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       description: >-
         New consumers must send the source_kind discriminated contract. The legacy branch is
         accepted only during migration and is deprecated.
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       requestBody:
         required: true
         content:
@@ -580,12 +714,17 @@ paths:
     post:
       summary: 批量生成创作候选
       operationId: generateCreationBatch
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       description: >-
         The current branch pins each item to an immutable prompt_version_id. The legacy item_ids
         branch remains accepted during migration and is deprecated.
       parameters:
         - $ref: '#/components/parameters/BatchId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       requestBody:
         required: true
         content:
@@ -601,10 +740,15 @@ paths:
     post:
       summary: 保存创作条目业务提示词版本
       operationId: saveCreationPromptVersion
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       description: Saves the editable business prompt without starting generation.
       parameters:
         - $ref: '#/components/parameters/CreationItemId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       requestBody:
         required: true
         content:
@@ -624,10 +768,15 @@ paths:
     post:
       summary: 基于固定提示词版本生成候选
       operationId: generateCreationItem
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       description: Freezes the selected prompt version and inputs into a generation job snapshot.
       parameters:
         - $ref: '#/components/parameters/CreationItemId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       requestBody:
         required: true
         content:
@@ -643,10 +792,15 @@ paths:
     post:
       summary: 采用候选但不写回项目
       operationId: adoptGenerationResult
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       description: Records a teacher or automation-policy adoption; it never creates an asset binding.
       parameters:
         - $ref: '#/components/parameters/GenerationResultId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       requestBody:
         required: true
         content:
@@ -666,12 +820,17 @@ paths:
     post:
       summary: 把已采用候选写回项目
       operationId: saveAdoptionToProject
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       description: >-
         Project-source adoptions use the immutable CreationPackage target and reject target
         overrides. Standalone adoptions require an explicitly authorized project and slot.
       parameters:
         - $ref: '#/components/parameters/AdoptionId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       requestBody:
         required: true
         content:
@@ -691,6 +850,10 @@ paths:
     post:
       summary: 兼容旧客户端的候选直接写回入口
       operationId: saveGenerationResultToProject
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       deprecated: true
       description: >-
         Legacy adapter only. The server must audit adoption and save as separate facts. New clients
@@ -702,6 +865,7 @@ paths:
           required: true
           schema: {type: string, format: uuid}
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       requestBody:
         required: true
         content:
@@ -742,9 +906,14 @@ paths:
     post:
       summary: 请求协作式取消异步任务
       operationId: cancelGenerationJob
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
       parameters:
         - $ref: '#/components/parameters/JobId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
       responses:
         '202':
           description: Cancellation requested
@@ -786,6 +955,19 @@ paths:
           $ref: '#/components/responses/Error'
 components:
   securitySchemes:
+    BrowserOrigin:
+      type: apiKey
+      in: header
+      name: Origin
+      description: >-
+        Browser-controlled request origin. User agents attach this header;
+        application callers must not synthesize it from user input.
+    CsrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: >-
+        Server-issued token bound to the current session and injected by the web client.
     cookieAuth:
       type: apiKey
       in: cookie
@@ -794,6 +976,14 @@ components:
         Server-issued Secure HttpOnly session resolved through the authentication adapter.
         Organization and user identity headers are not accepted.
   parameters:
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 64
+        maxLength: 64
     ProjectId:
       name: project_id
       in: path
@@ -903,6 +1093,49 @@ components:
           schema:
             $ref: '#/components/schemas/AcceptedJobEnvelope'
   schemas:
+    CreateSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [access_code]
+      properties:
+        access_code:
+          type: string
+          minLength: 1
+          maxLength: 512
+          writeOnly: true
+    SessionPrincipal:
+      type: object
+      additionalProperties: false
+      required:
+        - principal_id
+        - user_id
+        - organization_id
+        - display_name
+        - organization_name
+        - organization_role
+      properties:
+        principal_id: {type: string, format: uuid}
+        user_id: {type: string, format: uuid}
+        organization_id: {type: string, format: uuid}
+        display_name: {type: string, minLength: 1, maxLength: 160}
+        organization_name: {type: string, minLength: 1, maxLength: 160}
+        organization_role: {enum: [owner, admin, member]}
+    CurrentSession:
+      type: object
+      additionalProperties: false
+      required: [session_id, principal, expires_at, csrf_token]
+      properties:
+        session_id: {type: string, format: uuid}
+        principal: {$ref: '#/components/schemas/SessionPrincipal'}
+        expires_at: {type: string, format: date-time}
+        csrf_token: {type: string, minLength: 64, maxLength: 64}
+    SessionEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/CurrentSession'}
+        request_id: {type: string, minLength: 1}
     IntroOptionSet:
       $ref: './intro-option-set.schema.json'
     IntroOption:

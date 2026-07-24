@@ -13,6 +13,7 @@ from apps.api.errors import ApiError
 from apps.api.identity.authentication import Authenticator
 from apps.api.identity.context import ActorContext, AuthenticatedIdentity
 from apps.api.identity.repository import IdentityRepository
+from apps.api.identity.session_service import DatabaseSessionService
 
 session_cookie = APIKeyCookie(
     name="shanhai_session",
@@ -26,6 +27,9 @@ async def get_authenticated_identity(
     request: Request,
     token: Annotated[str | None, Security(session_cookie)],
 ) -> AuthenticatedIdentity:
+    cached = getattr(request.state, "authenticated_identity", None)
+    if isinstance(cached, AuthenticatedIdentity):
+        return cached
     authenticator = cast(Authenticator | None, request.app.state.authenticator)
     if authenticator is None or token is None:
         raise authentication_required()
@@ -61,3 +65,17 @@ def authentication_required() -> ApiError:
         code="AUTHENTICATION_REQUIRED",
         message="Authentication is required for this request.",
     )
+
+
+def enforce_session_request_security(request: Request) -> None:
+    """Require exact Origin and bound CSRF for production session writes."""
+
+    service = cast(DatabaseSessionService | None, request.app.state.session_service)
+    if service is None or request.method in {"GET", "HEAD", "OPTIONS"}:
+        return
+    if request.method == "POST" and request.url.path == "/api/v2/auth/session":
+        return
+    snapshot = service.require_snapshot(request.cookies.get("shanhai_session"))
+    service.require_origin(request.headers.get("Origin"))
+    service.require_csrf(snapshot, request.headers.get("X-CSRF-Token"))
+    request.state.authenticated_identity = snapshot.identity

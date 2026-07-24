@@ -10,6 +10,7 @@ export const artifactId = "01960000-0000-7000-8000-000000000301";
 export const assetSlotId = "01960000-0000-7000-8000-000000000401";
 export const assetBindingId = "01960000-0000-7000-8000-000000000402";
 export const fileAssetVersionId = "01960000-0000-7000-8000-000000000403";
+export const runtimeSessionCsrfToken = "placeholder".padEnd(64, "0");
 const workflowVersionId = "01960000-0000-7000-8000-000000000201";
 const now = "2026-07-20T08:00:00Z";
 
@@ -35,6 +36,7 @@ export type RuntimeApiState = {
   materialFileReads: number;
   materialParseReads: number;
   projectStreamRequests: number;
+  sessionReads: number;
   unhandled: string[];
   uploadFileRequests: number;
   uploadSessionRequests: number;
@@ -63,6 +65,20 @@ const baseProject = {
   created_at: now,
   updated_at: now,
 };
+
+const currentSession = {
+  session_id: "01960000-0000-7000-8000-000000000701",
+  principal: {
+    principal_id: "01960000-0000-7000-8000-000000000702",
+    user_id: "01960000-0000-7000-8000-000000000703",
+    organization_id: "01960000-0000-7000-8000-000000000704",
+    display_name: "王老师",
+    organization_name: "山海小学",
+    organization_role: "member",
+  },
+  expires_at: "2099-12-31T23:59:59Z",
+  csrf_token: runtimeSessionCsrfToken,
+} satisfies components["schemas"]["CurrentSession"];
 
 const lesson = {
   id: lessonId,
@@ -266,6 +282,7 @@ export async function installRuntimeApi(page: Page, options: RuntimeApiOptions =
     materialFileReads: 0,
     materialParseReads: 0,
     projectStreamRequests: 0,
+    sessionReads: 0,
     unhandled: [],
     uploadFileRequests: 0,
     uploadSessionRequests: 0,
@@ -305,6 +322,12 @@ export async function installRuntimeApi(page: Page, options: RuntimeApiOptions =
       state.csrfHeaders.push(request.headers()["x-csrf-token"] ?? "");
       state.idempotencyHeaders.push(request.headers()["idempotency-key"] ?? "");
       state.ifMatchHeaders.push(request.headers()["if-match"] ?? "");
+    }
+
+    if (method === "GET" && path === "/api/v2/auth/session") {
+      state.sessionReads += 1;
+      await json(route, envelope(currentSession, "req_session"));
+      return;
     }
 
     if (method === "GET" && path === "/api/v2/projects") {

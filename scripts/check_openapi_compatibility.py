@@ -47,7 +47,7 @@ class BreakingTransition:
 
 
 def contract_sha256(contract: bytes) -> str:
-    return sha256(contract).hexdigest()
+    return sha256(contract.replace(b"\r\n", b"\n")).hexdigest()
 
 
 def normalize_breaking_errors(errors: list[str]) -> list[str]:

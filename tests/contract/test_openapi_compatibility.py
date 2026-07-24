@@ -57,6 +57,12 @@ def test_current_contract_is_compatible_with_itself() -> None:
     assert find_breaking_changes(contract, deepcopy(contract)) == []
 
 
+def test_contract_hash_is_stable_across_platform_line_endings() -> None:
+    assert contract_sha256(b"openapi: 3.1.0\ninfo:\n  title: ShanHaiEdu\n") == contract_sha256(
+        b"openapi: 3.1.0\r\ninfo:\r\n  title: ShanHaiEdu\r\n"
+    )
+
+
 def test_removed_operation_is_breaking() -> None:
     base = load_current_contract()
     current = deepcopy(base)

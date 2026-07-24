@@ -8,6 +8,9 @@ from typing import Any
 import yaml
 from jsonschema import Draft202012Validator, FormatChecker
 
+from apps.api.main import create_app
+from apps.api.settings import Settings
+
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACTS = ROOT / "contracts"
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch"})
@@ -210,6 +213,59 @@ def test_protected_operations_use_cookie_auth_without_identity_headers() -> None
         assert forbidden_headers.isdisjoint(
             str(parameter.get("name", "")).lower() for parameter in parameters
         )
+
+
+def test_runtime_and_active_contract_express_browser_write_security() -> None:
+    active = load_openapi()
+    runtime = create_app(settings=Settings(_env_file=None, environment="test")).openapi()
+    expected_schemes = {
+        "BrowserOrigin": ("header", "Origin"),
+        "CsrfToken": ("header", "X-CSRF-Token"),
+        "cookieAuth": ("cookie", "shanhai_session"),
+    }
+
+    for document in (active, runtime):
+        schemes = document["components"]["securitySchemes"]
+        for name, (location, header_name) in expected_schemes.items():
+            scheme = schemes[name]
+            assert scheme["type"] == "apiKey"
+            assert scheme["in"] == location
+            assert scheme["name"] == header_name
+
+        for path, path_item in document["paths"].items():
+            for method, operation in path_item.items():
+                if method not in HTTP_METHODS or not isinstance(operation, dict):
+                    continue
+                if operation["operationId"] in {"getLiveness", "getReadiness"}:
+                    assert operation["security"] == []
+                elif operation["operationId"] == "createSession":
+                    assert operation["security"] == [{"BrowserOrigin": []}]
+                elif method in {"post", "put", "patch", "delete"}:
+                    assert operation["security"] == [
+                        {"BrowserOrigin": [], "CsrfToken": [], "cookieAuth": []}
+                    ]
+                else:
+                    assert operation.get("security", document.get("security")) == [
+                        {"cookieAuth": []}
+                    ], path
+
+
+def test_protected_writes_require_csrf_except_session_bootstrap() -> None:
+    openapi = load_openapi()
+    protected_write_count = 0
+
+    for path_item in openapi["paths"].values():
+        for method in ("post", "put", "patch", "delete"):
+            operation = path_item.get(method)
+            if not isinstance(operation, dict) or operation["operationId"] == "createSession":
+                continue
+            protected_write_count += 1
+            parameters = [resolve_local(openapi, item) for item in operation.get("parameters", [])]
+            assert any(parameter.get("name") == "X-CSRF-Token" for parameter in parameters), (
+                operation["operationId"]
+            )
+
+    assert protected_write_count > 0
 
 
 def test_generated_types_and_shared_client_are_present() -> None:

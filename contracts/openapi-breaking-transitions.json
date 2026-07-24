@@ -37,6 +37,37 @@
         "components.schemas.PromptPreviewEnvelope.data: property removed: schema",
         "components.schemas.PromptPreviewEnvelope.data: required properties changed"
       ]
+    },
+    {
+      "id": "issue-211-session-csrf-write-headers",
+      "issue": 211,
+      "reason": "Apply Issue #211 and make the Session-bound X-CSRF-Token requirement explicit for every protected write operation.",
+      "base_contract_sha256": "7bf53fbbe7e1640a7cebbf301660584c49c26e26cee6e0983e4797ab73ab02a8",
+      "current_contract_sha256": "fd124eba8a80167430813e0bdb6b7c4fc83202ca788e4761cb69ffbe57ff3d2d",
+      "breaking_errors_sha256": "eb8affce4263c9f0e59da195a0a1eb82454bdfc3cfc579341a9602ec70fbcee2",
+      "breaking_errors": [
+        "PATCH /lessons/{lesson_id}/branches: required parameter added: ('header', 'X-CSRF-Token')",
+        "PATCH /projects/{project_id}/automation-policy: required parameter added: ('header', 'X-CSRF-Token')",
+        "PATCH /projects/{project_id}/lessons: required parameter added: ('header', 'X-CSRF-Token')",
+        "POST /adoptions/{adoption_id}/save-to-project: required parameter added: ('header', 'X-CSRF-Token')",
+        "POST /artifact-versions/{artifact_version_id}/approvals: required parameter added: ('header', 'X-CSRF-Token')",
+        "POST /artifacts/{artifact_id}/versions: required parameter added: ('header', 'X-CSRF-Token')",
+        "POST /asset-bindings/{binding_id}/unbind: required parameter added: ('header', 'X-CSRF-Token')",
+        "POST /asset-slots/{slot_id}/bindings: required parameter added: ('header', 'X-CSRF-Token')",
+        "POST /creation-batches/{batch_id}/generate: required parameter added: ('header', 'X-CSRF-Token')",
+        "POST /creation-batches: required parameter added: ('header', 'X-CSRF-Token')",
+        "POST /creation-items/{item_id}/generate: required parameter added: ('header', 'X-CSRF-Token')",
+        "POST /creation-items/{item_id}/prompt-versions: required parameter added: ('header', 'X-CSRF-Token')",
+        "POST /generation-jobs/{job_id}/cancel: required parameter added: ('header', 'X-CSRF-Token')",
+        "POST /generation-results/{result_id}/adoptions: required parameter added: ('header', 'X-CSRF-Token')",
+        "POST /generation-results/{result_id}/save-to-project: required parameter added: ('header', 'X-CSRF-Token')",
+        "POST /lessons/{lesson_id}/intro-selections: required parameter added: ('header', 'X-CSRF-Token')",
+        "POST /projects/{project_id}/artifacts: required parameter added: ('header', 'X-CSRF-Token')",
+        "POST /projects/{project_id}/materials/uploads: required parameter added: ('header', 'X-CSRF-Token')",
+        "POST /projects/{project_id}/materials/{material_id}/confirm: required parameter added: ('header', 'X-CSRF-Token')",
+        "POST /projects: required parameter added: ('header', 'X-CSRF-Token')",
+        "PUT /artifacts/{artifact_id}/drafts/{draft_branch}: required parameter added: ('header', 'X-CSRF-Token')"
+      ]
     }
   ]
 }

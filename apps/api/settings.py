@@ -5,6 +5,8 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Self
+from urllib.parse import urlsplit
+from uuid import UUID
 
 from pydantic import Field, HttpUrl, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -80,9 +82,35 @@ class Settings(BaseSettings):
     )
     provider_media_max_ttl_seconds: int = Field(default=300, ge=1, le=3600)
     provider_media_max_file_bytes: int = Field(default=10_485_760, ge=1)
+    session_access_code: SecretStr | None = None
+    session_csrf_secret: SecretStr | None = None
+    session_teacher_principal_id: UUID | None = None
+    session_allowed_origins: list[str] = Field(default_factory=list)
+    session_cookie_secure: bool = True
+    session_ttl_seconds: int = Field(default=3_600, ge=300, le=604_800)
+    session_login_max_failures: int = Field(default=5, ge=1, le=100)
+    session_login_window_seconds: int = Field(default=300, ge=10, le=3_600)
+    session_trusted_proxy_hosts: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def require_production_dependencies(self) -> Self:
+        session_fields = (
+            "session_access_code",
+            "session_csrf_secret",
+            "session_teacher_principal_id",
+            "session_allowed_origins",
+        )
+        session_configured = any(bool(getattr(self, name)) for name in session_fields)
+        if session_configured:
+            missing_session = [name for name in session_fields if not getattr(self, name)]
+            if missing_session:
+                fields = ", ".join(missing_session)
+                raise ValueError(f"session configuration is missing required fields: {fields}")
+            self._validate_session_secrets()
+            self.session_allowed_origins = [
+                self._normalize_origin(origin) for origin in self.session_allowed_origins
+            ]
+
         if self.environment != "production":
             return self
         missing = [
@@ -94,13 +122,39 @@ class Settings(BaseSettings):
                 "object_storage_endpoint",
                 "object_storage_access_key",
                 "object_storage_secret_key",
+                *session_fields,
             )
-            if getattr(self, name) is None
+            if not getattr(self, name)
         ]
         if missing:
             fields = ", ".join(missing)
             raise ValueError(f"production configuration is missing required fields: {fields}")
+        if not self.session_cookie_secure:
+            raise ValueError("production session cookies must remain secure")
         return self
+
+    def _validate_session_secrets(self) -> None:
+        access_code = self.session_access_code
+        csrf_secret = self.session_csrf_secret
+        if access_code is not None and len(access_code.get_secret_value()) < 24:
+            raise ValueError("session_access_code must contain at least 24 characters")
+        if csrf_secret is not None and len(csrf_secret.get_secret_value()) < 32:
+            raise ValueError("session_csrf_secret must contain at least 32 characters")
+
+    @staticmethod
+    def _normalize_origin(value: str) -> str:
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.netloc
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path not in {"", "/"}
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("session_allowed_origins must contain plain HTTP(S) origins")
+        return f"{parsed.scheme.lower()}://{parsed.netloc.lower()}"
 
 
 @lru_cache(maxsize=1)

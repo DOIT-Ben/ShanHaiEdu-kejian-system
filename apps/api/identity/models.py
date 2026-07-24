@@ -5,7 +5,15 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, UniqueConstraint, Uuid
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from apps.api.database import Base
@@ -90,6 +98,46 @@ class Principal(Base):
     display_name: Mapped[str] = mapped_column(String(160), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class Session(Base):
+    __tablename__ = "identity_sessions"
+    __table_args__ = (
+        CheckConstraint("expires_at > created_at", name="expires_after_creation"),
+        UniqueConstraint("rotated_from_id", name="uq_identity_sessions_rotated_from"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    organization_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    principal_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("principals.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    csrf_nonce: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    rotated_from_id: Mapped[UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("identity_sessions.id", ondelete="SET NULL"),
+    )
+
+
+class SessionLoginThrottle(Base):
+    __tablename__ = "identity_session_login_throttles"
+
+    source_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    window_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    failure_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class ProjectMember(Base):

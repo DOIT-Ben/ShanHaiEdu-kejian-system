@@ -15,6 +15,7 @@ import {
   contractParseVersion,
   contractProject,
   contractPromptVersion,
+  contractSession,
   contractWorkflow,
   lessonFixture,
   projectFixture,
@@ -74,6 +75,36 @@ function contractSse(
 }
 
 export const handlers = [
+  http.get(`${apiConfig.baseUrl}/auth/session`, () =>
+    errorResponse(
+      "AUTHENTICATION_REQUIRED",
+      "Authentication is required.",
+      "contract_session_missing",
+      401,
+    ),
+  ),
+
+  http.post(`${apiConfig.baseUrl}/auth/session`, async ({ request }) => {
+    const input = (await request.json()) as Schema<"CreateSessionRequest">;
+    if (!input.access_code.trim())
+      return errorResponse(
+        "AUTHENTICATION_FAILED",
+        "The access code is invalid.",
+        "contract_session_rejected",
+        401,
+      );
+    const body = {
+      data: contractSession,
+      request_id: "contract_session_created",
+    } satisfies Schema<"SessionEnvelope">;
+    return HttpResponse.json(body, { status: 201 });
+  }),
+
+  http.delete(`${apiConfig.baseUrl}/auth/session`, ({ request }) => {
+    const rejected = requireCsrf(request);
+    return rejected ?? new HttpResponse(null, { status: 204 });
+  }),
+
   http.get(`${apiConfig.baseUrl}/health/live`, () => {
     const body = {
       data: { status: "ok", service: "shanhaiedu-api", environment: "development" },
