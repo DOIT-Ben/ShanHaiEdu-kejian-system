@@ -1,49 +1,46 @@
 # 当前项目状态
 
-当前阶段：阶段1教师可见R1纵向链的生产身份启动门禁。
+当前阶段：阶段1教师可见R1纵向链进入开放PR收敛与唯一入口重建。
 > 最后核验：2026-07-24。
-> 当前唯一P0：[Issue #211](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/211)；实现载体为[PR #216](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/216)。
+> 当前唯一P0：[Issue #217](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/217)。
 
 ## 当前可演示成果
 
-- `main`已有项目、上传、教材解析、课时、Artifact、质量报告、批准、IntroSelection、Job/Worker/SSE和模型网关等阶段1运行时基础，但尚未包含#211的生产Session/CSRF启动闭环。
-- 在`feat/211-runtime-auth`隔离短分支上，生产前端`/login`已经通过真实FastAPI和PostgreSQL使用受控access code登录，不依赖localStorage、sessionStorage、测试Cookie、MSW或浏览器拦截伪造身份。
-- 该分支已经通过真实API完成“登录 -> 带Session和CSRF创建项目 -> 刷新恢复 -> 登出 -> 原Session与CSRF立即失效 -> 后续写请求失败”。
-- 上述分支结果只有在PR #216通过独立审查、CI并合并后，才能作为`main`当前能力。
+- `main`已经包含生产Session/CSRF启动闭环：生产前端`/login`通过真实FastAPI和PostgreSQL使用受控access code登录，不依赖localStorage、sessionStorage、测试Cookie、MSW或浏览器拦截伪造身份。
+- 从最新`origin/main`创建的干净临时worktree已经通过真实API完成“登录 -> 带Session和CSRF创建项目 -> 刷新恢复同一Session -> 登出 -> 原Session与CSRF失效 -> 后续写请求返回401”。
+- `main`已有项目、上传、教材解析、课时、Artifact、QualityReport、Approval、IntroSelection、Job/Worker/SSE和模型网关等阶段1后端轨道基础；这些已实现能力不等于#11的完整教师R1纵向链已经验收。
 
 ## 已完成
 
-- #211分支已实现`POST /api/v2/auth/session`（`createSession`）、`GET /api/v2/auth/session`（`getCurrentSession`）和`DELETE /api/v2/auth/session`（`deleteSession`）。
-- 已同步SQLAlchemy Session模型、Alembic迁移、active OpenAPI、生成的TypeScript客户端、FastAPI路由、前端Session Provider、后端集成测试、真实API Playwright和`contracts/delivery-slices/211-runtime-auth.yaml`。
-- 已验证13个PostgreSQL Session/CSRF集成测试全部通过；安全读取不锁行、不更新`last_seen_at`或`revoked_at`，只有登录轮换和显式撤销锁定会话行；受信代理追加链不能通过伪造最左地址绕过登录限流；Alembic空库upgrade/downgrade/upgrade通过。
-- active OpenAPI和FastAPI runtime均以security schemes表达浏览器Origin、HttpOnly Cookie与Session绑定CSRF：`createSession`只要求精确Origin，其余22个写操作同时要求三者；active OpenAPI还为这22个写operation显式声明必填`X-CSRF-Token`参数，生成客户端由前端Session middleware履约。合同生成前后哈希一致；OpenAPI lint、runtime surface、JSON Schema、TypeScript合同类型、Issue #211精确兼容过渡和仓库策略门禁通过。合同测试为229 passed；两个本机条件skip分别是Windows无符号链接权限和未注入数据库的stage0资源用例，后者已在PostgreSQL环境另行1 passed。
-- 前端Session操作使用操作世代忽略迟到的刷新结果，普通业务请求绑定发起时的Session世代，迟到401不能清除后续新会话；format、lint、typecheck、61个文件中的232个单测和生产build全部通过。
-- delivery slice已通过精确3个backend selector和3个real API browser selector；每个selector均要求恰好一个通过并拒绝skip、xfail、xpass和flaky。
-- delivery runner定向测试为13 passed，覆盖Windows pnpm shim、独立JSON报告、错误spec、skip/xfail/flaky以及backend/browser子进程超时。
-- 全树Ruff、Pyright、tracked secret scan和`git diff --check`通过。
+- [Issue #211](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/211)已经由[PR #216](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/216)Squash Merge并关闭；`createSession`、`getCurrentSession`和`deleteSession`已经进入active OpenAPI、FastAPI运行时和生成的TypeScript客户端。
+- SQLAlchemy Session模型、Alembic迁移、Session绑定CSRF、前端Session Provider、PostgreSQL集成测试、真实API Playwright和`contracts/delivery-slices/211-runtime-auth.yaml`已经同步进入`main`。
+- PR #216最终Head的前端、后端、合同、PostgreSQL、真实浏览器和仓库治理CI全部通过；同一独立只读reviewer绑定最终base/head，P0/P1/P2/P3均为0。
+- 合并后复验在干净`origin/main` worktree运行，生产前端build通过；delivery slice精确通过3个backend selector和3个real API browser selector，零skip、xfail、xpass和flaky，测试进程及监听端口均已清理。
 
 ## 当前工作
 
-- PR #216的#211实现和本文件当前状态已经提交并推送，PR正文已同步输入、输出、验收、验证和回退证据；当前尚未合并。
-- 分支已关闭独立reviewer提出的全部finding；最终候选HEAD的CI和审查必须在合并前保持通过。
-- 最终base/head必须由未参与实现的同一只读reviewer审查；任何修复导致HEAD变化时，由同一reviewer复核并重新绑定，不能沿用旧HEAD批准。
+- [Issue #217](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/217)只负责收敛开放PR和重建唯一R1入口，不新增业务功能或治理框架。
+- [PR #212](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/212)仍为开放Draft，必须相对最新`main`形成文件级价值矩阵，只允许最小提取确实不可缺少且未被覆盖的内容，否则关闭。
+- [PR #209](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/209)仍为开放Draft，只审计独有价值后标记为historical video WIP并关闭，不恢复视频开发。
+- [PR #208](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/208)仍为开放Draft，必须先形成复用、覆盖、失效、重写和删除矩阵，再决定重整或从最新`main`重建；当前不得继续实现。
+- [PR #215](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/215)已经关闭；#217只核验其远端分支和本地现场清理状态，不重新审计内容。
 
 ## 当前阻塞
 
-- `main`在PR #216合并前没有生产Session/CSRF启动闭环，因此不能把分支验证结果声明为已发布能力。
-- 当前没有已知实现阻塞；剩余出口是保持最终HEAD独立审查和CI有效、Squash Merge及合并后复验。
-- #211合并前，Issue #11 / PR #208、PPT、视频和新治理工作全部暂停，不得竞争active OpenAPI、生成客户端或公共Session入口。
+- 当前没有已知的Session/CSRF实现阻塞；#211已经合并、关闭并从最新`main`复验。
+- 阶段1完整教师R1纵向链尚未验收。PR #208、#209和#212仍占用历史口径，必须由#217先确认独有价值并收口，不能直接恢复任何旧分支开发。
+- #217完成前，不开始#208实现、PPT、图片、视频、TTS或新的治理框架，也不竞争修改active OpenAPI、生成客户端、Artifact/Job公共合同、Workflow Binding、Model Gateway或前端公共Session入口。
 
 ## 下一个阶段出口
 
-1. 最终候选HEAD保持CI全绿和同一只读reviewer精确`origin/main...HEAD`批准；任何HEAD变化必须重新验证并重新绑定。
-2. 将PR转Ready后由维护者Squash Merge，关闭#211，删除任务分支和隔离worktree，从最新`main`复验关键Session/CSRF和delivery门禁。
-3. 只有#211进入最新`main`后，才审查PR #208并形成复用、覆盖、失效、重写和删除矩阵，恢复唯一R1纵向链。
+1. 对PR #212形成文件级价值矩阵，决定最小提取或废弃并关闭旧PR。
+2. 对PR #209只核验独有价值，记录historical video WIP结论并关闭；核验PR #215已关闭且分支现场已清理。
+3. 对PR #208形成复用、覆盖、失效、重写和删除矩阵，明确重整旧PR或关闭后从最新`main`重建。
+4. #217收口后，唯一业务主线回到Issue #11，并且只使用一个来自最新`main`的短分支和Draft PR推进真实教师R1纵向链。
 
 ## 接手提示
 
 1. 先读`README.md`、`AGENTS.md`、`docs/governance/项目记忆与接手索引.md`和本文件。
-2. 当前任务只接受#211及PR #216；不要从旧PR或历史文档恢复并行身份口径。
-3. 核对分支、HEAD、upstream、dirty文件和GitHub实时状态；`AGENTS.md`是本机规则升级现场，不属于PR #216。
-4. 真实验收入口是`contracts/delivery-slices/211-runtime-auth.yaml`及其runner；Mock、静态身份或浏览器拦截不能替代真实API验证。
-5. 合并后的下一项工作是只读审计PR #208，而不是直接在旧分支继续堆代码。
+2. 当前任务只接受#217的只读价值审计、PR关闭清理和唯一R1入口决定；不要从旧PR恢复实现。
+3. #211的当前运行证据以`main`中的代码、迁移、测试、active OpenAPI和`contracts/delivery-slices/211-runtime-auth.yaml`为准；PR #216保留合并前CI与独立审查证据。
+4. PR #208只有在#217矩阵完成并明确处置后才能恢复，且必须从最新`main`核对接口与正式事实。
