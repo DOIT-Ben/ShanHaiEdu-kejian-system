@@ -16,7 +16,7 @@
 - #211分支已实现`POST /api/v2/auth/session`（`createSession`）、`GET /api/v2/auth/session`（`getCurrentSession`）和`DELETE /api/v2/auth/session`（`deleteSession`）。
 - 已同步SQLAlchemy Session模型、Alembic迁移、active OpenAPI、生成的TypeScript客户端、FastAPI路由、前端Session Provider、后端集成测试、真实API Playwright和`contracts/delivery-slices/211-runtime-auth.yaml`。
 - 已验证13个PostgreSQL Session/CSRF集成测试全部通过；安全读取不锁行、不更新`last_seen_at`或`revoked_at`，只有登录轮换和显式撤销锁定会话行；受信代理追加链不能通过伪造最左地址绕过登录限流；Alembic空库upgrade/downgrade/upgrade通过。
-- active OpenAPI和FastAPI runtime均以security schemes表达浏览器Origin、HttpOnly Cookie与Session绑定CSRF：`createSession`只要求精确Origin，其余22个写操作同时要求三者。合同生成前后哈希一致；OpenAPI lint、runtime surface、JSON Schema、TypeScript合同类型、对`origin/main`兼容性和仓库策略门禁通过。合同测试为227 passed；两个本机条件skip分别是Windows无符号链接权限和未注入数据库的stage0资源用例，后者已在PostgreSQL环境另行1 passed。
+- active OpenAPI和FastAPI runtime均以security schemes表达浏览器Origin、HttpOnly Cookie与Session绑定CSRF：`createSession`只要求精确Origin，其余22个写操作同时要求三者；active OpenAPI还为这22个写operation显式声明必填`X-CSRF-Token`参数，生成客户端由前端Session middleware履约。合同生成前后哈希一致；OpenAPI lint、runtime surface、JSON Schema、TypeScript合同类型、Issue #211精确兼容过渡和仓库策略门禁通过。合同测试为227 passed；两个本机条件skip分别是Windows无符号链接权限和未注入数据库的stage0资源用例，后者已在PostgreSQL环境另行1 passed。
 - 前端Session操作使用请求世代忽略迟到的刷新结果，Session生命周期401不再绕过Provider清除新会话；format、lint、typecheck、61个文件中的231个单测和生产build全部通过。
 - delivery slice已通过精确3个backend selector和3个real API browser selector；每个selector均要求恰好一个通过并拒绝skip、xfail、xpass和flaky。
 - delivery runner定向测试为13 passed，覆盖Windows pnpm shim、独立JSON报告、错误spec、skip/xfail/flaky以及backend/browser子进程超时。
@@ -25,7 +25,7 @@
 ## 当前工作
 
 - PR #216仍是Draft；#211实现和本文件当前状态已经提交并推送，PR正文已同步输入、输出、验收、验证和回退证据。
-- 当前分支等待最新HEAD的CI和精确base/head独立审查，尚未转Ready或合并。
+- 当前分支已修复纯审计reviewer提出的OpenAPI CSRF P2，等待修复HEAD的CI和同一reviewer精确base/head复核，尚未转Ready或合并。
 - 最终base/head必须由未参与实现的同一只读reviewer审查；任何修复导致HEAD变化时，由同一reviewer复核并重新绑定。
 
 ## 当前阻塞

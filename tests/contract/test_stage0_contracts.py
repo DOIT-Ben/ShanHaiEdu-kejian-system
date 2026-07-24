@@ -250,6 +250,24 @@ def test_runtime_and_active_contract_express_browser_write_security() -> None:
                     ], path
 
 
+def test_protected_writes_require_csrf_except_session_bootstrap() -> None:
+    openapi = load_openapi()
+    protected_write_count = 0
+
+    for path_item in openapi["paths"].values():
+        for method in ("post", "put", "patch", "delete"):
+            operation = path_item.get(method)
+            if not isinstance(operation, dict) or operation["operationId"] == "createSession":
+                continue
+            protected_write_count += 1
+            parameters = [resolve_local(openapi, item) for item in operation.get("parameters", [])]
+            assert any(parameter.get("name") == "X-CSRF-Token" for parameter in parameters), (
+                operation["operationId"]
+            )
+
+    assert protected_write_count > 0
+
+
 def test_generated_types_and_shared_client_are_present() -> None:
     generated = CONTRACTS / "generated/typescript/schema.ts"
     client = CONTRACTS / "typescript/client.ts"

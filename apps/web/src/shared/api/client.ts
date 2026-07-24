@@ -1,4 +1,4 @@
-import createClient, { type Middleware } from "openapi-fetch";
+import createClient, { type Client, type Middleware } from "openapi-fetch";
 import type { components, paths } from "@/generated/api-schema";
 import { apiConfig } from "@/shared/api/config";
 
@@ -22,6 +22,25 @@ export class ApiError extends Error {
 
 type CsrfTokenProvider = () => string | null | undefined;
 type UnauthorizedHandler = () => void;
+
+type MiddlewareManagedHeader<Header> = Omit<Header, "X-CSRF-Token"> &
+  Partial<Pick<Header, Extract<keyof Header, "X-CSRF-Token">>>;
+
+type MiddlewareManagedOperation<Operation> = Operation extends {
+  parameters: infer Parameters;
+}
+  ? Omit<Operation, "parameters"> & {
+      parameters: Parameters extends { header: infer Header }
+        ? Omit<Parameters, "header"> & { header: MiddlewareManagedHeader<Header> }
+        : Parameters;
+    }
+  : Operation;
+
+type MiddlewareManagedPaths = {
+  [Path in keyof paths]: {
+    [Member in keyof paths[Path]]: MiddlewareManagedOperation<paths[Path][Member]>;
+  };
+};
 
 type OpenApiResult<T> = {
   data?: T;
@@ -183,11 +202,15 @@ function resolveBaseUrl(baseUrl: string) {
   return new URL(baseUrl, globalThis.location.origin).toString();
 }
 
-export const apiClient = createClient<paths>({
+const generatedApiClient = createClient<paths>({
   baseUrl: resolveBaseUrl(apiConfig.baseUrl),
   credentials: "include",
   fetch: authenticatedFetch,
 });
+
+// The active OpenAPI contract keeps CSRF required for every protected write. The
+// shared client fulfills that requirement from the in-memory Session provider.
+export const apiClient = generatedApiClient as Client<MiddlewareManagedPaths>;
 
 apiClient.use(requestMiddleware, responseMiddleware);
 
