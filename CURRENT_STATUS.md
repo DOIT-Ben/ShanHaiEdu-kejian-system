@@ -1,6 +1,6 @@
 # 当前项目状态
 
-当前阶段：阶段1教师可见R1纵向链已拆为7个严格串行的child Issues和短PR；当前只推进第一个项目事实查询切片#223。
+当前阶段：阶段1教师可见R1只按5个纵向结果验收；#223至#229保留为严格串行的工程子任务，当前停在第一个查询切片#223。
 > 最后核验：2026-07-25。
 > 当前唯一P0：[Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)；当前child为[Issue #223](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/223)与Draft [PR #230](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/230)。
 
@@ -25,24 +25,27 @@
 
 ## 当前工作
 
-- [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)保持`status:in-progress`，已经批准按#223至#229严格串行推进；前一child合并并从最新`origin/main`复验后，下一child才解除阻塞。
+- [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)保持`status:in-progress`；权威交付结果为A教材范围、B课时划分、C十二部分教案、D三类九套和E最终验收。每个结果只有同时具备生产页面、active API、PostgreSQL和real API浏览器证据才可称为完成。
+- #223至#229只是上述结果的工程子任务，继续严格串行；任一技术Issue或PR单独合并不得描述为教师功能完成。
 - [PR #222](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/222)只保留102文件大现场的远端WIP恢复证据，固定Head为`19f517a8d3c545a82f929583b0ec4f8eb09dd1e5`；不再新增实现、不直接转Ready或合并。
 - [Issue #223](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/223)当前为`status:in-progress`；分支`feat/223-r1-contract-queries`和Draft [PR #230](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/230)从`origin/main@0450b04d`建立，只激活项目材料、Artifact和GenerationJob查询。
 - #224至#229保持`status:blocked`；在#223合并前不开始教材范围写命令、Worker/质量闭环、前端页面、real API或真实Provider验收。
+- A教材范围固定为PDF解析后系统默认选中全部物理页`1..page_count`，教师可调整并确认；该确认是课时划分前的必要gate，AI只在批准范围内划分课时。整本教材按知识点智能推荐页码不进入当前R1。
 
 ## 当前阻塞
 
 - 当前没有已知的Session/CSRF实现阻塞；#211已经合并、关闭并从最新`main`复验。
 - 当前没有竞争修改Session、active OpenAPI、生成客户端或`apps/web`公共入口的开放业务PR；#208、#209、#212和#215均已关闭。
 - 阶段1完整教师R1纵向链尚未验收；教材列表与范围修订、异步节点启动、质量/批准HTTP闭环、生产页面消费者、真实文本Provider和R1 real API Playwright仍是#11待实现事实。
-- #223的本地定向合同、PostgreSQL、OpenAPI surface、类型和仓库治理验证已通过；PR #230的CI与最终独立reviewer尚未完成，不得声明本切片已合并或可用于完整R1。
+- #223已提交的定向合同、PostgreSQL、OpenAPI surface、类型和仓库治理证据保留；PR #230仍为Draft且没有最终独立reviewer，不得声明本切片已合并，更不得声明A-E完成。
 - #224仍被#223阻塞；Job的`lesson_id`过滤依赖#225新增正式`lesson_unit_id`持久字段和Alembic迁移，不得提前塞入无迁移的#223。
+- 固定架构仍是模块化FastAPI单体、模块自有ORM/repository、跨模块公开application interface/port与typed DTO、workflow只编排、PostgreSQL唯一事实源、`startNodeRun`固定`202 AcceptedJob`和现有Job/Project SSE、批准按ArtifactVersion到QualityReport到教师批准到领域投影、全程exact IDs。
 
 ## 下一个阶段出口
 
-1. 完成PR #230的CI、最终base/head自审和一次独立只读reviewer审查；关闭findings后才可转Ready。
+1. 当前停止在#223/PR #230 Draft并等待下一步指令；恢复后先核对实际CI状态，再决定是否进入最终base/head自审和一次独立只读reviewer审查。
 2. Squash Merge #223，从干净`origin/main`复验三个项目查询，再把#224从blocked转为ready并创建独立短分支。
-3. 严格按#224教材范围/prepare、#225异步运行时、#226质量批准、#227前端消费者、#228生产页面、#229最终验收推进；每项独立验收和回退。
+3. 严格按#224教材范围/prepare、#225异步运行时、#226质量批准、#227前端消费者、#228生产页面、#229最终验收推进；这些工程PR分别验收和回退，但只在纵向页面/API/PostgreSQL/浏览器证据齐全时更新A-E结果状态。
 4. #229以前不把deterministic Fake/HTTP stub称为真实Provider验收，也不恢复PPT、图片、视频或TTS开发。
 
 ## 接手提示
@@ -50,4 +53,4 @@
 1. 先读`README.md`、`AGENTS.md`、`docs/governance/项目记忆与接手索引.md`和本文件。
 2. #217和PR #219已经完成并清理；不要从旧PR恢复实现，也不要把历史矩阵当作可直接合并的代码。
 3. #211的当前运行证据以`main`中的代码、迁移、测试、active OpenAPI和`contracts/delivery-slices/211-runtime-auth.yaml`为准；PR #216保留合并前CI与独立审查证据。
-4. PR #208已经关闭且不得恢复；PR #222只能作为固定WIP检查点按文件/hunk提取。当前只接续#223/PR #230，禁止整体cherry-pick或并发启动#224至#229。
+4. PR #208已经关闭且不得恢复；PR #222只能作为固定WIP检查点按文件/hunk提取。当前唯一活动工程任务是#223/PR #230，禁止整体cherry-pick或并发启动#224至#229。
