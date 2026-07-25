@@ -420,6 +420,54 @@ paths:
                 $ref: '#/components/schemas/IntroOptionsEnvelope'
         '4XX':
           $ref: '#/components/responses/Error'
+  /lessons/{lesson_id}/intro-options/node-runs:
+    post:
+      summary: 准备课时导入方案生成节点
+      operationId: prepareIntroOptionGeneration
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrepareIntroOptionGenerationRequest'
+      responses:
+        '200':
+          description: Exact-input Intro generation NodeRun prepared
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeRunEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /lessons/{lesson_id}/lesson-plan/node-runs:
+    post:
+      summary: 准备课时教案生成节点
+      operationId: prepareLessonPlanGeneration
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: Exact-input lesson-plan generation NodeRun prepared
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeRunEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
   /lessons/{lesson_id}/intro-selections:
     post:
       summary: 教师选择一个已批准课堂导入方案
@@ -445,6 +493,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/IntroSelectionEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/materials:
+    get:
+      summary: 查询项目教材列表
+      operationId: listProjectMaterials
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: Newest-first source material page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceMaterialListEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/material-scope/versions:
+    post:
+      summary: 创建或修订项目教材范围版本
+      operationId: createMaterialScopeVersion
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMaterialScopeVersionRequest'
+      responses:
+        '201':
+          description: Submitted immutable material-scope version created or replayed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactEnvelope'
         '4XX':
           $ref: '#/components/responses/Error'
   /projects/{project_id}/materials/uploads:
@@ -548,7 +640,56 @@ paths:
                 $ref: '#/components/schemas/WorkflowEnvelope'
         '4XX':
           $ref: '#/components/responses/Error'
+  /projects/{project_id}/lesson-division/node-runs:
+    post:
+      summary: 准备项目课时划分生成节点
+      operationId: prepareLessonDivision
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrepareLessonDivisionRequest'
+      responses:
+        '200':
+          description: Exact material-scope lesson-division NodeRun prepared
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeRunEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
   /projects/{project_id}/artifacts:
+    get:
+      summary: 查询项目内容产物列表
+      operationId: listProjectArtifacts
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: lesson_id
+          in: query
+          required: false
+          schema: {type: string, format: uuid}
+        - name: artifact_type
+          in: query
+          required: false
+          schema: {type: string, minLength: 1, maxLength: 80}
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: Newest-first artifact page with exact optional filters
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ArtifactListEnvelope'}
+        '4XX': {$ref: '#/components/responses/Error'}
     post:
       summary: 创建项目内容产物及活动草稿
       operationId: createArtifact
@@ -665,6 +806,45 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ApprovalEnvelope'}
+        '4XX': {$ref: '#/components/responses/Error'}
+  /artifact-versions/{artifact_version_id}/quality-validations:
+    post:
+      summary: 启动产物版本质量校验
+      operationId: startArtifactVersionQualityValidation
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ArtifactVersionId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '202':
+          description: Exact-version quality validation NodeRun accepted
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AcceptedNodeRunEnvelope'}
+        '4XX': {$ref: '#/components/responses/Error'}
+  /node-runs/{node_run_id}/start:
+    post:
+      summary: 启动已准备的模型生成节点
+      operationId: startNodeRun
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/NodeRunId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StartNodeRunRequest'}
+      responses:
+        '202': {$ref: '#/components/responses/AcceptedJob'}
         '4XX': {$ref: '#/components/responses/Error'}
   /node-runs/{node_run_id}/prompt-preview:
     get:
@@ -885,6 +1065,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SaveOperationEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/generation-jobs:
+    get:
+      summary: 查询项目异步任务列表
+      operationId: listProjectGenerationJobs
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: lesson_id
+          in: query
+          required: false
+          schema: {type: string, format: uuid}
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: Newest-first generation job page with exact optional lesson filter
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GenerationJobListEnvelope'}
         '4XX':
           $ref: '#/components/responses/Error'
   /generation-jobs/{job_id}:
@@ -1238,6 +1438,13 @@ components:
       properties:
         artifact_version_id: {type: string, format: uuid}
         option_key: {type: string, minLength: 1, maxLength: 120}
+    PrepareIntroOptionGenerationRequest:
+      type: object
+      additionalProperties: false
+      required: [generation_mode]
+      properties:
+        generation_mode: {type: string, enum: [default_nine, refine_existing]}
+        source_artifact_version_id: {type: [string, 'null'], format: uuid}
     IntroSelectionEnvelope:
       type: object
       additionalProperties: false
@@ -1540,6 +1747,51 @@ components:
       properties:
         data: {$ref: '#/components/schemas/UploadSession'}
         request_id: {type: string, minLength: 1}
+    SourceMaterial:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - project_id
+        - material_kind
+        - file_asset_id
+        - original_filename
+        - mime_type
+        - upload_status
+        - confirmed_at
+        - created_at
+        - updated_at
+      properties:
+        id: {type: string, format: uuid}
+        project_id: {type: string, format: uuid}
+        material_kind: {type: string, minLength: 1, maxLength: 40}
+        file_asset_id: {type: [string, 'null'], format: uuid}
+        original_filename: {type: string, minLength: 1, maxLength: 255}
+        mime_type: {type: string, minLength: 1, maxLength: 255}
+        upload_status: {enum: [pending_upload, confirmed, rejected]}
+        confirmed_at: {type: [string, 'null'], format: date-time}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    SourceMaterialListEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, meta, request_id]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: {$ref: '#/components/schemas/SourceMaterial'}
+        meta:
+          type: object
+          additionalProperties: false
+          required: [next_cursor]
+          properties:
+            next_cursor: {type: [string, 'null']}
+        request_id: {type: string, minLength: 1}
     ConfirmUploadRequest:
       type: object
       additionalProperties: false
@@ -1795,6 +2047,52 @@ components:
             - {type: 'null'}
         started_at: {type: [string, 'null'], format: date-time}
         finished_at: {type: [string, 'null'], format: date-time}
+    NodeRunEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/NodeRun'}
+        request_id: {type: string, minLength: 1}
+    AcceptedNodeRunData:
+      type: object
+      additionalProperties: false
+      required: [node_run_id, status, events_url]
+      properties:
+        node_run_id: {type: string, format: uuid}
+        status: {$ref: './workflow-node-status.schema.json'}
+        events_url: {type: string, minLength: 1}
+    AcceptedNodeRunEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/AcceptedNodeRunData'}
+        request_id: {type: string, minLength: 1}
+    CreateMaterialScopeVersionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - source_material_id
+        - material_parse_version_id
+        - page_start
+        - page_end
+      properties:
+        source_material_id: {type: string, format: uuid}
+        material_parse_version_id: {type: string, format: uuid}
+        page_start: {type: integer, minimum: 1}
+        page_end: {type: integer, minimum: 1}
+    PrepareLessonDivisionRequest:
+      type: object
+      additionalProperties: false
+      required: [material_scope_artifact_version_id]
+      properties:
+        material_scope_artifact_version_id: {type: string, format: uuid}
+    StartNodeRunRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        user_revision: {type: [string, 'null'], maxLength: 6000}
     WorkflowRun:
       type: object
       additionalProperties: false
@@ -1880,6 +2178,9 @@ components:
       properties:
         id: {type: string, format: uuid}
         project_id: {type: [string, 'null'], format: uuid}
+        node_run_id: {type: [string, 'null'], format: uuid}
+        lesson_unit_id: {type: [string, 'null'], format: uuid}
+        result_artifact_version_id: {type: [string, 'null'], format: uuid}
         job_type: {type: string, minLength: 1}
         status: {$ref: '#/components/schemas/GenerationJobStatus'}
         progress_percent: {type: integer, minimum: 0, maximum: 100}
@@ -1893,6 +2194,26 @@ components:
       required: [data, request_id]
       properties:
         data: {$ref: '#/components/schemas/GenerationJob'}
+        request_id: {type: string, minLength: 1}
+    GenerationJobListEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, meta, request_id]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: {$ref: '#/components/schemas/GenerationJob'}
+        meta:
+          type: object
+          additionalProperties: false
+          required: [next_cursor]
+          properties:
+            next_cursor: {type: [string, 'null']}
         request_id: {type: string, minLength: 1}
     DependencyReadiness:
       type: object
@@ -2262,13 +2583,13 @@ components:
         content_definition_version_id: {type: string, format: uuid}
         lesson_unit_id: {type: [string, 'null'], format: uuid}
         draft_branch: {type: string, minLength: 1, maxLength: 80, default: main}
-        content: {type: object}
+        content: {type: object, additionalProperties: true}
     SaveArtifactDraftRequest:
       type: object
       additionalProperties: false
       required: [content]
       properties:
-        content: {type: object}
+        content: {type: object, additionalProperties: true}
     SubmitArtifactVersionRequest:
       type: object
       additionalProperties: false
@@ -2295,7 +2616,7 @@ components:
       properties:
         id: {type: string, format: uuid}
         draft_branch: {type: string}
-        content: {type: object}
+        content: {type: object, additionalProperties: true}
         validation_report: {type: object}
         based_on_version_id: {type: [string, 'null'], format: uuid}
         autosaved_at: {type: string, format: date-time}
@@ -2319,7 +2640,7 @@ components:
       properties:
         id: {type: string, format: uuid}
         version_no: {type: integer, minimum: 1}
-        content: {type: object}
+        content: {type: object, additionalProperties: true}
         content_hash: {type: string, pattern: '^[0-9a-f]{64}$'}
         render_summary: {type: object}
         source_kind: {enum: [manual, model, import, system]}
@@ -2405,6 +2726,26 @@ components:
       required: [data, request_id]
       properties:
         data: {$ref: '#/components/schemas/Artifact'}
+        request_id: {type: string, minLength: 1}
+    ArtifactListEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, meta, request_id]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: {$ref: '#/components/schemas/Artifact'}
+        meta:
+          type: object
+          additionalProperties: false
+          required: [next_cursor]
+          properties:
+            next_cursor: {type: [string, 'null']}
         request_id: {type: string, minLength: 1}
     ArtifactDraftEnvelope:
       type: object

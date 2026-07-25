@@ -247,6 +247,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/lessons/{lesson_id}/intro-options/node-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 准备课时导入方案生成节点 */
+        post: operations["prepareIntroOptionGeneration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lessons/{lesson_id}/lesson-plan/node-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 准备课时教案生成节点 */
+        post: operations["prepareLessonPlanGeneration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/lessons/{lesson_id}/intro-selections": {
         parameters: {
             query?: never;
@@ -258,6 +292,40 @@ export interface paths {
         put?: never;
         /** 教师选择一个已批准课堂导入方案 */
         post: operations["selectLessonIntroOption"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询项目教材列表 */
+        get: operations["listProjectMaterials"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/material-scope/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 创建或修订项目教材范围版本 */
+        post: operations["createMaterialScopeVersion"];
         delete?: never;
         options?: never;
         head?: never;
@@ -349,7 +417,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/projects/{project_id}/artifacts": {
+    "/projects/{project_id}/lesson-division/node-runs": {
         parameters: {
             query?: never;
             header?: never;
@@ -357,6 +425,24 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
+        put?: never;
+        /** 准备项目课时划分生成节点 */
+        post: operations["prepareLessonDivision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询项目内容产物列表 */
+        get: operations["listProjectArtifacts"];
         put?: never;
         /** 创建项目内容产物及活动草稿 */
         post: operations["createArtifact"];
@@ -428,6 +514,40 @@ export interface paths {
         put?: never;
         /** 追加产物版本审核动作 */
         post: operations["reviewArtifactVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/artifact-versions/{artifact_version_id}/quality-validations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 启动产物版本质量校验 */
+        post: operations["startArtifactVersionQualityValidation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/node-runs/{node_run_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 启动已准备的模型生成节点 */
+        post: operations["startNodeRun"];
         delete?: never;
         options?: never;
         head?: never;
@@ -592,6 +712,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project_id}/generation-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询项目异步任务列表 */
+        get: operations["listProjectGenerationJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/generation-jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -747,6 +884,12 @@ export interface components {
             /** Format: uuid */
             artifact_version_id: string;
             option_key: string;
+        };
+        PrepareIntroOptionGenerationRequest: {
+            /** @enum {string} */
+            generation_mode: "default_nine" | "refine_existing";
+            /** Format: uuid */
+            source_artifact_version_id?: string | null;
         };
         IntroSelectionEnvelope: {
             data: components["schemas"]["IntroSelection"];
@@ -948,6 +1091,34 @@ export interface components {
             data: components["schemas"]["UploadSession"];
             request_id: string;
         };
+        SourceMaterial: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            project_id: string;
+            material_kind: string;
+            /** Format: uuid */
+            file_asset_id: string | null;
+            original_filename: string;
+            mime_type: string;
+            /** @enum {unknown} */
+            upload_status: "pending_upload" | "confirmed" | "rejected";
+            /** Format: date-time */
+            confirmed_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        SourceMaterialListEnvelope: {
+            data: {
+                items: components["schemas"]["SourceMaterial"][];
+            };
+            meta: {
+                next_cursor: string | null;
+            };
+            request_id: string;
+        };
         ConfirmUploadRequest: {
             /** Format: uuid */
             upload_session_id: string;
@@ -1112,6 +1283,35 @@ export interface components {
             /** Format: date-time */
             finished_at?: string | null;
         };
+        NodeRunEnvelope: {
+            data: components["schemas"]["NodeRun"];
+            request_id: string;
+        };
+        AcceptedNodeRunData: {
+            /** Format: uuid */
+            node_run_id: string;
+            status: components["schemas"]["workflow-node-status.schema"];
+            events_url: string;
+        };
+        AcceptedNodeRunEnvelope: {
+            data: components["schemas"]["AcceptedNodeRunData"];
+            request_id: string;
+        };
+        CreateMaterialScopeVersionRequest: {
+            /** Format: uuid */
+            source_material_id: string;
+            /** Format: uuid */
+            material_parse_version_id: string;
+            page_start: number;
+            page_end: number;
+        };
+        PrepareLessonDivisionRequest: {
+            /** Format: uuid */
+            material_scope_artifact_version_id: string;
+        };
+        StartNodeRunRequest: {
+            user_revision?: string | null;
+        };
         WorkflowRun: {
             /** Format: uuid */
             id: string;
@@ -1168,6 +1368,12 @@ export interface components {
             id: string;
             /** Format: uuid */
             project_id?: string | null;
+            /** Format: uuid */
+            node_run_id?: string | null;
+            /** Format: uuid */
+            lesson_unit_id?: string | null;
+            /** Format: uuid */
+            result_artifact_version_id?: string | null;
             job_type: string;
             status: components["schemas"]["GenerationJobStatus"];
             progress_percent: number;
@@ -1180,6 +1386,15 @@ export interface components {
         };
         GenerationJobEnvelope: {
             data: components["schemas"]["GenerationJob"];
+            request_id: string;
+        };
+        GenerationJobListEnvelope: {
+            data: {
+                items: components["schemas"]["GenerationJob"][];
+            };
+            meta: {
+                next_cursor: string | null;
+            };
             request_id: string;
         };
         DependencyReadiness: {
@@ -1457,10 +1672,14 @@ export interface components {
             lesson_unit_id?: string | null;
             /** @default main */
             draft_branch: string;
-            content: Record<string, never>;
+            content: {
+                [key: string]: unknown;
+            };
         };
         SaveArtifactDraftRequest: {
-            content: Record<string, never>;
+            content: {
+                [key: string]: unknown;
+            };
         };
         SubmitArtifactVersionRequest: {
             /** @default main */
@@ -1475,7 +1694,9 @@ export interface components {
             /** Format: uuid */
             id: string;
             draft_branch: string;
-            content: Record<string, never>;
+            content: {
+                [key: string]: unknown;
+            };
             validation_report: Record<string, never>;
             /** Format: uuid */
             based_on_version_id: string | null;
@@ -1487,7 +1708,9 @@ export interface components {
             /** Format: uuid */
             id: string;
             version_no: number;
-            content: Record<string, never>;
+            content: {
+                [key: string]: unknown;
+            };
             content_hash: string;
             render_summary: Record<string, never>;
             /** @enum {unknown} */
@@ -1547,6 +1770,15 @@ export interface components {
         };
         ArtifactEnvelope: {
             data: components["schemas"]["Artifact"];
+            request_id: string;
+        };
+        ArtifactListEnvelope: {
+            data: {
+                items: components["schemas"]["Artifact"][];
+            };
+            meta: {
+                next_cursor: string | null;
+            };
             request_id: string;
         };
         ArtifactDraftEnvelope: {
@@ -2251,6 +2483,62 @@ export interface operations {
             "4XX": components["responses"]["Error"];
         };
     };
+    prepareIntroOptionGeneration: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                lesson_id: components["parameters"]["LessonId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrepareIntroOptionGenerationRequest"];
+            };
+        };
+        responses: {
+            /** @description Exact-input Intro generation NodeRun prepared */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeRunEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    prepareLessonPlanGeneration: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                lesson_id: components["parameters"]["LessonId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exact-input lesson-plan generation NodeRun prepared */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeRunEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
     selectLessonIntroOption: {
         parameters: {
             query?: never;
@@ -2276,6 +2564,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IntroSelectionEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    listProjectMaterials: {
+        parameters: {
+            query?: {
+                "page[cursor]"?: components["parameters"]["PageCursor"];
+                "page[limit]"?: components["parameters"]["PageLimit"];
+            };
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Newest-first source material page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceMaterialListEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    createMaterialScopeVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMaterialScopeVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Submitted immutable material-scope version created or replayed */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactEnvelope"];
                 };
             };
             "4XX": components["responses"]["Error"];
@@ -2401,6 +2745,64 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkflowEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    prepareLessonDivision: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrepareLessonDivisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Exact material-scope lesson-division NodeRun prepared */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeRunEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    listProjectArtifacts: {
+        parameters: {
+            query?: {
+                lesson_id?: string;
+                artifact_type?: string;
+                "page[cursor]"?: components["parameters"]["PageCursor"];
+                "page[limit]"?: components["parameters"]["PageLimit"];
+            };
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Newest-first artifact page with exact optional filters */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactListEnvelope"];
                 };
             };
             "4XX": components["responses"]["Error"];
@@ -2551,6 +2953,54 @@ export interface operations {
                     "application/json": components["schemas"]["ApprovalEnvelope"];
                 };
             };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    startArtifactVersionQualityValidation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                artifact_version_id: components["parameters"]["ArtifactVersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exact-version quality validation NodeRun accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedNodeRunEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    startNodeRun: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                node_run_id: components["parameters"]["NodeRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["StartNodeRunRequest"];
+            };
+        };
+        responses: {
+            202: components["responses"]["AcceptedJob"];
             "4XX": components["responses"]["Error"];
         };
     };
@@ -2770,6 +3220,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SaveOperationEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    listProjectGenerationJobs: {
+        parameters: {
+            query?: {
+                lesson_id?: string;
+                "page[cursor]"?: components["parameters"]["PageCursor"];
+                "page[limit]"?: components["parameters"]["PageLimit"];
+            };
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Newest-first generation job page with exact optional lesson filter */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerationJobListEnvelope"];
                 };
             };
             "4XX": components["responses"]["Error"];
