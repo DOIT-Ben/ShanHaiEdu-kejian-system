@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from uuid import UUID
@@ -17,8 +18,15 @@ from apps.api.lessons.models import LessonUnit
 from apps.api.main import create_app
 from apps.api.model_gateway.audit import SqlAlchemyAttemptAuditSink
 from apps.api.model_gateway.audit_models import GenerationAttempt
-from apps.api.model_gateway.contracts import ModelCapability
+from apps.api.model_gateway.contracts import (
+    GatewayErrorCode,
+    ModelAuditContext,
+    ModelCapability,
+    TextModelRequest,
+)
 from apps.api.model_gateway.gateway import ModelGateway
+from apps.api.model_gateway.pending import PendingTextGeneration
+from apps.api.model_gateway.ports import CancellationToken
 from apps.api.node_execution.fake import DeterministicNodeOutputProvider
 from apps.api.settings import Settings
 from apps.api.workflows.models import BranchRun, NodeRun
@@ -32,6 +40,36 @@ from workers.node_execution import execute_node_execution_job
 
 ROOT = Path(__file__).resolve().parents[2]
 GOLDEN_CASE = ROOT / "contracts/fixtures/golden-projects/numbers-1-to-5/golden-project.json"
+
+
+class _BlockingNodeModel:
+    def __init__(self, delegate: ModelGateway) -> None:
+        self._delegate = delegate
+        self.entered = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def generate_text_pending(
+        self,
+        request: TextModelRequest,
+        *,
+        cancellation: CancellationToken | None = None,
+        audit_context: ModelAuditContext | None = None,
+    ) -> PendingTextGeneration:
+        self.entered.set()
+        await self.release.wait()
+        return await self._delegate.generate_text_pending(
+            request,
+            cancellation=cancellation,
+            audit_context=audit_context,
+        )
+
+    def fail_text_pending(
+        self,
+        pending: PendingTextGeneration,
+        *,
+        code: GatewayErrorCode = GatewayErrorCode.INVALID_RESPONSE,
+    ) -> None:
+        self._delegate.fail_text_pending(pending, code=code)
 
 
 async def test_lesson_plan_job_worker_persists_exact_result_draft_and_cancellation(
@@ -194,6 +232,53 @@ async def test_lesson_plan_job_worker_persists_exact_result_draft_and_cancellati
             assert second_artifact.status_code == 200, second_artifact.text
             assert first_artifact.json()["data"]["artifact"] is not None
             assert second_artifact.json()["data"]["artifact"] is None
+
+            concurrent_node_id, concurrent_job_id = await _prepare_and_start(
+                client,
+                lesson_unit_id,
+                key_suffix="concurrent-lease",
+            )
+            blocking_provider = DeterministicNodeOutputProvider(outputs["lesson_plan.generate"])
+            blocking_model = _BlockingNodeModel(
+                ModelGateway(
+                    {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: blocking_provider},
+                    audit_sink=SqlAlchemyAttemptAuditSink(factory),
+                )
+            )
+            short_lease_settings = settings.model_copy(update={"worker_lease_seconds": 1})
+            first_delivery = asyncio.create_task(
+                execute_node_execution_job(
+                    concurrent_job_id,
+                    worker_id="r1-rescue-node-worker-original",
+                    model=blocking_model,
+                    settings=short_lease_settings,
+                )
+            )
+            await asyncio.wait_for(blocking_model.entered.wait(), timeout=5)
+            await asyncio.sleep(1.1)
+
+            duplicate_provider = DeterministicNodeOutputProvider(outputs["lesson_plan.generate"])
+            duplicate_outcome = await execute_node_execution_job(
+                concurrent_job_id,
+                worker_id="r1-rescue-node-worker-duplicate",
+                model=ModelGateway(
+                    {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: duplicate_provider},
+                    audit_sink=SqlAlchemyAttemptAuditSink(factory),
+                ),
+                settings=short_lease_settings,
+            )
+            assert duplicate_outcome == "ignored"
+            assert duplicate_provider.calls == 0
+
+            blocking_model.release.set()
+            assert await asyncio.wait_for(first_delivery, timeout=5) == "succeeded"
+            with factory() as session:
+                concurrent_job = session.get(GenerationJob, concurrent_job_id)
+                concurrent_node = session.get(NodeRun, concurrent_node_id)
+                assert concurrent_job is not None and concurrent_node is not None
+                assert concurrent_job.status == "succeeded"
+                assert concurrent_job.error_code is None
+                assert concurrent_node.status == "review_required"
 
             cancelled_node_id, cancelled_job_id = await _prepare_and_start(
                 client,

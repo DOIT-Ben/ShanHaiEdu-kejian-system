@@ -45,6 +45,22 @@ const fieldLabels: Record<string, string> = {
   teaching_value: "教学价值",
 };
 
+const nonEditableFields = new Set([
+  "assessment_evidence_keys",
+  "grade",
+  "homework_key",
+  "homework_objective_keys",
+  "lesson_plan_key",
+  "objective_evidence_refs",
+  "objective_key",
+  "process_objective_keys",
+  "process_section_key",
+  "reflection_state",
+  "source_lesson_unit_key",
+  "subject",
+  "teaching_evidence_refs",
+]);
+
 function recordValue(value: unknown): LessonPlanContent | undefined {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as LessonPlanContent)
@@ -74,7 +90,7 @@ function visibleLines(value: unknown, key = ""): string[] {
 type EditableField = { key: string; path: FieldPath; value: string };
 
 function editableFields(value: unknown, path: FieldPath = [], key = ""): EditableField[] {
-  if (hiddenField(key)) return [];
+  if (hiddenField(key) || nonEditableFields.has(key)) return [];
   if (typeof value === "string") {
     return value === "not_taught" ? [] : [{ key, path, value }];
   }

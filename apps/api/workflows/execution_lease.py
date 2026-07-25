@@ -50,6 +50,12 @@ class SqlAlchemyNodeExecutionLeasePort:
             lease.lease_expires_at = expires_at
         self._session.flush()
 
+    def active(self, node_run_id: UUID) -> bool:
+        lease = self._locked(node_run_id)
+        return bool(
+            lease is not None and lease.lease_expires_at > database_wall_clock(self._session)
+        )
+
     def owns(self, node_run_id: UUID, owner_token: str) -> bool:
         lease = self._locked(node_run_id)
         return bool(lease is not None and lease.owner_token == owner_token)

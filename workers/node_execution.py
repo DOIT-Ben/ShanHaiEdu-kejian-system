@@ -64,7 +64,14 @@ async def _execute_job(
     if routing is None:
         return "ignored"
     worker_actor = system_actor(routing.organization_id)
-    if not _claim_job(factory, worker_actor, job_id, worker_id=worker_id, settings=settings):
+    if not _claim_job(
+        factory,
+        worker_actor,
+        job_id,
+        node_run_id=routing.node_run_id,
+        worker_id=worker_id,
+        settings=settings,
+    ):
         return (
             "cancelled"
             if _synchronize_cancelled_node(factory, job_id, routing.node_run_id)
@@ -86,10 +93,13 @@ def _claim_job(
     actor: ActorContext,
     job_id: UUID,
     *,
+    node_run_id: UUID,
     worker_id: str,
     settings: Settings,
 ) -> bool:
     with factory() as session, session.begin():
+        if SqlAlchemyWorkflowExecutionPort(session, actor).execution_in_flight(node_run_id):
+            return False
         claimed = GenerationJobService(
             session,
             actor=actor,
