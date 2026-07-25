@@ -63,6 +63,28 @@ async def test_material_scope_command_appends_exact_submitted_versions(
                     organization_id=actor.organization_id,
                     principal_id=actor.principal_id,
                 )
+                textbook = session.get(SourceMaterial, material_id)
+                assert textbook is not None
+                session.add(
+                    SourceMaterial(
+                        id=new_uuid7(),
+                        organization_id=actor.organization_id,
+                        project_id=project_id,
+                        material_kind="supplement",
+                        file_asset_id=textbook.file_asset_id,
+                        original_filename="teacher-notes.pdf",
+                        mime_type="application/pdf",
+                        upload_status="confirmed",
+                        confirmed_at=utc_now(),
+                        confirmed_by=actor.principal_id,
+                        created_by=actor.principal_id,
+                        updated_by=actor.principal_id,
+                    )
+                )
+
+            materials = await client.get(f"/api/v2/projects/{project_id}/materials")
+            assert materials.status_code == 200, materials.text
+            assert [item["id"] for item in materials.json()["data"]["items"]] == [str(material_id)]
 
             payload = {
                 "source_material_id": str(material_id),
@@ -89,7 +111,7 @@ async def test_material_scope_command_appends_exact_submitted_versions(
                     "allowed": ["认识1到5"],
                     "forbidden": ["超出认识1到5及所选教材页段的内容"],
                 },
-                "approved_evidence_keys": ["p2-text-1", "p2-image-1"],
+                "approved_evidence_keys": ["p2-image-1", "p2-text-1"],
                 "duration_minutes": 40,
                 "lesson_count_mode": "auto",
                 "lesson_type_preferences": [],
@@ -384,6 +406,20 @@ def _seed_material_parse(
             },
             "parser": {"name": "r1-scope-fake", "version": "1"},
             "pages": pages,
+            "material_evidence": [
+                {
+                    "evidence_key": "p2-image-1",
+                    "supported_claim": "page 2 image evidence",
+                },
+                {
+                    "evidence_key": "p2-text-1",
+                    "supported_claim": "page 2 text evidence",
+                },
+                {
+                    "evidence_key": "p3-text-1",
+                    "supported_claim": "page 3 text evidence",
+                },
+            ],
         },
         page_count=3,
         text_checksum="b" * 64,

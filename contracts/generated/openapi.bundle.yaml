@@ -522,8 +522,8 @@ paths:
           $ref: '#/components/responses/Error'
   /projects/{project_id}/materials:
     get:
-      summary: 查询项目教材列表
-      operationId: listProjectMaterials
+      summary: 查询项目教材材料列表
+      operationId: listProjectTextbookMaterials
       parameters:
         - $ref: '#/components/parameters/ProjectId'
         - $ref: '#/components/parameters/PageCursor'
@@ -721,6 +721,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LessonDivisionArtifactEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/lesson-division/artifact-versions/{artifact_version_id}/quality-validations:
+    post:
+      summary: 对项目的课时划分版本执行质量检查
+      operationId: startLessonDivisionQualityValidation
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ArtifactVersionId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '202':
+          description: Exact lesson-division quality NodeRun accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcceptedNodeRunEnvelope'
         4XX:
           $ref: '#/components/responses/Error'
   /projects/{project_id}/lesson-division/generation-jobs:

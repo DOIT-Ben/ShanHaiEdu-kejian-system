@@ -1,35 +1,47 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from uuid import UUID
 
 import httpx
 
+from apps.api.artifact_quality.models import ArtifactQualityReport
+from apps.api.artifact_quality.runtime import runtime_quality_validator_registry
 from apps.api.content_runtime.package_source import load_builtin_courseware_release
 from apps.api.content_runtime.publication_service import ContentReleasePublisher
 from apps.api.database import build_session_factory
 from apps.api.main import create_app
+from apps.api.model_gateway.audit import SqlAlchemyAttemptAuditSink
+from apps.api.model_gateway.contracts import ModelCapability
+from apps.api.model_gateway.gateway import ModelGateway
+from apps.api.node_execution.fake import DeterministicNodeOutputProvider
 from apps.api.projects.models import Project
 from apps.api.settings import Settings
 from apps.api.workflows.artifact_input_selection import ArtifactInputSelectionReader
+from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
 from tests.conftest import run_migration
 from tests.fakes.identity import configure_test_identity
 from tests.fakes.object_storage import FakeObjectStorage
 from tests.integration.test_r1_material_scope_api import _seed_material_parse
+from workers.artifact_quality import execute_artifact_quality_node
+from workers.node_execution import execute_node_execution_job
 
 ROOT = Path(__file__).resolve().parents[2]
+GOLDEN_CASE = ROOT / "contracts/fixtures/golden-projects/numbers-1-to-5/golden-project.json"
 
 
 async def test_lesson_division_prepare_start_and_refresh_are_exact(
     postgres_database_url: str,
 ) -> None:
     run_migration(postgres_database_url, "head")
+    settings = Settings(
+        _env_file=None,
+        environment="test",
+        database_url=postgres_database_url,
+    )
     app = create_app(
-        settings=Settings(
-            _env_file=None,
-            environment="test",
-            database_url=postgres_database_url,
-        ),
+        settings=settings,
         object_storage=FakeObjectStorage(),
     )
     actor = configure_test_identity(app)
@@ -147,6 +159,110 @@ async def test_lesson_division_prepare_start_and_refresh_are_exact(
             division = await client.get(f"/api/v2/projects/{project_id}/lesson-division/artifact")
             assert division.status_code == 200, division.text
             assert division.json()["data"]["artifact"] is None
+
+            case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
+            output = build_golden_branch_source_outputs(case)["lesson.division.generate"]
+            output["lesson_units"][0]["evidence_refs"] = ["p2-text-1", "p2-image-1"]
+            provider = DeterministicNodeOutputProvider(output)
+            outcome = await execute_node_execution_job(
+                job_id,
+                worker_id="r1-division-worker-success",
+                model=ModelGateway(
+                    {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: provider},
+                    audit_sink=SqlAlchemyAttemptAuditSink(factory),
+                ),
+                settings=settings,
+            )
+            assert outcome == "succeeded"
+            assert provider.calls == 1
+
+            restored_jobs = await client.get(
+                f"/api/v2/projects/{project_id}/lesson-division/generation-jobs"
+            )
+            assert restored_jobs.status_code == 200, restored_jobs.text
+            restored_job = restored_jobs.json()["data"]["items"][0]
+            assert restored_job["id"] == str(job_id)
+            assert restored_job["status"] == "succeeded"
+            assert restored_job["result_artifact_version_id"] is not None
+
+            restored_division = await client.get(
+                f"/api/v2/projects/{project_id}/lesson-division/artifact"
+            )
+            assert restored_division.status_code == 200, restored_division.text
+            restored_artifact = restored_division.json()["data"]["artifact"]
+            assert restored_artifact is not None
+            assert (
+                restored_artifact["current_submitted_version"]["id"]
+                == restored_job["result_artifact_version_id"]
+            )
+
+            artifact_id = restored_artifact["id"]
+            editable = await client.get(f"/api/v2/artifacts/{artifact_id}")
+            assert editable.status_code == 200, editable.text
+            edited_content = json.loads(
+                json.dumps(editable.json()["data"]["current_draft"]["content"])
+            )
+            edited_content["lesson_units"][0]["title"] = "1-5的认识 (教师修订)"
+            saved = await client.put(
+                f"/api/v2/artifacts/{artifact_id}/drafts/main",
+                headers={
+                    "Idempotency-Key": "r1-division-save-001",
+                    "If-Match": editable.headers["ETag"],
+                },
+                json={"content": edited_content},
+            )
+            assert saved.status_code == 200, saved.text
+            submitted = await client.post(
+                f"/api/v2/artifacts/{artifact_id}/versions",
+                headers={
+                    "Idempotency-Key": "r1-division-submit-001",
+                    "If-Match": saved.headers["ETag"],
+                },
+                json={"draft_branch": "main"},
+            )
+            assert submitted.status_code == 201, submitted.text
+            submitted_version_id = UUID(submitted.json()["data"]["id"])
+
+            quality = await client.post(
+                f"/api/v2/projects/{project_id}/lesson-division/artifact-versions/"
+                f"{submitted_version_id}/quality-validations",
+                headers={"Idempotency-Key": "r1-division-quality-001"},
+            )
+            assert quality.status_code == 202, quality.text
+            quality_node_id = UUID(quality.json()["data"]["node_run_id"])
+            quality_result = execute_artifact_quality_node(
+                postgres_database_url,
+                quality_node_id,
+                runtime_quality_validator_registry(),
+            )
+            assert quality_result is not None
+            with factory() as session:
+                quality_report = session.get(ArtifactQualityReport, quality_result.report_id)
+                assert quality_report is not None
+                findings = quality_report.findings_json
+            assert quality_result.conclusion == "passed", findings
+
+            approved = await client.post(
+                f"/api/v2/artifact-versions/{submitted_version_id}/approvals",
+                headers={"Idempotency-Key": "r1-division-approve-001"},
+                json={"action": "approve", "comment": "课时划分确认"},
+            )
+            assert approved.status_code == 201, approved.text
+            assert approved.json()["data"]["artifact_version_id"] == str(submitted_version_id)
+
+            refreshed = await client.get(f"/api/v2/projects/{project_id}/lesson-division/artifact")
+            assert refreshed.status_code == 200, refreshed.text
+            assert refreshed.json()["data"]["artifact"]["current_approved_version"]["id"] == str(
+                submitted_version_id
+            )
+            assert refreshed.json()["data"]["latest_approval"]["artifact_version_id"] == str(
+                submitted_version_id
+            )
+            lessons = await client.get(f"/api/v2/projects/{project_id}/lessons")
+            assert lessons.status_code == 200, lessons.text
+            assert [item["title"] for item in lessons.json()["data"]["items"]] == [
+                "1-5的认识 (教师修订)"
+            ]
     finally:
         app.state.database_engine.dispose()
 

@@ -9,6 +9,9 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.middleware.cors import CORSMiddleware
 
+from apps.api.artifacts.lesson_division_quality_router import (
+    router as lesson_division_quality_router,
+)
 from apps.api.artifacts.lesson_division_router import router as lesson_division_artifacts_router
 from apps.api.artifacts.lesson_plan_quality_router import (
     router as lesson_plan_quality_router,
@@ -79,6 +82,7 @@ def create_app(
     app.include_router(artifacts_router)
     app.include_router(material_scope_router)
     app.include_router(lesson_division_artifacts_router)
+    app.include_router(lesson_division_quality_router)
     app.include_router(lesson_plan_artifacts_router)
     app.include_router(lesson_plan_quality_router)
     app.include_router(creation_router)

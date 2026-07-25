@@ -305,8 +305,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 查询项目教材列表 */
-        get: operations["listProjectMaterials"];
+        /** 查询项目教材材料列表 */
+        get: operations["listProjectTextbookMaterials"];
         put?: never;
         post?: never;
         delete?: never;
@@ -462,6 +462,23 @@ export interface paths {
         get: operations["getLessonDivisionArtifact"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/lesson-division/artifact-versions/{artifact_version_id}/quality-validations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 对项目的课时划分版本执行质量检查 */
+        post: operations["startLessonDivisionQualityValidation"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2635,7 +2652,7 @@ export interface operations {
             "4XX": components["responses"]["Error"];
         };
     };
-    listProjectMaterials: {
+    listProjectTextbookMaterials: {
         parameters: {
             query?: {
                 "page[cursor]"?: components["parameters"]["PageCursor"];
@@ -2887,6 +2904,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LessonDivisionArtifactEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    startLessonDivisionQualityValidation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+                artifact_version_id: components["parameters"]["ArtifactVersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exact lesson-division quality NodeRun accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedNodeRunEnvelope"];
                 };
             };
             "4XX": components["responses"]["Error"];

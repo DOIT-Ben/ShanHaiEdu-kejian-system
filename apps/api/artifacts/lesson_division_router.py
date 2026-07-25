@@ -38,7 +38,7 @@ def get_lesson_division_artifact(
     artifact = ArtifactRepository(session, actor).get_by_key(project_id, "lesson-division")
     if artifact is not None and (
         artifact.lesson_unit_id is not None
-        or artifact.branch_key != "lesson_division"
+        or artifact.branch_key != "project"
         or artifact.artifact_type != "lesson_division"
     ):
         raise ApiError(

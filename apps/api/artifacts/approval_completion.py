@@ -124,14 +124,18 @@ def _apply_declared_completion(
         return None
     if output.approval_completion.kind != "lesson_unit_sync":
         raise _invalid("The declared approval completion is unsupported.")
-    if version.source_node_run_id is None or output.quality_gate_node_key is None:
+    if output.quality_gate_node_key is None:
         raise _invalid("The lesson approval completion lineage is incomplete.")
-    previous = ArtifactLessonDivisionReader(session, actor).previous_content(previous_version_id)
+    division_reader = ArtifactLessonDivisionReader(session, actor)
+    lineage = division_reader.generated_lineage(artifact.id, version.version_no)
+    assert lineage.source_node_run_id is not None
+    previous = division_reader.previous_content(previous_version_id)
     return LessonDivisionApprovalPort(session, actor).apply(
         LessonDivisionApprovalCommand(
             project_id=artifact.project_id,
             artifact_version_id=version.id,
-            source_node_run_id=version.source_node_run_id,
+            source_node_run_id=lineage.source_node_run_id,
+            lineage_artifact_version_id=lineage.id,
             producer_node_key=output.producer_node_key,
             approval_gate_node_key=output.quality_gate_node_key,
             content_release_id=content_release_id,

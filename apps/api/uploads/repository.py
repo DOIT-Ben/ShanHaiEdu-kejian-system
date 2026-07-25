@@ -15,7 +15,7 @@ class SourceMaterialRepository:
         self._session = session
         self._organization_id = organization_id
 
-    def list_page(
+    def list_textbooks_page(
         self,
         project_id: UUID,
         *,
@@ -27,6 +27,7 @@ class SourceMaterialRepository:
             .where(
                 SourceMaterial.organization_id == self._organization_id,
                 SourceMaterial.project_id == project_id,
+                SourceMaterial.material_kind == "textbook",
                 SourceMaterial.deleted_at.is_(None),
             )
             .order_by(SourceMaterial.id.desc())

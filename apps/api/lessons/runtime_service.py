@@ -66,7 +66,7 @@ class LessonDivisionRuntimeService:
             raise _invalid("The fixed lesson-division validate node is missing.")
         run_id = self._workflow.require_source_run(
             source_node_run_id=fact.source_node_run_id,
-            artifact_version_id=fact.artifact_version_id,
+            artifact_version_id=fact.lineage_artifact_version_id,
             expected_producer_node_key=output.producer_node_key,
             project_id=fact.project_id,
             content_release_id=fact.content_release_id,
@@ -145,7 +145,7 @@ class LessonDivisionRuntimeService:
             raise _invalid("The fixed lesson-division approval gate is missing.")
         run_id = self._workflow.require_source_run(
             source_node_run_id=fact.source_node_run_id,
-            artifact_version_id=fact.artifact_version_id,
+            artifact_version_id=fact.lineage_artifact_version_id,
             expected_producer_node_key=output.producer_node_key,
             project_id=fact.project_id,
             content_release_id=fact.content_release_id,

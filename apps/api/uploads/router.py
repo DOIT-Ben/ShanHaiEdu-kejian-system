@@ -32,8 +32,12 @@ from apps.api.uploads.storage import ObjectStorage
 router = APIRouter(prefix="/api/v2/projects/{project_id}/materials", tags=["materials"])
 
 
-@router.get("", response_model=SourceMaterialListEnvelope, operation_id="listProjectMaterials")
-def list_project_materials(
+@router.get(
+    "",
+    response_model=SourceMaterialListEnvelope,
+    operation_id="listProjectTextbookMaterials",
+)
+def list_project_textbook_materials(
     project_id: UUID,
     request: Request,
     actor: Annotated[ActorContext, Depends(get_actor_context)],
@@ -42,7 +46,9 @@ def list_project_materials(
     page_limit: Annotated[int, Query(alias="page[limit]", ge=1, le=100)] = 20,
 ) -> SourceMaterialListEnvelope:
     ProjectAccessService(session, actor).require(project_id, ProjectAction.VIEW)
-    materials, next_cursor = SourceMaterialRepository(session, actor.organization_id).list_page(
+    materials, next_cursor = SourceMaterialRepository(
+        session, actor.organization_id
+    ).list_textbooks_page(
         project_id,
         cursor=_parse_page_cursor(page_cursor),
         limit=page_limit,
