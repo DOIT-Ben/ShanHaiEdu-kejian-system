@@ -9,11 +9,14 @@ from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from apps.api.assets.models import FileAssetVersion, MaterialParseVersion
+from apps.api.assets.parse_page_facts import read_material_parse_pages
 from apps.api.assets.repository import FileAssetRepository, MaterialFileRecord
 from apps.api.assets.schemas import (
     FileAssetEnvelope,
     FileAssetRead,
     FileAssetVersionRead,
+    MaterialParsePageListData,
+    MaterialParsePageListEnvelope,
     MaterialParseVersionListData,
     MaterialParseVersionListEnvelope,
     MaterialParseVersionRead,
@@ -70,6 +73,32 @@ def list_material_parse_versions(
     parses = repository.list_parse_versions(project_id, material_id)
     return MaterialParseVersionListEnvelope(
         data=MaterialParseVersionListData(items=[serialize_parse(item) for item in parses]),
+        request_id=request.state.request_id,
+    )
+
+
+@router.get(
+    "/api/v2/projects/{project_id}/materials/{material_id}/parse-versions/{parse_version_id}/pages",
+    response_model=MaterialParsePageListEnvelope,
+    operation_id="listMaterialParsePages",
+)
+def list_material_parse_pages(
+    project_id: UUID,
+    material_id: UUID,
+    parse_version_id: UUID,
+    request: Request,
+    actor: Annotated[ActorContext, Depends(get_actor_context)],
+    session: Annotated[Session, Depends(get_session)],
+) -> MaterialParsePageListEnvelope:
+    ProjectAccessService(session, actor).require(project_id, ProjectAction.VIEW)
+    repository = FileAssetRepository(session, actor)
+    if repository.get_for_material(project_id, material_id) is None:
+        raise material_file_not_found()
+    parse = repository.get_parse(parse_version_id)
+    if parse is None or parse.source_material_id != material_id:
+        raise material_parse_not_found()
+    return MaterialParsePageListEnvelope(
+        data=MaterialParsePageListData(items=read_material_parse_pages(parse)),
         request_id=request.state.request_id,
     )
 
@@ -134,4 +163,12 @@ def material_file_not_found() -> ApiError:
         status_code=404,
         code="MATERIAL_FILE_NOT_FOUND",
         message="The source material file was not found.",
+    )
+
+
+def material_parse_not_found() -> ApiError:
+    return ApiError(
+        status_code=404,
+        code="MATERIAL_PARSE_NOT_FOUND",
+        message="The material parse was not found.",
     )

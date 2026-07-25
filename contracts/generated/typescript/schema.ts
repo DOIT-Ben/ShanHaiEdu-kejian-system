@@ -417,6 +417,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project_id}/materials/{material_id}/parse-versions/{parse_version_id}/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询指定教材解析版本的页级事实 */
+        get: operations["listMaterialParsePages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project_id}/workflow": {
         parameters: {
             query?: never;
@@ -1299,6 +1316,18 @@ export interface components {
             };
             request_id: string;
         };
+        MaterialParsePage: {
+            page_number: number;
+            text_preview: string;
+            text_block_count: number;
+            image_count: number;
+        };
+        MaterialParsePageListEnvelope: {
+            data: {
+                items: components["schemas"]["MaterialParsePage"][];
+            };
+            request_id: string;
+        };
         SourceMaterial: {
             /** Format: uuid */
             id: string;
@@ -1863,6 +1892,7 @@ export interface components {
         LessonDivisionArtifactEnvelope: {
             data: {
                 artifact: components["schemas"]["Artifact"] | null;
+                quality_report: components["schemas"]["LessonPlanQualityReport"] | null;
                 latest_approval: components["schemas"]["Approval"] | null;
             };
             request_id: string;
@@ -2047,6 +2077,7 @@ export interface components {
         GenerationResultId: string;
         AdoptionId: string;
         MaterialId: string;
+        ParseVersionId: string;
         JobId: string;
         ArtifactId: string;
         ArtifactVersionId: string;
@@ -2828,6 +2859,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MaterialParseVersionListEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    listMaterialParsePages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+                material_id: components["parameters"]["MaterialId"];
+                parse_version_id: components["parameters"]["ParseVersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bounded page facts from the exact material parse version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaterialParsePageListEnvelope"];
                 };
             };
             "4XX": components["responses"]["Error"];

@@ -104,6 +104,7 @@ jobs:
           uv run alembic upgrade head
           uv run python scripts/seed_runtime_auth_e2e.py
           uv run python scripts/seed_r1_rescue_e2e.py
+          uv run python scripts/seed_r1_material_scope_e2e.py
 
       - name: Build the production frontend
         run: pnpm --dir apps/web build

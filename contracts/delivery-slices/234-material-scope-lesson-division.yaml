@@ -1,0 +1,55 @@
+schema_version: 1
+issue: 234
+rows:
+  - page_route: /app/projects/{project_id}/materials/{material_id}
+    navigation_path: /app/projects/material-scope-lesson-division/materials/textbook
+    api_requests:
+      - operation_id: listProjectTextbookMaterials
+        method: GET
+        path: /api/v2/projects/{project_id}/materials
+      - operation_id: listMaterialParsePages
+        method: GET
+        path: /api/v2/projects/{project_id}/materials/{material_id}/parse-versions/{parse_version_id}/pages
+      - operation_id: createMaterialScopeVersion
+        method: POST
+        path: /api/v2/projects/{project_id}/material-scope/versions
+      - operation_id: reviewArtifactVersion
+        method: POST
+        path: /api/v2/artifact-versions/{artifact_version_id}/approvals
+      - operation_id: prepareLessonDivision
+        method: POST
+        path: /api/v2/projects/{project_id}/lesson-division/node-runs
+      - operation_id: startNodeRun
+        method: POST
+        path: /api/v2/node-runs/{node_run_id}/start
+      - operation_id: listLessonDivisionGenerationJobs
+        method: GET
+        path: /api/v2/projects/{project_id}/lesson-division/generation-jobs
+      - operation_id: getLessonDivisionArtifact
+        method: GET
+        path: /api/v2/projects/{project_id}/lesson-division/artifact
+      - operation_id: saveArtifactDraft
+        method: PUT
+        path: /api/v2/artifacts/{artifact_id}/drafts/{draft_branch}
+      - operation_id: submitArtifactVersion
+        method: POST
+        path: /api/v2/artifacts/{artifact_id}/versions
+      - operation_id: startLessonDivisionQualityValidation
+        method: POST
+        path: /api/v2/projects/{project_id}/lesson-division/artifact-versions/{artifact_version_id}/quality-validations
+    formal_facts:
+      - Session
+      - Project
+      - SourceMaterial
+      - MaterialParseVersion
+      - Artifact
+      - ArtifactVersion
+      - GenerationJob
+      - LessonUnit
+      - ArtifactQualityReport
+      - Approval
+    backend_tests:
+      - tests/integration/test_r1_material_scope_api.py::test_material_scope_command_appends_exact_submitted_versions
+      - tests/integration/test_r1_lesson_division_api.py::test_lesson_division_prepare_start_and_refresh_are_exact
+    real_api_playwright:
+      - apps/web/e2e/real-api/material-scope-lesson-division.spec.ts::teacher_completes_exact_material_scope_and_lesson_division_with_real_api

@@ -241,6 +241,14 @@ async def test_lesson_division_prepare_start_and_refresh_are_exact(
                 assert quality_report is not None
                 findings = quality_report.findings_json
             assert quality_result.conclusion == "passed", findings
+            quality_status = await client.get(
+                f"/api/v2/projects/{project_id}/lesson-division/artifact"
+            )
+            assert quality_status.status_code == 200, quality_status.text
+            assert quality_status.json()["data"]["quality_report"]["artifact_version_id"] == str(
+                submitted_version_id
+            )
+            assert quality_status.json()["data"]["quality_report"]["conclusion"] == "passed"
 
             approved = await client.post(
                 f"/api/v2/artifact-versions/{submitted_version_id}/approvals",

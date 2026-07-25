@@ -85,6 +85,31 @@ async def test_material_scope_command_appends_exact_submitted_versions(
             materials = await client.get(f"/api/v2/projects/{project_id}/materials")
             assert materials.status_code == 200, materials.text
             assert [item["id"] for item in materials.json()["data"]["items"]] == [str(material_id)]
+            pages = await client.get(
+                f"/api/v2/projects/{project_id}/materials/{material_id}/"
+                f"parse-versions/{parse_id}/pages"
+            )
+            assert pages.status_code == 200, pages.text
+            assert pages.json()["data"]["items"] == [
+                {
+                    "page_number": 1,
+                    "text_preview": "",
+                    "text_block_count": 0,
+                    "image_count": 0,
+                },
+                {
+                    "page_number": 2,
+                    "text_preview": "page 2",
+                    "text_block_count": 1,
+                    "image_count": 1,
+                },
+                {
+                    "page_number": 3,
+                    "text_preview": "page 3",
+                    "text_block_count": 1,
+                    "image_count": 0,
+                },
+            ]
 
             payload = {
                 "source_material_id": str(material_id),

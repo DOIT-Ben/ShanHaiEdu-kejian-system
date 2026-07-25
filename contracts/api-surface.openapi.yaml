@@ -629,6 +629,21 @@ paths:
                 $ref: '#/components/schemas/MaterialParseVersionListEnvelope'
         '4XX':
           $ref: '#/components/responses/Error'
+  /projects/{project_id}/materials/{material_id}/parse-versions/{parse_version_id}/pages:
+    get:
+      summary: 查询指定教材解析版本的页级事实
+      operationId: listMaterialParsePages
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/MaterialId'
+        - $ref: '#/components/parameters/ParseVersionId'
+      responses:
+        '200':
+          description: Bounded page facts from the exact material parse version
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MaterialParsePageListEnvelope'}
+        '4XX': {$ref: '#/components/responses/Error'}
   /projects/{project_id}/workflow:
     get:
       summary: 获取项目工作台聚合状态
@@ -1239,6 +1254,11 @@ components:
       schema: {type: string, format: uuid}
     MaterialId:
       name: material_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    ParseVersionId:
+      name: parse_version_id
       in: path
       required: true
       schema: {type: string, format: uuid}
@@ -1994,6 +2014,29 @@ components:
             items:
               type: array
               items: {$ref: '#/components/schemas/MaterialParseVersion'}
+        request_id: {type: string, minLength: 1}
+    MaterialParsePage:
+      type: object
+      additionalProperties: false
+      required: [page_number, text_preview, text_block_count, image_count]
+      properties:
+        page_number: {type: integer, minimum: 1}
+        text_preview: {type: string, maxLength: 1000}
+        text_block_count: {type: integer, minimum: 0}
+        image_count: {type: integer, minimum: 0}
+    MaterialParsePageListEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: {$ref: '#/components/schemas/MaterialParsePage'}
         request_id: {type: string, minLength: 1}
     SourceMaterial:
       type: object
@@ -2807,11 +2850,15 @@ components:
         data:
           type: object
           additionalProperties: false
-          required: [artifact, latest_approval]
+          required: [artifact, quality_report, latest_approval]
           properties:
             artifact:
               oneOf:
                 - {$ref: '#/components/schemas/Artifact'}
+                - {type: 'null'}
+            quality_report:
+              oneOf:
+                - {$ref: '#/components/schemas/LessonPlanQualityReport'}
                 - {type: 'null'}
             latest_approval:
               oneOf:

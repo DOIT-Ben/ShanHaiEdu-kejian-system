@@ -61,7 +61,7 @@ class ArtifactQualityReportRepository:
         self,
         *,
         project_id: UUID,
-        lesson_unit_id: UUID,
+        lesson_unit_id: UUID | None,
         artifact_version_id: UUID,
     ) -> ArtifactQualityReport | None:
         if not self._actor.is_system:
@@ -92,6 +92,29 @@ class ArtifactQualityReportRepository:
         report = self.latest_for_artifact_version(
             project_id=project_id,
             lesson_unit_id=lesson_unit_id,
+            artifact_version_id=artifact_version_id,
+        )
+        if report is None or report.source_artifact_version_id is None:
+            return None
+        return LessonPlanQualityReportFact(
+            id=report.id,
+            artifact_version_id=report.source_artifact_version_id,
+            validate_node_run_id=report.validate_node_run_id,
+            conclusion=report.conclusion,
+            findings=report.findings_json,
+            evidence_hash=report.evidence_hash,
+            created_at=report.created_at,
+        )
+
+    def latest_project_artifact_fact(
+        self,
+        *,
+        project_id: UUID,
+        artifact_version_id: UUID,
+    ) -> LessonPlanQualityReportFact | None:
+        report = self.latest_for_artifact_version(
+            project_id=project_id,
+            lesson_unit_id=None,
             artifact_version_id=artifact_version_id,
         )
         if report is None or report.source_artifact_version_id is None:

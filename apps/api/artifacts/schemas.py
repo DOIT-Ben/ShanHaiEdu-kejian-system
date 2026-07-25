@@ -195,6 +195,7 @@ class MaterialScopeArtifactEnvelope(BaseModel):
 
 class LessonDivisionArtifactRead(BaseModel):
     artifact: ArtifactRead | None
+    quality_report: LessonPlanQualityReportRead | None
     latest_approval: ApprovalRead | None
 
 
