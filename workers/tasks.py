@@ -16,7 +16,7 @@ from apps.api.jobs.models import GenerationJob
 from apps.api.jobs.service import GenerationJobService
 from apps.api.settings import get_settings
 from workers.material_parse import run_material_parse_job
-from workers.node_execution import execute_node_execution_job
+from workers.node_execution import NodeExecutionJobInFlight, execute_node_execution_job
 
 logger = logging.getLogger(__name__)
 
@@ -117,4 +117,7 @@ def run_generation_job(job_id: UUID, *, worker_id: str | None = None) -> str:
 
 @dramatiq.actor(max_retries=5, min_backoff=1_000, max_backoff=30_000)
 def process_generation_job(job_id: str) -> None:
-    run_generation_job(UUID(job_id))
+    try:
+        run_generation_job(UUID(job_id))
+    except NodeExecutionJobInFlight as exc:
+        raise dramatiq.Retry(delay=exc.retry_after_seconds * 1_000) from None

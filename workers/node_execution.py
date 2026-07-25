@@ -28,6 +28,12 @@ from workflow.node_state import NodeStatus
 logger = logging.getLogger(__name__)
 
 
+class NodeExecutionJobInFlight(RuntimeError):
+    def __init__(self, *, retry_after_seconds: int) -> None:
+        super().__init__("node execution is owned by another worker")
+        self.retry_after_seconds = retry_after_seconds
+
+
 async def execute_node_execution_job(
     job_id: UUID,
     *,
@@ -98,8 +104,14 @@ def _claim_job(
     settings: Settings,
 ) -> bool:
     with factory() as session, session.begin():
-        if SqlAlchemyWorkflowExecutionPort(session, actor).execution_in_flight(node_run_id):
-            return False
+        current = GenerationJobRoutingReader(session).get_lesson_plan(job_id)
+        if current is not None and current.status == "running":
+            retry_after = SqlAlchemyWorkflowExecutionPort(
+                session,
+                actor,
+            ).execution_retry_after_seconds(node_run_id)
+            if retry_after is not None:
+                raise NodeExecutionJobInFlight(retry_after_seconds=retry_after)
         claimed = GenerationJobService(
             session,
             actor=actor,

@@ -6,12 +6,13 @@ from pathlib import Path
 from uuid import UUID
 
 import httpx
+import pytest
 from pydantic import SecretStr
 from sqlalchemy import func, select
 
 from apps.api.artifacts.models import Artifact, ArtifactDraft, ArtifactVersion
 from apps.api.artifacts.service import ArtifactService
-from apps.api.database import build_engine, build_session_factory
+from apps.api.database import build_engine, build_session_factory, utc_now
 from apps.api.ids import new_uuid7
 from apps.api.jobs.models import GenerationJob
 from apps.api.lessons.models import LessonUnit
@@ -29,14 +30,14 @@ from apps.api.model_gateway.pending import PendingTextGeneration
 from apps.api.model_gateway.ports import CancellationToken
 from apps.api.node_execution.fake import DeterministicNodeOutputProvider
 from apps.api.settings import Settings
-from apps.api.workflows.models import BranchRun, NodeRun
+from apps.api.workflows.models import BranchRun, NodeExecutionLease, NodeRun
 from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
 from tests.fakes.identity import override_test_identity
 from tests.fakes.object_storage import FakeObjectStorage
 from tests.integration.test_lesson_division_runtime import (
     _prepare_approval,  # pyright: ignore[reportPrivateUsage, reportUnknownVariableType]
 )
-from workers.node_execution import execute_node_execution_job
+from workers.node_execution import NodeExecutionJobInFlight, execute_node_execution_job
 
 ROOT = Path(__file__).resolve().parents[2]
 GOLDEN_CASE = ROOT / "contracts/fixtures/golden-projects/numbers-1-to-5/golden-project.json"
@@ -258,20 +259,42 @@ async def test_lesson_plan_job_worker_persists_exact_result_draft_and_cancellati
             await asyncio.sleep(1.1)
 
             duplicate_provider = DeterministicNodeOutputProvider(outputs["lesson_plan.generate"])
-            duplicate_outcome = await execute_node_execution_job(
-                concurrent_job_id,
-                worker_id="r1-rescue-node-worker-duplicate",
-                model=ModelGateway(
-                    {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: duplicate_provider},
-                    audit_sink=SqlAlchemyAttemptAuditSink(factory),
-                ),
-                settings=short_lease_settings,
-            )
-            assert duplicate_outcome == "ignored"
+            with pytest.raises(NodeExecutionJobInFlight) as in_flight:
+                await execute_node_execution_job(
+                    concurrent_job_id,
+                    worker_id="r1-rescue-node-worker-duplicate",
+                    model=ModelGateway(
+                        {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: duplicate_provider},
+                        audit_sink=SqlAlchemyAttemptAuditSink(factory),
+                    ),
+                    settings=short_lease_settings,
+                )
+            assert 1 <= in_flight.value.retry_after_seconds <= 301
             assert duplicate_provider.calls == 0
 
-            blocking_model.release.set()
-            assert await asyncio.wait_for(first_delivery, timeout=5) == "succeeded"
+            with factory() as session, session.begin():
+                stale_node_lease = session.get(NodeExecutionLease, concurrent_node_id)
+                stale_job = session.get(GenerationJob, concurrent_job_id)
+                assert stale_node_lease is not None and stale_job is not None
+                stale_node_lease.lease_expires_at = utc_now()
+                stale_job.lease_expires_at = utc_now()
+
+            assert (
+                await execute_node_execution_job(
+                    concurrent_job_id,
+                    worker_id="r1-rescue-node-worker-takeover",
+                    model=ModelGateway(
+                        {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: duplicate_provider},
+                        audit_sink=SqlAlchemyAttemptAuditSink(factory),
+                    ),
+                    settings=short_lease_settings,
+                )
+                == "succeeded"
+            )
+            assert duplicate_provider.calls == 1
+            first_delivery.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await first_delivery
             with factory() as session:
                 concurrent_job = session.get(GenerationJob, concurrent_job_id)
                 concurrent_node = session.get(NodeRun, concurrent_node_id)
