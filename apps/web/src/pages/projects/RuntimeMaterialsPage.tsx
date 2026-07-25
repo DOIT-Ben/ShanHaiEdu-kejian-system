@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, BookOpen } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   getSourceMaterialFileAsset,
   listMaterialParsePages,
@@ -9,7 +9,9 @@ import {
 } from "@/features/materials/api/materialsApi";
 import { MaterialDetailsPanel } from "@/features/materials/components/MaterialDetailsPanel";
 import { MaterialScopePanel } from "@/features/materials/components/MaterialScopePanel";
+import { ProjectMaterialUploadPanel } from "@/features/materials/components/ProjectMaterialUploadPanel";
 import { useMaterialScopeRuntime } from "@/features/materials/hooks/useMaterialScopeWorkflow";
+import { materialScopeVersionMatches } from "@/features/materials/lib/materialScopeIdentity";
 import { LessonDivisionWorkflowPanel } from "@/features/lessons/components/LessonDivisionWorkflowPanel";
 import { runtimeErrorMessage } from "@/shared/api/runtimeError";
 import { useProjectEvents } from "@/shared/api/useProjectEvents";
@@ -18,6 +20,7 @@ import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 
 export function RuntimeMaterialsPage() {
   const { materialId, projectId } = useParams();
+  const navigate = useNavigate();
   useProjectEvents(projectId);
   const materialsQuery = useQuery({
     enabled: Boolean(projectId),
@@ -81,7 +84,8 @@ export function RuntimeMaterialsPage() {
     currentApprovedScopeVersion &&
     latestScopeApproval &&
     currentApprovedScopeVersion.id === latestScopeApproval.artifact_version_id &&
-    latestScopeApproval.action === "approve"
+    latestScopeApproval.action === "approve" &&
+    materialScopeVersionMatches(currentApprovedScopeVersion, materialId, selectedParseVersion?.id)
       ? currentApprovedScopeVersion.id
       : undefined;
 
@@ -144,49 +148,56 @@ export function RuntimeMaterialsPage() {
             )}
           </div>
         ) : (
-          <section aria-labelledby="material-list-title">
-            <h2
-              className="text-lg font-semibold text-[var(--sh-ink-strong)]"
-              id="material-list-title"
-            >
-              选择教材
-            </h2>
-            {materialsQuery.isLoading ? (
-              <p className="mt-3 text-sm text-[var(--sh-ink-muted)]" role="status">
-                正在读取项目教材
-              </p>
-            ) : materialsQuery.error ? (
-              <p className="mt-3 text-sm text-[var(--sh-danger)]" role="alert">
-                {runtimeErrorMessage(materialsQuery.error, "项目教材暂时无法读取。")}
-              </p>
-            ) : materialsQuery.data?.length ? (
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                {materialsQuery.data.map((material) => (
-                  <Link
-                    className="flex min-h-24 items-center gap-3 rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-4 transition-colors hover:border-[var(--sh-brand-300)] hover:bg-[var(--sh-brand-50)]"
-                    key={material.id}
-                    to={`/app/projects/${projectId}/materials/${material.id}`}
-                  >
-                    <span className="grid size-10 shrink-0 place-items-center rounded-[var(--sh-radius-sm)] bg-[var(--sh-brand-50)] text-[var(--sh-brand-700)]">
-                      <BookOpen aria-hidden="true" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate font-semibold text-[var(--sh-ink-strong)]">
-                        {material.original_filename}
+          <div className="space-y-6">
+            <ProjectMaterialUploadPanel
+              onAccepted={({ jobId, materialId: acceptedMaterialId }) => {
+                const params = new URLSearchParams({ jobId, materialId: acceptedMaterialId });
+                void navigate(`/app/projects/${projectId}/setup?${params.toString()}`);
+              }}
+              projectId={projectId}
+            />
+            <section aria-labelledby="material-list-title">
+              <h2
+                className="text-lg font-semibold text-[var(--sh-ink-strong)]"
+                id="material-list-title"
+              >
+                选择教材
+              </h2>
+              {materialsQuery.isLoading ? (
+                <p className="mt-3 text-sm text-[var(--sh-ink-muted)]" role="status">
+                  正在读取项目教材
+                </p>
+              ) : materialsQuery.error ? (
+                <p className="mt-3 text-sm text-[var(--sh-danger)]" role="alert">
+                  {runtimeErrorMessage(materialsQuery.error, "项目教材暂时无法读取。")}
+                </p>
+              ) : materialsQuery.data?.length ? (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {materialsQuery.data.map((material) => (
+                    <Link
+                      className="flex min-h-24 items-center gap-3 rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-4 transition-colors hover:border-[var(--sh-brand-300)] hover:bg-[var(--sh-brand-50)]"
+                      key={material.id}
+                      to={`/app/projects/${projectId}/materials/${material.id}`}
+                    >
+                      <span className="grid size-10 shrink-0 place-items-center rounded-[var(--sh-radius-sm)] bg-[var(--sh-brand-50)] text-[var(--sh-brand-700)]">
+                        <BookOpen aria-hidden="true" />
                       </span>
-                      <span className="mt-1 block text-sm text-[var(--sh-ink-muted)]">
-                        {material.upload_status === "confirmed" ? "已上传" : "处理中"}
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold text-[var(--sh-ink-strong)]">
+                          {material.original_filename}
+                        </span>
+                        <span className="mt-1 block text-sm text-[var(--sh-ink-muted)]">
+                          {material.upload_status === "confirmed" ? "已上传" : "处理中"}
+                        </span>
                       </span>
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-3 rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-6 text-sm text-[var(--sh-ink-muted)]">
-                当前项目还没有教材。请从新建项目流程上传教材。
-              </p>
-            )}
-          </section>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-[var(--sh-ink-muted)]">当前项目还没有教材。</p>
+              )}
+            </section>
+          </div>
         )}
       </div>
     </div>

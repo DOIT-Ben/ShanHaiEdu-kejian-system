@@ -41,7 +41,7 @@ export function LessonDivisionWorkflowPanel({
       </div>
 
       <LessonDivisionGenerationPanel
-        artifactExists={artifactRuntime.artifact !== undefined}
+        artifactStatus={artifactRuntime.artifact?.status}
         materialScopeVersionId={materialScopeVersionId}
         projectId={projectId}
       />

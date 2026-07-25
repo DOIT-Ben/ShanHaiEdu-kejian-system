@@ -32,6 +32,10 @@ async def test_material_scope_command_appends_exact_submitted_versions(
             _env_file=None,
             environment="test",
             database_url=postgres_database_url,
+            session_access_code=None,
+            session_allowed_origins=[],
+            session_csrf_secret=None,
+            session_teacher_principal_id=None,
         ),
         object_storage=FakeObjectStorage(),
     )
@@ -212,6 +216,10 @@ async def test_material_scope_command_rejects_invalid_source_range_and_evidence(
             _env_file=None,
             environment="test",
             database_url=postgres_database_url,
+            session_access_code=None,
+            session_allowed_origins=[],
+            session_csrf_secret=None,
+            session_teacher_principal_id=None,
         ),
         object_storage=FakeObjectStorage(),
     )

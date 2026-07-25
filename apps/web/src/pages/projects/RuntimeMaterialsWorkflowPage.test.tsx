@@ -7,6 +7,8 @@ import { RuntimeMaterialsPage } from "@/pages/projects/RuntimeMaterialsPage";
 
 const workflow = vi.hoisted(() => ({
   approvedVersionId: undefined as string | undefined,
+  scopeMaterialId: undefined as string | undefined,
+  scopeParseVersionId: undefined as string | undefined,
 }));
 
 vi.mock("@/shared/api/useProjectEvents", () => ({ useProjectEvents: vi.fn() }));
@@ -28,7 +30,13 @@ vi.mock("@/features/materials/hooks/useMaterialScopeWorkflow", () => ({
     aggregateQuery: { refetch: vi.fn() },
     artifact: workflow.approvedVersionId
       ? {
-          current_approved_version: { id: workflow.approvedVersionId },
+          current_approved_version: {
+            content: {
+              material_parse_version_id: workflow.scopeParseVersionId,
+              source_material_id: workflow.scopeMaterialId,
+            },
+            id: workflow.approvedVersionId,
+          },
           status: "approved",
         }
       : undefined,
@@ -63,6 +71,8 @@ function renderPage(path: string) {
 describe("RuntimeMaterialsPage workflow", () => {
   beforeEach(() => {
     workflow.approvedVersionId = undefined;
+    workflow.scopeMaterialId = undefined;
+    workflow.scopeParseVersionId = undefined;
     vi.spyOn(materialsApi, "listProjectTextbookMaterials").mockResolvedValue([]);
   });
 
@@ -84,10 +94,13 @@ describe("RuntimeMaterialsPage workflow", () => {
       `/app/projects/${projectId}/materials/${materialId}`,
     );
     expect(materialsApi.listProjectTextbookMaterials).toHaveBeenCalledWith(projectId);
+    expect(screen.getByLabelText("选择教材 PDF")).toBeVisible();
   });
 
   it("binds exact parse pages and only exposes an approved scope to division", async () => {
     workflow.approvedVersionId = "scope-version-1";
+    workflow.scopeMaterialId = materialId;
+    workflow.scopeParseVersionId = parseVersionId;
     vi.spyOn(materialsApi, "getSourceMaterialFileAsset").mockResolvedValue({
       asset: { status: "active" } as materialsApi.FileAssetDto,
     });
@@ -116,5 +129,28 @@ describe("RuntimeMaterialsPage workflow", () => {
         projectId,
       }),
     );
+  });
+
+  it("does not expose another textbook parse scope to lesson division", async () => {
+    workflow.approvedVersionId = "scope-version-1";
+    workflow.scopeMaterialId = "01960000-0000-7000-8000-000000000099";
+    workflow.scopeParseVersionId = "01960000-0000-7000-8000-000000000098";
+    vi.spyOn(materialsApi, "getSourceMaterialFileAsset").mockResolvedValue({
+      asset: { status: "active" } as materialsApi.FileAssetDto,
+    });
+    vi.spyOn(materialsApi, "listMaterialParseVersions").mockResolvedValue([
+      {
+        id: parseVersionId,
+        page_count: 2,
+        status: "succeeded",
+      } as materialsApi.MaterialParseVersionDto,
+    ]);
+    vi.spyOn(materialsApi, "listMaterialParsePages").mockResolvedValue([
+      { page_number: 1 } as materialsApi.MaterialParsePageDto,
+    ]);
+
+    renderPage(`/app/projects/${projectId}/materials/${materialId}`);
+
+    expect(await screen.findByText("课时划分范围 未批准")).toBeVisible();
   });
 });

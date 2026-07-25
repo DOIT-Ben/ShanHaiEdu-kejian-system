@@ -1,3 +1,5 @@
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 function requiredEnvironment(name: string) {
@@ -19,14 +21,29 @@ async function login(page: Page) {
 test("teacher_completes_exact_material_scope_and_lesson_division_with_real_api", async ({
   page,
 }) => {
-  test.setTimeout(150_000);
+  test.setTimeout(180_000);
   await login(page);
   await page.getByRole("link", { name: "继续制作教材范围与课时划分验收" }).click();
   await expect(
     page.getByRole("heading", { level: 1, name: "教材范围与课时划分验收" }),
   ).toBeVisible();
   await page.getByRole("link", { name: "教材与解析" }).click();
-  await page.getByRole("link", { name: /一年级数学教材/ }).click();
+  await page
+    .getByLabel("选择教材 PDF")
+    .setInputFiles(join(tmpdir(), "shanhai-r1-e2e-textbook.pdf"));
+  const confirmationResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      /\/api\/v2\/projects\/[0-9a-f-]+\/materials\/[0-9a-f-]+\/confirm$/.test(response.url()),
+  );
+  await page.getByRole("button", { name: "上传并解析教材" }).click();
+  const parseJob = (await (await confirmationResponse).json()) as { data: { job_id: string } };
+  await expect(page).toHaveURL(/\/setup\?jobId=[0-9a-f-]+&materialId=[0-9a-f-]+$/);
+  await expect(page.getByRole("progressbar", { name: "教材处理进度 100%" })).toBeVisible({
+    timeout: 60_000,
+  });
+  expect(page.url()).toContain(`jobId=${parseJob.data.job_id}`);
+  await page.getByRole("link", { name: "查看教材详情" }).click();
 
   const routeIds = /\/projects\/([0-9a-f-]+)\/materials\/([0-9a-f-]+)/.exec(page.url());
   if (!routeIds) throw new Error("Material page URL is missing exact project and material IDs");
@@ -36,7 +53,7 @@ test("teacher_completes_exact_material_scope_and_lesson_division_with_real_api",
     throw new Error("Material page URL contains incomplete project or material IDs");
   }
   await expect(page.getByRole("heading", { name: "物理页 2" })).toBeVisible();
-  await expect(page.getByText("page 2")).toBeVisible();
+  await expect(page.getByText("R1 evidence page 2")).toBeVisible();
 
   await page.getByLabel("起始物理页").fill("2");
   await page.getByLabel("结束物理页").fill("2");
@@ -176,7 +193,7 @@ test("teacher_completes_exact_material_scope_and_lesson_division_with_real_api",
     },
     { baseUrl: apiBaseUrl, exactMaterialId: materialId },
   );
-  expect(isolationFacts.materialIds).toHaveLength(1);
+  expect(isolationFacts.materialIds).toHaveLength(0);
   expect(isolationFacts.sourceMaterialLeaked).toBe(false);
   expect(isolationFacts.scope).toBeNull();
   expect(isolationFacts.jobs).toEqual([]);

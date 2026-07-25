@@ -40,16 +40,13 @@ describe("LessonDivisionGenerationPanel", () => {
   });
 
   it("requires an approved exact scope version before generation", () => {
-    const { rerender } = render(
-      <LessonDivisionGenerationPanel artifactExists={false} projectId="project-1" />,
-    );
+    const { rerender } = render(<LessonDivisionGenerationPanel projectId="project-1" />);
 
     expect(screen.getByRole("button", { name: "生成课时划分" })).toBeDisabled();
     expect(screen.getByText("先确认教材范围，再启动课时划分。")).toBeVisible();
 
     rerender(
       <LessonDivisionGenerationPanel
-        artifactExists={false}
         materialScopeVersionId="scope-version-1"
         projectId="project-1"
       />,
@@ -61,5 +58,18 @@ describe("LessonDivisionGenerationPanel", () => {
     expect(workflow.generationOptions).toHaveBeenCalledWith(
       expect.objectContaining({ projectId: "project-1" }),
     );
+  });
+
+  it("allows regeneration when the previous division is stale", () => {
+    render(
+      <LessonDivisionGenerationPanel
+        artifactStatus="stale"
+        materialScopeVersionId="scope-version-2"
+        projectId="project-1"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "重新生成课时划分" }));
+    expect(workflow.generationMutate).toHaveBeenCalledWith("scope-version-2");
   });
 });

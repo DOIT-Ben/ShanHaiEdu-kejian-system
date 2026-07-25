@@ -9,11 +9,11 @@ import { runtimeErrorMessage } from "@/shared/api/runtimeError";
 import { Button } from "@/shared/ui/Button";
 
 export function LessonDivisionGenerationPanel({
-  artifactExists,
+  artifactStatus,
   materialScopeVersionId,
   projectId,
 }: {
-  artifactExists: boolean;
+  artifactStatus?: string;
   materialScopeVersionId?: string;
   projectId: string;
 }) {
@@ -25,6 +25,7 @@ export function LessonDivisionGenerationPanel({
   const jobLive = Boolean(
     jobRuntime.job && !["succeeded", "failed", "cancelled"].includes(jobRuntime.job.status),
   );
+  const artifactBlocksGeneration = Boolean(artifactStatus && artifactStatus !== "stale");
 
   return (
     <>
@@ -35,7 +36,7 @@ export function LessonDivisionGenerationPanel({
             !materialScopeVersionId ||
             generationMutation.isPending ||
             jobLive ||
-            artifactExists
+            artifactBlocksGeneration
           }
           loading={generationMutation.isPending}
           loadingText="正在启动课时划分"
@@ -44,7 +45,11 @@ export function LessonDivisionGenerationPanel({
           }
         >
           <RefreshCw aria-hidden="true" />
-          {artifactExists ? "课时划分已生成" : "生成课时划分"}
+          {artifactStatus === "stale"
+            ? "重新生成课时划分"
+            : artifactStatus
+              ? "课时划分已生成"
+              : "生成课时划分"}
         </Button>
         {!materialScopeVersionId ? (
           <p className="text-sm text-[var(--sh-ink-muted)]" role="status">

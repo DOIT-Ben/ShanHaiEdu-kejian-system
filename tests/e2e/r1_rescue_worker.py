@@ -16,6 +16,7 @@ from dramatiq.brokers.redis import RedisBroker
 from dramatiq.worker import Worker
 
 from apps.api.database import build_engine, build_session_factory
+from apps.api.jobs.models import GenerationJob
 from apps.api.model_gateway.audit import SqlAlchemyAttemptAuditSink
 from apps.api.model_gateway.contracts import (
     ModelCapability,
@@ -41,11 +42,12 @@ class R1RescueNodeOutputProvider:
         self._outputs = outputs
 
     async def complete(self, request: TextModelRequest) -> TextProviderResult:
-        node_key = (
-            "lesson.division.generate"
-            if "division_key" in request.prompt
-            else "lesson_plan.generate"
-        )
+        if '"lesson_plan_key"' in request.prompt:
+            node_key = "lesson_plan.generate"
+        elif '"division_key"' in request.prompt:
+            node_key = "lesson.division.generate"
+        else:
+            raise RuntimeError("the R1 E2E provider received an unsupported output contract")
         return TextProviderResult(
             text=json.dumps(
                 self._outputs[node_key],
@@ -85,17 +87,21 @@ def main() -> int:
     factory = build_session_factory(engine)
     case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
     outputs = build_golden_branch_source_outputs(case)
-    outputs["lesson.division.generate"]["lesson_units"][0]["evidence_refs"] = [
-        "p2-text-1",
-        "p2-image-1",
-    ]
+    outputs["lesson.division.generate"]["lesson_units"][0]["evidence_refs"] = ["p2-text-1"]
     provider = R1RescueNodeOutputProvider(outputs)
     gateway = ModelGateway(
         {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: provider},
         audit_sink=SqlAlchemyAttemptAuditSink(factory),
     )
 
+    original_run_generation_job = generation_tasks.run_generation_job
+
     def run_fixture_generation(job_id: UUID, *, worker_id: str | None = None) -> str:
+        with factory() as session:
+            job = session.get(GenerationJob, job_id)
+            job_type = job.job_type if job is not None else None
+        if job_type == "material.parse":
+            return original_run_generation_job(job_id, worker_id=worker_id)
         return asyncio.run(
             execute_node_execution_job(
                 job_id,

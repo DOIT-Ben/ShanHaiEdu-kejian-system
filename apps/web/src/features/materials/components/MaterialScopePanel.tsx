@@ -9,6 +9,7 @@ import {
   useCreateMaterialScopeMutation,
   type useMaterialScopeRuntime,
 } from "@/features/materials/hooks/useMaterialScopeWorkflow";
+import { materialScopeVersionMatches } from "@/features/materials/lib/materialScopeIdentity";
 import { isCsrfTokenAvailable } from "@/shared/api/client";
 import { runtimeErrorMessage } from "@/shared/api/runtimeError";
 import { Button } from "@/shared/ui/Button";
@@ -39,7 +40,10 @@ export function MaterialScopePanel({
   const [pageEnd, setPageEnd] = useState(1);
   const { artifact, latestApproval, refetch } = runtime;
   const createMutation = useCreateMaterialScopeMutation({ projectId, refetch });
-  const submittedVersionId = artifact?.current_submitted_version?.id;
+  const candidateVersion =
+    artifact?.current_submitted_version ?? artifact?.current_approved_version;
+  const exactScope = materialScopeVersionMatches(candidateVersion, materialId, parseVersion?.id);
+  const submittedVersionId = exactScope ? artifact?.current_submitted_version?.id : undefined;
   const approveMutation = useApproveMaterialScopeMutation({
     projectId,
     refetch,
@@ -48,10 +52,9 @@ export function MaterialScopePanel({
   const approved =
     artifact?.status === "approved" &&
     artifact.current_approved_version?.id === latestApproval?.artifact_version_id &&
-    latestApproval?.action === "approve";
-  const currentContent = contentRecord(
-    artifact?.current_submitted_version?.content ?? artifact?.current_approved_version?.content,
-  );
+    latestApproval?.action === "approve" &&
+    exactScope;
+  const currentContent = exactScope ? contentRecord(candidateVersion?.content) : undefined;
 
   useEffect(() => {
     const count = parseVersion?.page_count ?? pages.length;
@@ -80,7 +83,7 @@ export function MaterialScopePanel({
           </div>
           <p className="mt-1 text-sm text-[var(--sh-ink-muted)]">按真实解析页选择本次教学内容。</p>
         </div>
-        {artifact ? (
+        {exactScope ? (
           <StatusBadge status={approved ? "approved" : "review_required"} />
         ) : (
           <StatusBadge status={rangeValid ? "ready" : "not_ready"} />
@@ -159,9 +162,9 @@ export function MaterialScopePanel({
           }
           variant="secondary"
         >
-          {artifact ? "保存新的范围版本" : "保存教材范围"}
+          {exactScope ? "保存新的范围版本" : "保存教材范围"}
         </Button>
-        {artifact?.status === "in_review" && submittedVersionId ? (
+        {exactScope && artifact?.status === "in_review" && submittedVersionId ? (
           <Button
             disabled={!writeReady || approveMutation.isPending}
             loading={approveMutation.isPending}
