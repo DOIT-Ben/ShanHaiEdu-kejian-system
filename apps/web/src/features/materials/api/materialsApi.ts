@@ -5,7 +5,52 @@ export type UploadSessionDto = components["schemas"]["UploadSession"];
 export type AcceptedJobDto = components["schemas"]["AcceptedJobEnvelope"]["data"];
 export type FileAssetDto = components["schemas"]["FileAsset"];
 export type MaterialParseVersionDto = components["schemas"]["MaterialParseVersion"];
+export type SourceMaterialDto = components["schemas"]["SourceMaterial"];
+export type MaterialScopeArtifactDto = components["schemas"]["Artifact"];
 export type CreateUploadSessionRequest = components["schemas"]["CreateUploadSessionRequest"];
+export type CreateMaterialScopeVersionRequest =
+  components["schemas"]["CreateMaterialScopeVersionRequest"];
+
+export async function listProjectMaterialsPage({
+  cursor,
+  limit,
+  projectId,
+}: {
+  cursor?: string;
+  limit?: number;
+  projectId: string;
+}): Promise<{ items: SourceMaterialDto[]; nextCursor: string | null }> {
+  const response = unwrapApiResult(
+    await apiClient.GET("/projects/{project_id}/materials", {
+      params: {
+        path: { project_id: projectId },
+        query: { "page[cursor]": cursor, "page[limit]": limit },
+      },
+    }),
+  );
+  return { items: response.data.items, nextCursor: response.meta.next_cursor };
+}
+
+export async function createMaterialScopeVersion({
+  idempotencyKey,
+  input,
+  projectId,
+}: {
+  idempotencyKey: string;
+  input: CreateMaterialScopeVersionRequest;
+  projectId: string;
+}): Promise<MaterialScopeArtifactDto> {
+  const response = unwrapApiResult(
+    await apiClient.POST("/projects/{project_id}/material-scope/versions", {
+      body: input,
+      params: {
+        header: { "Idempotency-Key": idempotencyKey },
+        path: { project_id: projectId },
+      },
+    }),
+  );
+  return response.data;
+}
 
 async function readFileBuffer(file: File): Promise<ArrayBuffer> {
   if (typeof file.arrayBuffer === "function") return file.arrayBuffer();

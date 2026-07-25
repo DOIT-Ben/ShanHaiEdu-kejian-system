@@ -109,6 +109,10 @@ export function projectEventQueryKeys(projectId: string, event: ProjectStreamEve
       ["generation-jobs", event.resource.id],
       ["tasks", projectId],
       ["projects", projectId, "materials"],
+      ["projects", projectId, "artifacts"],
+      ["projects", projectId, "lessons"],
+      ["lessons"],
+      workflowKey,
     ] as const;
   }
   if (event.resource.type === "project") {
@@ -166,7 +170,7 @@ export async function invalidateProjectQueries(
       }),
       queryClient.invalidateQueries({
         queryKey: ["tasks", projectId],
-        exact: true,
+        exact: false,
         refetchType: "active",
       }),
     ]);
@@ -179,7 +183,12 @@ export async function invalidateProjectQueries(
         queryKey,
         exact: !(
           (queryKey.length === 1 && queryKey[0] === "lessons") ||
-          (queryKey.length === 3 && queryKey[1] === projectId && queryKey[2] === "materials")
+          (queryKey.length === 2 && queryKey[0] === "tasks" && queryKey[1] === projectId) ||
+          (queryKey.length === 3 &&
+            queryKey[1] === projectId &&
+            (queryKey[2] === "materials" ||
+              queryKey[2] === "artifacts" ||
+              queryKey[2] === "lessons"))
         ),
         refetchType: "active",
       }),

@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
+import { IntroOptionsWorkflowPanel } from "@/features/intro-options/components/IntroOptionsWorkflowPanel";
 import { getLesson } from "@/features/lessons/api/lessonsApi";
+import { LessonPlanWorkflowPanel } from "@/features/lessons/components/LessonPlanWorkflowPanel";
 import { getProject } from "@/features/projects/api/projectsApi";
 import { projectKeys } from "@/features/projects/hooks/useProjectsQuery";
 import { LessonWorkbenchSummary } from "@/features/workbench/components/LessonWorkbenchSummary";
@@ -107,9 +109,17 @@ export function RuntimeLessonWorkbenchPage() {
           lessonTitle={lesson.title}
           objective={lesson.objective_summary || lesson.scope_summary}
           progressErrorMessage="这一步暂时没有可显示的制作进度。其他项目资料仍可继续查看和编辑。"
-          progressState="error"
+          progressState={
+            branchKey === "lesson_plan" || branchKey === "intro_options" ? "ready" : "error"
+          }
           statuses={[]}
         />
+        {branchKey === "lesson_plan" ? (
+          <LessonPlanWorkflowPanel lessonId={lessonId} projectId={projectId} />
+        ) : null}
+        {branchKey === "intro_options" ? (
+          <IntroOptionsWorkflowPanel lessonId={lessonId} projectId={projectId} />
+        ) : null}
       </div>
     </div>
   );

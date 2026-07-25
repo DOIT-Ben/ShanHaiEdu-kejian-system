@@ -5,9 +5,39 @@ export type ArtifactDto = components["schemas"]["Artifact"];
 export type ArtifactDraftDto = components["schemas"]["ArtifactDraft"];
 export type ArtifactVersionDto = components["schemas"]["ArtifactVersion"];
 export type ApprovalDto = components["schemas"]["Approval"];
+export type AcceptedNodeRunDto = components["schemas"]["AcceptedNodeRunData"];
 export type CreateArtifactRequest = components["schemas"]["CreateArtifactRequest"];
 export type SaveArtifactDraftRequest = components["schemas"]["SaveArtifactDraftRequest"];
 export type ReviewArtifactVersionRequest = components["schemas"]["ReviewArtifactVersionRequest"];
+
+export async function listProjectArtifactsPage({
+  artifactType,
+  cursor,
+  lessonId,
+  limit,
+  projectId,
+}: {
+  artifactType?: string;
+  cursor?: string;
+  lessonId?: string;
+  limit?: number;
+  projectId: string;
+}): Promise<{ items: ArtifactDto[]; nextCursor: string | null }> {
+  const response = unwrapApiResult(
+    await apiClient.GET("/projects/{project_id}/artifacts", {
+      params: {
+        path: { project_id: projectId },
+        query: {
+          artifact_type: artifactType,
+          lesson_id: lessonId,
+          "page[cursor]": cursor,
+          "page[limit]": limit,
+        },
+      },
+    }),
+  );
+  return { items: response.data.items, nextCursor: response.meta.next_cursor };
+}
 
 export async function createArtifact({
   idempotencyKey,
@@ -101,6 +131,24 @@ export async function reviewArtifactVersion({
   const response = unwrapApiResult(
     await apiClient.POST("/artifact-versions/{artifact_version_id}/approvals", {
       body: input,
+      params: {
+        header: { "Idempotency-Key": idempotencyKey },
+        path: { artifact_version_id: artifactVersionId },
+      },
+    }),
+  );
+  return response.data;
+}
+
+export async function startArtifactVersionQualityValidation({
+  artifactVersionId,
+  idempotencyKey,
+}: {
+  artifactVersionId: string;
+  idempotencyKey: string;
+}): Promise<AcceptedNodeRunDto> {
+  const response = unwrapApiResult(
+    await apiClient.POST("/artifact-versions/{artifact_version_id}/quality-validations", {
       params: {
         header: { "Idempotency-Key": idempotencyKey },
         path: { artifact_version_id: artifactVersionId },

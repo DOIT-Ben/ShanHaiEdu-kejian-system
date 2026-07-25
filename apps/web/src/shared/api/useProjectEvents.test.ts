@@ -253,6 +253,10 @@ describe("project event transport", () => {
       ["generation-jobs", projectEvent.resource.id],
       ["tasks", "project-1"],
       ["projects", "project-1", "materials"],
+      ["projects", "project-1", "artifacts"],
+      ["projects", "project-1", "lessons"],
+      ["lessons"],
+      ["projects", "project-1", "workflow"],
     ]);
 
     const keysFor = (type: string, id = `${type}-1`) =>
@@ -330,13 +334,31 @@ describe("project event transport", () => {
     const queryClient = new QueryClient();
     const materialKey = ["projects", "project-1", "materials", "material-1"] as const;
     const parseVersionsKey = [...materialKey, "parse-versions"] as const;
+    const lessonPlanJobsKey = ["tasks", "project-1", "lesson-plan", "lesson-1"] as const;
+    const introJobsKey = ["tasks", "project-1", "intro-options", "lesson-1"] as const;
+    const otherProjectJobsKey = ["tasks", "project-2", "lesson-plan", "lesson-1"] as const;
+    const artifactKey = ["projects", "project-1", "artifacts", "lesson_plan", "lesson-1"] as const;
+    const introOptionsKey = ["lessons", "lesson-1", "intro-options"] as const;
+    const workflowKey = ["projects", "project-1", "workflow"] as const;
     queryClient.setQueryData(materialKey, { asset: { id: "asset-1" } });
     queryClient.setQueryData(parseVersionsKey, { items: [] });
+    queryClient.setQueryData(lessonPlanJobsKey, { items: [] });
+    queryClient.setQueryData(introJobsKey, { items: [] });
+    queryClient.setQueryData(otherProjectJobsKey, { items: [] });
+    queryClient.setQueryData(artifactKey, { items: [] });
+    queryClient.setQueryData(introOptionsKey, { data: null });
+    queryClient.setQueryData(workflowKey, { node_runs: [] });
 
     await invalidateProjectQueries(queryClient, "project-1", projectEvent);
 
     expect(queryClient.getQueryState(materialKey)?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(parseVersionsKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(lessonPlanJobsKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(introJobsKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(otherProjectJobsKey)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(artifactKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(introOptionsKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(workflowKey)?.isInvalidated).toBe(true);
   });
 
   it("refreshes the REST snapshot once when the stream ends on a permanent client error", async () => {

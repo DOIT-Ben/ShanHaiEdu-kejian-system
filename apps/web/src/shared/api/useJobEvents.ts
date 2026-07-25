@@ -69,20 +69,30 @@ export function jobEventQueryKeys(jobId: string, projectId?: string) {
   ] as const;
 }
 
+export async function invalidateJobQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  jobId: string,
+  projectId?: string,
+) {
+  const keys = jobEventQueryKeys(jobId, projectId);
+  await Promise.all(
+    keys.map((queryKey) =>
+      queryClient.invalidateQueries({
+        queryKey,
+        exact: queryKey[0] !== "tasks",
+        refetchType: "active",
+      }),
+    ),
+  );
+}
+
 export function useJobEvents(jobId: string | undefined, projectId?: string) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!jobId) return;
     const abortController = new AbortController();
-    const invalidate = async () => {
-      const keys = jobEventQueryKeys(jobId, projectId);
-      await Promise.all(
-        keys.map((queryKey) =>
-          queryClient.invalidateQueries({ queryKey, exact: true, refetchType: "active" }),
-        ),
-      );
-    };
+    const invalidate = () => invalidateJobQueries(queryClient, jobId, projectId);
     void runSseSubscription({
       clearCursor: () => clearJobLastSequence(jobId),
       connect: (cursor, onEvent, signal) =>

@@ -1,5 +1,11 @@
+import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
-import { jobEventQueryKeys, readJobLastSequence, streamJobEvents } from "@/shared/api/useJobEvents";
+import {
+  invalidateJobQueries,
+  jobEventQueryKeys,
+  readJobLastSequence,
+  streamJobEvents,
+} from "@/shared/api/useJobEvents";
 
 const jobEvent = {
   event_id: "01960000-0000-7000-8000-000000000902",
@@ -45,5 +51,27 @@ describe("generation job event transport", () => {
       ["tasks", "project-1"],
     ]);
     expect(jobEventQueryKeys("job-1")).toEqual([["generation-jobs", "job-1"]]);
+  });
+
+  it("invalidates every scoped project task cache while keeping the job snapshot exact", async () => {
+    const queryClient = new QueryClient();
+    const jobKey = ["generation-jobs", "job-1"] as const;
+    const otherJobKey = ["generation-jobs", "job-2"] as const;
+    const lessonPlanJobsKey = ["tasks", "project-1", "lesson-plan", "lesson-1"] as const;
+    const introJobsKey = ["tasks", "project-1", "intro-options", "lesson-1"] as const;
+    const otherProjectJobsKey = ["tasks", "project-2", "lesson-plan", "lesson-1"] as const;
+    queryClient.setQueryData(jobKey, { status: "running" });
+    queryClient.setQueryData(otherJobKey, { status: "running" });
+    queryClient.setQueryData(lessonPlanJobsKey, { items: [] });
+    queryClient.setQueryData(introJobsKey, { items: [] });
+    queryClient.setQueryData(otherProjectJobsKey, { items: [] });
+
+    await invalidateJobQueries(queryClient, "job-1", "project-1");
+
+    expect(queryClient.getQueryState(jobKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(otherJobKey)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(lessonPlanJobsKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(introJobsKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(otherProjectJobsKey)?.isInvalidated).toBe(false);
   });
 });
