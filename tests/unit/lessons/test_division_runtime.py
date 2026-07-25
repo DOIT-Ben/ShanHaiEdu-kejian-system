@@ -196,6 +196,30 @@ def test_coverage_uses_approved_scope_subset_and_rejects_scope_outside_exact_par
     assert "MATERIAL_SCOPE_EVIDENCE_INVALID" in finding_codes(invalid)
 
 
+def test_coverage_accepts_page_keys_from_material_evidence_package() -> None:
+    unit = lesson_unit("LESSON-01", 1)
+    unit["evidence_refs"] = ["p2-image-1", "p2-text-1"]
+    context = validation_context(division_content(unit))
+    context.supporting_inputs["content:material_evidence"] = {
+        "schema_version": "material-evidence-package.v1",
+        "pages": [
+            {
+                "page_number": 2,
+                "text_blocks": [{"block_id": "p2-text-1"}],
+                "image_references": [{"image_id": "p2-image-1"}],
+            }
+        ],
+    }
+    context.supporting_inputs["approval:material_scope"]["approved_evidence_keys"] = [
+        "p2-image-1",
+        "p2-text-1",
+    ]
+
+    outcome = LessonDivisionCoverageValidator().validate(context)
+
+    assert outcome.passed is True
+
+
 @pytest.mark.parametrize(
     ("scope_change", "expected_code"),
     (

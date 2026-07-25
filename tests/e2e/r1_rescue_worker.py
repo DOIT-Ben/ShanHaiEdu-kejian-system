@@ -6,6 +6,7 @@ import asyncio
 import json
 import signal
 import socket
+from decimal import Decimal
 from pathlib import Path
 from threading import Event
 from uuid import UUID
@@ -15,10 +16,15 @@ from dramatiq.brokers.redis import RedisBroker
 from dramatiq.worker import Worker
 
 from apps.api.database import build_engine, build_session_factory
+from apps.api.jobs.models import GenerationJob
 from apps.api.model_gateway.audit import SqlAlchemyAttemptAuditSink
-from apps.api.model_gateway.contracts import ModelCapability
+from apps.api.model_gateway.contracts import (
+    ModelCapability,
+    ModelUsage,
+    TextModelRequest,
+    TextProviderResult,
+)
 from apps.api.model_gateway.gateway import ModelGateway
-from apps.api.node_execution.fake import DeterministicNodeOutputProvider
 from apps.api.reliability.models import OutboxEvent
 from apps.api.reliability.outbox import OutboxDispatcher
 from apps.api.settings import get_settings
@@ -26,6 +32,40 @@ from scripts.golden_courseware_branch_inputs import build_golden_branch_source_o
 
 ROOT = Path(__file__).resolve().parents[2]
 GOLDEN_CASE = ROOT / "contracts/fixtures/golden-projects/numbers-1-to-5/golden-project.json"
+
+
+class R1RescueNodeOutputProvider:
+    provider_name = "r1-rescue-deterministic"
+    model_name = "r1-rescue-node-output-v1"
+
+    def __init__(self, outputs: dict[str, dict[str, object]]) -> None:
+        self._outputs = outputs
+
+    async def complete(self, request: TextModelRequest) -> TextProviderResult:
+        if '"lesson_plan_key"' in request.prompt:
+            node_key = "lesson_plan.generate"
+        elif '"division_key"' in request.prompt:
+            node_key = "lesson.division.generate"
+        else:
+            raise RuntimeError("the R1 E2E provider received an unsupported output contract")
+        return TextProviderResult(
+            text=json.dumps(
+                self._outputs[node_key],
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            ),
+            provider_request_id=f"fake:{request.request_id}",
+            actual_model=self.model_name,
+            finish_reason="stop",
+            usage=ModelUsage(
+                prompt_tokens=8,
+                completion_tokens=4,
+                total_tokens=12,
+                cost=Decimal("0"),
+            ),
+        )
 
 
 def main() -> int:
@@ -46,15 +86,22 @@ def main() -> int:
     engine = build_engine(settings.database_url.get_secret_value())
     factory = build_session_factory(engine)
     case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
-    provider = DeterministicNodeOutputProvider(
-        build_golden_branch_source_outputs(case)["lesson_plan.generate"]
-    )
+    outputs = build_golden_branch_source_outputs(case)
+    outputs["lesson.division.generate"]["lesson_units"][0]["evidence_refs"] = ["p2-text-1"]
+    provider = R1RescueNodeOutputProvider(outputs)
     gateway = ModelGateway(
         {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: provider},
         audit_sink=SqlAlchemyAttemptAuditSink(factory),
     )
 
+    original_run_generation_job = generation_tasks.run_generation_job
+
     def run_fixture_generation(job_id: UUID, *, worker_id: str | None = None) -> str:
+        with factory() as session:
+            job = session.get(GenerationJob, job_id)
+            job_type = job.job_type if job is not None else None
+        if job_type == "material.parse":
+            return original_run_generation_job(job_id, worker_id=worker_id)
         return asyncio.run(
             execute_node_execution_job(
                 job_id,

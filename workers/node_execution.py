@@ -1,4 +1,4 @@
-"""GenerationJob-backed execution for prepared lesson-plan nodes."""
+"""GenerationJob-backed execution for supported R1 generation nodes."""
 
 from __future__ import annotations
 
@@ -104,7 +104,7 @@ def _claim_job(
     settings: Settings,
 ) -> bool:
     with factory() as session, session.begin():
-        current = GenerationJobRoutingReader(session).get_lesson_plan(job_id)
+        current = GenerationJobRoutingReader(session).get_supported_r1(job_id)
         if current is not None and current.status == "running":
             retry_after = SqlAlchemyWorkflowExecutionPort(
                 session,
@@ -191,7 +191,7 @@ def _job_facts(
     job_id: UUID,
 ) -> GenerationJobRouting | None:
     with factory() as session:
-        return GenerationJobRoutingReader(session).get_lesson_plan(job_id)
+        return GenerationJobRoutingReader(session).get_supported_r1(job_id)
 
 
 def _initiating_actor(
@@ -244,7 +244,7 @@ def _fail_worker_execution(
     settings: Settings,
 ) -> None:
     code = "NODE_EXECUTION_WORKER_FAILED"
-    logger.exception("lesson_plan_generation_job_failed", extra={"job_id": str(job_id)})
+    logger.exception("node_generation_job_failed", extra={"job_id": str(job_id)})
     _terminalize_node_failure(
         factory,
         worker_actor,
@@ -267,7 +267,7 @@ def _user_revision(payload: dict[str, object] | None) -> str | None:
         return None
     value = payload["user_revision"]
     if not isinstance(value, str) or len(value) > 6_000:
-        raise RuntimeError("lesson-plan job contains an invalid user revision")
+        raise RuntimeError("node generation job contains an invalid user revision")
     return value
 
 
@@ -301,7 +301,7 @@ def _synchronize_cancelled_node(
     node_run_id: UUID,
 ) -> bool:
     with factory() as session, session.begin():
-        routing = GenerationJobRoutingReader(session).get_lesson_plan(job_id)
+        routing = GenerationJobRoutingReader(session).get_supported_r1(job_id)
         if routing is None or routing.status != "cancelled":
             return False
         actor = IdentityRepository(session).resolve_actor_for_principal(
@@ -351,6 +351,6 @@ def _terminalize_node_failure(
             )
     except (ApiError, WorkflowExecutionPortError):
         logger.exception(
-            "lesson_plan_node_terminalization_failed",
+            "node_generation_terminalization_failed",
             extra={"node_run_id": str(node_run_id)},
         )

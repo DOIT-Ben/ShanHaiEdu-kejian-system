@@ -143,6 +143,28 @@ const parseVersion = {
   completed_at: now,
 };
 
+const sourceMaterial = {
+  id: materialId,
+  project_id: projectId,
+  material_kind: "textbook_pdf",
+  file_asset_id: fileAsset.id,
+  original_filename: "六年级百分数教材.pdf",
+  mime_type: "application/pdf",
+  upload_status: "confirmed",
+  confirmed_at: now,
+  created_at: now,
+  updated_at: now,
+} satisfies components["schemas"]["SourceMaterial"];
+
+const parsePages = [
+  {
+    page_number: 1,
+    text_preview: "百分数的意义",
+    text_block_count: 1,
+    image_count: 0,
+  },
+] satisfies components["schemas"]["MaterialParsePage"][];
+
 const artifactVersion = {
   id: "01960000-0000-7000-8000-000000000302",
   version_no: 1,
@@ -478,6 +500,42 @@ export async function installRuntimeApi(page: Page, options: RuntimeApiOptions =
       return;
     }
 
+    if (method === "GET" && path === `/api/v2/projects/${projectId}/materials`) {
+      await json(route, {
+        data: { items: [sourceMaterial] },
+        meta: { next_cursor: null },
+        request_id: "req_materials",
+      });
+      return;
+    }
+
+    if (method === "GET" && path === `/api/v2/projects/${projectId}/material-scope/artifact`) {
+      await json(
+        route,
+        envelope({ artifact: null, latest_approval: null }, "req_material_scope_artifact"),
+      );
+      return;
+    }
+
+    if (
+      method === "GET" &&
+      path === `/api/v2/projects/${projectId}/lesson-division/generation-jobs`
+    ) {
+      await json(route, envelope({ items: [] }, "req_lesson_division_jobs"));
+      return;
+    }
+
+    if (method === "GET" && path === `/api/v2/projects/${projectId}/lesson-division/artifact`) {
+      await json(
+        route,
+        envelope(
+          { artifact: null, latest_approval: null, quality_report: null },
+          "req_lesson_division_artifact",
+        ),
+      );
+      return;
+    }
+
     if (method === "POST" && path === `/api/v2/projects/${projectId}/materials/uploads`) {
       state.uploadSessionRequests += 1;
       if (options.failFirstUploadSession && state.uploadSessionRequests === 1) {
@@ -543,6 +601,15 @@ export async function installRuntimeApi(page: Page, options: RuntimeApiOptions =
     ) {
       state.materialParseReads += 1;
       await json(route, envelope({ items: [parseVersion] }, "req_material_parses"));
+      return;
+    }
+
+    if (
+      method === "GET" &&
+      path ===
+        `/api/v2/projects/${projectId}/materials/${materialId}/parse-versions/${parseVersion.id}/pages`
+    ) {
+      await json(route, envelope({ items: parsePages }, "req_material_parse_pages"));
       return;
     }
 

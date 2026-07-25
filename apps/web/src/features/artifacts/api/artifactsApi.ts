@@ -6,6 +6,10 @@ export type ArtifactDraftDto = components["schemas"]["ArtifactDraft"];
 export type ArtifactVersionDto = components["schemas"]["ArtifactVersion"];
 export type ApprovalDto = components["schemas"]["Approval"];
 export type LessonPlanArtifactDto = components["schemas"]["LessonPlanArtifactEnvelope"]["data"];
+export type MaterialScopeArtifactDto =
+  components["schemas"]["MaterialScopeArtifactEnvelope"]["data"];
+export type LessonDivisionArtifactDto =
+  components["schemas"]["LessonDivisionArtifactEnvelope"]["data"];
 export type AcceptedNodeRunDto = components["schemas"]["AcceptedNodeRunEnvelope"]["data"];
 export type CreateArtifactRequest = components["schemas"]["CreateArtifactRequest"];
 export type SaveArtifactDraftRequest = components["schemas"]["SaveArtifactDraftRequest"];
@@ -21,6 +25,28 @@ export async function getLessonPlanArtifact({
   const response = unwrapApiResult(
     await apiClient.GET("/projects/{project_id}/lessons/{lesson_id}/lesson-plan/artifact", {
       params: { path: { lesson_id: lessonId, project_id: projectId } },
+    }),
+  );
+  return response.data;
+}
+
+export async function getMaterialScopeArtifact(
+  projectId: string,
+): Promise<MaterialScopeArtifactDto> {
+  const response = unwrapApiResult(
+    await apiClient.GET("/projects/{project_id}/material-scope/artifact", {
+      params: { path: { project_id: projectId } },
+    }),
+  );
+  return response.data;
+}
+
+export async function getLessonDivisionArtifact(
+  projectId: string,
+): Promise<LessonDivisionArtifactDto> {
+  const response = unwrapApiResult(
+    await apiClient.GET("/projects/{project_id}/lesson-division/artifact", {
+      params: { path: { project_id: projectId } },
     }),
   );
   return response.data;
@@ -143,6 +169,29 @@ export async function startLessonPlanQualityValidation({
         params: {
           header: { "Idempotency-Key": idempotencyKey },
           path: { artifact_version_id: artifactVersionId, lesson_id: lessonId },
+        },
+      },
+    ),
+  );
+  return response.data;
+}
+
+export async function startLessonDivisionQualityValidation({
+  artifactVersionId,
+  idempotencyKey,
+  projectId,
+}: {
+  artifactVersionId: string;
+  idempotencyKey: string;
+  projectId: string;
+}): Promise<AcceptedNodeRunDto> {
+  const response = unwrapApiResult(
+    await apiClient.POST(
+      "/projects/{project_id}/lesson-division/artifact-versions/{artifact_version_id}/quality-validations",
+      {
+        params: {
+          header: { "Idempotency-Key": idempotencyKey },
+          path: { artifact_version_id: artifactVersionId, project_id: projectId },
         },
       },
     ),

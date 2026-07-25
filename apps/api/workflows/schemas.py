@@ -55,6 +55,12 @@ class AcceptedNodeRunEnvelope(BaseModel):
     request_id: str
 
 
+class PrepareLessonDivisionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    material_scope_artifact_version_id: UUID
+
+
 class StartNodeRunRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

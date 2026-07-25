@@ -18,6 +18,17 @@ export async function listLessonPlanGenerationJobs({
   return response.data.items;
 }
 
+export async function listLessonDivisionGenerationJobs(
+  projectId: string,
+): Promise<GenerationJobDto[]> {
+  const response = unwrapApiResult(
+    await apiClient.GET("/projects/{project_id}/lesson-division/generation-jobs", {
+      params: { path: { project_id: projectId } },
+    }),
+  );
+  return response.data.items;
+}
+
 export async function getGenerationJob(jobId: string): Promise<GenerationJobDto> {
   const response = unwrapApiResult(
     await apiClient.GET("/generation-jobs/{job_id}", {

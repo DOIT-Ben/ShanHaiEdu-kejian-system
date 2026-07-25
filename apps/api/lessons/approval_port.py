@@ -35,6 +35,7 @@ class LessonDivisionApprovalCommand:
     project_id: UUID
     artifact_version_id: UUID
     source_node_run_id: UUID
+    lineage_artifact_version_id: UUID
     producer_node_key: str
     approval_gate_node_key: str
     content_release_id: UUID
@@ -96,7 +97,7 @@ class LessonDivisionApprovalPort:
         workflow = LessonDivisionWorkflowPort(self._session, self._actor)
         run_id = workflow.require_source_run(
             source_node_run_id=command.source_node_run_id,
-            artifact_version_id=command.artifact_version_id,
+            artifact_version_id=command.lineage_artifact_version_id,
             expected_producer_node_key=command.producer_node_key,
             project_id=command.project_id,
             content_release_id=command.content_release_id,

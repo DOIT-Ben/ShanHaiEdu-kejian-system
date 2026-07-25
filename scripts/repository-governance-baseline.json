@@ -55,10 +55,13 @@
     {"source": "workers/tasks.py", "target": "apps.api.jobs.models", "names": ["GenerationJob"], "owner": "area:workflow", "reason": "Existing deterministic worker transaction predates the jobs application boundary.", "exit_issue": "#92"}
   ],
   "oversized_files": [
+    {"path": "apps/api/artifacts/authoring_provision.py", "line_count": 410, "owner": "area:asset", "reason": "Issue #234 adds exact material-scope locked-draft authoring; the behavior-preserving split is deferred so the teacher vertical slice is not blocked by module shaping.", "exit_issue": "#237"},
     {"path": "apps/api/assets/project_service.py", "line_count": 419, "owner": "area:asset", "reason": "Existing project asset validation responsibilities require a separate split task.", "exit_issue": "#92"},
     {"path": "apps/api/uploads/confirmation_service.py", "line_count": 422, "owner": "area:asset", "reason": "Existing upload confirmation transaction requires a separate split task.", "exit_issue": "#92"}
   ],
   "oversized_functions": [
+    {"path": "apps/api/artifacts/authoring_provision.py", "qualname": "ArtifactAuthoringProvisionPort.replace_material_scope_draft", "line_count": 66, "owner": "area:asset", "reason": "Issue #234 keeps exact locked-field validation atomic; a behavior-preserving extraction is tracked separately.", "exit_issue": "#237"},
+    {"path": "apps/api/artifacts/material_scope_service.py", "qualname": "MaterialScopeVersionService.create", "line_count": 63, "owner": "area:asset", "reason": "Issue #234 keeps the idempotent material-scope version transaction cohesive; a behavior-preserving extraction is tracked separately.", "exit_issue": "#237"},
     {"path": "apps/api/assets/project_service.py", "qualname": "ProjectAssetService.bind", "line_count": 77, "owner": "area:asset", "reason": "Existing project asset binding transaction requires a focused split.", "exit_issue": "#92"},
     {"path": "apps/api/assets/project_service.py", "qualname": "ProjectAssetService.declare_slot", "line_count": 62, "owner": "area:asset", "reason": "Existing slot declaration transaction requires a focused split.", "exit_issue": "#92"},
     {"path": "apps/api/assets/pypdf_parser.py", "qualname": "_parse_pdf", "line_count": 95, "owner": "area:asset", "reason": "Existing PDF parsing flow requires a focused split.", "exit_issue": "#92"},

@@ -1,11 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { ArrowLeft, BookOpen } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   getSourceMaterialFileAsset,
+  listMaterialParsePages,
   listMaterialParseVersions,
+  listProjectTextbookMaterials,
 } from "@/features/materials/api/materialsApi";
 import { MaterialDetailsPanel } from "@/features/materials/components/MaterialDetailsPanel";
+import { MaterialScopePanel } from "@/features/materials/components/MaterialScopePanel";
+import { ProjectMaterialUploadPanel } from "@/features/materials/components/ProjectMaterialUploadPanel";
+import { useMaterialScopeRuntime } from "@/features/materials/hooks/useMaterialScopeWorkflow";
+import { materialScopeVersionMatches } from "@/features/materials/lib/materialScopeIdentity";
+import { LessonDivisionWorkflowPanel } from "@/features/lessons/components/LessonDivisionWorkflowPanel";
 import { runtimeErrorMessage } from "@/shared/api/runtimeError";
 import { useProjectEvents } from "@/shared/api/useProjectEvents";
 import { buttonVariants } from "@/shared/ui/Button";
@@ -13,7 +20,14 @@ import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
 
 export function RuntimeMaterialsPage() {
   const { materialId, projectId } = useParams();
+  const navigate = useNavigate();
   useProjectEvents(projectId);
+  const materialsQuery = useQuery({
+    enabled: Boolean(projectId),
+    queryFn: () => listProjectTextbookMaterials(projectId ?? ""),
+    queryKey: ["projects", projectId, "materials"],
+  });
+  const scopeRuntime = useMaterialScopeRuntime(projectId);
 
   const materialQuery = useQuery({
     enabled: Boolean(projectId && materialId),
@@ -42,6 +56,38 @@ export function RuntimeMaterialsPage() {
     },
     queryKey: ["projects", projectId, "materials", materialId],
   });
+  const selectedParseVersion = materialQuery.data?.parseVersions.find(
+    (version) => version.status === "succeeded",
+  );
+  const pagesQuery = useQuery({
+    enabled: Boolean(projectId && materialId && selectedParseVersion?.id),
+    queryFn: () =>
+      listMaterialParsePages({
+        materialId: materialId ?? "",
+        parseVersionId: selectedParseVersion?.id ?? "",
+        projectId: projectId ?? "",
+      }),
+    queryKey: [
+      "projects",
+      projectId,
+      "materials",
+      materialId,
+      "parse-versions",
+      selectedParseVersion?.id,
+      "pages",
+    ],
+  });
+  const currentApprovedScopeVersion = scopeRuntime.artifact?.current_approved_version;
+  const latestScopeApproval = scopeRuntime.latestApproval;
+  const approvedScopeVersionId =
+    scopeRuntime.artifact?.status === "approved" &&
+    currentApprovedScopeVersion &&
+    latestScopeApproval &&
+    currentApprovedScopeVersion.id === latestScopeApproval.artifact_version_id &&
+    latestScopeApproval.action === "approve" &&
+    materialScopeVersionMatches(currentApprovedScopeVersion, materialId, selectedParseVersion?.id)
+      ? currentApprovedScopeVersion.id
+      : undefined;
 
   if (!projectId) return null;
 
@@ -57,30 +103,101 @@ export function RuntimeMaterialsPage() {
             返回项目
           </Link>
         }
-        description="查看教材文件校验与解析记录。"
-        title="教材与解析结果"
+        description="核对教材解析页，确认教学范围并形成可执行的课时划分。"
+        title="教材与课时划分"
       />
 
       <div className="mt-5">
         {materialId ? (
-          <MaterialDetailsPanel
-            asset={materialQuery.data?.asset}
-            errorMessage={
-              materialQuery.isError
-                ? runtimeErrorMessage(materialQuery.error, "教材状态暂时无法读取，请稍后重试。")
-                : materialQuery.data?.partialError
-            }
-            loading={materialQuery.isFetching}
-            onRefresh={() => void materialQuery.refetch()}
-            parseVersions={materialQuery.data?.parseVersions ?? []}
-          />
+          <div className="space-y-6">
+            <MaterialDetailsPanel
+              asset={materialQuery.data?.asset}
+              errorMessage={
+                materialQuery.isError
+                  ? runtimeErrorMessage(materialQuery.error, "教材状态暂时无法读取，请稍后重试。")
+                  : materialQuery.data?.partialError
+              }
+              loading={materialQuery.isFetching}
+              onRefresh={() => void materialQuery.refetch()}
+              parseVersions={materialQuery.data?.parseVersions ?? []}
+            />
+
+            {selectedParseVersion ? (
+              <>
+                {pagesQuery.error ? (
+                  <p className="text-sm text-[var(--sh-danger)]" role="alert">
+                    {runtimeErrorMessage(pagesQuery.error, "教材页事实暂时无法读取。")}
+                  </p>
+                ) : null}
+                <MaterialScopePanel
+                  materialId={materialId}
+                  pages={pagesQuery.data ?? []}
+                  parseVersion={selectedParseVersion}
+                  projectId={projectId}
+                  runtime={scopeRuntime}
+                />
+                <LessonDivisionWorkflowPanel
+                  materialScopeVersionId={approvedScopeVersionId}
+                  projectId={projectId}
+                />
+              </>
+            ) : (
+              <p className="border-t border-[var(--sh-line-subtle)] pt-5 text-sm text-[var(--sh-ink-muted)]">
+                教材解析成功后即可确认范围并生成课时划分。
+              </p>
+            )}
+          </div>
         ) : (
-          <section className="rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-6">
-            <h2 className="font-semibold text-[var(--sh-ink-strong)]">教材详情暂时无法打开</h2>
-            <p className="mt-2 text-sm leading-6 text-[var(--sh-ink-muted)]">
-              当前项目没有可直接打开的教材记录入口。新上传的教材完成处理后，可从对应任务进入详情。
-            </p>
-          </section>
+          <div className="space-y-6">
+            <ProjectMaterialUploadPanel
+              onAccepted={({ jobId, materialId: acceptedMaterialId }) => {
+                const params = new URLSearchParams({ jobId, materialId: acceptedMaterialId });
+                void navigate(`/app/projects/${projectId}/setup?${params.toString()}`);
+              }}
+              projectId={projectId}
+            />
+            <section aria-labelledby="material-list-title">
+              <h2
+                className="text-lg font-semibold text-[var(--sh-ink-strong)]"
+                id="material-list-title"
+              >
+                选择教材
+              </h2>
+              {materialsQuery.isLoading ? (
+                <p className="mt-3 text-sm text-[var(--sh-ink-muted)]" role="status">
+                  正在读取项目教材
+                </p>
+              ) : materialsQuery.error ? (
+                <p className="mt-3 text-sm text-[var(--sh-danger)]" role="alert">
+                  {runtimeErrorMessage(materialsQuery.error, "项目教材暂时无法读取。")}
+                </p>
+              ) : materialsQuery.data?.length ? (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {materialsQuery.data.map((material) => (
+                    <Link
+                      className="flex min-h-24 items-center gap-3 rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-4 transition-colors hover:border-[var(--sh-brand-300)] hover:bg-[var(--sh-brand-50)]"
+                      key={material.id}
+                      to={`/app/projects/${projectId}/materials/${material.id}`}
+                    >
+                      <span className="grid size-10 shrink-0 place-items-center rounded-[var(--sh-radius-sm)] bg-[var(--sh-brand-50)] text-[var(--sh-brand-700)]">
+                        <BookOpen aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold text-[var(--sh-ink-strong)]">
+                          {material.original_filename}
+                        </span>
+                        <span className="mt-1 block text-sm text-[var(--sh-ink-muted)]">
+                          {material.upload_status === "confirmed" ? "已上传" : "处理中"}
+                        </span>
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-[var(--sh-ink-muted)]">当前项目还没有教材。</p>
+              )}
+            </section>
+          </div>
         )}
       </div>
     </div>

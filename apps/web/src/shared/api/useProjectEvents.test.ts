@@ -283,6 +283,8 @@ describe("project event transport", () => {
     expect(keysFor("artifact", "artifact-1")).toEqual([
       ["artifacts", "artifact-1"],
       ["projects", "project-1", "artifacts"],
+      ["projects", "project-1", "material-scope", "artifact"],
+      ["projects", "project-1", "lesson-division", "artifact"],
       ["projects", "project-1", "workflow"],
     ]);
     expect(keysFor("asset_binding", "binding-1")).toEqual([

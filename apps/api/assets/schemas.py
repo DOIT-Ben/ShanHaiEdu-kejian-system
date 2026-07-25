@@ -64,3 +64,19 @@ class MaterialParseVersionListData(BaseModel):
 class MaterialParseVersionListEnvelope(BaseModel):
     data: MaterialParseVersionListData
     request_id: str
+
+
+class MaterialParsePageRead(BaseModel):
+    page_number: int
+    text_preview: str
+    text_block_count: int
+    image_count: int
+
+
+class MaterialParsePageListData(BaseModel):
+    items: list[MaterialParsePageRead]
+
+
+class MaterialParsePageListEnvelope(BaseModel):
+    data: MaterialParsePageListData
+    request_id: str

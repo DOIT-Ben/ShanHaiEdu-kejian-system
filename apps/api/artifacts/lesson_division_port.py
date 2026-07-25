@@ -28,6 +28,7 @@ class GeneratedLessonDivisionFact:
     content_release_id: UUID
     workflow_definition_version_id: UUID
     source_node_run_id: UUID
+    lineage_artifact_version_id: UUID
     context_snapshot_id: UUID
     content_hash: str
     content: dict[str, Any]
@@ -52,10 +53,16 @@ class ArtifactLessonDivisionReader:
             content_release_id=project.content_release_id,
         )
         if (
-            definition_key is None
-            or version.source_node_run_id is None
-            or version.context_snapshot_id is None
+            definition_key != "lesson.division.generate.output"
+            or artifact.artifact_type != "lesson_division"
+            or artifact.branch_key != "project"
+            or artifact.lesson_unit_id is not None
+            or artifact.status != "in_review"
+            or artifact.current_submitted_version_id != version.id
         ):
+            raise self._invalid("The submitted artifact is not an exact lesson division.")
+        lineage = self.generated_lineage(artifact.id, version.version_no)
+        if lineage.source_node_run_id is None or lineage.context_snapshot_id is None:
             raise self._invalid("The generated artifact has incomplete fixed-release lineage.")
         return GeneratedLessonDivisionFact(
             artifact_id=artifact.id,
@@ -64,11 +71,37 @@ class ArtifactLessonDivisionReader:
             content_definition_key=definition_key,
             content_release_id=project.content_release_id,
             workflow_definition_version_id=project.workflow_definition_version_id,
-            source_node_run_id=version.source_node_run_id,
-            context_snapshot_id=version.context_snapshot_id,
+            source_node_run_id=lineage.source_node_run_id,
+            lineage_artifact_version_id=lineage.id,
+            context_snapshot_id=lineage.context_snapshot_id,
             content_hash=version.content_hash,
             content=version.content_json,
         )
+
+    def generated_lineage(
+        self,
+        artifact_id: UUID,
+        maximum_version_no: int,
+    ) -> ArtifactVersion:
+        version = self._session.scalar(
+            select(ArtifactVersion)
+            .where(
+                ArtifactVersion.artifact_id == artifact_id,
+                ArtifactVersion.organization_id == self._actor.organization_id,
+                ArtifactVersion.version_no <= maximum_version_no,
+                ArtifactVersion.source_node_run_id.is_not(None),
+                ArtifactVersion.context_snapshot_id.is_not(None),
+            )
+            .order_by(ArtifactVersion.version_no.desc())
+            .limit(1)
+        )
+        if (
+            version is None
+            or version.source_node_run_id is None
+            or version.context_snapshot_id is None
+        ):
+            raise self._invalid("The lesson division has no generated fixed-release lineage.")
+        return version
 
     def require_quality_evidence(self, artifact_version_id: UUID) -> None:
         record = ArtifactRepository(self._session, self._actor).get_version(artifact_version_id)

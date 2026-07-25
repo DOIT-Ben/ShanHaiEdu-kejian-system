@@ -5,7 +5,22 @@ export type UploadSessionDto = components["schemas"]["UploadSession"];
 export type AcceptedJobDto = components["schemas"]["AcceptedJobEnvelope"]["data"];
 export type FileAssetDto = components["schemas"]["FileAsset"];
 export type MaterialParseVersionDto = components["schemas"]["MaterialParseVersion"];
+export type MaterialParsePageDto = components["schemas"]["MaterialParsePage"];
+export type SourceMaterialDto = components["schemas"]["SourceMaterial"];
 export type CreateUploadSessionRequest = components["schemas"]["CreateUploadSessionRequest"];
+export type CreateMaterialScopeVersionRequest =
+  components["schemas"]["CreateMaterialScopeVersionRequest"];
+
+export async function listProjectTextbookMaterials(
+  projectId: string,
+): Promise<SourceMaterialDto[]> {
+  const response = unwrapApiResult(
+    await apiClient.GET("/projects/{project_id}/materials", {
+      params: { path: { project_id: projectId }, query: { "page[limit]": 100 } },
+    }),
+  );
+  return response.data.items;
+}
 
 async function readFileBuffer(file: File): Promise<ArrayBuffer> {
   if (typeof file.arrayBuffer === "function") return file.arrayBuffer();
@@ -124,4 +139,51 @@ export async function listMaterialParseVersions({
     }),
   );
   return response.data.items;
+}
+
+export async function listMaterialParsePages({
+  materialId,
+  parseVersionId,
+  projectId,
+}: {
+  materialId: string;
+  parseVersionId: string;
+  projectId: string;
+}): Promise<MaterialParsePageDto[]> {
+  const response = unwrapApiResult(
+    await apiClient.GET(
+      "/projects/{project_id}/materials/{material_id}/parse-versions/{parse_version_id}/pages",
+      {
+        params: {
+          path: {
+            material_id: materialId,
+            parse_version_id: parseVersionId,
+            project_id: projectId,
+          },
+        },
+      },
+    ),
+  );
+  return response.data.items;
+}
+
+export async function createMaterialScopeVersion({
+  idempotencyKey,
+  input,
+  projectId,
+}: {
+  idempotencyKey: string;
+  input: CreateMaterialScopeVersionRequest;
+  projectId: string;
+}) {
+  const response = unwrapApiResult(
+    await apiClient.POST("/projects/{project_id}/material-scope/versions", {
+      body: input,
+      params: {
+        header: { "Idempotency-Key": idempotencyKey },
+        path: { project_id: projectId },
+      },
+    }),
+  );
+  return response.data;
 }

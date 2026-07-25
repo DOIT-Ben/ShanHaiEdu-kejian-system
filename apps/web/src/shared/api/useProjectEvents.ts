@@ -66,6 +66,7 @@ const artifactResourceTypes = new Set([
   "artifact",
   "artifact_draft",
   "artifact_version",
+  "artifact_quality_report",
   "approval",
 ]);
 const assetResourceTypes = new Set([
@@ -87,6 +88,8 @@ function materialEventQueryKeys(projectId: string, materialId: string) {
 function artifactEventQueryKeys(projectId: string, event: ProjectStreamEvent) {
   const projectKeys = [
     ["projects", projectId, "artifacts"],
+    ["projects", projectId, "material-scope", "artifact"],
+    ["projects", projectId, "lesson-division", "artifact"],
     ["projects", projectId, "workflow"],
   ] as const;
   return event.resource.type === "artifact"
@@ -179,7 +182,8 @@ export async function invalidateProjectQueries(
         queryKey,
         exact: !(
           (queryKey.length === 1 && queryKey[0] === "lessons") ||
-          (queryKey.length === 3 && queryKey[1] === projectId && queryKey[2] === "materials")
+          (queryKey.length === 3 && queryKey[1] === projectId && queryKey[2] === "materials") ||
+          (queryKey.length === 5 && queryKey[4] === "parse-versions")
         ),
         refetchType: "active",
       }),

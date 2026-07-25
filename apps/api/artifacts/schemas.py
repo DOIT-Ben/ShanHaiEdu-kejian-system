@@ -74,6 +74,15 @@ class CreateArtifactRequest(BaseModel):
     content: dict[str, Any]
 
 
+class CreateMaterialScopeVersionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source_material_id: UUID
+    material_parse_version_id: UUID
+    page_start: int = Field(ge=1)
+    page_end: int = Field(ge=1)
+
+
 class SaveArtifactDraftRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -171,6 +180,27 @@ class LessonPlanArtifactRead(BaseModel):
 
 class LessonPlanArtifactEnvelope(BaseModel):
     data: LessonPlanArtifactRead
+    request_id: str
+
+
+class MaterialScopeArtifactRead(BaseModel):
+    artifact: ArtifactRead | None
+    latest_approval: ApprovalRead | None
+
+
+class MaterialScopeArtifactEnvelope(BaseModel):
+    data: MaterialScopeArtifactRead
+    request_id: str
+
+
+class LessonDivisionArtifactRead(BaseModel):
+    artifact: ArtifactRead | None
+    quality_report: LessonPlanQualityReportRead | None
+    latest_approval: ApprovalRead | None
+
+
+class LessonDivisionArtifactEnvelope(BaseModel):
+    data: LessonDivisionArtifactRead
     request_id: str
 
 

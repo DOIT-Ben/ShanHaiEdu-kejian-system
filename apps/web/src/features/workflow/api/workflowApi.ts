@@ -23,6 +23,27 @@ export async function prepareLessonPlanGeneration({
   return response.data;
 }
 
+export async function prepareLessonDivision({
+  idempotencyKey,
+  materialScopeArtifactVersionId,
+  projectId,
+}: {
+  idempotencyKey: string;
+  materialScopeArtifactVersionId: string;
+  projectId: string;
+}): Promise<NodeRunDto> {
+  const response = unwrapApiResult(
+    await apiClient.POST("/projects/{project_id}/lesson-division/node-runs", {
+      body: { material_scope_artifact_version_id: materialScopeArtifactVersionId },
+      params: {
+        header: { "Idempotency-Key": idempotencyKey },
+        path: { project_id: projectId },
+      },
+    }),
+  );
+  return response.data;
+}
+
 export async function startNodeRun({
   idempotencyKey,
   nodeRunId,
