@@ -13,6 +13,7 @@ from apps.api.artifacts.lesson_plan_quality_router import (
     router as lesson_plan_quality_router,
 )
 from apps.api.artifacts.lesson_plan_router import router as lesson_plan_artifacts_router
+from apps.api.artifacts.material_scope_router import router as material_scope_router
 from apps.api.artifacts.router import router as artifacts_router
 from apps.api.assets.project_router import router as project_assets_router
 from apps.api.assets.router import router as assets_router
@@ -74,6 +75,7 @@ def create_app(
     register_error_handlers(app)
     app.include_router(session_router)
     app.include_router(artifacts_router)
+    app.include_router(material_scope_router)
     app.include_router(lesson_plan_artifacts_router)
     app.include_router(lesson_plan_quality_router)
     app.include_router(creation_router)

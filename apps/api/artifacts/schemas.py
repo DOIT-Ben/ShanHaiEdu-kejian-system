@@ -74,6 +74,15 @@ class CreateArtifactRequest(BaseModel):
     content: dict[str, Any]
 
 
+class CreateMaterialScopeVersionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source_material_id: UUID
+    material_parse_version_id: UUID
+    page_start: int = Field(ge=1)
+    page_end: int = Field(ge=1)
+
+
 class SaveArtifactDraftRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

@@ -298,6 +298,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project_id}/material-scope/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 创建或修订项目教材范围版本 */
+        post: operations["createMaterialScopeVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project_id}/materials/uploads": {
         parameters: {
             query?: never;
@@ -1575,6 +1592,14 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        CreateMaterialScopeVersionRequest: {
+            /** Format: uuid */
+            source_material_id: string;
+            /** Format: uuid */
+            material_parse_version_id: string;
+            page_start: number;
+            page_end: number;
+        };
         SaveArtifactDraftRequest: {
             content: {
                 [key: string]: unknown;
@@ -2473,6 +2498,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IntroSelectionEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    createMaterialScopeVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMaterialScopeVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Submitted immutable material-scope version created or replayed */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactEnvelope"];
                 };
             };
             "4XX": components["responses"]["Error"];

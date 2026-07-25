@@ -486,6 +486,33 @@ paths:
                 $ref: '#/components/schemas/IntroSelectionEnvelope'
         '4XX':
           $ref: '#/components/responses/Error'
+  /projects/{project_id}/material-scope/versions:
+    post:
+      summary: 创建或修订项目教材范围版本
+      operationId: createMaterialScopeVersion
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMaterialScopeVersionRequest'
+      responses:
+        '201':
+          description: Submitted immutable material-scope version created or replayed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
   /projects/{project_id}/materials/uploads:
     post:
       summary: 创建教材私有直传会话
@@ -2404,6 +2431,19 @@ components:
         lesson_unit_id: {type: [string, 'null'], format: uuid}
         draft_branch: {type: string, minLength: 1, maxLength: 80, default: main}
         content: {type: object, additionalProperties: true}
+    CreateMaterialScopeVersionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - source_material_id
+        - material_parse_version_id
+        - page_start
+        - page_end
+      properties:
+        source_material_id: {type: string, format: uuid}
+        material_parse_version_id: {type: string, format: uuid}
+        page_start: {type: integer, minimum: 1}
+        page_end: {type: integer, minimum: 1}
     SaveArtifactDraftRequest:
       type: object
       additionalProperties: false

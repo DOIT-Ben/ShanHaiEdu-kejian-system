@@ -196,6 +196,73 @@ class ArtifactAuthoringProvisionPort:
         self._session.flush()
         return draft
 
+    def replace_material_scope_draft(
+        self,
+        *,
+        artifact_id: UUID,
+        draft_branch: str,
+        content: Mapping[str, Any],
+        locked_fields: Mapping[str, Any],
+    ) -> ArtifactDraft:
+        self._require_system()
+        artifact = self._require_artifact(artifact_id)
+        if (
+            artifact.artifact_key != "material-scope"
+            or artifact.artifact_type != "material_scope"
+            or artifact.branch_key != "project"
+            or artifact.lesson_unit_id is not None
+        ):
+            raise self._conflict("The material-scope artifact identity is unavailable.")
+        expected_locked = {
+            "source_material_id",
+            "material_parse_version_id",
+            "page_start",
+            "page_end",
+        }
+        candidate = deepcopy(dict(content))
+        supplied_locked = deepcopy(dict(locked_fields))
+        if set(supplied_locked) != expected_locked or any(
+            candidate.get(key) != value for key, value in supplied_locked.items()
+        ):
+            raise ApiError(
+                status_code=422,
+                code="AUTHORING_POLICY_VIOLATION",
+                message="The material-scope locked fields are incomplete or inconsistent.",
+                details={"paths": sorted(expected_locked)},
+            )
+        policy = self._require_policy(artifact.content_definition_version_id)
+        policy_locked = {field.field_key for field in policy.fields if not field.editable}
+        if not expected_locked <= policy_locked:
+            raise ApiError(
+                status_code=422,
+                code="AUTHORING_POLICY_UNAVAILABLE",
+                message="The published material-scope authoring policy is unavailable.",
+            )
+        definition = self._validation.require_artifact_definition(artifact)
+        report = self._validation.validation_report(definition, candidate)
+        if not report["valid"]:
+            raise ApiError(
+                status_code=422,
+                code="INVALID_ARTIFACT",
+                message="The material-scope content does not match the published schema.",
+                details={"validation": report},
+            )
+        draft = self._repository.get_draft(artifact.id, draft_branch, for_update=True)
+        if draft is None:
+            raise self._conflict("The material-scope authoring draft is unavailable.")
+        ArtifactAuthoringGuard.record_initial_locked_fields(report, supplied_locked)
+        draft.content_json = candidate
+        draft.validation_report_json = report
+        draft.based_on_version_id = None
+        draft.autosaved_at = utc_now()
+        draft.updated_at = utc_now()
+        draft.updated_by = self._actor.principal_id
+        draft.lock_version += 1
+        artifact.current_draft_id = draft.id
+        self._touch_artifact(artifact)
+        self._session.flush()
+        return draft
+
     def provision_repeatable_item(
         self,
         request: RepeatableItemProvision,
