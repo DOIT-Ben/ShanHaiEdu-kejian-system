@@ -114,5 +114,14 @@ jobs:
       - name: Run Chromium flows
         run: pnpm --filter @shanhaiedu/web test:e2e --project=chromium
 
+      - name: Upload Chromium failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-browser-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/test-results/e2e/
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Run runtime contract flows
         run: pnpm --filter @shanhaiedu/web test:e2e:runtime --project=runtime-chromium
