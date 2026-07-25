@@ -447,6 +447,23 @@ paths:
                 $ref: '#/components/schemas/IntroSelectionEnvelope'
         '4XX':
           $ref: '#/components/responses/Error'
+  /projects/{project_id}/materials:
+    get:
+      summary: 查询项目教材事实
+      operationId: listProjectMaterials
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: Newest-first source materials from PostgreSQL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceMaterialListEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
   /projects/{project_id}/materials/uploads:
     post:
       summary: 创建教材私有直传会话
@@ -549,6 +566,30 @@ paths:
         '4XX':
           $ref: '#/components/responses/Error'
   /projects/{project_id}/artifacts:
+    get:
+      summary: 查询项目产物事实
+      operationId: listProjectArtifacts
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: lesson_id
+          in: query
+          required: false
+          schema: {type: string, format: uuid}
+        - name: artifact_type
+          in: query
+          required: false
+          schema: {type: string, minLength: 1, maxLength: 80}
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: Newest-first project artifacts from PostgreSQL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtifactListEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
     post:
       summary: 创建项目内容产物及活动草稿
       operationId: createArtifact
@@ -885,6 +926,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SaveOperationEnvelope'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/generation-jobs:
+    get:
+      summary: 查询项目异步任务事实
+      operationId: listProjectGenerationJobs
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: Newest-first generation jobs from PostgreSQL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationJobListEnvelope'
         '4XX':
           $ref: '#/components/responses/Error'
   /generation-jobs/{job_id}:
@@ -1549,6 +1607,51 @@ components:
         etag: {type: string, minLength: 1, maxLength: 255}
         size_bytes: {type: integer, minimum: 1}
         sha256: {type: string, pattern: '^[a-f0-9]{64}$'}
+    SourceMaterial:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - project_id
+        - material_kind
+        - file_asset_id
+        - original_filename
+        - mime_type
+        - upload_status
+        - confirmed_at
+        - created_at
+        - updated_at
+      properties:
+        id: {type: string, format: uuid}
+        project_id: {type: string, format: uuid}
+        material_kind: {type: string, minLength: 1}
+        file_asset_id: {type: [string, 'null'], format: uuid}
+        original_filename: {type: string, minLength: 1}
+        mime_type: {type: string, minLength: 1}
+        upload_status: {enum: [pending_upload, confirmed, rejected]}
+        confirmed_at: {type: [string, 'null'], format: date-time}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    SourceMaterialListEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, meta, request_id]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: {$ref: '#/components/schemas/SourceMaterial'}
+        meta:
+          type: object
+          additionalProperties: false
+          required: [next_cursor]
+          properties:
+            next_cursor: {type: [string, 'null'], format: uuid}
+        request_id: {type: string, minLength: 1}
     FileAssetVersion:
       type: object
       additionalProperties: false
@@ -1893,6 +1996,26 @@ components:
       required: [data, request_id]
       properties:
         data: {$ref: '#/components/schemas/GenerationJob'}
+        request_id: {type: string, minLength: 1}
+    GenerationJobListEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, meta, request_id]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: {$ref: '#/components/schemas/GenerationJob'}
+        meta:
+          type: object
+          additionalProperties: false
+          required: [next_cursor]
+          properties:
+            next_cursor: {type: [string, 'null'], format: uuid}
         request_id: {type: string, minLength: 1}
     DependencyReadiness:
       type: object
@@ -2405,6 +2528,26 @@ components:
       required: [data, request_id]
       properties:
         data: {$ref: '#/components/schemas/Artifact'}
+        request_id: {type: string, minLength: 1}
+    ArtifactListEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, meta, request_id]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: {$ref: '#/components/schemas/Artifact'}
+        meta:
+          type: object
+          additionalProperties: false
+          required: [next_cursor]
+          properties:
+            next_cursor: {type: [string, 'null'], format: uuid}
         request_id: {type: string, minLength: 1}
     ArtifactDraftEnvelope:
       type: object

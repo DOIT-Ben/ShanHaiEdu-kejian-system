@@ -136,6 +136,20 @@ class ArtifactRead(BaseModel):
     updated_at: datetime
 
 
+class ArtifactListData(BaseModel):
+    items: list[ArtifactRead]
+
+
+class ArtifactPageMeta(BaseModel):
+    next_cursor: str | None
+
+
+class ArtifactListEnvelope(BaseModel):
+    data: ArtifactListData
+    meta: ArtifactPageMeta
+    request_id: str
+
+
 class ApprovalRead(BaseModel):
     id: UUID
     artifact_version_id: UUID

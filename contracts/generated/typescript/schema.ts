@@ -264,6 +264,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project_id}/materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询项目教材事实 */
+        get: operations["listProjectMaterials"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project_id}/materials/uploads": {
         parameters: {
             query?: never;
@@ -356,7 +373,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** 查询项目产物事实 */
+        get: operations["listProjectArtifacts"];
         put?: never;
         /** 创建项目内容产物及活动草稿 */
         post: operations["createArtifact"];
@@ -586,6 +604,23 @@ export interface paths {
          * @description Legacy adapter only. The server must audit adoption and save as separate facts. New clients use POST /generation-results/{result_id}/adoptions followed by POST /adoptions/{adoption_id}/save-to-project.
          */
         post: operations["saveGenerationResultToProject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/generation-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询项目异步任务事实 */
+        get: operations["listProjectGenerationJobs"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -955,6 +990,35 @@ export interface components {
             size_bytes: number;
             sha256: string;
         };
+        SourceMaterial: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            project_id: string;
+            material_kind: string;
+            /** Format: uuid */
+            file_asset_id: string | null;
+            original_filename: string;
+            mime_type: string;
+            /** @enum {unknown} */
+            upload_status: "pending_upload" | "confirmed" | "rejected";
+            /** Format: date-time */
+            confirmed_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        SourceMaterialListEnvelope: {
+            data: {
+                items: components["schemas"]["SourceMaterial"][];
+            };
+            meta: {
+                /** Format: uuid */
+                next_cursor: string | null;
+            };
+            request_id: string;
+        };
         FileAssetVersion: {
             /** Format: uuid */
             id: string;
@@ -1180,6 +1244,16 @@ export interface components {
         };
         GenerationJobEnvelope: {
             data: components["schemas"]["GenerationJob"];
+            request_id: string;
+        };
+        GenerationJobListEnvelope: {
+            data: {
+                items: components["schemas"]["GenerationJob"][];
+            };
+            meta: {
+                /** Format: uuid */
+                next_cursor: string | null;
+            };
             request_id: string;
         };
         DependencyReadiness: {
@@ -1547,6 +1621,16 @@ export interface components {
         };
         ArtifactEnvelope: {
             data: components["schemas"]["Artifact"];
+            request_id: string;
+        };
+        ArtifactListEnvelope: {
+            data: {
+                items: components["schemas"]["Artifact"][];
+            };
+            meta: {
+                /** Format: uuid */
+                next_cursor: string | null;
+            };
             request_id: string;
         };
         ArtifactDraftEnvelope: {
@@ -2281,6 +2365,32 @@ export interface operations {
             "4XX": components["responses"]["Error"];
         };
     };
+    listProjectMaterials: {
+        parameters: {
+            query?: {
+                "page[cursor]"?: components["parameters"]["PageCursor"];
+                "page[limit]"?: components["parameters"]["PageLimit"];
+            };
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Newest-first source materials from PostgreSQL */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceMaterialListEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
     createMaterialUploadSession: {
         parameters: {
             query?: never;
@@ -2401,6 +2511,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkflowEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    listProjectArtifacts: {
+        parameters: {
+            query?: {
+                lesson_id?: string;
+                artifact_type?: string;
+                "page[cursor]"?: components["parameters"]["PageCursor"];
+                "page[limit]"?: components["parameters"]["PageLimit"];
+            };
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Newest-first project artifacts from PostgreSQL */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactListEnvelope"];
                 };
             };
             "4XX": components["responses"]["Error"];
@@ -2770,6 +2908,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SaveOperationEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    listProjectGenerationJobs: {
+        parameters: {
+            query?: {
+                "page[cursor]"?: components["parameters"]["PageCursor"];
+                "page[limit]"?: components["parameters"]["PageLimit"];
+            };
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Newest-first generation jobs from PostgreSQL */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerationJobListEnvelope"];
                 };
             };
             "4XX": components["responses"]["Error"];

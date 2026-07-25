@@ -38,6 +38,20 @@ class GenerationJobEnvelope(BaseModel):
     request_id: str
 
 
+class GenerationJobListData(BaseModel):
+    items: list[GenerationJobRead]
+
+
+class GenerationJobPageMeta(BaseModel):
+    next_cursor: str | None
+
+
+class GenerationJobListEnvelope(BaseModel):
+    data: GenerationJobListData
+    meta: GenerationJobPageMeta
+    request_id: str
+
+
 class AcceptedJobData(BaseModel):
     job_id: UUID
     status: Literal["created", "queued", "running"]

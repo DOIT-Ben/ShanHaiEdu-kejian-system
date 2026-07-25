@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Request, status
+from fastapi import APIRouter, Depends, Header, Query, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -15,12 +15,46 @@ from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.dependencies import get_actor_context
 from apps.api.identity.permissions import ProjectAccessService
 from apps.api.jobs.repository import GenerationJobRepository
-from apps.api.jobs.schemas import GenerationJobEnvelope, GenerationJobRead
+from apps.api.jobs.schemas import (
+    GenerationJobEnvelope,
+    GenerationJobListData,
+    GenerationJobListEnvelope,
+    GenerationJobPageMeta,
+    GenerationJobRead,
+)
 from apps.api.jobs.service import GenerationJobService
+from apps.api.pagination import parse_uuid_page_cursor
 from apps.api.reliability.sse import EventReplayRepository, parse_last_event_id, stream_events
 from apps.api.settings import Settings
 
 router = APIRouter(prefix="/api/v2/generation-jobs", tags=["generation-jobs"])
+project_router = APIRouter(tags=["generation-jobs"])
+
+
+@project_router.get(
+    "/api/v2/projects/{project_id}/generation-jobs",
+    response_model=GenerationJobListEnvelope,
+    operation_id="listProjectGenerationJobs",
+)
+def list_project_generation_jobs(
+    project_id: UUID,
+    request: Request,
+    actor: Annotated[ActorContext, Depends(get_actor_context)],
+    session: Annotated[Session, Depends(get_session)],
+    page_cursor: Annotated[str | None, Query(alias="page[cursor]")] = None,
+    page_limit: Annotated[int, Query(alias="page[limit]", ge=1, le=100)] = 20,
+) -> GenerationJobListEnvelope:
+    ProjectAccessService(session, actor).require(project_id, ProjectAction.VIEW)
+    jobs, next_cursor = GenerationJobRepository(session, actor.organization_id).list_page(
+        project_id,
+        cursor=parse_uuid_page_cursor(page_cursor),
+        limit=page_limit,
+    )
+    return GenerationJobListEnvelope(
+        data=GenerationJobListData(items=[GenerationJobRead.model_validate(job) for job in jobs]),
+        meta=GenerationJobPageMeta(next_cursor=next_cursor),
+        request_id=request.state.request_id,
+    )
 
 
 @router.get("/{job_id}", response_model=GenerationJobEnvelope, operation_id="getGenerationJob")
