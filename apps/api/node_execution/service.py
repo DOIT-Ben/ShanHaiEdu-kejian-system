@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from uuid import UUID
 
 from apps.api.model_gateway.contracts import (
@@ -27,9 +28,12 @@ class NodeExecutionService:
         self,
         transactions: NodeExecutionTransactionFactory,
         model: NodeExecutionModelPort,
+        *,
+        generation_job_id: UUID | None = None,
     ) -> None:
         self._transactions = transactions
         self._model = model
+        self._generation_job_id = generation_job_id
 
     async def execute(
         self,
@@ -40,6 +44,14 @@ class NodeExecutionService:
         cancellation: CancellationToken | None = None,
     ) -> CommittedNodeExecution:
         prepared = self._prepare(node_run_id, request_id, user_revision)
+        if self._generation_job_id is not None:
+            prepared = replace(
+                prepared,
+                audit_context=replace(
+                    prepared.audit_context,
+                    generation_job_id=self._generation_job_id,
+                ),
+            )
         if prepared.committed_result is not None:
             return prepared.committed_result
         if prepared.recovery_available:

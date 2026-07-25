@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import dramatiq
+import pytest
 from dramatiq.brokers.stub import StubBroker
+
+from workers.node_execution import NodeExecutionJobInFlight
 
 
 def test_generation_job_actor_uses_dramatiq_message_contract() -> None:
@@ -19,6 +22,23 @@ def test_generation_job_actor_uses_dramatiq_message_contract() -> None:
         assert message.args == ("01900000-0000-7000-8000-000000000001",)
     finally:
         dramatiq.set_broker(original)
+
+
+def test_generation_job_actor_delays_active_node_execution_delivery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from workers import tasks
+
+    def in_flight(_job_id: object, *, worker_id: str | None = None) -> str:
+        del worker_id
+        raise NodeExecutionJobInFlight(retry_after_seconds=17)
+
+    monkeypatch.setattr(tasks, "run_generation_job", in_flight)
+
+    with pytest.raises(dramatiq.Retry) as retry:
+        tasks.process_generation_job.fn("01900000-0000-7000-8000-000000000001")
+
+    assert retry.value.delay == 17_000
 
 
 def test_artifact_quality_actor_uses_dramatiq_message_contract() -> None:

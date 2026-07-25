@@ -72,7 +72,7 @@ class ArtifactLessonPlanReader:
         if lesson is None:
             raise self._invalid("The target lesson has no approved division source.")
         lineage = self._generated_lineage(artifact.id, version.version_no)
-        division, division_context_snapshot_id = self._approved_division(
+        division, division_context_snapshot_id = self.require_approved_division(
             project_id=artifact.project_id,
             version_id=lesson.source_division_version_id,
         )
@@ -131,7 +131,7 @@ class ArtifactLessonPlanReader:
             raise self._invalid("The lesson plan has no generated fixed-release lineage.")
         return version
 
-    def _approved_division(
+    def require_approved_division(
         self,
         *,
         project_id: UUID,

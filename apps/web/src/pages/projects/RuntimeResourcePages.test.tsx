@@ -193,13 +193,18 @@ describe("Runtime resource pages", () => {
   it("reads and cancels the same generation job represented by the route", async () => {
     const job = {
       created_at: "2030-01-01T00:00:00Z",
+      error_code: null,
       id: jobId,
       job_type: "parse_material",
+      lesson_unit_id: null,
+      node_run_id: null,
       progress_message: "正在整理教材",
       progress_percent: 35,
       project_id: projectId,
+      result_artifact_version_id: null,
       status: "running",
       updated_at: "2030-01-01T00:00:01Z",
+      workflow_node_key: null,
     } as jobsApi.GenerationJobDto;
     vi.spyOn(jobsApi, "getGenerationJob").mockResolvedValue(job);
     const cancelJob = vi
@@ -224,13 +229,18 @@ describe("Runtime resource pages", () => {
   it("blocks a generation job that does not belong to the route project", async () => {
     const job = {
       created_at: "2030-01-01T00:00:00Z",
+      error_code: null,
       id: jobId,
       job_type: "parse_material",
+      lesson_unit_id: null,
+      node_run_id: null,
       progress_message: "正在整理教材",
       progress_percent: 35,
       project_id: otherProjectId,
+      result_artifact_version_id: null,
       status: "running",
       updated_at: "2030-01-01T00:00:01Z",
+      workflow_node_key: null,
     } as jobsApi.GenerationJobDto;
     vi.spyOn(jobsApi, "getGenerationJob").mockResolvedValue(job);
     const cancelJob = vi.spyOn(jobsApi, "cancelGenerationJob");
@@ -250,13 +260,18 @@ describe("Runtime resource pages", () => {
   it("does not keep the job event stream open after a terminal status is loaded", async () => {
     vi.spyOn(jobsApi, "getGenerationJob").mockResolvedValue({
       created_at: "2030-01-01T00:00:00Z",
+      error_code: null,
       id: jobId,
       job_type: "parse_material",
+      lesson_unit_id: null,
+      node_run_id: null,
       progress_message: "教材整理完成",
       progress_percent: 100,
       project_id: projectId,
+      result_artifact_version_id: null,
       status: "succeeded",
       updated_at: "2030-01-01T00:00:01Z",
+      workflow_node_key: null,
     });
 
     renderRoute(

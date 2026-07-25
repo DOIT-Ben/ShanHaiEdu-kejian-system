@@ -198,6 +198,28 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
     }.issubset(generation_attempt_columns)
     assert "ix_generation_attempts_provider_task" in generation_attempt_indexes
     assert "ix_generation_attempts_status_lease" in generation_attempt_indexes
+    generation_job_columns = {
+        column["name"] for column in database_inspector.get_columns("generation_jobs")
+    }
+    generation_job_indexes = {
+        index["name"] for index in database_inspector.get_indexes("generation_jobs")
+    }
+    generation_job_foreign_keys = {
+        foreign_key["name"]
+        for foreign_key in database_inspector.get_foreign_keys("generation_jobs")
+    }
+    assert {
+        "node_run_id",
+        "lesson_unit_id",
+        "workflow_node_key",
+        "result_artifact_version_id",
+    }.issubset(generation_job_columns)
+    assert "ix_gen_jobs_org_project_lesson_node" in generation_job_indexes
+    assert {
+        "fk_generation_jobs_node_run_id_node_runs",
+        "fk_generation_jobs_lesson_unit_id_lesson_units",
+        "fk_generation_jobs_result_artifact_version_id_artifact_versions",
+    }.issubset(generation_job_foreign_keys)
     with engine.connect() as connection:
         assert (
             connection.scalar(
@@ -232,7 +254,7 @@ def test_empty_database_upgrade_downgrade_upgrade(postgres_database_url: str) ->
         column["name"] for column in database_inspector.get_columns("node_execution_leases")
     }
     assert {"node_run_id", "owner_token", "lease_expires_at"}.issubset(lease_columns)
-    assert ScriptDirectory.from_config(config).get_current_head() == "l6g7h8i9j012"
+    assert ScriptDirectory.from_config(config).get_current_head() == "m7h8i9j0k123"
     previous = os.environ.get("SHANHAI_DATABASE_URL")
     os.environ["SHANHAI_DATABASE_URL"] = postgres_database_url
     try:

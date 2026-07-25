@@ -10,10 +10,15 @@ function job(status: GenerationJobDto["status"]): GenerationJobDto {
     error_code: status === "failed" ? "PROVIDER_TIMEOUT" : null,
     id: "job-1",
     job_type: "parse_material",
+    lesson_unit_id: null,
+    node_run_id: null,
     progress_message: status === "failed" ? "教材解析超时" : "正在解析教材",
     progress_percent: status === "failed" ? 52 : 32,
+    project_id: null,
+    result_artifact_version_id: null,
     status,
     updated_at: "2030-01-01T00:01:00Z",
+    workflow_node_key: null,
   };
 }
 

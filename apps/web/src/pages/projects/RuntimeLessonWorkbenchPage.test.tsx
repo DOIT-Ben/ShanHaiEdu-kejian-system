@@ -8,6 +8,13 @@ import { RuntimeLessonWorkbenchPage } from "@/pages/projects/RuntimeLessonWorkbe
 import { useProjectEvents } from "@/shared/api/useProjectEvents";
 
 vi.mock("@/shared/api/useProjectEvents", () => ({ useProjectEvents: vi.fn() }));
+const lessonPlanPanelMock = vi.hoisted(() => vi.fn());
+vi.mock("@/features/lessons/components/LessonPlanWorkflowPanel", () => ({
+  LessonPlanWorkflowPanel: (props: { lessonId: string; projectId: string }) => {
+    lessonPlanPanelMock(props);
+    return <div data-testid="lesson-plan-workflow" />;
+  },
+}));
 
 const projectId = "01960000-0000-7000-8000-000000000001";
 const lessonId = "01960000-0000-7000-8000-000000000002";
@@ -35,6 +42,7 @@ function renderPage(stepKey = "lesson_plan") {
 
 describe("RuntimeLessonWorkbenchPage", () => {
   beforeEach(() => {
+    lessonPlanPanelMock.mockClear();
     vi.spyOn(projectsApi, "getProject").mockResolvedValue({
       id: projectId,
       title: "认识百分数",
@@ -72,9 +80,11 @@ describe("RuntimeLessonWorkbenchPage", () => {
     renderPage();
 
     expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("百分数的意义");
-    expect(screen.getByRole("alert", { name: "制作进度读取失败" })).toHaveTextContent(
-      "这一步暂时没有可显示的制作进度",
-    );
+    expect(
+      screen.getByText("这一步还没有制作任务。完成前一步后，新的任务会显示在这里。"),
+    ).toBeVisible();
+    expect(screen.getByTestId("lesson-plan-workflow")).toBeVisible();
+    expect(lessonPlanPanelMock).toHaveBeenCalledWith({ lessonId, projectId });
     expect(screen.getByRole("link", { name: /返回项目/ })).toHaveAttribute(
       "href",
       `/app/projects/${projectId}`,
@@ -83,6 +93,14 @@ describe("RuntimeLessonWorkbenchPage", () => {
       "href",
       `/app/projects/${projectId}/lessons/${lessonId}/work/ppt`,
     );
+  });
+
+  it("只在教案分支挂载教案闭环", async () => {
+    renderPage("ppt");
+
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("课堂 PPT");
+    expect(screen.queryByTestId("lesson-plan-workflow")).not.toBeInTheDocument();
+    expect(lessonPlanPanelMock).not.toHaveBeenCalled();
   });
 
   it("旧连字符路由与未知步骤都不会泄漏内部键", async () => {

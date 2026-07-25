@@ -45,6 +45,8 @@ jobs:
       SHANHAI_E2E_API_BASE_URL: http://127.0.0.1:58080/api/v2
       SHANHAI_E2E_API_PORT: "58080"
       SHANHAI_E2E_WEB_PORT: "44177"
+      SHANHAI_R1_RESCUE_E2E: "1"
+      SHANHAI_REDIS_URL: redis://127.0.0.1:6379/0
       SHANHAI_SESSION_ALLOWED_ORIGINS: '["http://127.0.0.1:44177"]'
       VITE_API_BASE_URL: http://127.0.0.1:58080/api/v2
       VITE_API_MODE: real
@@ -101,6 +103,7 @@ jobs:
         run: |
           uv run alembic upgrade head
           uv run python scripts/seed_runtime_auth_e2e.py
+          uv run python scripts/seed_r1_rescue_e2e.py
 
       - name: Build the production frontend
         run: pnpm --dir apps/web build

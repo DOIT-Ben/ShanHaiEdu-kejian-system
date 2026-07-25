@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from math import ceil
 from uuid import UUID
 
 from sqlalchemy import select
@@ -49,6 +50,13 @@ class SqlAlchemyNodeExecutionLeasePort:
             lease.owner_token = owner_token
             lease.lease_expires_at = expires_at
         self._session.flush()
+
+    def retry_after_seconds(self, node_run_id: UUID) -> int | None:
+        lease = self._locked(node_run_id)
+        if lease is None:
+            return None
+        remaining = (lease.lease_expires_at - database_wall_clock(self._session)).total_seconds()
+        return ceil(remaining) + 1 if remaining > 0 else None
 
     def owns(self, node_run_id: UUID, owner_token: str) -> bool:
         lease = self._locked(node_run_id)

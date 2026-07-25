@@ -3,6 +3,21 @@ import { apiClient, unwrapApiResult } from "@/shared/api/client";
 
 export type GenerationJobDto = components["schemas"]["GenerationJob"];
 
+export async function listLessonPlanGenerationJobs({
+  lessonId,
+  projectId,
+}: {
+  lessonId: string;
+  projectId: string;
+}): Promise<GenerationJobDto[]> {
+  const response = unwrapApiResult(
+    await apiClient.GET("/projects/{project_id}/lessons/{lesson_id}/lesson-plan/generation-jobs", {
+      params: { path: { lesson_id: lessonId, project_id: projectId } },
+    }),
+  );
+  return response.data.items;
+}
+
 export async function getGenerationJob(jobId: string): Promise<GenerationJobDto> {
   const response = unwrapApiResult(
     await apiClient.GET("/generation-jobs/{job_id}", {

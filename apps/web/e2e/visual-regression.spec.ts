@@ -189,7 +189,7 @@ for (const viewport of viewports) {
     await expect(main).toContainText("认识百分数");
     await expect(main).toContainText("百分数的意义");
     await expect(main).toContainText("教案");
-    await expect(main).toContainText("这一步暂时没有可显示的制作进度");
+    await expect(main).toContainText("这一步还没有制作任务");
     await assertPageFrame(page);
     await captureVisual(page, testInfo, `workbench-${widthLabel}`);
   });

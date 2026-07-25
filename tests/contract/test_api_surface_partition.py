@@ -15,7 +15,6 @@ GENERATED_TYPES = ROOT / "contracts/generated/typescript/schema.ts"
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 INITIAL_PLANNED_OPERATIONS = {
     "createCreationPackage",
-    "startNodeRun",
     "updateProject",
 }
 PROMOTED_INTRO_OPERATIONS = {

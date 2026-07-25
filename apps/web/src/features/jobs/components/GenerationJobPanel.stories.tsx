@@ -7,11 +7,15 @@ const runningJob = {
   error_code: null,
   id: "50000000-0000-4000-8000-000000000001",
   job_type: "material_parse",
+  lesson_unit_id: null,
+  node_run_id: null,
   progress_message: "正在核对第 42 页",
   progress_percent: 56,
   project_id: "50000000-0000-4000-8000-000000000002",
+  result_artifact_version_id: null,
   status: "running",
   updated_at: "2026-07-22T05:03:00Z",
+  workflow_node_key: null,
 } satisfies GenerationJobDto;
 
 const meta = {

@@ -173,6 +173,10 @@ export const contractParseVersion = {
 export const contractJob = {
   id: contractIds.jobId,
   project_id: contractIds.projectId,
+  node_run_id: null,
+  lesson_unit_id: null,
+  workflow_node_key: null,
+  result_artifact_version_id: null,
   job_type: "material.parse",
   status: "succeeded",
   progress_percent: 100,

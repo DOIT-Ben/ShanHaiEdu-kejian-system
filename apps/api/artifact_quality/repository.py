@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from apps.api.artifact_quality.contracts import QualitySourceType
+from apps.api.artifact_quality.contracts import LessonPlanQualityReportFact, QualitySourceType
 from apps.api.artifact_quality.models import ArtifactQualityReport
 from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.permissions import ProjectAccessService
@@ -55,4 +55,53 @@ class ArtifactQualityReportRepository:
                 == workflow_definition_version_id,
                 ArtifactQualityReport.validator_set_hash == validator_set_hash,
             )
+        )
+
+    def latest_for_artifact_version(
+        self,
+        *,
+        project_id: UUID,
+        lesson_unit_id: UUID,
+        artifact_version_id: UUID,
+    ) -> ArtifactQualityReport | None:
+        if not self._actor.is_system:
+            ProjectAccessService(self._session, self._actor).require(
+                project_id,
+                ProjectAction.VIEW,
+            )
+        return self._session.scalar(
+            select(ArtifactQualityReport)
+            .where(
+                ArtifactQualityReport.organization_id == self._actor.organization_id,
+                ArtifactQualityReport.project_id == project_id,
+                ArtifactQualityReport.lesson_unit_id == lesson_unit_id,
+                ArtifactQualityReport.source_type == "artifact",
+                ArtifactQualityReport.source_artifact_version_id == artifact_version_id,
+            )
+            .order_by(ArtifactQualityReport.created_at.desc(), ArtifactQualityReport.id.desc())
+            .limit(1)
+        )
+
+    def latest_lesson_plan_fact(
+        self,
+        *,
+        project_id: UUID,
+        lesson_unit_id: UUID,
+        artifact_version_id: UUID,
+    ) -> LessonPlanQualityReportFact | None:
+        report = self.latest_for_artifact_version(
+            project_id=project_id,
+            lesson_unit_id=lesson_unit_id,
+            artifact_version_id=artifact_version_id,
+        )
+        if report is None or report.source_artifact_version_id is None:
+            return None
+        return LessonPlanQualityReportFact(
+            id=report.id,
+            artifact_version_id=report.source_artifact_version_id,
+            validate_node_run_id=report.validate_node_run_id,
+            conclusion=report.conclusion,
+            findings=report.findings_json,
+            evidence_hash=report.evidence_hash,
+            created_at=report.created_at,
         )

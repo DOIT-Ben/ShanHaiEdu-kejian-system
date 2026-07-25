@@ -213,6 +213,9 @@ class SqlAlchemyWorkflowExecutionPort:
     def claim_execution_owner(self, node_run_id: UUID, owner_token: str) -> None:
         self._execution_leases.claim(node_run_id, owner_token)
 
+    def execution_retry_after_seconds(self, node_run_id: UUID) -> int | None:
+        return self._execution_leases.retry_after_seconds(node_run_id)
+
     def owns_execution_owner(self, node_run_id: UUID, owner_token: str) -> bool:
         return self._execution_leases.owns(node_run_id, owner_token)
 

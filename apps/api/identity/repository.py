@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -57,6 +59,28 @@ class IdentityRepository:
             actor_type="user",
             organization_role=membership.role,
         )
+
+    def resolve_actor_for_principal(
+        self,
+        principal_id: UUID,
+        organization_id: UUID,
+    ) -> ActorContext:
+        principal = self._session.get(Principal, principal_id)
+        if (
+            principal is None
+            or principal.organization_id != organization_id
+            or principal.user_id is None
+        ):
+            raise self._permission_denied()
+        actor = self.resolve_actor(
+            AuthenticatedIdentity(
+                user_id=principal.user_id,
+                organization_id=organization_id,
+            )
+        )
+        if actor.principal_id != principal_id:
+            raise self._permission_denied()
+        return actor
 
     @staticmethod
     def _permission_denied() -> ApiError:

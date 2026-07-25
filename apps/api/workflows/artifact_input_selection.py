@@ -1,4 +1,4 @@
-"""Immutable exact optional-Artifact selection owned by Workflow runtime."""
+"""Immutable exact Artifact selection owned by Workflow runtime."""
 
 from __future__ import annotations
 

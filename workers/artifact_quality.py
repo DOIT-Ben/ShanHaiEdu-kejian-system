@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 import dramatiq
+from sqlalchemy.orm import Session
 
 from apps.api.artifact_quality.contracts import (
     ArtifactQualityReportResult,
@@ -14,7 +15,8 @@ from apps.api.artifact_quality.runtime import runtime_quality_validator_registry
 from apps.api.artifact_quality.service import ArtifactQualityService
 from apps.api.artifact_quality.sqlalchemy import SqlAlchemyArtifactQualityTransactionFactory
 from apps.api.database import build_engine, build_session_factory
-from apps.api.identity.context import system_actor
+from apps.api.identity.context import ActorContext
+from apps.api.identity.repository import IdentityRepository
 from apps.api.settings import get_settings
 from apps.api.workflows.quality_port import QualityNodeRoutingReader
 
@@ -46,16 +48,25 @@ def execute_artifact_quality_node(
     factory = build_session_factory(engine)
     try:
         with factory() as session:
-            organization_id = QualityNodeRoutingReader(session).organization_id(node_run_id)
-        if organization_id is None:
+            actor = _initiating_actor(session, node_run_id)
+        if actor is None:
             return None
-        actor = system_actor(organization_id)
         return ArtifactQualityService(
             SqlAlchemyArtifactQualityTransactionFactory(factory, actor),
             validators,
         ).execute(node_run_id)
     finally:
         engine.dispose()
+
+
+def _initiating_actor(session: Session, node_run_id: UUID) -> ActorContext | None:
+    routing = QualityNodeRoutingReader(session).get(node_run_id)
+    if routing is None:
+        return None
+    return IdentityRepository(session).resolve_actor_for_principal(
+        routing.created_by,
+        routing.organization_id,
+    )
 
 
 def run_artifact_quality_node(node_run_id: UUID) -> ArtifactQualityReportResult | None:

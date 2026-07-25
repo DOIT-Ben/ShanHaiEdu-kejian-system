@@ -12,7 +12,10 @@ from apps.api.artifacts.approval_completion import (
     prepare_declared_approval,
     retire_declared_approval_gate,
 )
-from apps.api.artifacts.approval_events import append_stale_approval_event
+from apps.api.artifacts.approval_events import (
+    append_approved_version_stale_event,
+    append_stale_approval_event,
+)
 from apps.api.artifacts.domain import ApprovalAction
 from apps.api.artifacts.models import Approval, Artifact, ArtifactVersion
 from apps.api.artifacts.relation_service import ArtifactRelationService
@@ -156,13 +159,12 @@ class ArtifactApprovalService:
             },
             request_id,
         )
-        append_stale_approval_event(
+        append_approved_version_stale_event(
             self._session,
             self._actor,
             artifact,
             version.id,
             stale_ids,
-            "UPSTREAM_APPROVED_VERSION_CHANGED",
             request_id,
         )
         return approval

@@ -5,9 +5,26 @@ export type ArtifactDto = components["schemas"]["Artifact"];
 export type ArtifactDraftDto = components["schemas"]["ArtifactDraft"];
 export type ArtifactVersionDto = components["schemas"]["ArtifactVersion"];
 export type ApprovalDto = components["schemas"]["Approval"];
+export type LessonPlanArtifactDto = components["schemas"]["LessonPlanArtifactEnvelope"]["data"];
+export type AcceptedNodeRunDto = components["schemas"]["AcceptedNodeRunEnvelope"]["data"];
 export type CreateArtifactRequest = components["schemas"]["CreateArtifactRequest"];
 export type SaveArtifactDraftRequest = components["schemas"]["SaveArtifactDraftRequest"];
 export type ReviewArtifactVersionRequest = components["schemas"]["ReviewArtifactVersionRequest"];
+
+export async function getLessonPlanArtifact({
+  lessonId,
+  projectId,
+}: {
+  lessonId: string;
+  projectId: string;
+}): Promise<LessonPlanArtifactDto> {
+  const response = unwrapApiResult(
+    await apiClient.GET("/projects/{project_id}/lessons/{lesson_id}/lesson-plan/artifact", {
+      params: { path: { lesson_id: lessonId, project_id: projectId } },
+    }),
+  );
+  return response.data;
+}
 
 export async function createArtifact({
   idempotencyKey,
@@ -106,6 +123,29 @@ export async function reviewArtifactVersion({
         path: { artifact_version_id: artifactVersionId },
       },
     }),
+  );
+  return response.data;
+}
+
+export async function startLessonPlanQualityValidation({
+  artifactVersionId,
+  idempotencyKey,
+  lessonId,
+}: {
+  artifactVersionId: string;
+  idempotencyKey: string;
+  lessonId: string;
+}): Promise<AcceptedNodeRunDto> {
+  const response = unwrapApiResult(
+    await apiClient.POST(
+      "/lessons/{lesson_id}/lesson-plan/artifact-versions/{artifact_version_id}/quality-validations",
+      {
+        params: {
+          header: { "Idempotency-Key": idempotencyKey },
+          path: { artifact_version_id: artifactVersionId, lesson_id: lessonId },
+        },
+      },
+    ),
   );
   return response.data;
 }

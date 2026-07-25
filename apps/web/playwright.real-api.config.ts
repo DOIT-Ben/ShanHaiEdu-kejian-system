@@ -13,6 +13,7 @@ const webPort = Number.parseInt(process.env.SHANHAI_E2E_WEB_PORT ?? "44177", 10)
 const apiPort = Number.parseInt(process.env.SHANHAI_E2E_API_PORT ?? "58080", 10);
 const webOrigin = `http://127.0.0.1:${String(webPort)}`;
 const apiOrigin = `http://127.0.0.1:${String(apiPort)}`;
+const rescueWorkerEnabled = process.env.SHANHAI_R1_RESCUE_E2E === "1";
 
 export default defineConfig({
   testDir: "./e2e/real-api",
@@ -54,6 +55,26 @@ export default defineConfig({
       timeout: 120_000,
       url: `${webOrigin}/login`,
     },
+    ...(rescueWorkerEnabled
+      ? [
+          {
+            command: "uv run python tests/e2e/r1_rescue_worker.py",
+            cwd: repositoryRoot,
+            env: {
+              ...process.env,
+              SHANHAI_DATABASE_URL: requiredEnvironment("SHANHAI_DATABASE_URL"),
+              SHANHAI_ENVIRONMENT: "test",
+              SHANHAI_REDIS_URL: requiredEnvironment("SHANHAI_REDIS_URL"),
+              SHANHAI_SESSION_ALLOWED_ORIGINS: JSON.stringify([webOrigin]),
+            },
+            reuseExistingServer: false,
+            stderr: "pipe" as const,
+            stdout: "pipe" as const,
+            timeout: 120_000,
+            wait: { stdout: /r1 rescue e2e worker ready/ },
+          },
+        ]
+      : []),
   ],
   projects: [{ name: "real-api-chromium", use: { ...devices["Desktop Chrome"] } }],
 });

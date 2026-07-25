@@ -17,13 +17,18 @@ const projectId = "01960000-0000-7000-8000-000000000001";
 const jobId = "01960000-0000-7000-8000-000000000002";
 const runningJob: GenerationJobDto = {
   created_at: "2030-01-01T00:00:00Z",
+  error_code: null,
   id: jobId,
   job_type: "textbook.parse",
+  lesson_unit_id: null,
+  node_run_id: null,
   progress_message: "正在整理教材内容",
   progress_percent: 42,
   project_id: projectId,
+  result_artifact_version_id: null,
   status: "running",
   updated_at: "2030-01-01T00:00:01Z",
+  workflow_node_key: null,
 };
 
 function renderPage() {

@@ -220,7 +220,7 @@ def test_snapshot_service_is_idempotent_and_never_overwrites_frozen_prompt(
         assert caught.value.code == "PROMPT_SNAPSHOT_ALREADY_FROZEN"
 
 
-def test_prompt_freeze_serializes_with_node_execution_start(
+def test_prompt_freeze_serializes_with_queue_transition(
     migrated_database_url: str,
 ) -> None:
     factory = build_session_factory(build_engine(migrated_database_url))
@@ -256,9 +256,15 @@ def test_prompt_freeze_serializes_with_node_execution_start(
             with pytest.raises(FutureTimeoutError):
                 future.result(timeout=0.5)
 
-        with pytest.raises(PromptSnapshotError) as frozen:
-            future.result(timeout=5)
-        assert frozen.value.code == "PROMPT_SNAPSHOT_NODE_FROZEN"
+        future.result(timeout=5)
+        with factory() as verification:
+            context_snapshot = (
+                verification.query(ContextSnapshot).filter_by(node_run_id=node.id).one()
+            )
+            prompt_snapshot = (
+                verification.query(PromptSnapshot).filter_by(node_run_id=node.id).one()
+            )
+            assert prompt_snapshot.context_snapshot_id == context_snapshot.id
     finally:
         executor.shutdown(wait=True)
 

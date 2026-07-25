@@ -100,7 +100,10 @@ def _context_artifact_versions(
         if (
             selected_upstream is not None
             and definition is not None
-            and definition.contract_ref in optional_refs
+            and (
+                definition.contract_ref in selected_upstream
+                or definition.contract_ref in optional_refs
+            )
         ):
             selected = selected_upstream.get(definition.contract_ref)
             values[source] = (selected,) if selected is not None else ()
@@ -123,10 +126,10 @@ def collect_upstream_artifacts(
             "NODE_EXECUTION_OPTIONAL_INPUT_INVALID",
             "published optional inputs must be declared inputs",
         )
-    if artifact_selection is not None and not set(artifact_selection) <= set(optional):
+    if artifact_selection is not None and not set(artifact_selection) <= set(refs):
         raise NodeExecutionError(
             "NODE_EXECUTION_ARTIFACT_SELECTION_INVALID",
-            "exact artifact selection may contain only declared optional inputs",
+            "exact artifact selection may contain only declared inputs",
         )
     selected = (
         artifacts.load_frozen_versions(execution, dict(artifact_selection))
@@ -137,11 +140,9 @@ def collect_upstream_artifacts(
         artifacts.verify_frozen_versions(execution, selected)
     upstream: dict[str, ArtifactContextVersion] = {}
     for raw in refs:
-        if artifact_selection is not None and raw in optional:
-            selected_value = selected.get(raw)
-            values = (selected_value,) if selected_value is not None else ()
-        else:
-            values = artifacts.list_context_versions(execution, raw)
+        values = _selected_artifact_values(
+            artifacts, execution, raw, optional, artifact_selection, selected
+        )
         if len(values) > 1:
             raise NodeExecutionError(
                 "NODE_EXECUTION_INPUT_CONTRACT_AMBIGUOUS",
@@ -168,6 +169,22 @@ def collect_upstream_artifacts(
                 "a required artifact input version is unavailable",
             )
     return upstream
+
+
+def _selected_artifact_values(
+    artifacts: ArtifactPort,
+    execution: WorkflowExecutionContext,
+    contract_ref: str,
+    optional: tuple[str, ...],
+    selection: Mapping[str, UUID] | None,
+    selected: Mapping[str, ArtifactContextVersion],
+) -> tuple[ArtifactContextVersion, ...]:
+    if selection is not None and contract_ref in selection:
+        value = selected.get(contract_ref)
+        return (value,) if value is not None else ()
+    if selection is not None and contract_ref in optional:
+        return ()
+    return artifacts.list_context_versions(execution, contract_ref)
 
 
 def _contract_refs(value: object) -> tuple[str, ...]:
