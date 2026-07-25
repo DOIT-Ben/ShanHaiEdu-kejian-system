@@ -90,8 +90,13 @@ async def test_lesson_plan_job_worker_persists_exact_result_draft_and_cancellati
         )
 
     settings = Settings(
+        _env_file=None,
         environment="test",
         database_url=SecretStr(migrated_database_url),
+        session_access_code=None,
+        session_allowed_origins=[],
+        session_csrf_secret=None,
+        session_teacher_principal_id=None,
     )
     app = create_app(settings=settings, object_storage=FakeObjectStorage())
     override_test_identity(app, prepared.actor)
