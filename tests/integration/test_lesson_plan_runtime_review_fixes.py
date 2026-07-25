@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
+import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -14,7 +15,7 @@ from apps.api.artifacts.authoring_provision import (
     ArtifactAuthoringProvisionPort,
     GeneratedDraftRequest,
 )
-from apps.api.artifacts.models import Artifact, ArtifactRelation, ArtifactVersion
+from apps.api.artifacts.models import Artifact, ArtifactDraft, ArtifactRelation, ArtifactVersion
 from apps.api.artifacts.relation_service import ArtifactRelationService
 from apps.api.artifacts.service import ArtifactService
 from apps.api.database import build_engine, build_session_factory, utc_now
@@ -25,6 +26,7 @@ from apps.api.lessons.models import LessonUnit
 from apps.api.model_gateway.audit import SqlAlchemyAttemptAuditSink
 from apps.api.model_gateway.contracts import ModelCapability
 from apps.api.model_gateway.gateway import ModelGateway
+from apps.api.node_execution.contracts import NodeExecutionError
 from apps.api.node_execution.fake import DeterministicNodeOutputProvider
 from apps.api.node_execution.service import NodeExecutionService
 from apps.api.node_execution.sqlalchemy import SqlAlchemyNodeExecutionTransactionFactory
@@ -188,9 +190,11 @@ async def test_model_regeneration_retires_previous_exact_gate(
     with factory() as session, session.begin():
         first = session.get(NodeRun, prepared.generate_node_id)
         assert first is not None and first.branch_run_id is not None
+        workflow_run_id = first.workflow_run_id
+        branch_run_id = first.branch_run_id
         replacement_node = WorkflowRuntimeService(session, prepared.actor).create_branch_node_run(
-            first.workflow_run_id,
-            first.branch_run_id,
+            workflow_run_id,
+            branch_run_id,
             node_key=first.node_key,
             status=NodeStatus.READY,
         )
@@ -217,6 +221,11 @@ async def test_model_regeneration_retires_previous_exact_gate(
         assert artifact is not None and gate is not None
         assert replacement.artifact_version_id != prepared.version_id
         assert artifact.current_submitted_version_id == replacement.artifact_version_id
+        assert artifact.current_draft_id is not None
+        draft = session.get(ArtifactDraft, artifact.current_draft_id)
+        assert draft is not None
+        assert draft.based_on_version_id == replacement.artifact_version_id
+        assert draft.content_json == output
         assert gate.status == "skipped"
         current_relation = session.scalar(
             select(ArtifactRelation).where(
@@ -234,6 +243,55 @@ async def test_model_regeneration_retires_previous_exact_gate(
         )
         assert current_relation is not None
         assert historical_relation is None
+
+    with factory() as session, session.begin():
+        artifact = session.get(Artifact, prepared.artifact_id)
+        assert artifact is not None and artifact.current_draft_id is not None
+        draft = session.get(ArtifactDraft, artifact.current_draft_id)
+        assert draft is not None
+        edited_content = deepcopy(draft.content_json)
+        edited_content["teaching_content"]["lesson_topic"] = "教师保留的局部修订"
+        ArtifactService(session, prepared.actor).save_draft(
+            artifact.id,
+            "main",
+            expected_lock_version=draft.lock_version,
+            content=edited_content,
+            request_id="issue-126-dirty-generated-draft",
+        )
+        blocked_node = WorkflowRuntimeService(
+            session,
+            prepared.actor,
+        ).create_branch_node_run(
+            workflow_run_id,
+            branch_run_id,
+            node_key="lesson_plan.generate",
+            status=NodeStatus.READY,
+        )
+        blocked_node_id = blocked_node.id
+
+    blocked_output = deepcopy(output)
+    blocked_output["teaching_content"]["lesson_topic"] = "不应覆盖教师修订"
+    with pytest.raises(NodeExecutionError) as blocked:
+        await NodeExecutionService(
+            SqlAlchemyNodeExecutionTransactionFactory(factory, prepared.actor),
+            ModelGateway(
+                {
+                    ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: (
+                        DeterministicNodeOutputProvider(blocked_output)
+                    )
+                },
+                audit_sink=SqlAlchemyAttemptAuditSink(factory),
+            ),
+        ).execute(blocked_node_id, request_id="issue-126-block-dirty-regenerate")
+    assert blocked.value.code == "AUTHORING_PROVISION_CONFLICT"
+
+    with factory() as session:
+        artifact = session.get(Artifact, prepared.artifact_id)
+        assert artifact is not None
+        assert artifact.current_submitted_version_id == replacement.artifact_version_id
+        draft = session.get(ArtifactDraft, artifact.current_draft_id)
+        assert draft is not None
+        assert draft.content_json == edited_content
 
 
 async def test_gate_snapshot_uses_published_quality_report_ref(

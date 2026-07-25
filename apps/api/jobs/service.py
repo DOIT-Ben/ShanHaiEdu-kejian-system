@@ -22,7 +22,7 @@ from apps.api.jobs.state_machine import InvalidJobTransition, require_transition
 from apps.api.reliability.events import EventResource, EventWriter, append_outbox_only
 from apps.api.reliability.idempotency import CommandResult, IdempotencyService
 
-_MODEL_ATTEMPT_JOB_TYPES = frozenset({"creation.item", "creation.batch"})
+_MODEL_ATTEMPT_JOB_TYPES = frozenset({"creation.item", "creation.batch", "workflow.node"})
 _MODEL_ATTEMPT_BINDABLE_STATUSES = frozenset({"running"})
 
 
@@ -213,6 +213,7 @@ class GenerationJobService:
         *,
         worker_id: str,
         error_code: str | None = None,
+        result_artifact_version_id: UUID | None = None,
     ) -> GenerationJob | None:
         self._require_system_actor()
         job = self._repository.get(job_id, for_update=True)
@@ -224,13 +225,28 @@ class GenerationJobService:
             if job.status != "running" or job.lease_owner != worker_id:
                 return None
             target = "failed" if error_code else "succeeded"
+        if result_artifact_version_id is not None and target != "succeeded":
+            raise ApiError(
+                status_code=409,
+                code="PRECONDITION_NOT_MET",
+                message="A cancelled or failed job cannot accept a result version.",
+            )
         self._transition(job, target)
+        if result_artifact_version_id is not None:
+            job.result_artifact_version_id = result_artifact_version_id
         job.progress_percent = 100 if target == "succeeded" else job.progress_percent
-        job.progress_message = {
-            "succeeded": "Deterministic stage-zero task completed",
-            "failed": "Deterministic stage-zero task failed",
-            "cancelled": "Generation job cancelled",
-        }[target]
+        if job.job_type == "workflow.node":
+            job.progress_message = {
+                "succeeded": "Node execution completed",
+                "failed": "Node execution failed",
+                "cancelled": "Node execution cancelled",
+            }[target]
+        else:
+            job.progress_message = {
+                "succeeded": "Deterministic stage-zero task completed",
+                "failed": "Deterministic stage-zero task failed",
+                "cancelled": "Generation job cancelled",
+            }[target]
         job.error_code = error_code
         job.finished_at = utc_now()
         job.lease_owner = None
@@ -286,6 +302,13 @@ class GenerationJobService:
             "status": job.status,
             "progress_percent": job.progress_percent,
             "attempt_count": job.attempt_count,
+            "node_run_id": str(job.node_run_id) if job.node_run_id is not None else None,
+            "lesson_unit_id": (str(job.lesson_unit_id) if job.lesson_unit_id is not None else None),
+            "result_artifact_version_id": (
+                str(job.result_artifact_version_id)
+                if job.result_artifact_version_id is not None
+                else None
+            ),
         }
         resource = EventResource(type="generation_job", id=job.id)
         if job.project_id is not None:

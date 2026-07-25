@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import socket
 from uuid import UUID, uuid4
@@ -15,6 +16,7 @@ from apps.api.jobs.models import GenerationJob
 from apps.api.jobs.service import GenerationJobService
 from apps.api.settings import get_settings
 from workers.material_parse import run_material_parse_job
+from workers.node_execution import execute_node_execution_job
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +104,14 @@ def run_generation_job(job_id: UUID, *, worker_id: str | None = None) -> str:
         engine.dispose()
     if job_type == "material.parse":
         return run_material_parse_job(job_id, worker_id=resolved_worker_id)
+    if job_type == "workflow.node":
+        return asyncio.run(
+            execute_node_execution_job(
+                job_id,
+                worker_id=resolved_worker_id,
+                settings=settings,
+            )
+        )
     return run_deterministic_job(job_id, worker_id=resolved_worker_id)
 
 

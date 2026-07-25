@@ -77,28 +77,29 @@ class ArtifactAuthoringProvisionPort:
         definition = self._validation.require_artifact_definition(artifact)
         self._require_policy(definition.id)
         self._validate_draft_branch(request.draft_branch)
+        validation_report = self._validation.validation_report(
+            definition,
+            version.content_json,
+        )
         existing = self._repository.get_draft(
             artifact.id,
             request.draft_branch,
             for_update=True,
         )
         if existing is not None:
-            if (
-                existing.based_on_version_id != version.id
-                or canonical_content_hash(existing.content_json) != version.content_hash
-            ):
-                raise self._conflict("The generated authoring draft already differs.")
-            return existing
+            return self._reuse_or_reset_generated_draft(
+                artifact,
+                existing,
+                version,
+                validation_report,
+            )
         draft = ArtifactDraft(
             id=new_uuid7(),
             organization_id=self._actor.organization_id,
             artifact_id=artifact.id,
             draft_branch=request.draft_branch,
             content_json=version.content_json,
-            validation_report_json=self._validation.validation_report(
-                definition,
-                version.content_json,
-            ),
+            validation_report_json=validation_report,
             based_on_version_id=version.id,
             autosaved_at=utc_now(),
             created_by=self._actor.principal_id,
@@ -106,6 +107,39 @@ class ArtifactAuthoringProvisionPort:
         )
         self._session.add(draft)
         self._session.flush()
+        artifact.current_draft_id = draft.id
+        self._touch_artifact(artifact)
+        self._session.flush()
+        return draft
+
+    def _reuse_or_reset_generated_draft(
+        self,
+        artifact: Artifact,
+        draft: ArtifactDraft,
+        version: ArtifactVersion,
+        validation_report: dict[str, Any],
+    ) -> ArtifactDraft:
+        draft_hash = canonical_content_hash(draft.content_json)
+        if draft.based_on_version_id == version.id and draft_hash == version.content_hash:
+            return draft
+        baseline = (
+            self._repository.get_version(draft.based_on_version_id)
+            if draft.based_on_version_id is not None
+            else None
+        )
+        if (
+            baseline is None
+            or baseline[1].id != artifact.id
+            or draft_hash != baseline[0].content_hash
+        ):
+            raise self._conflict("The generated authoring draft already differs.")
+        draft.content_json = deepcopy(version.content_json)
+        draft.validation_report_json = validation_report
+        draft.based_on_version_id = version.id
+        draft.autosaved_at = utc_now()
+        draft.updated_at = utc_now()
+        draft.updated_by = self._actor.principal_id
+        draft.lock_version += 1
         artifact.current_draft_id = draft.id
         self._touch_artifact(artifact)
         self._session.flush()
@@ -153,6 +187,73 @@ class ArtifactAuthoringProvisionPort:
         ArtifactAuthoringGuard.record_initial_locked_fields(report, fields)
         draft.content_json = content
         draft.validation_report_json = report
+        draft.autosaved_at = utc_now()
+        draft.updated_at = utc_now()
+        draft.updated_by = self._actor.principal_id
+        draft.lock_version += 1
+        artifact.current_draft_id = draft.id
+        self._touch_artifact(artifact)
+        self._session.flush()
+        return draft
+
+    def replace_material_scope_draft(
+        self,
+        *,
+        artifact_id: UUID,
+        draft_branch: str,
+        content: Mapping[str, Any],
+        locked_fields: Mapping[str, Any],
+    ) -> ArtifactDraft:
+        self._require_system()
+        artifact = self._require_artifact(artifact_id)
+        if (
+            artifact.artifact_key != "material-scope"
+            or artifact.artifact_type != "material_scope"
+            or artifact.branch_key != "project"
+            or artifact.lesson_unit_id is not None
+        ):
+            raise self._conflict("The material-scope artifact identity is unavailable.")
+        expected_locked = {
+            "source_material_id",
+            "material_parse_version_id",
+            "page_start",
+            "page_end",
+        }
+        candidate = deepcopy(dict(content))
+        supplied_locked = deepcopy(dict(locked_fields))
+        if set(supplied_locked) != expected_locked or any(
+            candidate.get(key) != value for key, value in supplied_locked.items()
+        ):
+            raise ApiError(
+                status_code=422,
+                code="AUTHORING_POLICY_VIOLATION",
+                message="The material-scope locked fields are incomplete or inconsistent.",
+                details={"paths": sorted(expected_locked)},
+            )
+        policy = self._require_policy(artifact.content_definition_version_id)
+        policy_locked = {field.field_key for field in policy.fields if not field.editable}
+        if not expected_locked <= policy_locked:
+            raise ApiError(
+                status_code=422,
+                code="AUTHORING_POLICY_UNAVAILABLE",
+                message="The published material-scope authoring policy is unavailable.",
+            )
+        definition = self._validation.require_artifact_definition(artifact)
+        report = self._validation.validation_report(definition, candidate)
+        if not report["valid"]:
+            raise ApiError(
+                status_code=422,
+                code="INVALID_ARTIFACT",
+                message="The material-scope content does not match the published schema.",
+                details={"validation": report},
+            )
+        draft = self._repository.get_draft(artifact.id, draft_branch, for_update=True)
+        if draft is None:
+            raise self._conflict("The material-scope authoring draft is unavailable.")
+        ArtifactAuthoringGuard.record_initial_locked_fields(report, supplied_locked)
+        draft.content_json = candidate
+        draft.validation_report_json = report
+        draft.based_on_version_id = None
         draft.autosaved_at = utc_now()
         draft.updated_at = utc_now()
         draft.updated_by = self._actor.principal_id

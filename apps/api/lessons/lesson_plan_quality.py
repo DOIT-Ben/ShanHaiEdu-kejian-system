@@ -10,6 +10,7 @@ from apps.api.artifact_quality.contracts import (
     ValidatorOutcome,
     ValidatorRef,
 )
+from apps.api.assets.material_evidence import material_evidence_keys
 from apps.api.lessons.lesson_plan import LessonPlanBusinessValidator
 from apps.api.lessons.lesson_plan_domain import (
     ApprovedLessonPlanScope,
@@ -125,7 +126,7 @@ def _scope(context: QualityValidationContext) -> ApprovedLessonPlanScope:
         )
     unit = _exact_lesson(division, lesson_key)
     evidence_refs = _strings(unit.get("evidence_refs"))
-    material_evidence = _material_evidence_keys(material)
+    material_evidence = material_evidence_keys(material)
     if not evidence_refs or not set(evidence_refs) <= material_evidence:
         raise LessonPlanSliceError(
             "MATERIAL_EVIDENCE_INVALID: lesson evidence is outside the exact material parse"
@@ -175,19 +176,6 @@ def _exact_lesson(division: Mapping[str, Any], lesson_key: str) -> Mapping[str, 
             "LESSON_SCOPE_INVALID: approved division has no exact target lesson"
         )
     return unit
-
-
-def _material_evidence_keys(material: Mapping[str, Any]) -> set[str]:
-    raw = material.get("material_evidence")
-    if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes, bytearray)):
-        return set()
-    return {
-        cast(str, cast(Mapping[str, Any], item).get("evidence_key"))
-        for item in cast(Sequence[object], raw)
-        if isinstance(item, Mapping)
-        and isinstance(cast(Mapping[str, Any], item).get("evidence_key"), str)
-        and cast(str, cast(Mapping[str, Any], item).get("evidence_key")).strip()
-    }
 
 
 def _strings(value: object) -> tuple[str, ...]:

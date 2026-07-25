@@ -40,6 +40,32 @@ class ArtifactRepository:
             )
         )
 
+    def list_page(
+        self,
+        project_id: UUID,
+        *,
+        cursor: UUID | None,
+        limit: int,
+        lesson_unit_id: UUID | None,
+        artifact_type: str | None,
+    ) -> tuple[list[Artifact], str | None]:
+        statement = (
+            self._visible_artifacts()
+            .where(Artifact.project_id == project_id)
+            .order_by(Artifact.id.desc())
+            .limit(limit + 1)
+        )
+        if cursor is not None:
+            statement = statement.where(Artifact.id < cursor)
+        if lesson_unit_id is not None:
+            statement = statement.where(Artifact.lesson_unit_id == lesson_unit_id)
+        if artifact_type is not None:
+            statement = statement.where(Artifact.artifact_type == artifact_type)
+        artifacts = list(self._session.scalars(statement))
+        page = artifacts[:limit]
+        next_cursor = str(page[-1].id) if len(artifacts) > limit and page else None
+        return page, next_cursor
+
     def get_draft(
         self,
         artifact_id: UUID,

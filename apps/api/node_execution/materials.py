@@ -97,13 +97,14 @@ def _context_artifact_versions(
     values: dict[str, tuple[ArtifactContextVersion, ...]] = {}
     for source in sources:
         definition = resolve_artifact_source(source)
-        if (
-            selected_upstream is not None
-            and definition is not None
-            and definition.contract_ref in optional_refs
-        ):
+        if selected_upstream is not None and definition is not None:
             selected = selected_upstream.get(definition.contract_ref)
-            values[source] = (selected,) if selected is not None else ()
+            if selected is not None:
+                values[source] = (selected,)
+            elif definition.contract_ref in optional_refs:
+                values[source] = ()
+            else:
+                values[source] = artifacts.list_context_versions(execution, source)
         else:
             values[source] = artifacts.list_context_versions(execution, source)
     return values
@@ -123,10 +124,11 @@ def collect_upstream_artifacts(
             "NODE_EXECUTION_OPTIONAL_INPUT_INVALID",
             "published optional inputs must be declared inputs",
         )
-    if artifact_selection is not None and not set(artifact_selection) <= set(optional):
+    artifact_refs = {ref for ref in refs if resolve_artifact_source(ref) is not None}
+    if artifact_selection is not None and not set(artifact_selection) <= artifact_refs:
         raise NodeExecutionError(
             "NODE_EXECUTION_ARTIFACT_SELECTION_INVALID",
-            "exact artifact selection may contain only declared optional inputs",
+            "exact artifact selection may contain only declared artifact inputs",
         )
     selected = (
         artifacts.load_frozen_versions(execution, dict(artifact_selection))
@@ -137,7 +139,7 @@ def collect_upstream_artifacts(
         artifacts.verify_frozen_versions(execution, selected)
     upstream: dict[str, ArtifactContextVersion] = {}
     for raw in refs:
-        if artifact_selection is not None and raw in optional:
+        if artifact_selection is not None and (raw in selected or raw in optional):
             selected_value = selected.get(raw)
             values = (selected_value,) if selected_value is not None else ()
         else:
@@ -212,13 +214,18 @@ def execution_snapshot(
     }
 
 
-def audit_context(execution: WorkflowExecutionContext, user_id: UUID | None) -> ModelAuditContext:
+def audit_context(
+    execution: WorkflowExecutionContext,
+    user_id: UUID | None,
+    *,
+    generation_job_id: UUID | None = None,
+) -> ModelAuditContext:
     return ModelAuditContext(
         organization_id=execution.organization_id,
         user_id=user_id,
         project_id=execution.project_id,
         node_run_id=execution.node_run_id,
-        generation_job_id=None,
+        generation_job_id=generation_job_id,
     )
 
 

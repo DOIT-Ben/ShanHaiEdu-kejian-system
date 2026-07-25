@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
+from dataclasses import replace
 from typing import Any
 from uuid import UUID
 
@@ -62,10 +63,13 @@ class SqlAlchemyNodeExecutionTransactionFactory(NodeExecutionTransactionFactory)
         session_factory: sessionmaker[Session],
         actor: ActorContext,
         fault_injector: Callable[[str], None] | None = None,
+        *,
+        generation_job_id: UUID | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._actor = actor
         self._fault_injector: Callable[[str], None] = fault_injector or _ignore_fault_stage
+        self._generation_job_id = generation_job_id
 
     @contextmanager
     def begin(self) -> Generator[NodeExecutionTransaction]:
@@ -76,6 +80,7 @@ class SqlAlchemyNodeExecutionTransactionFactory(NodeExecutionTransactionFactory)
                     session,
                     self._actor,
                     fault_injector=self._fault_injector,
+                    generation_job_id=self._generation_job_id,
                 )
         finally:
             session.close()
@@ -88,6 +93,7 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
         actor: ActorContext,
         *,
         fault_injector: Callable[[str], None],
+        generation_job_id: UUID | None,
     ) -> None:
         self._session = session
         self._actor = actor
@@ -99,6 +105,7 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
         self._packages = SqlAlchemyCreationPackagePort(session, actor)
         self._attempts = SqlAlchemyAttemptExecutionPort(session, actor)
         self._fault_injector = fault_injector
+        self._generation_job_id = generation_job_id
         self._recovery = SqlAlchemyRecoveryFactStore(
             session,
             actor,
@@ -190,7 +197,7 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
             )
         owner_token = claim_execution_owner(self._workflow, node_run_id)
         self._workflow.start(node_run_id)
-        return build_prepared_execution(
+        prepared = build_prepared_execution(
             node_run_id=node_run_id,
             execution=execution,
             materials=inputs.materials,
@@ -203,6 +210,15 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
             succeeded=None,
             recovery_state="none",
             owner_token=owner_token,
+        )
+        if self._generation_job_id is None:
+            return prepared
+        return replace(
+            prepared,
+            audit_context=replace(
+                prepared.audit_context,
+                generation_job_id=self._generation_job_id,
+            ),
         )
 
     def _prepare_recovery(
@@ -234,7 +250,11 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
         return build_recovered_execution(
             node_run_id=node_run_id,
             request=request,
-            audit_context=audit_context(execution, self._actor.user_id),
+            audit_context=audit_context(
+                execution,
+                self._actor.user_id,
+                generation_job_id=self._generation_job_id,
+            ),
             output_schema=materials.output_schema,
             commit_context=context,
             succeeded=succeeded,
@@ -264,7 +284,11 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
         return build_frozen_invocation(
             node_run_id=node_run_id,
             request=request,
-            audit_context=audit_context(execution, self._actor.user_id),
+            audit_context=audit_context(
+                execution,
+                self._actor.user_id,
+                generation_job_id=self._generation_job_id,
+            ),
             output_schema=materials.output_schema,
             commit_context=context,
             owner_token=owner_token,

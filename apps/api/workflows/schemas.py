@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from apps.api.artifacts.schemas import ArtifactStaleReasonRead
 from apps.api.projects.schemas import ProjectRead
@@ -26,7 +26,7 @@ class WorkflowRunRead(BaseModel):
 
 
 class NodeRunRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: UUID
     workflow_run_id: UUID
@@ -34,9 +34,37 @@ class NodeRunRead(BaseModel):
     node_key: str
     run_no: int
     status: NodeStatus
-    stale_reason: ArtifactStaleReasonRead | None
+    stale_reason: ArtifactStaleReasonRead | None = Field(validation_alias="stale_reason_json")
     started_at: datetime | None
     finished_at: datetime | None
+
+
+class NodeRunEnvelope(BaseModel):
+    data: NodeRunRead
+    request_id: str
+
+
+class AcceptedNodeRunData(BaseModel):
+    node_run_id: UUID
+    status: NodeStatus
+    events_url: str
+
+
+class AcceptedNodeRunEnvelope(BaseModel):
+    data: AcceptedNodeRunData
+    request_id: str
+
+
+class PrepareLessonDivisionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    material_scope_artifact_version_id: UUID
+
+
+class StartNodeRunRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    user_revision: str | None = Field(default=None, max_length=6_000)
 
 
 class WorkflowAggregateData(BaseModel):

@@ -35,6 +35,19 @@ class GenerationJob(MutableAuditMixin, Base):
             "status",
             "created_at",
         ),
+        Index(
+            "ix_generation_jobs_organization_project_id",
+            "organization_id",
+            "project_id",
+            "id",
+        ),
+        Index(
+            "ix_generation_jobs_organization_project_lesson_id",
+            "organization_id",
+            "project_id",
+            "lesson_unit_id",
+            "id",
+        ),
         Index("ix_generation_jobs_status_lease", "status", "lease_expires_at"),
     )
 
@@ -47,6 +60,15 @@ class GenerationJob(MutableAuditMixin, Base):
     )
     source_material_id: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("source_materials.id", ondelete="RESTRICT")
+    )
+    node_run_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("node_runs.id", ondelete="RESTRICT")
+    )
+    lesson_unit_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("lesson_units.id", ondelete="RESTRICT")
+    )
+    result_artifact_version_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("artifact_versions.id", ondelete="RESTRICT")
     )
     creation_prompt_version_id: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("creation_prompt_versions.id", ondelete="RESTRICT")

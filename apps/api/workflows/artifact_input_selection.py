@@ -13,9 +13,74 @@ from sqlalchemy.orm import Session
 
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext
+from apps.api.ids import new_uuid7
 from apps.api.workflows.models import NodeInputSnapshot, NodeRun, WorkflowRun
+from workflow.node_state import NodeStatus
 
 ARTIFACT_INPUT_SELECTION_KEY = "runtime.artifact_input_selection"
+
+
+class ArtifactInputSelectionWriter:
+    def __init__(
+        self,
+        session: Session,
+        actor: ActorContext,
+        *,
+        error_code: str = "ARTIFACT_WORKFLOW_RUNTIME_INVALID",
+    ) -> None:
+        self._session = session
+        self._actor = actor
+        self._error_code = error_code
+
+    def freeze(self, node_run_id: UUID, selection: Mapping[str, UUID]) -> None:
+        row = self._session.execute(
+            select(NodeRun, WorkflowRun)
+            .join(WorkflowRun, WorkflowRun.id == NodeRun.workflow_run_id)
+            .where(
+                NodeRun.id == node_run_id,
+                NodeRun.organization_id == self._actor.organization_id,
+                NodeRun.deleted_at.is_(None),
+                WorkflowRun.organization_id == self._actor.organization_id,
+                WorkflowRun.deleted_at.is_(None),
+            )
+            .with_for_update(of=NodeRun)
+        ).one_or_none()
+        if row is None:
+            raise self._invalid("The Artifact generation node is unavailable.")
+        node, run = row
+        if NodeStatus(node.status) is not NodeStatus.READY:
+            raise self._invalid("The Artifact generation node is not ready.")
+        payload = artifact_input_selection_payload(selection)
+        content_hash = artifact_input_selection_hash(payload)
+        existing = self._session.scalar(
+            select(NodeInputSnapshot)
+            .where(
+                NodeInputSnapshot.node_run_id == node.id,
+                NodeInputSnapshot.input_key == ARTIFACT_INPUT_SELECTION_KEY,
+            )
+            .with_for_update(of=NodeInputSnapshot)
+        )
+        if existing is not None:
+            if existing.content_hash == content_hash and existing.snapshot_json == payload:
+                return
+            raise self._invalid("The generation node already has another exact input selection.")
+        self._session.add(
+            NodeInputSnapshot(
+                id=new_uuid7(),
+                node_run_id=node.id,
+                input_key=ARTIFACT_INPUT_SELECTION_KEY,
+                source_type="workflow_definition",
+                source_id=run.id,
+                source_version_id=run.workflow_definition_version_id,
+                content_hash=content_hash,
+                snapshot_json=payload,
+                created_by=self._actor.principal_id,
+            )
+        )
+        self._session.flush()
+
+    def _invalid(self, message: str) -> ApiError:
+        return ApiError(status_code=409, code=self._error_code, message=message)
 
 
 class ArtifactInputSelectionReader:

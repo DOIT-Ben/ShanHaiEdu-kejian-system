@@ -250,7 +250,7 @@ def test_prompt_freeze_serializes_with_node_execution_start(
         with factory() as locker, locker.begin():
             locked_node = locker.get(NodeRun, node.id, with_for_update=True)
             assert locked_node is not None
-            locked_node.status = NodeStatus.QUEUED.value
+            locked_node.status = NodeStatus.RUNNING.value
             locker.flush()
             future = executor.submit(freeze)
             with pytest.raises(FutureTimeoutError):

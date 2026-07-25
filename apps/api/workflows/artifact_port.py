@@ -12,11 +12,8 @@ from sqlalchemy.orm import Session
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.permissions import ProjectAccessService
-from apps.api.ids import new_uuid7
 from apps.api.workflows.artifact_input_selection import (
-    ARTIFACT_INPUT_SELECTION_KEY,
-    artifact_input_selection_hash,
-    artifact_input_selection_payload,
+    ArtifactInputSelectionWriter,
 )
 from apps.api.workflows.models import (
     BranchRun,
@@ -150,7 +147,11 @@ class ArtifactWorkflowPort:
                 node_key=producer_node_key,
                 status=NodeStatus.READY,
             )
-        self._freeze_artifact_selection(node.id, scope, selected_artifact_versions)
+        ArtifactInputSelectionWriter(
+            self._session,
+            self._actor,
+            error_code=self._error_code,
+        ).freeze(node.id, selected_artifact_versions)
         return node.id
 
     def require_source_scope(
@@ -247,41 +248,6 @@ class ArtifactWorkflowPort:
         elif status is not NodeStatus.REVIEW_REQUIRED or not all(replayed):
             raise self._invalid("The approval gate cannot accept different frozen inputs.")
         return node.id
-
-    def _freeze_artifact_selection(
-        self,
-        node_run_id: UUID,
-        scope: ArtifactRunScope,
-        selection: Mapping[str, UUID],
-    ) -> None:
-        payload = artifact_input_selection_payload(selection)
-        content_hash = artifact_input_selection_hash(payload)
-        existing = self._session.scalar(
-            select(NodeInputSnapshot)
-            .where(
-                NodeInputSnapshot.node_run_id == node_run_id,
-                NodeInputSnapshot.input_key == ARTIFACT_INPUT_SELECTION_KEY,
-            )
-            .with_for_update(of=NodeInputSnapshot)
-        )
-        if existing is not None:
-            if existing.content_hash == content_hash and existing.snapshot_json == payload:
-                return
-            raise self._invalid("The generation node already has another exact input selection.")
-        self._session.add(
-            NodeInputSnapshot(
-                id=new_uuid7(),
-                node_run_id=node_run_id,
-                input_key=ARTIFACT_INPUT_SELECTION_KEY,
-                source_type="workflow_definition",
-                source_id=scope.workflow_run_id,
-                source_version_id=scope.workflow_definition_version_id,
-                content_hash=content_hash,
-                snapshot_json=payload,
-                created_by=self._actor.principal_id,
-            )
-        )
-        self._session.flush()
 
     def _node_for_source(
         self,

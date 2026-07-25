@@ -24,6 +24,9 @@ class GenerationJobRead(BaseModel):
 
     id: UUID
     project_id: UUID | None
+    node_run_id: UUID | None
+    lesson_unit_id: UUID | None
+    result_artifact_version_id: UUID | None
     job_type: str
     status: JobStatus
     progress_percent: int
@@ -35,6 +38,20 @@ class GenerationJobRead(BaseModel):
 
 class GenerationJobEnvelope(BaseModel):
     data: GenerationJobRead
+    request_id: str
+
+
+class GenerationJobListData(BaseModel):
+    items: list[GenerationJobRead]
+
+
+class GenerationJobPageMeta(BaseModel):
+    next_cursor: str | None
+
+
+class GenerationJobListEnvelope(BaseModel):
+    data: GenerationJobListData
+    meta: GenerationJobPageMeta
     request_id: str
 
 

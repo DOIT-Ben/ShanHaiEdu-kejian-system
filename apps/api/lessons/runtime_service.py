@@ -36,6 +36,22 @@ class LessonDivisionRuntimeService:
     def initialize_revision(self, project_id: UUID) -> LessonDivisionRunNodes:
         return self._workflow.initialize(project_id, revision=True)
 
+    def prepare(
+        self,
+        project_id: UUID,
+        *,
+        material_scope_artifact_version_id: UUID,
+    ) -> UUID:
+        scope = self._artifacts.require_approved_material_scope(
+            project_id=project_id,
+            artifact_version_id=material_scope_artifact_version_id,
+        )
+        nodes = self._workflow.prepare(
+            project_id,
+            material_scope_artifact_version_id=scope.source_version_id,
+        )
+        return nodes.generate_node_run_id
+
     def stage_quality(self, artifact_version_id: UUID) -> UUID:
         fact = self._artifacts.require_generated(artifact_version_id)
         output = self._workflow.output_binding(

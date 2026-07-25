@@ -15,6 +15,7 @@ from apps.api.artifacts.lesson_plan_port import (
 from apps.api.assets.quality_port import SqlAlchemyAssetQualitySourcePort
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext
+from apps.api.lessons.repository import LessonRepository
 from apps.api.prompt_runtime.lesson_context_port import LessonContextSnapshotReader
 from apps.api.workflows.lesson_plan_port import (
     LessonPlanInputSnapshot,
@@ -32,6 +33,40 @@ class LessonPlanRuntimeService:
         self._actor = actor
         self._artifacts = ArtifactLessonPlanReader(session, actor)
         self._workflow = LessonPlanWorkflowPort(session, actor)
+
+    def stage_generation(self, lesson_unit_id: UUID) -> UUID:
+        lesson = LessonRepository(self._session, self._actor).get(
+            lesson_unit_id,
+            for_update=True,
+        )
+        if lesson is None or lesson.status != "active":
+            raise ApiError(
+                status_code=404,
+                code="LESSON_NOT_FOUND",
+                message="The lesson was not found.",
+            )
+        division, _context_snapshot_id = self._artifacts.require_approved_division(
+            project_id=lesson.project_id,
+            version_id=lesson.source_division_version_id,
+        )
+        scope = self._workflow.require_lesson_scope(
+            project_id=lesson.project_id,
+            lesson_unit_id=lesson.id,
+            branch_key="lesson_plan",
+        )
+        output = self._workflow.output_binding(
+            scope.workflow_definition_version_id,
+            "lesson_plan.generate.output",
+        )
+        if output.producer_node_key != "lesson_plan.generate":
+            raise self._invalid("The fixed lesson-plan generation entrypoint is unavailable.")
+        return self._workflow.stage_generation(
+            scope,
+            output.producer_node_key,
+            selected_artifact_versions={
+                "approval:lesson_division": division.source_version_id,
+            },
+        )
 
     def stage_quality(self, artifact_version_id: UUID) -> UUID:
         fact = self._artifacts.require_reviewable(artifact_version_id)

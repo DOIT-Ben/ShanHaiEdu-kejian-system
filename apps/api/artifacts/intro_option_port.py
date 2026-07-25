@@ -27,6 +27,7 @@ from apps.api.workflows.artifact_input_selection import ArtifactInputSelectionRe
 CONTENT_DEFINITION_KEY = "intro.generate_options.output"
 SOURCE_INPUT_REF = "artifact:intro_option_set_source"
 ARTIFACT_INPUT_REF = "artifact:intro_option_set"
+DIVISION_INPUT_REF = "approval:lesson_division"
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +88,13 @@ class IntroOptionArtifactReader:
         )
         if definition_key != CONTENT_DEFINITION_KEY:
             raise _invalid("The exact Intro source uses another content definition.")
+
+    def require_exact_division(self, *, project_id: UUID, version_id: UUID) -> None:
+        self._approved_artifact_version(
+            version_id,
+            project_id=project_id,
+            artifact_type="lesson_division",
+        )
 
     def require_reviewable(self, artifact_version_id: UUID) -> ReviewableIntroOptionFact:
         record = ArtifactRepository(self._session, self._actor).get_version(artifact_version_id)
@@ -202,12 +210,15 @@ class IntroOptionArtifactReader:
             else ()
         )
         mode = content.get("generation_mode")
-        if mode == "default_nine" and selection == {} and refs == ():
+        division = selection.get(DIVISION_INPUT_REF)
+        if division is None:
+            raise _invalid("The Intro generation has no exact lesson-division selection.")
+        if mode == "default_nine" and len(selection) == 1 and refs == ():
             return
         selected = selection.get(SOURCE_INPUT_REF)
         if (
             mode == "refine_existing"
-            and len(selection) == 1
+            and len(selection) == 2
             and selected is not None
             and refs == (str(selected),)
         ):

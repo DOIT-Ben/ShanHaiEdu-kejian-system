@@ -76,6 +76,13 @@ class SelectIntroOptionRequest(BaseModel):
     option_key: str = Field(min_length=1, max_length=120)
 
 
+class PrepareIntroOptionGenerationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    generation_mode: Literal["default_nine", "refine_existing"]
+    source_artifact_version_id: UUID | None = None
+
+
 class IntroSelectionEnvelope(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

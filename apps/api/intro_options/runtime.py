@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from apps.api.artifacts.intro_option_port import (
     ARTIFACT_INPUT_REF,
     CONTENT_DEFINITION_KEY,
+    DIVISION_INPUT_REF,
     SOURCE_INPUT_REF,
     IntroOptionArtifactReader,
     ReviewableIntroOptionFact,
@@ -62,8 +63,13 @@ class IntroOptionRuntimeService:
             or completion.source_input_ref != ARTIFACT_INPUT_REF
         ):
             raise self._invalid("The fixed Intro workflow-gate completion is unavailable.")
+        self._artifacts.require_exact_division(
+            project_id=project_id,
+            version_id=lesson.source_division_version_id,
+        )
+        selected = {DIVISION_INPUT_REF: lesson.source_division_version_id}
         if generation_mode == "default_nine" and source_artifact_version_id is None:
-            selected: dict[str, UUID] = {}
+            pass
         elif generation_mode == "refine_existing" and source_artifact_version_id is not None:
             self._artifacts.require_exact_source(
                 project_id=project_id,
@@ -72,7 +78,7 @@ class IntroOptionRuntimeService:
                 content_release_id=scope.content_release_id,
                 version_id=source_artifact_version_id,
             )
-            selected = {SOURCE_INPUT_REF: source_artifact_version_id}
+            selected[SOURCE_INPUT_REF] = source_artifact_version_id
         else:
             raise self._invalid("The generation mode and exact source cardinality disagree.")
         return self._workflow.stage_generation(

@@ -31,10 +31,11 @@ class SqlAlchemyLessonExecutionPort:
         *,
         project_id: UUID,
     ) -> LessonExecutionFacts:
-        ProjectAccessService(self._session, self._actor).require(
-            project_id,
-            ProjectAction.GENERATE,
-        )
+        if not self._actor.is_system:
+            ProjectAccessService(self._session, self._actor).require(
+                project_id,
+                ProjectAction.GENERATE,
+            )
         lesson = self._session.scalar(
             select(LessonUnit).where(
                 LessonUnit.id == lesson_unit_id,

@@ -9,6 +9,8 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.middleware.cors import CORSMiddleware
 
+from apps.api.artifacts.material_scope_router import router as material_scope_router
+from apps.api.artifacts.quality_router import router as artifact_quality_router
 from apps.api.artifacts.router import router as artifacts_router
 from apps.api.assets.project_router import router as project_assets_router
 from apps.api.assets.router import router as assets_router
@@ -21,7 +23,9 @@ from apps.api.identity.dependencies import enforce_session_request_security
 from apps.api.identity.session_router import router as session_router
 from apps.api.identity.session_service import DatabaseSessionService
 from apps.api.intro_options.router import router as intro_options_router
+from apps.api.jobs.router import project_router as project_jobs_router
 from apps.api.jobs.router import router as jobs_router
+from apps.api.lessons.generation_router import router as lesson_generation_router
 from apps.api.lessons.router import router as lessons_router
 from apps.api.logging import configure_logging
 from apps.api.middleware import RequestContextMiddleware, SessionLoginBodyLimitMiddleware
@@ -31,6 +35,7 @@ from apps.api.settings import Settings, get_settings
 from apps.api.uploads.router import router as uploads_router
 from apps.api.uploads.storage import ObjectStorage, build_object_storage
 from apps.api.workflows.router import router as workflows_router
+from apps.api.workflows.start_router import router as workflow_start_router
 
 
 def create_app(
@@ -67,15 +72,20 @@ def create_app(
     register_error_handlers(app)
     app.include_router(session_router)
     app.include_router(artifacts_router)
+    app.include_router(material_scope_router)
+    app.include_router(artifact_quality_router)
     app.include_router(creation_router)
     app.include_router(assets_router)
     app.include_router(project_assets_router)
     app.include_router(projects_router)
     app.include_router(prompt_runtime_router)
+    app.include_router(lesson_generation_router)
     app.include_router(lessons_router)
     app.include_router(intro_options_router)
     app.include_router(uploads_router)
+    app.include_router(project_jobs_router)
     app.include_router(jobs_router)
+    app.include_router(workflow_start_router)
     app.include_router(workflows_router)
     _include_health_routes(app, resolved_settings, readiness_provider)
     _configure_openapi_security_contract(app)

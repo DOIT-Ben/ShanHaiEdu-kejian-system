@@ -14,6 +14,7 @@ from apps.api.artifact_quality.contracts import (
     ValidatorRef,
 )
 from apps.api.artifact_quality.registry import InMemoryQualityValidatorRegistry
+from apps.api.assets.material_evidence import material_evidence_keys
 
 INTRO_OPTION_SCHEMA_REF = ValidatorRef(
     key="validator.intro.option_set_schema",
@@ -109,7 +110,7 @@ class IntroSingleAnchorQualityValidator:
             )
         )
         declared_evidence = set(_string_sequence(content.get("source_material_evidence_keys")))
-        available_evidence = _material_evidence_keys(material)
+        available_evidence = material_evidence_keys(material)
         lesson_evidence: set[str] = (
             set(_string_sequence(unit.get("evidence_refs"))) if unit is not None else set()
         )
@@ -203,16 +204,6 @@ def _string_sequence(value: object) -> tuple[str, ...]:
     if any(type(item) is not str or not item.strip() for item in values):
         return ()
     return cast(tuple[str, ...], values)
-
-
-def _material_evidence_keys(material: Mapping[str, Any] | None) -> set[str]:
-    raw = material.get("material_evidence") if material is not None else None
-    values: set[str] = set()
-    for item in _mapping_sequence(raw):
-        key = item.get("evidence_key")
-        if type(key) is str and key.strip():
-            values.add(key)
-    return values
 
 
 def _lesson_boundary_findings(

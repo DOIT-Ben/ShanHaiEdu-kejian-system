@@ -6,18 +6,22 @@ import re
 from typing import Annotated, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Request, Response, status
+from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
 from apps.api.artifacts.approval_service import ArtifactApprovalService
 from apps.api.artifacts.models import Approval, Artifact, ArtifactDraft, ArtifactVersion
 from apps.api.artifacts.repository import ArtifactRepository
+from apps.api.artifacts.review_runtime import open_r1_approval_gate
 from apps.api.artifacts.schemas import (
     ApprovalEnvelope,
     ApprovalRead,
     ArtifactDraftEnvelope,
     ArtifactDraftRead,
     ArtifactEnvelope,
+    ArtifactListData,
+    ArtifactListEnvelope,
+    ArtifactPageMeta,
     ArtifactRead,
     ArtifactVersionEnvelope,
     ArtifactVersionRead,
@@ -32,11 +36,44 @@ from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.dependencies import get_actor_context
 from apps.api.identity.permissions import ProjectAccessService
+from apps.api.pagination import parse_uuid_page_cursor
 from apps.api.reliability.idempotency import CommandResult, IdempotencyService
 from apps.api.settings import Settings
 
 router = APIRouter(tags=["artifacts"])
 ETAG_PATTERN = re.compile(r'^(?:W/)?"(?P<version>[1-9][0-9]*)"$')
+
+
+@router.get(
+    "/api/v2/projects/{project_id}/artifacts",
+    response_model=ArtifactListEnvelope,
+    operation_id="listProjectArtifacts",
+)
+def list_project_artifacts(
+    project_id: UUID,
+    request: Request,
+    actor: Annotated[ActorContext, Depends(get_actor_context)],
+    session: Annotated[Session, Depends(get_session)],
+    lesson_id: Annotated[UUID | None, Query()] = None,
+    artifact_type: Annotated[str | None, Query(min_length=1, max_length=80)] = None,
+    page_cursor: Annotated[str | None, Query(alias="page[cursor]")] = None,
+    page_limit: Annotated[int, Query(alias="page[limit]", ge=1, le=100)] = 20,
+) -> ArtifactListEnvelope:
+    ProjectAccessService(session, actor).require(project_id, ProjectAction.VIEW)
+    artifacts, next_cursor = ArtifactRepository(session, actor).list_page(
+        project_id,
+        cursor=parse_uuid_page_cursor(page_cursor),
+        limit=page_limit,
+        lesson_unit_id=lesson_id,
+        artifact_type=artifact_type,
+    )
+    return ArtifactListEnvelope(
+        data=ArtifactListData(
+            items=[serialize_artifact(session, actor, artifact) for artifact in artifacts]
+        ),
+        meta=ArtifactPageMeta(next_cursor=next_cursor),
+        request_id=request.state.request_id,
+    )
 
 
 @router.post(
@@ -251,6 +288,12 @@ def review_artifact_version(
     settings = cast(Settings, request.app.state.settings)
 
     def command() -> CommandResult:
+        open_r1_approval_gate(
+            session,
+            actor,
+            artifact_version_id,
+            action=payload.action,
+        )
         approval = ArtifactService(session, actor).review(
             artifact_version_id,
             action=payload.action,
