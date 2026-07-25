@@ -1,6 +1,6 @@
 # 当前项目状态
 
-当前阶段：十二部分教案教师纵向救援已完成实现和本地门禁，等待#231/#232最终审查、CI与合并。
+当前阶段：阶段1十二部分教案教师纵向救援已完成实现和本地门禁，等待#231/#232最终审查、CI与合并。
 > 最后核验：2026-07-25。
 > 当前唯一P0：[Issue #231](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/231)；任务分支`feat/231-lesson-plan-rescue`和[Draft PR #232](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/232)已经建立，状态为`status:in-progress`。
 

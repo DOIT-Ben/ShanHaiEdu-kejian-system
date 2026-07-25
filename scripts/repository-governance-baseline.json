@@ -55,7 +55,6 @@
     {"source": "workers/tasks.py", "target": "apps.api.jobs.models", "names": ["GenerationJob"], "owner": "area:workflow", "reason": "Existing deterministic worker transaction predates the jobs application boundary.", "exit_issue": "#92"}
   ],
   "oversized_files": [
-    {"path": "apps/api/artifacts/router.py", "line_count": 422, "owner": "area:asset", "reason": "Existing artifact routing and presentation responsibilities require a separate split task.", "exit_issue": "#92"},
     {"path": "apps/api/assets/project_service.py", "line_count": 419, "owner": "area:asset", "reason": "Existing project asset validation responsibilities require a separate split task.", "exit_issue": "#92"},
     {"path": "apps/api/uploads/confirmation_service.py", "line_count": 422, "owner": "area:asset", "reason": "Existing upload confirmation transaction requires a separate split task.", "exit_issue": "#92"}
   ],

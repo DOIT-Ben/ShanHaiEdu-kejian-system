@@ -40,8 +40,13 @@ async def test_exact_lesson_plan_api_restores_edit_quality_approval_and_tenant_s
         assert lesson is not None and lesson.project_id == project_id
 
     settings = Settings(
+        _env_file=None,
         environment="test",
         database_url=SecretStr(migrated_database_url),
+        session_access_code=None,
+        session_allowed_origins=[],
+        session_csrf_secret=None,
+        session_teacher_principal_id=None,
     )
     app = create_app(settings=settings, object_storage=FakeObjectStorage())
     override_test_identity(app, prepared.actor)
