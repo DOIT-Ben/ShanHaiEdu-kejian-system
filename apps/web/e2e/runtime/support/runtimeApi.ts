@@ -602,6 +602,28 @@ export async function installRuntimeApi(page: Page, options: RuntimeApiOptions =
       return;
     }
 
+    if (
+      method === "GET" &&
+      path === `/api/v2/projects/${projectId}/lessons/${lessonId}/lesson-plan/artifact`
+    ) {
+      await json(
+        route,
+        envelope(
+          { artifact: null, quality_report: null, latest_approval: null },
+          "req_lesson_plan_artifact",
+        ),
+      );
+      return;
+    }
+
+    if (
+      method === "GET" &&
+      path === `/api/v2/projects/${projectId}/lessons/${lessonId}/lesson-plan/generation-jobs`
+    ) {
+      await json(route, envelope({ items: [] }, "req_lesson_plan_jobs"));
+      return;
+    }
+
     if (method === "GET" && path === `/api/v2/artifacts/${artifactId}`) {
       state.artifactReads += 1;
       await json(route, envelope(currentArtifact, "req_artifact"), 200, {

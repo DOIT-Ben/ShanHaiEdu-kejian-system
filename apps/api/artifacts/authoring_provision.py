@@ -77,28 +77,29 @@ class ArtifactAuthoringProvisionPort:
         definition = self._validation.require_artifact_definition(artifact)
         self._require_policy(definition.id)
         self._validate_draft_branch(request.draft_branch)
+        validation_report = self._validation.validation_report(
+            definition,
+            version.content_json,
+        )
         existing = self._repository.get_draft(
             artifact.id,
             request.draft_branch,
             for_update=True,
         )
         if existing is not None:
-            if (
-                existing.based_on_version_id != version.id
-                or canonical_content_hash(existing.content_json) != version.content_hash
-            ):
-                raise self._conflict("The generated authoring draft already differs.")
-            return existing
+            return self._reuse_or_reset_generated_draft(
+                artifact,
+                existing,
+                version,
+                validation_report,
+            )
         draft = ArtifactDraft(
             id=new_uuid7(),
             organization_id=self._actor.organization_id,
             artifact_id=artifact.id,
             draft_branch=request.draft_branch,
             content_json=version.content_json,
-            validation_report_json=self._validation.validation_report(
-                definition,
-                version.content_json,
-            ),
+            validation_report_json=validation_report,
             based_on_version_id=version.id,
             autosaved_at=utc_now(),
             created_by=self._actor.principal_id,
@@ -106,6 +107,39 @@ class ArtifactAuthoringProvisionPort:
         )
         self._session.add(draft)
         self._session.flush()
+        artifact.current_draft_id = draft.id
+        self._touch_artifact(artifact)
+        self._session.flush()
+        return draft
+
+    def _reuse_or_reset_generated_draft(
+        self,
+        artifact: Artifact,
+        draft: ArtifactDraft,
+        version: ArtifactVersion,
+        validation_report: dict[str, Any],
+    ) -> ArtifactDraft:
+        draft_hash = canonical_content_hash(draft.content_json)
+        if draft.based_on_version_id == version.id and draft_hash == version.content_hash:
+            return draft
+        baseline = (
+            self._repository.get_version(draft.based_on_version_id)
+            if draft.based_on_version_id is not None
+            else None
+        )
+        if (
+            baseline is None
+            or baseline[1].id != artifact.id
+            or draft_hash != baseline[0].content_hash
+        ):
+            raise self._conflict("The generated authoring draft already differs.")
+        draft.content_json = deepcopy(version.content_json)
+        draft.validation_report_json = validation_report
+        draft.based_on_version_id = version.id
+        draft.autosaved_at = utc_now()
+        draft.updated_at = utc_now()
+        draft.updated_by = self._actor.principal_id
+        draft.lock_version += 1
         artifact.current_draft_id = draft.id
         self._touch_artifact(artifact)
         self._session.flush()

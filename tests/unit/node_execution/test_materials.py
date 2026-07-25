@@ -23,6 +23,25 @@ class ArtifactPortStub:
     ) -> tuple[ArtifactContextVersion, ...]:
         return self.values.get(source, ())
 
+    def load_frozen_versions(
+        self,
+        execution: WorkflowExecutionContext,
+        refs: dict[str, UUID],
+    ) -> dict[str, ArtifactContextVersion]:
+        return {
+            contract_ref: value
+            for contract_ref, version_id in refs.items()
+            for value in self.values.get(contract_ref, ())
+            if value.artifact_version_id == version_id
+        }
+
+    def verify_frozen_versions(
+        self,
+        execution: WorkflowExecutionContext,
+        upstream: dict[str, ArtifactContextVersion],
+    ) -> None:
+        return None
+
 
 def execution() -> WorkflowExecutionContext:
     return WorkflowExecutionContext(
@@ -75,6 +94,17 @@ def test_required_artifact_input_cannot_be_absent() -> None:
         )
 
     assert caught.value.code == "NODE_EXECUTION_INPUT_CONTRACT_MISSING"
+
+
+def test_required_artifact_input_can_be_bound_to_one_exact_declared_version() -> None:
+    exact = source()
+
+    assert collect_upstream_artifacts(
+        ArtifactPortStub({"artifact:intro_option_set_source": (exact,)}),
+        execution(),
+        {"input_contract_refs": ["artifact:intro_option_set_source"]},
+        artifact_selection={"artifact:intro_option_set_source": VERSION_ID},
+    ) == {"artifact:intro_option_set_source": exact}
 
 
 def test_artifact_input_cannot_resolve_to_multiple_versions() -> None:

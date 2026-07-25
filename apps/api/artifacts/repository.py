@@ -40,6 +40,25 @@ class ArtifactRepository:
             )
         )
 
+    def lesson_plan_for_lesson(
+        self,
+        project_id: UUID,
+        lesson_unit_id: UUID,
+    ) -> tuple[Artifact, ...]:
+        return tuple(
+            self._session.scalars(
+                self._visible_artifacts()
+                .where(
+                    Artifact.project_id == project_id,
+                    Artifact.lesson_unit_id == lesson_unit_id,
+                    Artifact.artifact_type == "lesson_plan",
+                    Artifact.branch_key == "lesson_plan",
+                )
+                .order_by(Artifact.id)
+                .limit(2)
+            )
+        )
+
     def get_draft(
         self,
         artifact_id: UUID,
@@ -108,6 +127,17 @@ class ArtifactRepository:
                 Approval.organization_id == self._actor.organization_id,
                 Approval.artifact_version_id == version_id,
                 Approval.action == action,
+            )
+            .order_by(Approval.created_at.desc(), Approval.id.desc())
+            .limit(1)
+        )
+
+    def latest_approval(self, version_id: UUID) -> Approval | None:
+        return self._session.scalar(
+            select(Approval)
+            .where(
+                Approval.organization_id == self._actor.organization_id,
+                Approval.artifact_version_id == version_id,
             )
             .order_by(Approval.created_at.desc(), Approval.id.desc())
             .limit(1)

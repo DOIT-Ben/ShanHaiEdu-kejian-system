@@ -113,7 +113,7 @@ test("真实模式接入课时、只读内容版本、素材包和任务的现�
   expect(api.ifMatchHeaders).toContain('"lesson-v1"');
 
   await page.goto(`/app/projects/${projectId}/lessons/${lessonId}/work/lesson_plan`);
-  await expect(page.getByText("这一步暂时没有可显示的制作进度。")).toBeVisible();
+  await expect(page.getByText("这一步还没有制作任务。")).toBeVisible();
   await expect(page.getByRole("main")).not.toContainText("lesson_plan");
 
   await page.goto(

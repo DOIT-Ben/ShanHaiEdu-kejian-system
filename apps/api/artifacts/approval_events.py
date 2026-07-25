@@ -33,3 +33,22 @@ def append_stale_approval_event(
         },
         request_id=request_id,
     )
+
+
+def append_approved_version_stale_event(
+    session: Session,
+    actor: ActorContext,
+    artifact: Artifact,
+    source_version_id: UUID,
+    stale_ids: list[UUID],
+    request_id: str | None,
+) -> None:
+    append_stale_approval_event(
+        session,
+        actor,
+        artifact,
+        source_version_id,
+        stale_ids,
+        "UPSTREAM_APPROVED_VERSION_CHANGED",
+        request_id,
+    )

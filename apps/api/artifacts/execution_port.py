@@ -8,6 +8,10 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from apps.api.artifacts.authoring_provision import (
+    ArtifactAuthoringProvisionPort,
+    GeneratedDraftRequest,
+)
 from apps.api.artifacts.context_source_registry import (
     is_known_context_source,
     resolve_artifact_source,
@@ -19,7 +23,7 @@ from apps.api.artifacts.lesson_context_projection import project_artifact_contex
 from apps.api.artifacts.models import Artifact, ArtifactVersion
 from apps.api.artifacts.relation_service import ArtifactRelationService
 from apps.api.artifacts.replacement_service import ArtifactReplacementService
-from apps.api.identity.context import ActorContext, ProjectAction
+from apps.api.identity.context import ActorContext, ProjectAction, system_actor
 from apps.api.identity.permissions import ProjectAccessService
 from apps.api.ids import new_uuid7
 from apps.api.runtime_boundary.contract_values import plain_json_value
@@ -197,6 +201,17 @@ class SqlAlchemyArtifactPort:
             replacement,
         )
         self._write_relations(write, existing.id)
+        ArtifactAuthoringProvisionPort(
+            self._session,
+            system_actor(self._actor.organization_id),
+        ).open_generated_draft(
+            GeneratedDraftRequest(
+                artifact_id=artifact.id,
+                artifact_version_id=existing.id,
+                expected_content_hash=existing.content_hash,
+                draft_branch="main",
+            )
+        )
         return ArtifactWriteResult(
             artifact_id=artifact.id,
             artifact_version_id=existing.id,

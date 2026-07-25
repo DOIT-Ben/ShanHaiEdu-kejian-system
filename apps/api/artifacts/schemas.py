@@ -153,6 +153,27 @@ class ArtifactEnvelope(BaseModel):
     request_id: str
 
 
+class LessonPlanQualityReportRead(BaseModel):
+    id: UUID
+    artifact_version_id: UUID
+    validate_node_run_id: UUID
+    conclusion: Literal["passed", "failed"]
+    findings: list[dict[str, Any]]
+    evidence_hash: str
+    created_at: datetime
+
+
+class LessonPlanArtifactRead(BaseModel):
+    artifact: ArtifactRead | None
+    quality_report: LessonPlanQualityReportRead | None
+    latest_approval: ApprovalRead | None
+
+
+class LessonPlanArtifactEnvelope(BaseModel):
+    data: LessonPlanArtifactRead
+    request_id: str
+
+
 class ArtifactDraftEnvelope(BaseModel):
     data: ArtifactDraftRead
     request_id: str

@@ -29,8 +29,9 @@ LESSON_PLAN_RESCUE_OPERATIONS = {
     ("post", "/node-runs/{node_run_id}/start"): "startNodeRun",
     (
         "post",
-        "/artifact-versions/{artifact_version_id}/quality-validations",
-    ): "startArtifactVersionQualityValidation",
+        "/lessons/{lesson_id}/lesson-plan/artifact-versions/"
+        "{artifact_version_id}/quality-validations",
+    ): "startLessonPlanQualityValidation",
 }
 
 FORBIDDEN_PROJECT_QUERY_OPERATIONS = {

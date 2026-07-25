@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Literal, Protocol
 from uuid import UUID
 
@@ -70,6 +71,17 @@ class ArtifactQualityReportResult:
     report_id: UUID
     node_run_id: UUID
     conclusion: QualityConclusion
+
+
+@dataclass(frozen=True, slots=True)
+class LessonPlanQualityReportFact:
+    id: UUID
+    artifact_version_id: UUID
+    validate_node_run_id: UUID
+    conclusion: str
+    findings: list[dict[str, Any]]
+    evidence_hash: str
+    created_at: datetime
 
 
 class QualityValidator(Protocol):

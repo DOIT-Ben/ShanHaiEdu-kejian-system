@@ -213,6 +213,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/lessons/{lesson_id}/lesson-plan/node-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 准备指定课时的十二部分教案生成节点 */
+        post: operations["prepareLessonPlanGeneration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lessons/{lesson_id}/lesson-plan/artifact-versions/{artifact_version_id}/quality-validations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 对指定课时的教案版本执行质量检查 */
+        post: operations["startLessonPlanQualityValidation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/lessons/{lesson_id}/branches": {
         parameters: {
             query?: never;
@@ -349,6 +383,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project_id}/lessons/{lesson_id}/lesson-plan/artifact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 恢复指定课时的教案、质量报告和审批事实 */
+        get: operations["getLessonPlanArtifact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/lessons/{lesson_id}/lesson-plan/generation-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询指定课时的教案生成任务 */
+        get: operations["listLessonPlanGenerationJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project_id}/artifacts": {
         parameters: {
             query?: never;
@@ -428,6 +496,23 @@ export interface paths {
         put?: never;
         /** 追加产物版本审核动作 */
         post: operations["reviewArtifactVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/node-runs/{node_run_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 启动已准备的十二部分教案生成节点 */
+        post: operations["startNodeRun"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1112,6 +1197,22 @@ export interface components {
             /** Format: date-time */
             finished_at?: string | null;
         };
+        NodeRunEnvelope: {
+            data: components["schemas"]["NodeRun"];
+            request_id: string;
+        };
+        AcceptedNodeRunEnvelope: {
+            data: {
+                /** Format: uuid */
+                node_run_id: string;
+                status: components["schemas"]["workflow-node-status.schema"];
+                events_url: string;
+            };
+            request_id: string;
+        };
+        StartNodeRunRequest: {
+            user_revision?: string | null;
+        };
         WorkflowRun: {
             /** Format: uuid */
             id: string;
@@ -1168,6 +1269,13 @@ export interface components {
             id: string;
             /** Format: uuid */
             project_id?: string | null;
+            /** Format: uuid */
+            node_run_id?: string | null;
+            /** Format: uuid */
+            lesson_unit_id?: string | null;
+            workflow_node_key?: string | null;
+            /** Format: uuid */
+            result_artifact_version_id?: string | null;
             job_type: string;
             status: components["schemas"]["GenerationJobStatus"];
             progress_percent: number;
@@ -1180,6 +1288,12 @@ export interface components {
         };
         GenerationJobEnvelope: {
             data: components["schemas"]["GenerationJob"];
+            request_id: string;
+        };
+        GenerationJobListEnvelope: {
+            data: {
+                items: components["schemas"]["GenerationJob"][];
+            };
             request_id: string;
         };
         DependencyReadiness: {
@@ -1457,10 +1571,14 @@ export interface components {
             lesson_unit_id?: string | null;
             /** @default main */
             draft_branch: string;
-            content: Record<string, never>;
+            content: {
+                [key: string]: unknown;
+            };
         };
         SaveArtifactDraftRequest: {
-            content: Record<string, never>;
+            content: {
+                [key: string]: unknown;
+            };
         };
         SubmitArtifactVersionRequest: {
             /** @default main */
@@ -1475,7 +1593,9 @@ export interface components {
             /** Format: uuid */
             id: string;
             draft_branch: string;
-            content: Record<string, never>;
+            content: {
+                [key: string]: unknown;
+            };
             validation_report: Record<string, never>;
             /** Format: uuid */
             based_on_version_id: string | null;
@@ -1487,7 +1607,9 @@ export interface components {
             /** Format: uuid */
             id: string;
             version_no: number;
-            content: Record<string, never>;
+            content: {
+                [key: string]: unknown;
+            };
             content_hash: string;
             render_summary: Record<string, never>;
             /** @enum {unknown} */
@@ -1549,6 +1671,28 @@ export interface components {
             data: components["schemas"]["Artifact"];
             request_id: string;
         };
+        LessonPlanQualityReport: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            artifact_version_id: string;
+            /** Format: uuid */
+            validate_node_run_id: string;
+            /** @enum {unknown} */
+            conclusion: "passed" | "failed";
+            findings: Record<string, never>[];
+            evidence_hash: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        LessonPlanArtifactEnvelope: {
+            data: {
+                artifact: components["schemas"]["Artifact"] | null;
+                quality_report: components["schemas"]["LessonPlanQualityReport"] | null;
+                latest_approval: components["schemas"]["Approval"] | null;
+            };
+            request_id: string;
+        };
         ArtifactDraftEnvelope: {
             data: components["schemas"]["ArtifactDraft"];
             request_id: string;
@@ -1572,30 +1716,6 @@ export interface components {
                 };
             };
             request_id: string;
-        };
-        /** @enum {unknown} */
-        tendency: "science" | "application" | "story";
-        option: {
-            option_key: string;
-            lesson_unit_key: string;
-            knowledge_point: string;
-            primary_tendency: components["schemas"]["tendency"];
-            secondary_tendencies: components["schemas"]["tendency"][];
-            title: string;
-            creative_concept: string;
-            hook: string;
-            viewer_value: string;
-            /** @enum {unknown} */
-            suggested_medium: "video" | "image" | "physical_object" | "question" | "performance" | "mixed";
-            duration_seconds: number;
-            course_anchor: string;
-            classroom_first_question: string;
-            handoff_moment: string;
-            must_not_preteach: string[];
-            fit_reason: string;
-            risks: string[];
-            recommendation_score: number;
-            recommendation_reason: string;
         };
         /**
          * WorkflowNodeStatus
@@ -1650,6 +1770,30 @@ export interface components {
                 };
             };
         } & unknown;
+        /** @enum {unknown} */
+        tendency: "science" | "application" | "story";
+        option: {
+            option_key: string;
+            lesson_unit_key: string;
+            knowledge_point: string;
+            primary_tendency: components["schemas"]["tendency"];
+            secondary_tendencies: components["schemas"]["tendency"][];
+            title: string;
+            creative_concept: string;
+            hook: string;
+            viewer_value: string;
+            /** @enum {unknown} */
+            suggested_medium: "video" | "image" | "physical_object" | "question" | "performance" | "mixed";
+            duration_seconds: number;
+            course_anchor: string;
+            classroom_first_question: string;
+            handoff_moment: string;
+            must_not_preteach: string[];
+            fit_reason: string;
+            risks: string[];
+            recommendation_score: number;
+            recommendation_reason: string;
+        };
         /**
          * IntroOptionSet
          * @description 由最小课程种子直接生成的一套或三类九套课堂导入方案。业务校验器额外保证主要倾向分布、课程追溯、辅助倾向交叉和最高推荐分唯一。
@@ -2196,6 +2340,59 @@ export interface operations {
             "4XX": components["responses"]["Error"];
         };
     };
+    prepareLessonPlanGeneration: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                lesson_id: components["parameters"]["LessonId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exact lesson-plan NodeRun prepared */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeRunEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    startLessonPlanQualityValidation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                lesson_id: components["parameters"]["LessonId"];
+                artifact_version_id: components["parameters"]["ArtifactVersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exact lesson-plan quality NodeRun accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedNodeRunEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
     updateLessonBranches: {
         parameters: {
             query?: never;
@@ -2406,6 +2603,54 @@ export interface operations {
             "4XX": components["responses"]["Error"];
         };
     };
+    getLessonPlanArtifact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+                lesson_id: components["parameters"]["LessonId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exact lesson-plan aggregate from PostgreSQL */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LessonPlanArtifactEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    listLessonPlanGenerationJobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+                lesson_id: components["parameters"]["LessonId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exact lesson-plan GenerationJobs from PostgreSQL */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerationJobListEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
     createArtifact: {
         parameters: {
             query?: never;
@@ -2549,6 +2794,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApprovalEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    startNodeRun: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                node_run_id: components["parameters"]["NodeRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["StartNodeRunRequest"];
+            };
+        };
+        responses: {
+            /** @description GenerationJob queued for the exact NodeRun */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedJobEnvelope"];
                 };
             };
             "4XX": components["responses"]["Error"];

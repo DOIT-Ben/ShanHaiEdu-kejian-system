@@ -1,0 +1,44 @@
+schema_version: 1
+issue: 231
+rows:
+  - page_route: /app/projects/{project_id}/lessons/{lesson_id}/work/lesson_plan
+    navigation_path: /app/projects/lesson-plan-rescue/lessons/lesson-plan/work/lesson_plan
+    api_requests:
+      - operation_id: prepareLessonPlanGeneration
+        method: POST
+        path: /api/v2/lessons/{lesson_id}/lesson-plan/node-runs
+      - operation_id: startNodeRun
+        method: POST
+        path: /api/v2/node-runs/{node_run_id}/start
+      - operation_id: listLessonPlanGenerationJobs
+        method: GET
+        path: /api/v2/projects/{project_id}/lessons/{lesson_id}/lesson-plan/generation-jobs
+      - operation_id: getLessonPlanArtifact
+        method: GET
+        path: /api/v2/projects/{project_id}/lessons/{lesson_id}/lesson-plan/artifact
+      - operation_id: saveArtifactDraft
+        method: PUT
+        path: /api/v2/artifacts/{artifact_id}/drafts/{draft_branch}
+      - operation_id: submitArtifactVersion
+        method: POST
+        path: /api/v2/artifacts/{artifact_id}/versions
+      - operation_id: startLessonPlanQualityValidation
+        method: POST
+        path: /api/v2/lessons/{lesson_id}/lesson-plan/artifact-versions/{artifact_version_id}/quality-validations
+      - operation_id: reviewArtifactVersion
+        method: POST
+        path: /api/v2/artifact-versions/{artifact_version_id}/approvals
+    formal_facts:
+      - Session
+      - Project
+      - LessonUnit
+      - GenerationJob
+      - Artifact
+      - ArtifactVersion
+      - ArtifactQualityReport
+      - Approval
+    backend_tests:
+      - tests/integration/test_r1_lesson_plan_worker.py::test_lesson_plan_job_worker_persists_exact_result_draft_and_cancellation
+      - tests/integration/test_r1_lesson_plan_rescue_api.py::test_exact_lesson_plan_api_restores_edit_quality_approval_and_tenant_scope
+    real_api_playwright:
+      - apps/web/e2e/real-api/lesson-plan-rescue.spec.ts::teacher_completes_exact_lesson_plan_rescue_with_real_api

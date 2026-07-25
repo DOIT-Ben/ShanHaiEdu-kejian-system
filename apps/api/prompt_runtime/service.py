@@ -241,7 +241,7 @@ class PromptSnapshotService:
                 "PROMPT_SNAPSHOT_ALREADY_FROZEN",
                 "node prompt snapshots already exist with different content",
             )
-        if NodeStatus(node.status) not in {NodeStatus.READY, NodeStatus.DRAFT}:
+        if NodeStatus(node.status) not in {NodeStatus.READY, NodeStatus.DRAFT, NodeStatus.QUEUED}:
             raise PromptSnapshotError(
                 "PROMPT_SNAPSHOT_NODE_FROZEN",
                 "prompt snapshots must be created before node execution starts",

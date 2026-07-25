@@ -904,17 +904,19 @@ async def _prepare_approval(
     case,
     output: dict[str, object],
     *,
+    actor: ActorContext | None = None,
     approved_evidence_keys: tuple[str, ...] | None = None,
     add_second_parse: bool = False,
+    project_title: str = "Lesson division runtime",
 ) -> PreparedApproval:
     with factory() as session, session.begin():
-        actor = seed_test_actor(session)
+        resolved_actor = actor or seed_test_actor(session)
         published = ContentReleasePublisher(session).publish(
             load_builtin_courseware_release(ROOT),
-            published_by=actor.principal_id,
+            published_by=resolved_actor.principal_id,
         )
-        project = ProjectRepository(session, actor).create(
-            CreateProjectRequest(title="Lesson division runtime", knowledge_point="1-5")
+        project = ProjectRepository(session, resolved_actor).create(
+            CreateProjectRequest(title=project_title, knowledge_point="1-5")
         )
         definition = session.scalar(
             select(ContentDefinitionVersion).where(
@@ -926,16 +928,16 @@ async def _prepare_approval(
         assert definition is not None
         material_parse_version_id, scope_version_id = _seed_material_and_scope(
             session,
-            actor,
+            resolved_actor,
             project.id,
             definition.id,
             case,
             approved_evidence_keys=approved_evidence_keys,
             add_second_parse=add_second_parse,
         )
-        nodes = LessonDivisionRuntimeService(session, actor).initialize(project.id)
+        nodes = LessonDivisionRuntimeService(session, resolved_actor).initialize(project.id)
     execution = NodeExecutionService(
-        SqlAlchemyNodeExecutionTransactionFactory(factory, actor),
+        SqlAlchemyNodeExecutionTransactionFactory(factory, resolved_actor),
         ModelGateway(
             {
                 ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: (
@@ -950,10 +952,10 @@ async def _prepare_approval(
         request_id="issue-125-generate",
     )
     with factory() as session, session.begin():
-        validate_id = LessonDivisionRuntimeService(session, actor).stage_quality(
+        validate_id = LessonDivisionRuntimeService(session, resolved_actor).stage_quality(
             committed.artifact_version_id
         )
-        replayed_validate_id = LessonDivisionRuntimeService(session, actor).stage_quality(
+        replayed_validate_id = LessonDivisionRuntimeService(session, resolved_actor).stage_quality(
             committed.artifact_version_id
         )
         assert replayed_validate_id == validate_id
@@ -966,16 +968,16 @@ async def _prepare_approval(
             == 3
         )
     quality = ArtifactQualityService(
-        SqlAlchemyArtifactQualityTransactionFactory(factory, actor),
+        SqlAlchemyArtifactQualityTransactionFactory(factory, resolved_actor),
         runtime_quality_validator_registry(),
     ).execute(validate_id)
     assert quality.conclusion == "passed"
     with factory() as session, session.begin():
-        gate_id = LessonDivisionRuntimeService(session, actor).open_approval(
+        gate_id = LessonDivisionRuntimeService(session, resolved_actor).open_approval(
             committed.artifact_version_id
         )
     return PreparedApproval(
-        actor=actor,
+        actor=resolved_actor,
         project_id=project.id,
         version_id=committed.artifact_version_id,
         generate_node_id=nodes.generate_node_run_id,

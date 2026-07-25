@@ -23,18 +23,31 @@ class GenerationJobRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    project_id: UUID | None
+    project_id: UUID | None = None
+    node_run_id: UUID | None = None
+    lesson_unit_id: UUID | None = None
+    workflow_node_key: str | None = None
+    result_artifact_version_id: UUID | None = None
     job_type: str
     status: JobStatus
     progress_percent: int
-    progress_message: str | None
-    error_code: str | None
+    progress_message: str | None = None
+    error_code: str | None = None
     created_at: datetime
     updated_at: datetime
 
 
 class GenerationJobEnvelope(BaseModel):
     data: GenerationJobRead
+    request_id: str
+
+
+class GenerationJobListData(BaseModel):
+    items: list[GenerationJobRead]
+
+
+class GenerationJobListEnvelope(BaseModel):
+    data: GenerationJobListData
     request_id: str
 
 

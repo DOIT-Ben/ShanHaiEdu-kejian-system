@@ -35,6 +35,12 @@ class QualityFailureRouting:
     workflow_definition_version_id: UUID
 
 
+@dataclass(frozen=True, slots=True)
+class QualityNodeRouting:
+    organization_id: UUID
+    created_by: UUID
+
+
 class SqlAlchemyQualityWorkflowPort:
     def __init__(self, session: Session, actor: ActorContext) -> None:
         self._session = session
@@ -133,10 +139,11 @@ class QualityNodeRoutingReader:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def organization_id(self, node_run_id: UUID) -> UUID | None:
-        return self._session.scalar(
-            select(NodeRun.organization_id).where(
+    def get(self, node_run_id: UUID) -> QualityNodeRouting | None:
+        row = self._session.execute(
+            select(NodeRun.organization_id, NodeRun.created_by).where(
                 NodeRun.id == node_run_id,
                 NodeRun.deleted_at.is_(None),
             )
-        )
+        ).one_or_none()
+        return QualityNodeRouting(*row) if row is not None else None

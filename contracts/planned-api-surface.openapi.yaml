@@ -51,27 +51,6 @@ paths:
                 $ref: './api-surface.openapi.yaml#/components/schemas/ProjectEnvelope'
         '4XX':
           $ref: './api-surface.openapi.yaml#/components/responses/Error'
-  /node-runs/{node_run_id}/start:
-    post:
-      summary: 启动节点运行
-      operationId: startNodeRun
-      x-shanhai-availability: planned
-      parameters:
-        - $ref: './api-surface.openapi.yaml#/components/parameters/NodeRunId'
-        - $ref: './api-surface.openapi.yaml#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                prompt_revision_id: {type: string, format: uuid}
-      responses:
-        '202':
-          $ref: './api-surface.openapi.yaml#/components/responses/AcceptedJob'
-        '4XX':
-          $ref: './api-surface.openapi.yaml#/components/responses/Error'
   /node-runs/{node_run_id}/creation-packages:
     post:
       summary: 从项目节点创建不可变创作包

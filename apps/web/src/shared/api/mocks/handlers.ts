@@ -701,6 +701,28 @@ export const handlers = [
     return HttpResponse.json(body);
   }),
 
+  http.get(
+    `${apiConfig.baseUrl}/projects/:projectId/lessons/:lessonId/lesson-plan/artifact`,
+    () => {
+      const body = {
+        data: { artifact: null, quality_report: null, latest_approval: null },
+        request_id: "contract_lesson_plan_artifact_empty",
+      } satisfies Schema<"LessonPlanArtifactEnvelope">;
+      return HttpResponse.json(body);
+    },
+  ),
+
+  http.get(
+    `${apiConfig.baseUrl}/projects/:projectId/lessons/:lessonId/lesson-plan/generation-jobs`,
+    () => {
+      const body = {
+        data: { items: [] },
+        request_id: "contract_lesson_plan_jobs_empty",
+      } satisfies Schema<"GenerationJobListEnvelope">;
+      return HttpResponse.json(body);
+    },
+  ),
+
   http.get(`${apiConfig.baseUrl}/generation-jobs/:jobId`, ({ params, request }) => {
     const state = scenario(request);
     const status =

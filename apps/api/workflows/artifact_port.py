@@ -26,6 +26,7 @@ from apps.api.workflows.models import (
     WorkflowRun,
 )
 from apps.api.workflows.repository import WorkflowRuntimeRepository
+from apps.api.workflows.schemas import NodeRunRead
 from apps.api.workflows.service import WorkflowRuntimeService
 from workflow.definition import WorkflowOutputDefinitionBinding
 from workflow.node_state import NodeStatus
@@ -152,6 +153,12 @@ class ArtifactWorkflowPort:
             )
         self._freeze_artifact_selection(node.id, scope, selected_artifact_versions)
         return node.id
+
+    def read_node(self, node_run_id: UUID) -> NodeRunRead:
+        node = self._repository.get_node(node_run_id)
+        if node is None:
+            raise self._invalid("The staged lesson Artifact node is unavailable.")
+        return NodeRunRead.model_validate(node)
 
     def require_source_scope(
         self,

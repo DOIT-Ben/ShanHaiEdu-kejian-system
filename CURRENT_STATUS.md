@@ -1,8 +1,8 @@
 # 当前项目状态
 
-当前阶段：阶段1教师可见R1纵向链已经完成历史PR收敛，等待从最新`main`建立#11唯一实现入口。
+当前阶段：十二部分教案教师纵向救援已完成实现和本地门禁，等待#231/#232最终审查、CI与合并。
 > 最后核验：2026-07-25。
-> 当前唯一P0：[Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)；在新短分支和Draft PR建立前保持`status:blocked`。
+> 当前唯一P0：[Issue #231](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/231)；任务分支`feat/231-lesson-plan-rescue`和[Draft PR #232](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/232)已经建立，状态为`status:in-progress`。
 
 ## 当前可演示成果
 
@@ -25,27 +25,29 @@
 
 ## 当前工作
 
-- 历史竞争PR已经全部关闭；当前没有开放的R1业务实现PR。
-- [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)是下一条唯一业务主线，当前仍为`status:blocked`；唯一允许的实现入口是从最新`origin/main`创建`feat/11-real-teacher-r1`和一个新的Draft PR，不恢复PR #208或其分支。
-- #11的第一个原子动作是先确认最小Contract Change：`startNodeRun`返回`202 AcceptedJob`并绑定现有Job/Worker/SSE；教材范围合法修订及质量阶段到`reviewArtifactVersion`的正式HTTP顺序必须同时明确，合同未确认前不得自造接口。
+- [Issue #231](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/231)是当前唯一P0；[Draft PR #232](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/232)已经完成lesson-scoped active API、应用服务、现有Worker接线、生产页面和验收测试。
+- 真实API浏览器已从全新PostgreSQL数据库通过“生产登录 -> 打开已有LessonUnit -> 异步生成十二部分教案 -> 真实进度 -> 编辑保存 -> 质量检查 -> 批准exact ArtifactVersion -> 刷新恢复 -> 双课时隔离 -> 登出写入401”。
+- active OpenAPI、FastAPI运行面与生成TypeScript客户端保持一致且相对`origin/main`兼容；查询只提供exact lesson-scoped Artifact与GenerationJob，不新增项目级通用查询平台。
+- PostgreSQL集成测试、Alembic完整往返、后端静态门禁、完整前端门禁、确定性/runtime Playwright和真实API Playwright均已完成本地验证。
+- [Draft PR #222](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/222)冻结为固定WIP代码来源，不新增代码、不直接合并；[Draft PR #230](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/230)暂停，不转Ready、不默认合并。#223至#229只保留为参考清单，不再强制串行。
 
 ## 当前阻塞
 
 - 当前没有已知的Session/CSRF实现阻塞；#211已经合并、关闭并从最新`main`复验。
-- 当前没有竞争修改Session、active OpenAPI、生成客户端或`apps/web`公共入口的开放业务PR；#208、#209、#212和#215均已关闭。
-- 阶段1完整教师R1纵向链尚未验收；教材列表与范围修订、异步节点启动、质量/批准HTTP闭环、生产页面消费者、真实文本Provider和R1 real API Playwright仍是#11待实现事实。
-- #11的新短分支、Draft PR和最小Contract Change入口尚未建立；在此之前不开始业务实现、PPT、图片、视频、TTS或新的治理框架，也不竞争修改active OpenAPI、生成客户端、Artifact/Job公共合同、Workflow Binding、Model Gateway或前端公共Session入口。
+- 当前没有实现或外部阻塞；#232保持Draft，等待远端CI全部通过，再由未参与实现的只读reviewer绑定最终base/head完成审查。
+- [Issue #233](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/233)单独跟踪`origin/main`既有Stage1 E2E旧`impact_scope` fixture；该测试债不改变#231验收结果，也不在救援PR内顺手修复。
+- 教材上传和范围确认、课时划分、三类九套、PPT、图片、视频、TTS、通用查询/审批/状态机、SSE重构和全仓技术债均不在本轮范围。
 
 ## 下一个阶段出口
 
-1. 从最新`origin/main`创建`feat/11-real-teacher-r1`和新的Draft PR，将Issue #11转回`status:in-progress`。
-2. 先在#11/#210确认异步`startNodeRun`、教材范围修订和质量/批准HTTP顺序的最小Contract Change，再同步active OpenAPI、FastAPI和生成客户端。
-3. 只推进“真实登录 -> 项目 -> 教材与物理页 -> 课时划分 -> LessonUnit -> 十二部分教案 -> 三类九套 -> 批准 -> 唯一IntroSelection -> 刷新恢复”的生产页面、PostgreSQL、Job/Worker/SSE、真实Provider和real API Playwright闭环。
-4. 以PostgreSQL集成测试、real API Playwright、delivery slice和受控真实文本Provider验收完整R1；在此之前不恢复媒体线。
+1. 等待#232远端CI全部通过；若出现分支特有失败，只修复与本切片直接相关的问题并刷新验证证据。
+2. 由未参与实现的只读reviewer绑定最终base/head完成全量diff审查；关闭全部P0/P1并处置P2/P3后将#232转Ready。
+3. Squash Merge #232并从干净`origin/main`复验delivery slice、生产build和真实API教师闭环，关闭#231并清理任务分支/worktree。
+4. 合并后分别建立“教材范围与课时划分”和“三类九套与最终R1验收”两个教师可见纵向任务。
 
 ## 接手提示
 
 1. 先读`README.md`、`AGENTS.md`、`docs/governance/项目记忆与接手索引.md`和本文件。
-2. #217和PR #219已经完成并清理；不要从旧PR恢复实现，也不要把历史矩阵当作可直接合并的代码。
-3. #211的当前运行证据以`main`中的代码、迁移、测试、active OpenAPI和`contracts/delivery-slices/211-runtime-auth.yaml`为准；PR #216保留合并前CI与独立审查证据。
-4. PR #208已经关闭且不得恢复；#11的新短分支和Draft PR尚未建立，建立前必须再次fetch并以最新`origin/main`为base。
+2. #231和#232是唯一实时任务入口；#11是父任务，#210是既有Decision，不得恢复按技术层严格串行的旧执行方式。
+3. #222只允许按#231范围提取必要文件或hunk，禁止整体cherry-pick；#230保持暂停，禁止把项目级通用查询带入救援切片。
+4. #211的生产Session/CSRF和main已有Artifact、LessonPlanRuntime、GenerationJob、Worker、SSE、QualityReport、Approval、Model Gateway必须复用，不建设第二套系统。
