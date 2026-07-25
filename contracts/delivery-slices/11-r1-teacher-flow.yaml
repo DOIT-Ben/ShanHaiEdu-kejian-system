@@ -1,0 +1,70 @@
+schema_version: 1
+issue: 11
+rows:
+  - page_route: /app/projects/new
+    navigation_path: /app/projects/new
+    api_requests:
+      - operation_id: createProject
+        method: POST
+        path: /api/v2/projects
+      - operation_id: createMaterialUploadSession
+        method: POST
+        path: /api/v2/projects/{project_id}/materials/uploads
+      - operation_id: confirmMaterialUpload
+        method: POST
+        path: /api/v2/projects/{project_id}/materials/{material_id}/confirm
+    formal_facts:
+      [Project, SourceMaterial, UploadSession, FileAsset, FileAssetVersion, MaterialParseVersion, GenerationJob]
+    backend_tests:
+      - tests/integration/test_r1_teacher_flow_api.py::test_r1_teacher_flow_persists_and_recovers
+    real_api_playwright:
+      - apps/web/e2e/real-api/r1-teacher-flow.spec.ts::teacher_completes_textbook_to_intro_and_recovers_after_reload
+  - page_route: /app/projects/:projectId/materials/:materialId?
+    navigation_path: /app/projects/00000000-0000-7000-8000-000000000001/materials/00000000-0000-7000-8000-000000000002
+    api_requests:
+      - operation_id: createMaterialScopeVersion
+        method: POST
+        path: /api/v2/projects/{project_id}/material-scope/versions
+      - operation_id: prepareLessonDivision
+        method: POST
+        path: /api/v2/projects/{project_id}/lesson-division/node-runs
+      - operation_id: startNodeRun
+        method: POST
+        path: /api/v2/node-runs/{node_run_id}/start
+      - operation_id: startArtifactVersionQualityValidation
+        method: POST
+        path: /api/v2/artifact-versions/{artifact_version_id}/quality-validations
+      - operation_id: reviewArtifactVersion
+        method: POST
+        path: /api/v2/artifact-versions/{artifact_version_id}/approvals
+    formal_facts:
+      [Artifact, ArtifactVersion, ArtifactQualityReport, Approval, NodeRun, GenerationAttempt, GenerationJob, LessonUnit]
+    backend_tests:
+      - tests/integration/test_r1_start_node_run_api.py::test_start_node_run_queues_one_exact_job_and_rejects_conflicts
+      - tests/integration/test_r1_quality_approval_api.py::test_review_api_opens_exact_quality_gate_before_approval
+    real_api_playwright:
+      - apps/web/e2e/real-api/r1-teacher-flow.spec.ts::teacher_completes_textbook_to_intro_and_recovers_after_reload
+  - page_route: /app/projects/:projectId/lessons/:lessonId/work/:stepKey
+    navigation_path: /app/projects/00000000-0000-7000-8000-000000000001/lessons/00000000-0000-7000-8000-000000000003/work/lesson_plan
+    api_requests:
+      - operation_id: prepareLessonPlanGeneration
+        method: POST
+        path: /api/v2/lessons/{lesson_id}/lesson-plan/node-runs
+      - operation_id: prepareIntroOptionGeneration
+        method: POST
+        path: /api/v2/lessons/{lesson_id}/intro-options/node-runs
+      - operation_id: startArtifactVersionQualityValidation
+        method: POST
+        path: /api/v2/artifact-versions/{artifact_version_id}/quality-validations
+      - operation_id: reviewArtifactVersion
+        method: POST
+        path: /api/v2/artifact-versions/{artifact_version_id}/approvals
+      - operation_id: selectLessonIntroOption
+        method: POST
+        path: /api/v2/lessons/{lesson_id}/intro-selections
+    formal_facts:
+      [LessonUnit, Artifact, ArtifactVersion, ArtifactQualityReport, Approval, NodeRun, GenerationAttempt, GenerationJob, IntroSelection]
+    backend_tests:
+      - tests/integration/test_r1_teacher_flow_api.py::test_r1_teacher_flow_persists_and_recovers
+    real_api_playwright:
+      - apps/web/e2e/real-api/r1-teacher-flow.spec.ts::teacher_completes_textbook_to_intro_and_recovers_after_reload

@@ -16,7 +16,7 @@ concurrency:
 jobs:
   runtime-auth:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16.14-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
@@ -41,16 +41,58 @@ jobs:
           --health-timeout 3s
           --health-retries 30
     env:
+      SHANHAI_R1_MINIO_CONTAINER: shanhai-r1-minio-${{ github.run_id }}-${{ github.run_attempt }}
       SHANHAI_DATABASE_URL: postgresql://shanhai:shanhai-ci-only@127.0.0.1:5432/shanhai_test
       SHANHAI_E2E_API_BASE_URL: http://127.0.0.1:58080/api/v2
       SHANHAI_E2E_API_PORT: "58080"
+      SHANHAI_E2E_PROVIDER_PORT: "58081"
       SHANHAI_E2E_WEB_PORT: "44177"
+      SHANHAI_E2E_TEXT_PROVIDER_KEY: shanhai-r1-provider-ci-only
+      SHANHAI_ENVIRONMENT: test
+      SHANHAI_OBJECT_STORAGE_ACCESS_KEY: shanhai-ci
+      SHANHAI_OBJECT_STORAGE_BUCKET: shanhaiedu-ci
+      SHANHAI_OBJECT_STORAGE_ENDPOINT: 127.0.0.1:59000
+      SHANHAI_OBJECT_STORAGE_HEALTH_URL: http://127.0.0.1:59000/minio/health/ready
+      SHANHAI_OBJECT_STORAGE_SECRET_KEY: shanhai-ci-only
+      SHANHAI_OBJECT_STORAGE_SECURE: "false"
+      SHANHAI_REDIS_URL: redis://127.0.0.1:6379/0
       SHANHAI_SESSION_ALLOWED_ORIGINS: '["http://127.0.0.1:44177"]'
+      SHANHAI_SESSION_COOKIE_SECURE: "false"
+      SHANHAI_TEXT_PROVIDER_BASE_URL: http://127.0.0.1:58081/v1
+      SHANHAI_TEXT_PROVIDER_MODEL: r1-deterministic-http-v1
+      SHANHAI_TEXT_PROVIDER_NAME: r1-deterministic-http
+      SHANHAI_TEXT_PROVIDER_SECRET_ENV: SHANHAI_E2E_TEXT_PROVIDER_KEY
       VITE_API_BASE_URL: http://127.0.0.1:58080/api/v2
       VITE_API_MODE: real
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Start CI MinIO
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach \
+            --name "$SHANHAI_R1_MINIO_CONTAINER" \
+            --publish 127.0.0.1:59000:9000 \
+            --env MINIO_API_CORS_ALLOW_ORIGIN=http://127.0.0.1:44177 \
+            --env MINIO_ROOT_USER=shanhai-ci \
+            --env MINIO_ROOT_PASSWORD=shanhai-ci-only \
+            minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e \
+            server /data
+          for _attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error \
+              http://127.0.0.1:59000/minio/health/ready >/dev/null; then
+              exit 0
+            fi
+            if [[ "$(docker inspect --format '{{.State.Running}}' "$SHANHAI_R1_MINIO_CONTAINER")" != "true" ]]; then
+              docker logs "$SHANHAI_R1_MINIO_CONTAINER"
+              exit 1
+            fi
+            sleep 1
+          done
+          docker logs "$SHANHAI_R1_MINIO_CONTAINER"
+          exit 1
 
       - name: Set up uv and Python
         uses: astral-sh/setup-uv@v6
@@ -97,16 +139,63 @@ jobs:
                   print(f"::add-mask::{value}")
                   output.write(f"{name}={value}\n")
 
-      - name: Migrate and seed the controlled teacher
+      - name: Migrate, seed the controlled teacher and publish golden content
         run: |
           uv run alembic upgrade head
           uv run python scripts/seed_runtime_auth_e2e.py
+          uv run python -m apps.api.cli publish-golden-content
 
       - name: Build the production frontend
         run: pnpm --dir apps/web build
 
+      - name: Start the R1 worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          worker_log="$RUNNER_TEMP/shanhai-r1-worker.log"
+          uv run python -m workers.main >"$worker_log" 2>&1 &
+          worker_pid=$!
+          echo "SHANHAI_R1_WORKER_LOG=$worker_log" >> "$GITHUB_ENV"
+          echo "SHANHAI_R1_WORKER_PID=$worker_pid" >> "$GITHUB_ENV"
+          for _attempt in $(seq 1 60); do
+            if grep -q "worker_booted" "$worker_log"; then
+              exit 0
+            fi
+            if ! kill -0 "$worker_pid" 2>/dev/null; then
+              cat "$worker_log"
+              exit 1
+            fi
+            sleep 1
+          done
+          cat "$worker_log"
+          exit 1
+
       - name: Run exact delivery slice selectors
-        run: uv run python scripts/run_delivery_slice_tests.py
+        shell: bash
+        run: |
+          if ! uv run python scripts/run_delivery_slice_tests.py; then
+            cat "$SHANHAI_R1_WORKER_LOG"
+            exit 1
+          fi
 
       - name: Verify the migration cycle
         run: uv run pytest tests/integration/test_migrations.py::test_empty_database_upgrade_downgrade_upgrade
+
+      - name: Stop the R1 worker
+        if: always()
+        shell: bash
+        run: |
+          if [[ -n "${SHANHAI_R1_WORKER_PID:-}" ]] && kill -0 "$SHANHAI_R1_WORKER_PID" 2>/dev/null; then
+            kill "$SHANHAI_R1_WORKER_PID"
+            wait "$SHANHAI_R1_WORKER_PID" || true
+          fi
+
+      - name: Stop and remove CI MinIO
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if docker container inspect "$SHANHAI_R1_MINIO_CONTAINER" >/dev/null 2>&1; then
+            docker stop --time 10 "$SHANHAI_R1_MINIO_CONTAINER"
+            docker rm "$SHANHAI_R1_MINIO_CONTAINER"
+          fi
