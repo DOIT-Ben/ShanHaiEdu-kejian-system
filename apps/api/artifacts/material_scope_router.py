@@ -9,13 +9,17 @@ from fastapi import APIRouter, Depends, Header, Request, status
 from sqlalchemy.orm import Session
 
 from apps.api.artifacts.material_scope_service import MaterialScopeVersionService
-from apps.api.artifacts.presentation import serialize_artifact
+from apps.api.artifacts.presentation import serialize_approval, serialize_artifact
+from apps.api.artifacts.repository import ArtifactRepository
 from apps.api.artifacts.schemas import (
     ArtifactEnvelope,
     ArtifactRead,
     CreateMaterialScopeVersionRequest,
+    MaterialScopeArtifactEnvelope,
+    MaterialScopeArtifactRead,
 )
 from apps.api.dependencies import get_session
+from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.dependencies import get_actor_context
 from apps.api.identity.permissions import ProjectAccessService
@@ -23,6 +27,48 @@ from apps.api.reliability.idempotency import CommandResult, IdempotencyService
 from apps.api.settings import Settings
 
 router = APIRouter(tags=["artifacts"])
+
+
+@router.get(
+    "/api/v2/projects/{project_id}/material-scope/artifact",
+    response_model=MaterialScopeArtifactEnvelope,
+    operation_id="getMaterialScopeArtifact",
+)
+def get_material_scope_artifact(
+    project_id: UUID,
+    request: Request,
+    actor: Annotated[ActorContext, Depends(get_actor_context)],
+    session: Annotated[Session, Depends(get_session)],
+) -> MaterialScopeArtifactEnvelope:
+    ProjectAccessService(session, actor).require(project_id, ProjectAction.VIEW)
+    artifact = ArtifactRepository(session, actor).get_by_key(project_id, "material-scope")
+    if artifact is not None and (
+        artifact.lesson_unit_id is not None
+        or artifact.branch_key != "project"
+        or artifact.artifact_type != "material_scope"
+    ):
+        raise ApiError(
+            status_code=409,
+            code="MATERIAL_SCOPE_CONFLICT",
+            message="The project material-scope singleton is incompatible.",
+        )
+    version_id = (
+        artifact.current_submitted_version_id or artifact.current_approved_version_id
+        if artifact is not None
+        else None
+    )
+    approval = (
+        ArtifactRepository(session, actor).latest_approval(version_id)
+        if version_id is not None
+        else None
+    )
+    return MaterialScopeArtifactEnvelope(
+        data=MaterialScopeArtifactRead(
+            artifact=(serialize_artifact(session, actor, artifact) if artifact else None),
+            latest_approval=(serialize_approval(approval) if approval else None),
+        ),
+        request_id=request.state.request_id,
+    )
 
 
 @router.post(

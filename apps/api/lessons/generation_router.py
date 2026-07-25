@@ -15,11 +15,70 @@ from apps.api.identity.dependencies import get_actor_context
 from apps.api.identity.permissions import ProjectAccessService
 from apps.api.lessons.lesson_plan_runtime import LessonPlanRuntimeService
 from apps.api.lessons.repository import LessonRepository
+from apps.api.lessons.runtime_service import LessonDivisionRuntimeService
 from apps.api.reliability.idempotency import CommandResult, IdempotencyService
 from apps.api.settings import Settings
-from apps.api.workflows.schemas import NodeRunEnvelope, NodeRunRead
+from apps.api.workflows.schemas import (
+    NodeRunEnvelope,
+    NodeRunRead,
+    PrepareLessonDivisionRequest,
+)
 
 router = APIRouter(tags=["workflows"])
+
+
+@router.post(
+    "/api/v2/projects/{project_id}/lesson-division/node-runs",
+    response_model=NodeRunEnvelope,
+    operation_id="prepareLessonDivision",
+)
+def prepare_lesson_division(
+    project_id: UUID,
+    payload: PrepareLessonDivisionRequest,
+    request: Request,
+    idempotency_key: Annotated[
+        str,
+        Header(alias="Idempotency-Key", min_length=8, max_length=128),
+    ],
+    actor: Annotated[ActorContext, Depends(get_actor_context)],
+    session: Annotated[Session, Depends(get_session)],
+) -> NodeRunEnvelope:
+    settings = cast(Settings, request.app.state.settings)
+
+    def command() -> CommandResult:
+        runtime = LessonDivisionRuntimeService(session, actor)
+        node_id = runtime.prepare(
+            project_id,
+            material_scope_artifact_version_id=payload.material_scope_artifact_version_id,
+        )
+        data = runtime.read_node(node_id)
+        return CommandResult(
+            status_code=200,
+            body=data.model_dump(mode="json"),
+            resource_type="node_run",
+            resource_id=node_id,
+        )
+
+    with session.begin():
+        result = IdempotencyService(
+            session,
+            actor.organization_id,
+            ttl_seconds=settings.idempotency_ttl_seconds,
+        ).execute(
+            scope=f"lesson-division.prepare:{project_id}:{actor.principal_id}",
+            key=idempotency_key,
+            payload=payload.model_dump(mode="json"),
+            authorize=lambda: ProjectAccessService(session, actor).require(
+                project_id,
+                ProjectAction.GENERATE,
+                for_update=True,
+            ),
+            command=command,
+        )
+    return NodeRunEnvelope(
+        data=NodeRunRead.model_validate(result.body),
+        request_id=request.state.request_id,
+    )
 
 
 @router.post(

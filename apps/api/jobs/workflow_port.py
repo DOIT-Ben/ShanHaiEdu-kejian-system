@@ -1,4 +1,4 @@
-"""Jobs-owned enqueue capability for exact lesson-plan NodeRuns."""
+"""Jobs-owned enqueue capability for supported R1 generation NodeRuns."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ class LessonPlanGenerationJobPort:
         *,
         project_id: UUID,
         node_run_id: UUID,
-        lesson_unit_id: UUID,
+        lesson_unit_id: UUID | None,
         workflow_node_key: str,
         creation_request: dict[str, object],
         idempotency_key: str,
@@ -47,7 +47,7 @@ class LessonPlanGenerationJobPort:
             job_type="workflow.node",
             status="queued",
             progress_percent=0,
-            progress_message="Queued for lesson-plan generation",
+            progress_message="Queued for node generation",
             error_code=None,
             idempotency_key=idempotency_key,
             request_hash=request_hash,

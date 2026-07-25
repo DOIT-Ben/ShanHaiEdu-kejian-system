@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.middleware.cors import CORSMiddleware
 
+from apps.api.artifacts.lesson_division_router import router as lesson_division_artifacts_router
 from apps.api.artifacts.lesson_plan_quality_router import (
     router as lesson_plan_quality_router,
 )
@@ -26,6 +27,7 @@ from apps.api.identity.dependencies import enforce_session_request_security
 from apps.api.identity.session_router import router as session_router
 from apps.api.identity.session_service import DatabaseSessionService
 from apps.api.intro_options.router import router as intro_options_router
+from apps.api.jobs.lesson_division_router import router as lesson_division_jobs_router
 from apps.api.jobs.lesson_plan_router import router as lesson_plan_jobs_router
 from apps.api.jobs.router import router as jobs_router
 from apps.api.lessons.generation_router import router as lesson_plan_generation_router
@@ -76,6 +78,7 @@ def create_app(
     app.include_router(session_router)
     app.include_router(artifacts_router)
     app.include_router(material_scope_router)
+    app.include_router(lesson_division_artifacts_router)
     app.include_router(lesson_plan_artifacts_router)
     app.include_router(lesson_plan_quality_router)
     app.include_router(creation_router)
@@ -88,6 +91,7 @@ def create_app(
     app.include_router(intro_options_router)
     app.include_router(uploads_router)
     app.include_router(jobs_router)
+    app.include_router(lesson_division_jobs_router)
     app.include_router(lesson_plan_jobs_router)
     app.include_router(workflows_router)
     app.include_router(workflow_start_router)

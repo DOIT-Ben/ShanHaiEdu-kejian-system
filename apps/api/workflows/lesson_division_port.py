@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.permissions import ProjectAccessService
+from apps.api.workflows.artifact_input_selection import ArtifactInputSelectionWriter
 from apps.api.workflows.models import (
     NodeInputSnapshot,
     NodeRun,
@@ -18,10 +19,13 @@ from apps.api.workflows.models import (
     WorkflowRun,
 )
 from apps.api.workflows.repository import WorkflowRuntimeRepository
+from apps.api.workflows.schemas import NodeRunRead
 from apps.api.workflows.service import WorkflowRuntimeService
 from workflow.definition import WorkflowOutputDefinitionBinding
 from workflow.node_state import NodeStatus
 from workflow.registry import BUILTIN_WORKFLOW_REGISTRY
+
+_ACTIVE_STATUSES = frozenset({NodeStatus.QUEUED, NodeStatus.RUNNING, NodeStatus.CANCEL_REQUESTED})
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +74,56 @@ class LessonDivisionWorkflowPort:
         validate = self._ensure_project_node(run, validate_key, NodeStatus.NOT_READY)
         approve = self._ensure_project_node(run, gate_key, NodeStatus.NOT_READY)
         return LessonDivisionRunNodes(run.id, generate.id, validate.id, approve.id)
+
+    def prepare(
+        self,
+        project_id: UUID,
+        *,
+        material_scope_artifact_version_id: UUID,
+    ) -> LessonDivisionRunNodes:
+        project = ProjectAccessService(self._session, self._actor).require(
+            project_id,
+            ProjectAction.GENERATE,
+            for_update=True,
+        )
+        run = self._repository.active_for_project(project.id, for_update=True)
+        if run is None:
+            run = WorkflowRuntimeService(self._session, self._actor).start_project_run(project.id)
+        output = self.output_binding(run.workflow_definition_version_id)
+        validate_key, gate_key = self._quality_keys(output)
+        latest = self._latest_project_node(run.id, output.producer_node_key, for_update=True)
+        if latest is None:
+            nodes = self._create_chain(run, output.producer_node_key, validate_key, gate_key)
+        else:
+            status = NodeStatus(latest.status)
+            if status in _ACTIVE_STATUSES:
+                raise self._invalid("The lesson-division generation is already active.")
+            if status is NodeStatus.READY:
+                nodes = self._require_current_chain(run, latest, validate_key, gate_key)
+            else:
+                previous_gate = self._latest_project_node(run.id, gate_key, for_update=True)
+                if (
+                    previous_gate is None
+                    or previous_gate.run_no != latest.run_no
+                    or NodeStatus(previous_gate.status) is not NodeStatus.APPROVED
+                ):
+                    raise self._invalid("The preceding lesson-division approval is not complete.")
+                nodes = self._create_chain(run, output.producer_node_key, validate_key, gate_key)
+        ArtifactInputSelectionWriter(
+            self._session,
+            self._actor,
+            error_code="LESSON_DIVISION_RUNTIME_INVALID",
+        ).freeze(
+            nodes.generate_node_run_id,
+            {"approval:material_scope": material_scope_artifact_version_id},
+        )
+        return nodes
+
+    def read_node(self, node_run_id: UUID) -> NodeRunRead:
+        node = self._repository.get_node(node_run_id)
+        if node is None:
+            raise self._invalid("The prepared lesson-division NodeRun is unavailable.")
+        return NodeRunRead.model_validate(node)
 
     def output_binding(
         self,
@@ -223,6 +277,24 @@ class LessonDivisionWorkflowPort:
         gate = runtime.create_project_node_run(
             run.id, node_key=gate_key, status=NodeStatus.NOT_READY
         )
+        return LessonDivisionRunNodes(run.id, generate.id, validate.id, gate.id)
+
+    def _require_current_chain(
+        self,
+        run: WorkflowRun,
+        generate: NodeRun,
+        validate_key: str,
+        gate_key: str,
+    ) -> LessonDivisionRunNodes:
+        validate = self._latest_project_node(run.id, validate_key, for_update=True)
+        gate = self._latest_project_node(run.id, gate_key, for_update=True)
+        if (
+            validate is None
+            or gate is None
+            or validate.run_no != generate.run_no
+            or gate.run_no != generate.run_no
+        ):
+            raise self._invalid("The fixed lesson-division chain is incomplete.")
         return LessonDivisionRunNodes(run.id, generate.id, validate.id, gate.id)
 
     def _ensure_project_node(

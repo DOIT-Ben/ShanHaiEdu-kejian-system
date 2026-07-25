@@ -89,7 +89,7 @@ class NodeRunStartService:
                 code="NODE_RUN_NOT_READY",
                 message="The node run is not ready to start.",
             )
-        self._require_lesson_plan_generation(
+        self._require_supported_generation(
             node_run_id,
             execution.node_key,
             execution.lesson_unit_id,
@@ -100,7 +100,6 @@ class NodeRunStartService:
                 code="NODE_RUN_JOB_ACTIVE",
                 message="The node run already has an active generation job.",
             )
-        assert execution.lesson_unit_id is not None
         job_id = self._jobs.enqueue(
             project_id=execution.project_id,
             node_run_id=node_run_id,
@@ -120,7 +119,9 @@ class NodeRunStartService:
                 "progress_percent": 0,
                 "attempt_count": 0,
                 "node_run_id": str(node_run_id),
-                "lesson_unit_id": str(execution.lesson_unit_id),
+                "lesson_unit_id": (
+                    str(execution.lesson_unit_id) if execution.lesson_unit_id is not None else None
+                ),
                 "workflow_node_key": execution.node_key,
             },
             request_id=request_id,
@@ -143,17 +144,20 @@ class NodeRunStartService:
                 message="The node run is unavailable for generation.",
             ) from exc
 
-    def _require_lesson_plan_generation(
+    def _require_supported_generation(
         self,
         node_run_id: UUID,
         node_key: str,
         lesson_unit_id: UUID | None,
     ) -> None:
-        if node_key != "lesson_plan.generate" or lesson_unit_id is None:
+        supported = (node_key == "lesson_plan.generate" and lesson_unit_id is not None) or (
+            node_key == "lesson.division.generate" and lesson_unit_id is None
+        )
+        if not supported:
             raise ApiError(
                 status_code=409,
                 code="NODE_RUN_UNSUPPORTED",
-                message="Only lesson-plan generation can be started by this rescue API.",
+                message="The node run is outside the active R1 generation surface.",
             )
         try:
             self._definitions.resolve(node_run_id)

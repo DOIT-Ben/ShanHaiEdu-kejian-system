@@ -183,6 +183,26 @@ class LessonPlanArtifactEnvelope(BaseModel):
     request_id: str
 
 
+class MaterialScopeArtifactRead(BaseModel):
+    artifact: ArtifactRead | None
+    latest_approval: ApprovalRead | None
+
+
+class MaterialScopeArtifactEnvelope(BaseModel):
+    data: MaterialScopeArtifactRead
+    request_id: str
+
+
+class LessonDivisionArtifactRead(BaseModel):
+    artifact: ArtifactRead | None
+    latest_approval: ApprovalRead | None
+
+
+class LessonDivisionArtifactEnvelope(BaseModel):
+    data: LessonDivisionArtifactRead
+    request_id: str
+
+
 class ArtifactDraftEnvelope(BaseModel):
     data: ArtifactDraftRead
     request_id: str

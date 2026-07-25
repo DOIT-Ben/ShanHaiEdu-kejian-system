@@ -520,6 +520,38 @@ paths:
                 $ref: '#/components/schemas/IntroSelectionEnvelope'
         4XX:
           $ref: '#/components/responses/Error'
+  /projects/{project_id}/materials:
+    get:
+      summary: 查询项目教材列表
+      operationId: listProjectMaterials
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/PageCursor'
+        - $ref: '#/components/parameters/PageLimit'
+      responses:
+        '200':
+          description: Newest-first source material page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceMaterialListEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/material-scope/artifact:
+    get:
+      summary: 恢复项目当前教材范围及审批事实
+      operationId: getMaterialScopeArtifact
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Exact material-scope aggregate from PostgreSQL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialScopeArtifactEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
   /projects/{project_id}/material-scope/versions:
     post:
       summary: 创建或修订项目教材范围版本
@@ -647,6 +679,63 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkflowEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/lesson-division/node-runs:
+    post:
+      summary: 按指定教材范围准备课时划分生成节点
+      operationId: prepareLessonDivision
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrepareLessonDivisionRequest'
+      responses:
+        '200':
+          description: Exact material-scope lesson-division NodeRun prepared
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeRunEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/lesson-division/artifact:
+    get:
+      summary: 恢复项目当前课时划分及审批事实
+      operationId: getLessonDivisionArtifact
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Exact lesson-division aggregate from PostgreSQL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonDivisionArtifactEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/lesson-division/generation-jobs:
+    get:
+      summary: 查询项目课时划分生成任务
+      operationId: listLessonDivisionGenerationJobs
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Exact lesson-division GenerationJobs from PostgreSQL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationJobListEnvelope'
         4XX:
           $ref: '#/components/responses/Error'
   /projects/{project_id}/lessons/{lesson_id}/lesson-plan/artifact:
@@ -2563,6 +2652,89 @@ components:
         request_id:
           type: string
           minLength: 1
+    SourceMaterial:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - project_id
+        - material_kind
+        - file_asset_id
+        - original_filename
+        - mime_type
+        - upload_status
+        - confirmed_at
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        material_kind:
+          type: string
+          minLength: 1
+        file_asset_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        original_filename:
+          type: string
+          minLength: 1
+        mime_type:
+          type: string
+          minLength: 1
+        upload_status:
+          enum:
+            - pending_upload
+            - confirmed
+            - rejected
+        confirmed_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    SourceMaterialListEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - meta
+        - request_id
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            - items
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/SourceMaterial'
+        meta:
+          type: object
+          additionalProperties: false
+          required:
+            - next_cursor
+          properties:
+            next_cursor:
+              type:
+                - string
+                - 'null'
+              format: uuid
+        request_id:
+          type: string
+          minLength: 1
     NodeRun:
       type: object
       additionalProperties: false
@@ -2643,6 +2815,15 @@ components:
         request_id:
           type: string
           minLength: 1
+    PrepareLessonDivisionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - material_scope_artifact_version_id
+      properties:
+        material_scope_artifact_version_id:
+          type: string
+          format: uuid
     StartNodeRunRequest:
       type: object
       additionalProperties: false
@@ -3969,6 +4150,56 @@ components:
             quality_report:
               oneOf:
                 - $ref: '#/components/schemas/LessonPlanQualityReport'
+                - type: 'null'
+            latest_approval:
+              oneOf:
+                - $ref: '#/components/schemas/Approval'
+                - type: 'null'
+        request_id:
+          type: string
+          minLength: 1
+    MaterialScopeArtifactEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            - artifact
+            - latest_approval
+          properties:
+            artifact:
+              oneOf:
+                - $ref: '#/components/schemas/Artifact'
+                - type: 'null'
+            latest_approval:
+              oneOf:
+                - $ref: '#/components/schemas/Approval'
+                - type: 'null'
+        request_id:
+          type: string
+          minLength: 1
+    LessonDivisionArtifactEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            - artifact
+            - latest_approval
+          properties:
+            artifact:
+              oneOf:
+                - $ref: '#/components/schemas/Artifact'
                 - type: 'null'
             latest_approval:
               oneOf:

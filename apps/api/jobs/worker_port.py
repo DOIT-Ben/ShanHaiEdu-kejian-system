@@ -24,7 +24,7 @@ class GenerationJobRoutingReader:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def get_lesson_plan(self, job_id: UUID) -> GenerationJobRouting | None:
+    def get_supported_r1(self, job_id: UUID) -> GenerationJobRouting | None:
         row = self._session.execute(
             select(
                 GenerationJob.organization_id,
@@ -35,7 +35,9 @@ class GenerationJobRoutingReader:
             ).where(
                 GenerationJob.id == job_id,
                 GenerationJob.job_type == "workflow.node",
-                GenerationJob.workflow_node_key == "lesson_plan.generate",
+                GenerationJob.workflow_node_key.in_(
+                    ("lesson_plan.generate", "lesson.division.generate")
+                ),
                 GenerationJob.node_run_id.is_not(None),
                 GenerationJob.deleted_at.is_(None),
             )
