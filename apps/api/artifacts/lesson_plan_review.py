@@ -10,6 +10,7 @@ from apps.api.artifacts.approval_service import ArtifactApprovalService
 from apps.api.artifacts.domain import ApprovalAction
 from apps.api.content_runtime.approval_port import ContentDefinitionApprovalReader
 from apps.api.identity.context import ActorContext
+from apps.api.intro_options.runtime import IntroOptionRuntimeService
 from apps.api.lessons.lesson_plan_runtime import LessonPlanRuntimeService
 from apps.api.lessons.runtime_service import LessonDivisionRuntimeService
 from apps.api.projects.repository import ProjectRepository
@@ -48,3 +49,8 @@ def open_lesson_plan_approval_gate(
         and definition_key == "lesson.division.generate.output"
     ):
         LessonDivisionRuntimeService(session, actor).open_approval(artifact_version_id)
+    elif (
+        artifact.artifact_type == "intro_option_set"
+        and definition_key == "intro.generate_options.output"
+    ):
+        IntroOptionRuntimeService(session, actor).open_approval(artifact_version_id)

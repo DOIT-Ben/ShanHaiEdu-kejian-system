@@ -236,10 +236,15 @@ class GenerationJobService:
             job.result_artifact_version_id = result_artifact_version_id
         job.progress_percent = 100 if target == "succeeded" else job.progress_percent
         if job.job_type == "workflow.node":
+            subject = (
+                "Intro-options"
+                if job.workflow_node_key == "intro.generate_options"
+                else "Lesson-plan"
+            )
             job.progress_message = {
-                "succeeded": "Lesson-plan generation completed",
-                "failed": "Lesson-plan generation failed",
-                "cancelled": "Lesson-plan generation cancelled",
+                "succeeded": f"{subject} generation completed",
+                "failed": f"{subject} generation failed",
+                "cancelled": f"{subject} generation cancelled",
             }[target]
         else:
             job.progress_message = {

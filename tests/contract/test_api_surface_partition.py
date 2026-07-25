@@ -18,8 +18,12 @@ INITIAL_PLANNED_OPERATIONS = {
     "updateProject",
 }
 PROMOTED_INTRO_OPERATIONS = {
+    "getIntroOptionArtifact",
     "getLessonIntroOptions",
+    "listIntroOptionGenerationJobs",
+    "prepareIntroOptionGeneration",
     "selectLessonIntroOption",
+    "startIntroOptionQualityValidation",
 }
 
 

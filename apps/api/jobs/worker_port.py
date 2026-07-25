@@ -36,7 +36,11 @@ class GenerationJobRoutingReader:
                 GenerationJob.id == job_id,
                 GenerationJob.job_type == "workflow.node",
                 GenerationJob.workflow_node_key.in_(
-                    ("lesson_plan.generate", "lesson.division.generate")
+                    (
+                        "lesson_plan.generate",
+                        "lesson.division.generate",
+                        "intro.generate_options",
+                    )
                 ),
                 GenerationJob.node_run_id.is_not(None),
                 GenerationJob.deleted_at.is_(None),

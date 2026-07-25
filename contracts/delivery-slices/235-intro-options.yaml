@@ -1,0 +1,60 @@
+schema_version: 1
+issue: 235
+rows:
+  - page_route: /app/projects/{project_id}/lessons/{lesson_id}/work/intro_options
+    navigation_path: /app/projects/r1/lessons/lesson-1/work/intro_options
+    api_requests:
+      - operation_id: prepareIntroOptionGeneration
+        method: POST
+        path: /api/v2/lessons/{lesson_id}/intro-options/node-runs
+      - operation_id: startNodeRun
+        method: POST
+        path: /api/v2/node-runs/{node_run_id}/start
+      - operation_id: listIntroOptionGenerationJobs
+        method: GET
+        path: /api/v2/projects/{project_id}/lessons/{lesson_id}/intro-options/generation-jobs
+      - operation_id: getGenerationJob
+        method: GET
+        path: /api/v2/generation-jobs/{job_id}
+      - operation_id: getIntroOptionArtifact
+        method: GET
+        path: /api/v2/projects/{project_id}/lessons/{lesson_id}/intro-options/artifact
+      - operation_id: getArtifact
+        method: GET
+        path: /api/v2/artifacts/{artifact_id}
+      - operation_id: saveArtifactDraft
+        method: PUT
+        path: /api/v2/artifacts/{artifact_id}/drafts/{draft_branch}
+      - operation_id: submitArtifactVersion
+        method: POST
+        path: /api/v2/artifacts/{artifact_id}/versions
+      - operation_id: startIntroOptionQualityValidation
+        method: POST
+        path: /api/v2/lessons/{lesson_id}/intro-options/artifact-versions/{artifact_version_id}/quality-validations
+      - operation_id: reviewArtifactVersion
+        method: POST
+        path: /api/v2/artifact-versions/{artifact_version_id}/approvals
+      - operation_id: getLessonIntroOptions
+        method: GET
+        path: /api/v2/lessons/{lesson_id}/intro-options
+      - operation_id: selectLessonIntroOption
+        method: POST
+        path: /api/v2/lessons/{lesson_id}/intro-selections
+    formal_facts:
+      - Session
+      - Project
+      - SourceMaterial
+      - MaterialParseVersion
+      - LessonUnit
+      - Artifact
+      - ArtifactVersion
+      - GenerationJob
+      - ArtifactQualityReport
+      - Approval
+      - IntroSelection
+    backend_tests:
+      - tests/integration/test_r1_intro_options_api.py::test_intro_option_prepare_is_idempotent_and_exactly_lesson_scoped
+      - tests/integration/test_r1_intro_options_api.py::test_intro_options_restore_edit_quality_exact_approval_and_selection
+      - tests/integration/test_r1_intro_options_worker.py::test_intro_worker_persists_one_exact_nine_option_job_and_isolates_lessons
+    real_api_playwright:
+      - apps/web/e2e/real-api/lesson-plan-rescue.spec.ts::teacher_completes_exact_lesson_plan_rescue_with_real_api

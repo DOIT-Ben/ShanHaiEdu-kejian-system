@@ -69,6 +69,13 @@ class IntroOptionsEnvelope(BaseModel):
     request_id: str = Field(min_length=1)
 
 
+class PrepareIntroOptionGenerationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    generation_mode: Literal["default_nine", "refine_existing"]
+    source_artifact_version_id: UUID | None = None
+
+
 class SelectIntroOptionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

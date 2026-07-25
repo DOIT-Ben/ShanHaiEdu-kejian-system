@@ -18,6 +18,7 @@ from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext
 from apps.api.lessons.approval_port import LessonApprovalReader
 from apps.api.workflows.artifact_port import ArtifactInputSnapshot, ArtifactWorkflowPort
+from apps.api.workflows.schemas import NodeRunRead
 
 
 class IntroOptionRuntimeService:
@@ -92,6 +93,9 @@ class IntroOptionRuntimeService:
             source=self._source_snapshot(fact),
             supporting=self._supporting_snapshots(fact),
         )
+
+    def read_node(self, node_run_id: UUID) -> NodeRunRead:
+        return self._workflow.read_node(node_run_id)
 
     def open_approval(self, artifact_version_id: UUID) -> UUID:
         fact = self._artifacts.require_reviewable(artifact_version_id)

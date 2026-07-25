@@ -493,6 +493,55 @@ paths:
                 $ref: '#/components/schemas/IntroOptionsEnvelope'
         4XX:
           $ref: '#/components/responses/Error'
+  /lessons/{lesson_id}/intro-options/node-runs:
+    post:
+      summary: 准备指定课时的三类九套导入方案生成节点
+      operationId: prepareIntroOptionGeneration
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrepareIntroOptionGenerationRequest'
+      responses:
+        '200':
+          description: Exact Intro option NodeRun prepared
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeRunEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /lessons/{lesson_id}/intro-options/artifact-versions/{artifact_version_id}/quality-validations:
+    post:
+      summary: 对指定课时的导入方案版本执行质量检查
+      operationId: startIntroOptionQualityValidation
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/ArtifactVersionId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '202':
+          description: Exact Intro option quality NodeRun accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcceptedNodeRunEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
   /lessons/{lesson_id}/intro-selections:
     post:
       summary: 教师选择一个已批准课堂导入方案
@@ -803,6 +852,38 @@ paths:
       responses:
         '200':
           description: Exact lesson-plan GenerationJobs from PostgreSQL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerationJobListEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/lessons/{lesson_id}/intro-options/artifact:
+    get:
+      summary: 恢复指定课时的导入方案、质量报告和审批事实
+      operationId: getIntroOptionArtifact
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Exact Intro option aggregate from PostgreSQL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntroOptionArtifactEnvelope'
+        4XX:
+          $ref: '#/components/responses/Error'
+  /projects/{project_id}/lessons/{lesson_id}/intro-options/generation-jobs:
+    get:
+      summary: 查询指定课时的导入方案生成任务
+      operationId: listIntroOptionGenerationJobs
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Exact Intro option GenerationJobs from PostgreSQL
           content:
             application/json:
               schema:
@@ -1681,6 +1762,23 @@ components:
         request_id:
           type: string
           minLength: 1
+    PrepareIntroOptionGenerationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - generation_mode
+        - source_artifact_version_id
+      properties:
+        generation_mode:
+          type: string
+          enum:
+            - default_nine
+            - refine_existing
+        source_artifact_version_id:
+          type:
+            - string
+            - 'null'
+          format: uuid
     SelectIntroOptionRequest:
       type: object
       additionalProperties: false
@@ -4216,6 +4314,36 @@ components:
           type: string
           format: date-time
     LessonPlanArtifactEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - request_id
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            - artifact
+            - quality_report
+            - latest_approval
+          properties:
+            artifact:
+              oneOf:
+                - $ref: '#/components/schemas/Artifact'
+                - type: 'null'
+            quality_report:
+              oneOf:
+                - $ref: '#/components/schemas/LessonPlanQualityReport'
+                - type: 'null'
+            latest_approval:
+              oneOf:
+                - $ref: '#/components/schemas/Approval'
+                - type: 'null'
+        request_id:
+          type: string
+          minLength: 1
+    IntroOptionArtifactEnvelope:
       type: object
       additionalProperties: false
       required:
