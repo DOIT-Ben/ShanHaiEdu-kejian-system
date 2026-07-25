@@ -1,8 +1,8 @@
 # 当前项目状态
 
-当前阶段：阶段1教师可见R1纵向链已经完成历史PR收敛，等待从最新`main`建立#11唯一实现入口。
+当前阶段：阶段1教师可见R1纵向链已拆为7个严格串行的child Issues和短PR；当前只推进第一个项目事实查询切片#223。
 > 最后核验：2026-07-25。
-> 当前唯一P0：[Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)；在新短分支和Draft PR建立前保持`status:blocked`。
+> 当前唯一P0：[Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)；当前child为[Issue #223](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/223)与Draft [PR #230](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/230)。
 
 ## 当前可演示成果
 
@@ -25,27 +25,29 @@
 
 ## 当前工作
 
-- 历史竞争PR已经全部关闭；当前没有开放的R1业务实现PR。
-- [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)是下一条唯一业务主线，当前仍为`status:blocked`；唯一允许的实现入口是从最新`origin/main`创建`feat/11-real-teacher-r1`和一个新的Draft PR，不恢复PR #208或其分支。
-- #11的第一个原子动作是先确认最小Contract Change：`startNodeRun`返回`202 AcceptedJob`并绑定现有Job/Worker/SSE；教材范围合法修订及质量阶段到`reviewArtifactVersion`的正式HTTP顺序必须同时明确，合同未确认前不得自造接口。
+- [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)保持`status:in-progress`，已经批准按#223至#229严格串行推进；前一child合并并从最新`origin/main`复验后，下一child才解除阻塞。
+- [PR #222](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/222)只保留102文件大现场的远端WIP恢复证据，固定Head为`19f517a8d3c545a82f929583b0ec4f8eb09dd1e5`；不再新增实现、不直接转Ready或合并。
+- [Issue #223](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/223)当前为`status:in-progress`；分支`feat/223-r1-contract-queries`和Draft [PR #230](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/230)从`origin/main@0450b04d`建立，只激活项目材料、Artifact和GenerationJob查询。
+- #224至#229保持`status:blocked`；在#223合并前不开始教材范围写命令、Worker/质量闭环、前端页面、real API或真实Provider验收。
 
 ## 当前阻塞
 
 - 当前没有已知的Session/CSRF实现阻塞；#211已经合并、关闭并从最新`main`复验。
 - 当前没有竞争修改Session、active OpenAPI、生成客户端或`apps/web`公共入口的开放业务PR；#208、#209、#212和#215均已关闭。
 - 阶段1完整教师R1纵向链尚未验收；教材列表与范围修订、异步节点启动、质量/批准HTTP闭环、生产页面消费者、真实文本Provider和R1 real API Playwright仍是#11待实现事实。
-- #11的新短分支、Draft PR和最小Contract Change入口尚未建立；在此之前不开始业务实现、PPT、图片、视频、TTS或新的治理框架，也不竞争修改active OpenAPI、生成客户端、Artifact/Job公共合同、Workflow Binding、Model Gateway或前端公共Session入口。
+- #223的本地定向合同、PostgreSQL、OpenAPI surface、类型和仓库治理验证已通过；PR #230的CI与最终独立reviewer尚未完成，不得声明本切片已合并或可用于完整R1。
+- #224仍被#223阻塞；Job的`lesson_id`过滤依赖#225新增正式`lesson_unit_id`持久字段和Alembic迁移，不得提前塞入无迁移的#223。
 
 ## 下一个阶段出口
 
-1. 从最新`origin/main`创建`feat/11-real-teacher-r1`和新的Draft PR，将Issue #11转回`status:in-progress`。
-2. 先在#11/#210确认异步`startNodeRun`、教材范围修订和质量/批准HTTP顺序的最小Contract Change，再同步active OpenAPI、FastAPI和生成客户端。
-3. 只推进“真实登录 -> 项目 -> 教材与物理页 -> 课时划分 -> LessonUnit -> 十二部分教案 -> 三类九套 -> 批准 -> 唯一IntroSelection -> 刷新恢复”的生产页面、PostgreSQL、Job/Worker/SSE、真实Provider和real API Playwright闭环。
-4. 以PostgreSQL集成测试、real API Playwright、delivery slice和受控真实文本Provider验收完整R1；在此之前不恢复媒体线。
+1. 完成PR #230的CI、最终base/head自审和一次独立只读reviewer审查；关闭findings后才可转Ready。
+2. Squash Merge #223，从干净`origin/main`复验三个项目查询，再把#224从blocked转为ready并创建独立短分支。
+3. 严格按#224教材范围/prepare、#225异步运行时、#226质量批准、#227前端消费者、#228生产页面、#229最终验收推进；每项独立验收和回退。
+4. #229以前不把deterministic Fake/HTTP stub称为真实Provider验收，也不恢复PPT、图片、视频或TTS开发。
 
 ## 接手提示
 
 1. 先读`README.md`、`AGENTS.md`、`docs/governance/项目记忆与接手索引.md`和本文件。
 2. #217和PR #219已经完成并清理；不要从旧PR恢复实现，也不要把历史矩阵当作可直接合并的代码。
 3. #211的当前运行证据以`main`中的代码、迁移、测试、active OpenAPI和`contracts/delivery-slices/211-runtime-auth.yaml`为准；PR #216保留合并前CI与独立审查证据。
-4. PR #208已经关闭且不得恢复；#11的新短分支和Draft PR尚未建立，建立前必须再次fetch并以最新`origin/main`为base。
+4. PR #208已经关闭且不得恢复；PR #222只能作为固定WIP检查点按文件/hunk提取。当前只接续#223/PR #230，禁止整体cherry-pick或并发启动#224至#229。
