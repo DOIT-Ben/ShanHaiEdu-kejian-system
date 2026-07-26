@@ -20,6 +20,11 @@ from apps.api.artifacts.authoring_provision import (
 )
 from apps.api.artifacts.models import Approval, Artifact, ArtifactVersion
 from apps.api.artifacts.service import ArtifactService
+from apps.api.content_runtime.package_source import (
+    BuiltinCoursewareReleaseSource,
+    load_builtin_courseware_release,
+)
+from apps.api.content_runtime.publication_service import ContentReleasePublisher
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, system_actor
@@ -35,6 +40,9 @@ from apps.api.node_execution.sqlalchemy import SqlAlchemyNodeExecutionTransactio
 from apps.api.prompt_runtime.models import ContextSnapshot
 from apps.api.workflows.models import NodeInputSnapshot, NodeRun
 from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
+from tests.integration.test_content_package_publication import (
+    release_1_4_courseware_release,  # pyright: ignore[reportPrivateUsage]
+)
 from tests.integration.test_lesson_division_runtime import (
     _prepare_approval,  # pyright: ignore[reportPrivateUsage, reportUnknownVariableType]
 )
@@ -49,6 +57,27 @@ class PreparedLessonPlan:
     artifact_id: UUID
     version_id: UUID
     generate_node_id: UUID
+
+
+async def test_release_1_4_lesson_plan_quality_remains_executable_after_1_5_publication(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    current = load_builtin_courseware_release(ROOT)
+    prepared = await _prepare_generated_lesson_plan(
+        factory,
+        release_source=release_1_4_courseware_release(current),
+    )
+    with factory() as session, session.begin():
+        ContentReleasePublisher(session).publish(
+            current,
+            published_by=prepared.actor.principal_id,
+        )
+
+    validate_id, report_id = _stage_and_validate(factory, prepared.actor, prepared.version_id)
+
+    assert validate_id is not None
+    assert report_id is not None
 
 
 async def test_lesson_plan_three_node_chain_uses_exact_lesson_and_material_scope(
@@ -321,10 +350,17 @@ async def test_lesson_plan_return_edit_revalidate_and_approve_requires_new_exact
 
 async def _prepare_generated_lesson_plan(
     factory: sessionmaker[Session],
+    *,
+    release_source: BuiltinCoursewareReleaseSource | None = None,
 ) -> PreparedLessonPlan:
     case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
     outputs = build_golden_branch_source_outputs(case)
-    division = await _prepare_approval(factory, case, outputs["lesson.division.generate"])
+    division = await _prepare_approval(
+        factory,
+        case,
+        outputs["lesson.division.generate"],
+        release_source=release_source,
+    )
     with factory() as session, session.begin():
         ArtifactService(session, division.actor).review(
             division.version_id,

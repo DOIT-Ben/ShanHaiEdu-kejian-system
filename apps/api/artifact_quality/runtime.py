@@ -12,6 +12,10 @@ from apps.api.intro_options.quality import (
     IntroSingleAnchorQualityValidator,
     IntroUniqueRecommendationQualityValidator,
 )
+from apps.api.intro_options.quality_legacy import (
+    LEGACY_INTRO_OPTION_SCHEMA_REF,
+    LEGACY_INTRO_SINGLE_ANCHOR_REF,
+)
 from apps.api.lessons.division_runtime import (
     LESSON_DIVISION_COVERAGE_REF,
     LESSON_DIVISION_SCHEMA_REF,
@@ -19,6 +23,8 @@ from apps.api.lessons.division_runtime import (
     LessonDivisionSchemaValidator,
 )
 from apps.api.lessons.lesson_plan_quality import (
+    LEGACY_LESSON_PLAN_SCOPE_REF,
+    LEGACY_LESSON_PLAN_TEACHING_QUALITY_REF,
     LESSON_PLAN_SCHEMA_REF,
     LESSON_PLAN_SCOPE_REF,
     LESSON_PLAN_TEACHING_QUALITY_REF,
@@ -33,9 +39,25 @@ _VALIDATORS: dict[ValidatorRef, QualityValidator] = {
     LESSON_PLAN_SCHEMA_REF: LessonPlanSchemaQualityValidator(),
     LESSON_PLAN_SCOPE_REF: LessonPlanScopeQualityValidator(),
     LESSON_PLAN_TEACHING_QUALITY_REF: LessonPlanTeachingQualityValidator(),
+    LEGACY_LESSON_PLAN_SCOPE_REF: LessonPlanScopeQualityValidator(
+        ref=LEGACY_LESSON_PLAN_SCOPE_REF,
+        include_page_evidence=False,
+    ),
+    LEGACY_LESSON_PLAN_TEACHING_QUALITY_REF: LessonPlanTeachingQualityValidator(
+        ref=LEGACY_LESSON_PLAN_TEACHING_QUALITY_REF,
+        include_page_evidence=False,
+    ),
     INTRO_OPTION_SCHEMA_REF: IntroOptionSchemaQualityValidator(),
     INTRO_SINGLE_ANCHOR_REF: IntroSingleAnchorQualityValidator(),
     INTRO_UNIQUE_RECOMMENDATION_REF: IntroUniqueRecommendationQualityValidator(),
+    LEGACY_INTRO_OPTION_SCHEMA_REF: IntroOptionSchemaQualityValidator(
+        ref=LEGACY_INTRO_OPTION_SCHEMA_REF,
+        enforce_default_nine_identity=False,
+    ),
+    LEGACY_INTRO_SINGLE_ANCHOR_REF: IntroSingleAnchorQualityValidator(
+        ref=LEGACY_INTRO_SINGLE_ANCHOR_REF,
+        include_page_evidence=False,
+    ),
 }
 
 

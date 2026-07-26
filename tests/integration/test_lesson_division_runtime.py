@@ -22,7 +22,10 @@ from apps.api.artifacts.service import ArtifactService
 from apps.api.assets.execution_port import AssetExecutionPortError
 from apps.api.assets.models import FileAsset, FileAssetVersion, MaterialParseVersion
 from apps.api.content_runtime.models import ContentDefinitionVersion
-from apps.api.content_runtime.package_source import load_builtin_courseware_release
+from apps.api.content_runtime.package_source import (
+    BuiltinCoursewareReleaseSource,
+    load_builtin_courseware_release,
+)
 from apps.api.content_runtime.publication_service import ContentReleasePublisher
 from apps.api.database import build_engine, build_session_factory, utc_now
 from apps.api.errors import ApiError
@@ -910,11 +913,12 @@ async def _prepare_approval(
     material_content: dict[str, object] | None = None,
     material_scope_page_range: tuple[int, int] | None = None,
     project_title: str = "Lesson division runtime",
+    release_source: BuiltinCoursewareReleaseSource | None = None,
 ) -> PreparedApproval:
     with factory() as session, session.begin():
         resolved_actor = actor or seed_test_actor(session)
         published = ContentReleasePublisher(session).publish(
-            load_builtin_courseware_release(ROOT),
+            release_source or load_builtin_courseware_release(ROOT),
             published_by=resolved_actor.principal_id,
         )
         project = ProjectRepository(session, resolved_actor).create(

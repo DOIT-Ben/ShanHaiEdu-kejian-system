@@ -18,6 +18,10 @@ from apps.api.intro_options.quality import (
     IntroSingleAnchorQualityValidator,
     IntroUniqueRecommendationQualityValidator,
 )
+from apps.api.intro_options.quality_legacy import (
+    LEGACY_INTRO_OPTION_SCHEMA_REF,
+    LEGACY_INTRO_SINGLE_ANCHOR_REF,
+)
 from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -99,8 +103,14 @@ def test_real_parser_page_evidence_is_accepted() -> None:
     ]
 
     outcome = IntroSingleAnchorQualityValidator().validate(context)
+    legacy = IntroSingleAnchorQualityValidator(
+        ref=LEGACY_INTRO_SINGLE_ANCHOR_REF,
+        include_page_evidence=False,
+    ).validate(context)
 
     assert outcome.passed is True, outcome.findings
+    assert legacy.validator == LEGACY_INTRO_SINGLE_ANCHOR_REF
+    assert legacy.passed is False
 
 
 @pytest.mark.parametrize(
@@ -130,6 +140,20 @@ def test_default_nine_rejects_duplicate_or_mismatched_option_identity(mutate, co
 
     assert outcome.passed is False
     assert code in {str(item["code"]) for item in outcome.findings}
+
+
+def test_release_1_4_schema_keeps_its_pre_identity_validation_behavior() -> None:
+    content = _content("default_nine")
+    options = cast(list[dict[str, Any]], content["options"])
+    options[1]["option_key"] = options[0]["option_key"]
+
+    outcome = IntroOptionSchemaQualityValidator(
+        ref=LEGACY_INTRO_OPTION_SCHEMA_REF,
+        enforce_default_nine_identity=False,
+    ).validate(_context(content))
+
+    assert outcome.validator == LEGACY_INTRO_OPTION_SCHEMA_REF
+    assert outcome.passed is True, outcome.findings
 
 
 def test_unique_recommendation_and_no_preteach_fail_closed() -> None:

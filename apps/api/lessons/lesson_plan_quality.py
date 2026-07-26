@@ -29,10 +29,20 @@ LESSON_PLAN_SCOPE_REF = ValidatorRef(
     semantic_version="1.1.0",
     implementation_digest="117d447f4a032fc2b7cdaf809ba8b84de99eaeddb8cc007093ed83e23c2a68b9",
 )
+LEGACY_LESSON_PLAN_SCOPE_REF = ValidatorRef(
+    key="validator.lesson_plan.scope",
+    semantic_version="1.0.0",
+    implementation_digest="72de7b0aa6677502ef36f29339badaf432b37c0b0409e22236efd5b03f99b68b",
+)
 LESSON_PLAN_TEACHING_QUALITY_REF = ValidatorRef(
     key="validator.lesson_plan.teaching_quality",
     semantic_version="1.1.0",
     implementation_digest="a9b19c72861e863ef3a551d58f846be47c6bb358e2dbb59315fc474b152329e6",
+)
+LEGACY_LESSON_PLAN_TEACHING_QUALITY_REF = ValidatorRef(
+    key="validator.lesson_plan.teaching_quality",
+    semantic_version="1.0.0",
+    implementation_digest="10296a5dfb1da0fdd73f8be5bf04fd597b37f934ef492dbe58edd7ac58afbdf2",
 )
 
 
@@ -52,17 +62,26 @@ class LessonPlanSchemaQualityValidator:
 
 
 class LessonPlanScopeQualityValidator:
+    def __init__(
+        self,
+        *,
+        ref: ValidatorRef = LESSON_PLAN_SCOPE_REF,
+        include_page_evidence: bool = True,
+    ) -> None:
+        self._ref = ref
+        self._include_page_evidence = include_page_evidence
+
     def validate(self, context: QualityValidationContext) -> ValidatorOutcome:
         try:
-            scope = _scope(context)
+            scope = _scope(context, include_page_evidence=self._include_page_evidence)
             LessonPlanBusinessValidator(_definition(context)).validate_scope(
                 scope,
                 _content(context),
             )
         except LessonPlanSliceError as exc:
-            return _failed(LESSON_PLAN_SCOPE_REF, exc)
+            return _failed(self._ref, exc)
         return ValidatorOutcome(
-            validator=LESSON_PLAN_SCOPE_REF,
+            validator=self._ref,
             passed=True,
             findings=(),
             evidence={
@@ -75,17 +94,26 @@ class LessonPlanScopeQualityValidator:
 
 
 class LessonPlanTeachingQualityValidator:
+    def __init__(
+        self,
+        *,
+        ref: ValidatorRef = LESSON_PLAN_TEACHING_QUALITY_REF,
+        include_page_evidence: bool = True,
+    ) -> None:
+        self._ref = ref
+        self._include_page_evidence = include_page_evidence
+
     def validate(self, context: QualityValidationContext) -> ValidatorOutcome:
         try:
-            scope = _scope(context)
+            scope = _scope(context, include_page_evidence=self._include_page_evidence)
             LessonPlanBusinessValidator(_definition(context)).validate_teaching_quality(
                 scope,
                 _content(context),
             )
         except LessonPlanSliceError as exc:
-            return _failed(LESSON_PLAN_TEACHING_QUALITY_REF, exc)
+            return _failed(self._ref, exc)
         return ValidatorOutcome(
-            validator=LESSON_PLAN_TEACHING_QUALITY_REF,
+            validator=self._ref,
             passed=True,
             findings=(),
             evidence={
@@ -107,7 +135,11 @@ def _content(context: QualityValidationContext) -> dict[str, Any]:
     return dict(context.source_content)
 
 
-def _scope(context: QualityValidationContext) -> ApprovedLessonPlanScope:
+def _scope(
+    context: QualityValidationContext,
+    *,
+    include_page_evidence: bool = True,
+) -> ApprovedLessonPlanScope:
     lesson_key = context.lesson_key
     division = context.supporting_inputs.get("approval:lesson_division")
     material = context.supporting_inputs.get("content:material_evidence")
@@ -127,6 +159,13 @@ def _scope(context: QualityValidationContext) -> ApprovedLessonPlanScope:
     unit = _exact_lesson(division, lesson_key)
     evidence_refs = _strings(unit.get("evidence_refs"))
     material_evidence = material_evidence_keys(material)
+    if not include_page_evidence:
+        material_evidence = {
+            cast(str, item.get("evidence_key"))
+            for item in _mapping_sequence(material.get("material_evidence"))
+            if isinstance(item.get("evidence_key"), str)
+            and cast(str, item.get("evidence_key")).strip()
+        }
     if not evidence_refs or not set(evidence_refs) <= material_evidence:
         raise LessonPlanSliceError(
             "MATERIAL_EVIDENCE_INVALID: lesson evidence is outside the exact material parse"
@@ -185,6 +224,16 @@ def _strings(value: object) -> tuple[str, ...]:
     if any(type(item) is not str or not item.strip() for item in values):
         return ()
     return cast(tuple[str, ...], values)
+
+
+def _mapping_sequence(value: object) -> tuple[Mapping[str, Any], ...]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        return ()
+    return tuple(
+        cast(Mapping[str, Any], item)
+        for item in cast(Sequence[object], value)
+        if isinstance(item, Mapping)
+    )
 
 
 def _required_text(value: Mapping[str, Any], key: str) -> str:

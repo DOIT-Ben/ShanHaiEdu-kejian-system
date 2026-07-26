@@ -9,6 +9,8 @@ from uuid import UUID
 from apps.api.artifact_quality.contracts import QualityValidationContext
 from apps.api.content_runtime.definition_projection import build_content_json_schema
 from apps.api.lessons.lesson_plan_quality import (
+    LEGACY_LESSON_PLAN_SCOPE_REF,
+    LEGACY_LESSON_PLAN_TEACHING_QUALITY_REF,
     LESSON_PLAN_SCOPE_REF,
     LESSON_PLAN_TEACHING_QUALITY_REF,
     LessonPlanScopeQualityValidator,
@@ -29,6 +31,18 @@ def test_lesson_plan_quality_accepts_real_parser_pages_only_evidence() -> None:
 
     assert LessonPlanScopeQualityValidator().validate(context).passed is True
     assert LessonPlanTeachingQualityValidator().validate(context).passed is True
+    legacy_scope = LessonPlanScopeQualityValidator(
+        ref=LEGACY_LESSON_PLAN_SCOPE_REF,
+        include_page_evidence=False,
+    ).validate(context)
+    legacy_teaching = LessonPlanTeachingQualityValidator(
+        ref=LEGACY_LESSON_PLAN_TEACHING_QUALITY_REF,
+        include_page_evidence=False,
+    ).validate(context)
+    assert legacy_scope.validator == LEGACY_LESSON_PLAN_SCOPE_REF
+    assert legacy_teaching.validator == LEGACY_LESSON_PLAN_TEACHING_QUALITY_REF
+    assert legacy_scope.passed is False
+    assert legacy_teaching.passed is False
 
 
 def _context_with_pages_only_evidence() -> QualityValidationContext:
