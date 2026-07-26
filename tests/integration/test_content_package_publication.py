@@ -86,6 +86,20 @@ RELEASE_1_5_CHANGE_SUMMARY = (
     "在不可变1.4.0基础上前向修正三类九套真实教材证据兼容与方案唯一性校验；"  # noqa: RUF001
     "旧Release与既有项目绑定保持不变。"
 )
+RELEASE_1_5_LESSON_DIVISION_PROMPT_SHA256 = (
+    "53271e4e0b409236444ffafc3e93200d9fcbb7bf1f1947e338e42f106abbf93e"
+)
+RELEASE_1_5_LESSON_DIVISION_OUTPUT_SHA256 = (
+    "5b5cc8bd1efee1a3b1a817a55f4a8a57ba7a720dced84d2d4561f97c914f979c"
+)
+RELEASE_1_5_LESSON_DIVISION_METHOD = (
+    "先分析批准范围中的知识结构、前后联系、例题或活动层次和学生可能的认知转折，再划分课时。"  # noqa: RUF001
+    "默认按40分钟容量，由直观经验到抽象表示、由概念形成到应用练习；新授课每课时聚焦一个核心知识或方法，"  # noqa: RUF001
+    "不把多个难点强塞在一起。若同页包含多个认知层次，按认知难度而非机械页码拆分；若材料只包含一个容量适当的"  # noqa: RUF001
+    "小知识点，保留单课时，不为凑结构增加练习课或复习课。每课时写明稳定键、顺序、课型、核心学习结果、教材范围"  # noqa: RUF001
+    "与证据、前置基础、讲授边界、不得提前讲授、重点、难点、划分理由和后续衔接。指定课时数与容量或知识边界冲突时，"  # noqa: RUF001
+    "在待确认问题中如实报告，不牺牲理解过程硬塞。"  # noqa: RUF001
+)
 RELEASE_1_5_LESSON_PLAN_PROMPT_SHA256 = (
     "749b1baad411fb74272e0e253147f551186523494c8e5ce59ac5029cf3d05e8b"
 )
@@ -652,6 +666,23 @@ def restore_lesson_plan_output_before_1_5_1(items: dict[str, dict[str, Any]]) ->
     process_assessment.pop("description", None)
 
 
+def restore_lesson_division_before_1_5_1(items: dict[str, dict[str, Any]]) -> None:
+    prompt = items["lesson.division.generate.prompt"]
+    method = next(
+        section for section in prompt["spec"]["sections"] if section["section_key"] == "method"
+    )
+    method["content"] = RELEASE_1_5_LESSON_DIVISION_METHOD
+
+    output = items["lesson.division.generate.output"]
+    coverage = next(
+        field for field in output["spec"]["fields"] if field["field_key"] == "coverage_check"
+    )
+    unresolved = next(
+        field for field in coverage["children"] if field["field_key"] == "unresolved_questions"
+    )
+    unresolved["editable"] = False
+
+
 def legacy_courseware_release(
     source: BuiltinCoursewareReleaseSource,
 ) -> BuiltinCoursewareReleaseSource:
@@ -667,6 +698,7 @@ def legacy_courseware_release(
         fixture_path = LEGACY_RELEASE_FIXTURE_ROOT / entry["path"]
         if fixture_path.exists():
             items[entry["item_key"]] = load_json_object(fixture_path)
+    restore_lesson_division_before_1_5_1(items)
     restore_lesson_plan_output_before_1_5_1(items)
     if set(items) != set(entries):
         raise AssertionError("legacy package item inventory differs from the published snapshot")
@@ -826,6 +858,18 @@ def release_1_5_courseware_release(
     manifest = deepcopy(source.manifest)
     manifest["semantic_version"] = "1.5.0"
     manifest["change_summary"] = RELEASE_1_5_CHANGE_SUMMARY
+    division_prompt_entry = next(
+        entry
+        for entry in manifest["items"]
+        if entry["item_key"] == "lesson.division.generate.prompt"
+    )
+    division_prompt_entry["sha256"] = RELEASE_1_5_LESSON_DIVISION_PROMPT_SHA256
+    division_output_entry = next(
+        entry
+        for entry in manifest["items"]
+        if entry["item_key"] == "lesson.division.generate.output"
+    )
+    division_output_entry["sha256"] = RELEASE_1_5_LESSON_DIVISION_OUTPUT_SHA256
     prompt_entry = next(
         entry for entry in manifest["items"] if entry["item_key"] == "lesson_plan.generate.prompt"
     )
@@ -836,6 +880,17 @@ def release_1_5_courseware_release(
     output_entry["sha256"] = RELEASE_1_5_LESSON_PLAN_OUTPUT_SHA256
     entries = {entry["item_key"]: entry for entry in manifest["items"]}
     items = deepcopy(source.items)
+    restore_lesson_division_before_1_5_1(items)
+    if (
+        canonical_json_sha256(items["lesson.division.generate.prompt"])
+        != RELEASE_1_5_LESSON_DIVISION_PROMPT_SHA256
+    ):
+        raise AssertionError("1.5.0 lesson-division Prompt differs from the published snapshot")
+    if (
+        canonical_json_sha256(items["lesson.division.generate.output"])
+        != RELEASE_1_5_LESSON_DIVISION_OUTPUT_SHA256
+    ):
+        raise AssertionError("1.5.0 lesson-division output differs from the published snapshot")
     prompt = items["lesson_plan.generate.prompt"]
     replacements = {
         "method": RELEASE_1_5_LESSON_PLAN_METHOD,
