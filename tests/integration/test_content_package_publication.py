@@ -107,6 +107,28 @@ RELEASE_1_5_LESSON_PLAN_OUTPUT_SHA256 = (
     "5ecbbef08390810ddedf0ae84e30592ab49978dec213900d254bcb0604f1a733"
 )
 RELEASE_1_5_INTRO_OUTPUT_SHA256 = "b9cc12772863821d328889319cd958108f49f4d5af296839869bce237099cd0a"
+RELEASE_1_5_1_PACKAGE_CHECKSUM = "724d95b532b1f181f0ea428cab5d83cb5e142e41b00a3cbaa3bbdb49139d90f8"
+RELEASE_1_5_1_WORKFLOW_CHECKSUM = "017995664712052bd8652c4ac2094f3881ad1ad8e087675bf975c2875513b79c"
+RELEASE_1_5_1_CHANGE_SUMMARY = (
+    "在不可变1.5.0基础上前向强化十二部分教案的教材范围与评价证据引用约束，并收紧三类九套的方案键、"  # noqa: RUF001
+    "媒介与数值输出约束；旧Release与既有项目绑定保持不变。"  # noqa: RUF001
+)
+RELEASE_1_5_1_INTRO_PROMPT_SHA256 = (
+    "4a38faaeec92bcd61151eb172a3517e4b00024b04986260cf0ad7342b4e3486d"
+)
+RELEASE_1_5_1_INTRO_OUTPUT_SHA256 = (
+    "16ef79ffae29ed44a6c82b2b1b0a7a6b2489be2b205459e27694671bfcbfe674"
+)
+RELEASE_1_5_1_INTRO_GENERATION_SHA256 = (
+    "b898282ebe7917d0b454694906d62feea1bf580e37073a9c6c61cba8ba9dad06"
+)
+RELEASE_1_5_1_EVALUATION_ITEM_KEYS = frozenset(
+    {
+        "intro.generate_options.candidates.output",
+        "intro.generate_options.evaluation.output",
+        "intro.generate_options.evaluation.prompt",
+    }
+)
 RELEASE_1_5_LESSON_PLAN_METHOD = (
     "先确定本课前置基础、核心学习结果、后续衔接和不得提前讲授内容；再写可观察、可评价且有成功标准的目标，"  # noqa: RUF001
     "并让每个目标同时绑定教学环节和评价证据。按设定课时长度设计学习启动、核心探究、应用或评价、课堂收束，"  # noqa: RUF001
@@ -124,6 +146,11 @@ RELEASE_1_4_INTRO_OPTION_SCHEMA = {
     "key": "validator.intro.option_set_schema",
     "semantic_version": "1.0.0",
     "implementation_digest": "2049fe72e70c9c5280e011cfd131b47d7444128973c4e7163c2c51d08d18a379",
+}
+RELEASE_1_5_1_INTRO_OPTION_SCHEMA = {
+    "key": "validator.intro.option_set_schema",
+    "semantic_version": "1.1.0",
+    "implementation_digest": "d60f89477c8db4c3f116fa7e524b8b8688e4f5403cc8cb137b0f1d56a170e6e4",
 }
 RELEASE_1_4_INTRO_SINGLE_ANCHOR = {
     "key": "validator.intro.single_anchor",
@@ -694,6 +721,67 @@ def restore_intro_output_before_1_5_1(items: dict[str, dict[str, Any]]) -> None:
     children["recommendation_score"].pop("validation_rules", None)
 
 
+def restore_intro_before_1_5_2(items: dict[str, dict[str, Any]]) -> None:
+    generation = items["intro.generate_options"]
+    generation_spec = generation["spec"]
+    generation_spec["description"] = (
+        "以已批准课时、知识边界、最小教材证据和教师偏好，在一次生成中产出一套或三类九套最终课堂导入方案；"  # noqa: RUF001
+        "完善已有创意时绑定一个exact来源版本。"
+    )
+    generation_spec.pop("evaluation_stage", None)
+
+    prompt = items["intro.generate_options.prompt"]
+    prompt_spec = prompt["spec"]
+    prompt_spec["description"] = generation_spec["description"]
+    prompt_spec["output_definition_ref"] = {
+        "item_key": "intro.generate_options.output",
+        "kind": "content_definition",
+    }
+    prompt_sections = {
+        "role": "你是小学数学课程驱动的课堂导入方案设计师，擅长从知识点、学习目标、教材证据和不得提前讲授边界中设计科普、应用、故事倾向可交叉的创意方案。",  # noqa: E501, RUF001
+        "task": "读取目标课时稳定键、知识点、一句话学习目标、教学内容边界、must_not_preteach、年级或年龄段、教材证据摘要及可选教师创意、媒介和时长偏好，在一次调用中直接生成最终intro_option_set。default_nine禁止已有创意来源并生成九套；refine_existing必须基于一个exact已有方案版本只完善一套。不要生成教案正文、PPT、分镜、旁白、字幕、资产、Provider参数或费用。",  # noqa: E501, RUF001
+        "method": "先提取课程种子，再从可观察现象、真实任务、人物或主体目标等不同角度生成创意；课程依据必须从创意形成开始参与，不能在完成后补贴课题词。每套同时形成主要与辅助倾向、创意概念、钩子、观看价值、课程关联、课堂第一问、交接时刻、不得提前讲授、媒介、时长、适配、风险和推荐结论。science、application、story只是主要倾向，辅助倾向可以交叉。",  # noqa: E501, RUF001
+        "quality_gate": "default_nine来源版本为0、主要倾向各恰好三套且至少一套包含两个以上辅助倾向；refine_existing来源版本恰好1且方案恰好1套。每套必须可追溯目标课时、知识点和教材证据，创意与课程依据存在实质关联；不得提前讲出需要学生发现的定义、写法、方法或结论；default_nine最高推荐分必须唯一；不得把三种倾向解释为互斥类别；输出不含完整教案、PPT、视频产物、Provider和费用。",  # noqa: E501, RUF001
+    }
+    for section in prompt_spec["sections"]:
+        section["content"] = prompt_sections[section["section_key"]]
+
+    output = items["intro.generate_options.output"]
+    output_spec = output["spec"]
+    output_spec["description"] = (
+        "一套或三类九套完整导入方案、0或1个exact来源版本、默认路径唯一最高推荐分和可冻结选择快照。"
+    )
+    options = next(field for field in output_spec["fields"] if field["field_key"] == "options")
+    primary_index = next(
+        index
+        for index, field in enumerate(options["children"])
+        if field["field_key"] == "primary_tendency"
+    )
+    options["children"].insert(
+        primary_index + 1,
+        {
+            "field_key": "secondary_tendencies",
+            "label": "辅助创作倾向",
+            "type": "list",
+            "required": True,
+            "editable": True,
+            "deletable": False,
+        },
+    )
+
+
+def restore_release_1_5_1_validator(catalog: dict[str, Any]) -> None:
+    intro_generate = package_node(catalog, "intro.generate_options")
+    intro_validate = package_node(catalog, "intro.validate")
+    for refs in (
+        intro_generate["validator_refs"],
+        intro_validate["validator_refs"],
+        intro_validate["quality_report_persistence"]["validator_refs"],
+        catalog["validator_descriptors"],
+    ):
+        replace_validator_ref(refs, RELEASE_1_5_1_INTRO_OPTION_SCHEMA)
+
+
 def legacy_courseware_release(
     source: BuiltinCoursewareReleaseSource,
 ) -> BuiltinCoursewareReleaseSource:
@@ -863,10 +951,57 @@ def release_1_3_courseware_release(
     )
 
 
-def release_1_5_courseware_release(
+def release_1_5_1_courseware_release(
     source: BuiltinCoursewareReleaseSource,
 ) -> BuiltinCoursewareReleaseSource:
     manifest = deepcopy(source.manifest)
+    manifest["semantic_version"] = "1.5.1"
+    manifest["change_summary"] = RELEASE_1_5_1_CHANGE_SUMMARY
+    manifest["items"] = [
+        entry
+        for entry in manifest["items"]
+        if entry["item_key"] not in RELEASE_1_5_1_EVALUATION_ITEM_KEYS
+    ]
+    intro_hashes = {
+        "intro.generate_options": RELEASE_1_5_1_INTRO_GENERATION_SHA256,
+        "intro.generate_options.output": RELEASE_1_5_1_INTRO_OUTPUT_SHA256,
+        "intro.generate_options.prompt": RELEASE_1_5_1_INTRO_PROMPT_SHA256,
+    }
+    for entry in manifest["items"]:
+        if entry["item_key"] in intro_hashes:
+            entry["sha256"] = intro_hashes[entry["item_key"]]
+    entries = {entry["item_key"]: entry for entry in manifest["items"]}
+    items = {item_key: deepcopy(source.items[item_key]) for item_key in entries}
+    restore_intro_before_1_5_2(items)
+    for item_key, entry in entries.items():
+        if canonical_json_sha256(items[item_key]) != entry["sha256"]:
+            raise AssertionError(f"1.5.1 package item drifted: {item_key}")
+    catalog = deepcopy(source.workflow_catalog)
+    catalog["semantic_version"] = "1.5.1"
+    restore_release_1_5_1_validator(catalog)
+    package_checksum = canonical_json_sha256(manifest)
+    workflow_checksum = hashlib.sha256(canonical_catalog_json(catalog)).hexdigest()
+    if (
+        package_checksum != RELEASE_1_5_1_PACKAGE_CHECKSUM
+        or workflow_checksum != RELEASE_1_5_1_WORKFLOW_CHECKSUM
+    ):
+        raise AssertionError("1.5.1 release checksum differs from the published snapshot")
+    return replace(
+        source,
+        manifest=manifest,
+        items=items,
+        manifest_entries=entries,
+        workflow_catalog=catalog,
+        package_checksum=package_checksum,
+        workflow_checksum=workflow_checksum,
+    )
+
+
+def release_1_5_courseware_release(
+    source: BuiltinCoursewareReleaseSource,
+) -> BuiltinCoursewareReleaseSource:
+    release_1_5_1 = release_1_5_1_courseware_release(source)
+    manifest = deepcopy(release_1_5_1.manifest)
     manifest["semantic_version"] = "1.5.0"
     manifest["change_summary"] = RELEASE_1_5_CHANGE_SUMMARY
     division_prompt_entry = next(
@@ -894,7 +1029,7 @@ def release_1_5_courseware_release(
     )
     intro_output_entry["sha256"] = RELEASE_1_5_INTRO_OUTPUT_SHA256
     entries = {entry["item_key"]: entry for entry in manifest["items"]}
-    items = deepcopy(source.items)
+    items = deepcopy(release_1_5_1.items)
     restore_lesson_division_before_1_5_1(items)
     if (
         canonical_json_sha256(items["lesson.division.generate.prompt"])
@@ -924,7 +1059,7 @@ def release_1_5_courseware_release(
     restore_intro_output_before_1_5_1(items)
     if canonical_json_sha256(intro_output) != RELEASE_1_5_INTRO_OUTPUT_SHA256:
         raise AssertionError("1.5.0 intro output differs from the published snapshot")
-    catalog = deepcopy(source.workflow_catalog)
+    catalog = deepcopy(release_1_5_1.workflow_catalog)
     catalog["semantic_version"] = "1.5.0"
     package_checksum = canonical_json_sha256(manifest)
     workflow_checksum = hashlib.sha256(canonical_catalog_json(catalog)).hexdigest()
@@ -934,7 +1069,7 @@ def release_1_5_courseware_release(
     ):
         raise AssertionError("1.5.0 release checksum differs from the published snapshot")
     return replace(
-        source,
+        release_1_5_1,
         manifest=manifest,
         items=items,
         manifest_entries=entries,
@@ -981,6 +1116,29 @@ def test_release_1_5_reconstruction_preserves_published_prompt_snapshot(
     assert (
         canonical_json_sha256(previous.items["lesson_plan.generate.prompt"])
         == RELEASE_1_5_LESSON_PLAN_PROMPT_SHA256
+    )
+
+
+def test_release_1_5_1_reconstruction_preserves_published_intro_snapshot(
+    builtin_courseware_source: BuiltinCoursewareReleaseSource,
+) -> None:
+    previous = release_1_5_1_courseware_release(builtin_courseware_source)
+
+    assert previous.semantic_version == "1.5.1"
+    assert previous.package_checksum == RELEASE_1_5_1_PACKAGE_CHECKSUM
+    assert previous.workflow_checksum == RELEASE_1_5_1_WORKFLOW_CHECKSUM
+    assert RELEASE_1_5_1_EVALUATION_ITEM_KEYS.isdisjoint(previous.items)
+    assert (
+        canonical_json_sha256(previous.items["intro.generate_options"])
+        == RELEASE_1_5_1_INTRO_GENERATION_SHA256
+    )
+    assert (
+        canonical_json_sha256(previous.items["intro.generate_options.prompt"])
+        == RELEASE_1_5_1_INTRO_PROMPT_SHA256
+    )
+    assert (
+        canonical_json_sha256(previous.items["intro.generate_options.output"])
+        == RELEASE_1_5_1_INTRO_OUTPUT_SHA256
     )
 
 
@@ -1132,14 +1290,14 @@ def test_golden_release_is_published_from_validated_fixtures_and_is_idempotent(
         assert second.created is False
         assert second == first.as_existing()
         assert publication_counts(session) == counts_after_first
-        assert source.semantic_version == "1.5.1"
-        assert source.manifest["semantic_version"] == "1.5.1"
-        assert source.workflow_catalog["semantic_version"] == "1.5.1"
-        assert source.release_key == f"{source.package_key}@1.5.1"
+        assert source.semantic_version == "1.5.2"
+        assert source.manifest["semantic_version"] == "1.5.2"
+        assert source.workflow_catalog["semantic_version"] == "1.5.2"
+        assert source.release_key == f"{source.package_key}@1.5.2"
         assert package_version is not None
-        assert package_version.semantic_version == "1.5.1"
+        assert package_version.semantic_version == "1.5.2"
         assert package_version.manifest_json == source.manifest
-        assert package_version.manifest_json["semantic_version"] == "1.5.1"
+        assert package_version.manifest_json["semantic_version"] == "1.5.2"
         assert package_version.checksum == source.package_checksum
         assert release is not None and release.status == "published"
         assert release.release_key == source.release_key
@@ -1277,11 +1435,11 @@ def test_forward_publication_preserves_legacy_release_and_project_bindings(
         assert current_result.content_release_id != old_release.id
         assert current_result.workflow_definition_version_id != old_workflow.id
         assert current_package_version.content_package_id == old_package.id
-        assert current_package_version.semantic_version == source.semantic_version == "1.5.1"
+        assert current_package_version.semantic_version == source.semantic_version == "1.5.2"
         assert current_package_version.manifest_json == source.manifest
         assert current_package_version.checksum == source.package_checksum
         assert current_release.release_key == source.release_key
-        assert current_release.release_key == f"{source.package_key}@1.5.1"
+        assert current_release.release_key == f"{source.package_key}@1.5.2"
         assert current_workflow.graph_json == source.workflow_catalog
         assert current_workflow.checksum == source.workflow_checksum
         assert old_result.content_release_id == old_project.content_release_id
@@ -1474,12 +1632,12 @@ def test_release_1_4_preserves_1_3_rows_and_existing_project_binding(
         assert snapshot_publication_rows(session, previous_result) == previous_snapshot
 
 
-def test_release_1_5_1_preserves_1_5_rows_and_existing_project_binding(
+def test_release_1_5_2_preserves_1_5_1_rows_and_existing_project_binding(
     migrated_database_url: str,
 ) -> None:
     factory = build_session_factory(build_engine(migrated_database_url))
     source = load_builtin_courseware_release(ROOT)
-    previous = release_1_5_courseware_release(source)
+    previous = release_1_5_1_courseware_release(source)
 
     with factory() as session, session.begin():
         actor = seed_test_actor(session)
@@ -1488,7 +1646,7 @@ def test_release_1_5_1_preserves_1_5_rows_and_existing_project_binding(
             published_by=actor.principal_id,
         )
         existing = ProjectRepository(session, actor).create(
-            CreateProjectRequest(title="Bound to 1.5.0", knowledge_point="One half")
+            CreateProjectRequest(title="Bound to 1.5.1", knowledge_point="One half")
         )
         previous_snapshot = snapshot_publication_rows(session, previous_result)
         previous_binding = (
@@ -1501,13 +1659,13 @@ def test_release_1_5_1_preserves_1_5_rows_and_existing_project_binding(
             published_by=actor.principal_id,
         )
         current = ProjectRepository(session, actor).create(
-            CreateProjectRequest(title="Bound to 1.5.1", knowledge_point="One half")
+            CreateProjectRequest(title="Bound to 1.5.2", knowledge_point="One half")
         )
 
-        assert previous.semantic_version == "1.5.0"
-        assert previous.package_checksum == RELEASE_1_5_PACKAGE_CHECKSUM
-        assert previous.workflow_checksum == RELEASE_1_5_WORKFLOW_CHECKSUM
-        assert source.semantic_version == "1.5.1"
+        assert previous.semantic_version == "1.5.1"
+        assert previous.package_checksum == RELEASE_1_5_1_PACKAGE_CHECKSUM
+        assert previous.workflow_checksum == RELEASE_1_5_1_WORKFLOW_CHECKSUM
+        assert source.semantic_version == "1.5.2"
         assert previous_result.content_release_id != current_result.content_release_id
         assert (
             current.content_release_id,

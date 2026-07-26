@@ -75,7 +75,7 @@ def test_schema_and_complete_primary_math_catalog_are_valid() -> None:
 
     node_keys = {node["node_key"] for node in catalog["nodes"]}
     assert catalog["api_version"] == "shanhai.workflow-node-generation-binding/v2"
-    assert catalog["semantic_version"] == "1.5.1"
+    assert catalog["semantic_version"] == "1.5.2"
     assert len(node_keys) == 48
     assert {
         "project": 7,
@@ -769,7 +769,7 @@ def test_catalog_hash_is_deterministic_for_semantically_identical_objects() -> N
     assert first_validated.canonical_json == second_validated.canonical_json
     assert first_validated.content_hash == second_validated.content_hash
     assert first_validated.content_hash == (
-        "017995664712052bd8652c4ac2094f3881ad1ad8e087675bf975c2875513b79c"
+        "a2e5dafe66c0138bc2f997e74bdf5d14944f1b5d65a9929f914aae592220ba3d"
     )
 
 

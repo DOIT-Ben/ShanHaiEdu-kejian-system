@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any, cast
+from typing import Any, Literal, cast
 from uuid import UUID
 
 from apps.api.content_runtime.runtime_port import RuntimeNodeMaterials
@@ -20,7 +20,12 @@ from apps.api.runtime_boundary.ports import (
     WorkflowExecutionContext,
 )
 
-from .contracts import NodeExecutionCommitContext, NodeExecutionError, PreparedNodeExecution
+from .contracts import (
+    NodeExecutionCommitContext,
+    NodeExecutionError,
+    PreparedNodeExecution,
+    TextEvaluationPlan,
+)
 from .prompt_plan import CompiledNodePrompt
 
 
@@ -59,6 +64,7 @@ def build_prepared_execution(
             reference_asset_authorization=reference_authorization,
         ),
         recovery_available=recovery_state == "available",
+        evaluation=_evaluation_plan(materials),
     )
 
 
@@ -80,6 +86,9 @@ def build_recovered_execution(
     succeeded: SucceededAttempt,
     recovery_state: str,
     owner_token: str,
+    evaluation: TextEvaluationPlan | None = None,
+    recovery_stage: Literal["initial", "final"] | None = None,
+    recovery_output: dict[str, Any] | None = None,
 ) -> PreparedNodeExecution:
     return PreparedNodeExecution(
         node_run_id=node_run_id,
@@ -91,6 +100,9 @@ def build_recovered_execution(
         pre_model_error_message="the successful model result is unavailable for T2",
         commit_context=commit_context,
         recovery_available=recovery_state == "available",
+        evaluation=evaluation,
+        recovery_stage=recovery_stage,
+        recovery_output=recovery_output,
     )
 
 
@@ -102,6 +114,7 @@ def build_frozen_invocation(
     output_schema: dict[str, Any],
     commit_context: NodeExecutionCommitContext,
     owner_token: str,
+    evaluation: TextEvaluationPlan | None = None,
 ) -> PreparedNodeExecution:
     return PreparedNodeExecution(
         node_run_id=node_run_id,
@@ -110,6 +123,17 @@ def build_frozen_invocation(
         output_schema=output_schema,
         execution_owner_token=owner_token,
         commit_context=commit_context,
+        evaluation=evaluation,
+    )
+
+
+def _evaluation_plan(materials: RuntimeNodeMaterials) -> TextEvaluationPlan | None:
+    if materials.evaluation is None:
+        return None
+    return TextEvaluationPlan(
+        prompt_template=materials.evaluation.prompt_template,
+        output_schema=materials.evaluation.output_schema,
+        final_output_schema=materials.evaluation.final_output_schema,
     )
 
 

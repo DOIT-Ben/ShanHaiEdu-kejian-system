@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -30,6 +30,7 @@ from apps.api.node_execution.contracts import (
     NodeExecutionTransaction,
     NodeExecutionTransactionFactory,
     PreparedNodeExecution,
+    TextEvaluationPlan,
 )
 from apps.api.node_execution.fresh_inputs import compile_fresh_inputs
 from apps.api.node_execution.materials import audit_context, execution_snapshot
@@ -223,6 +224,8 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
             )
         owner_token = claim_execution_owner(self._workflow, node_run_id)
         recovery_state = self._recovery.state(execution, succeeded, succeeded.request_id)
+        recovery_stage: Literal["initial", "final"] | None = None
+        recovery_output = None
         if recovery_state == "available":
             self._recovery.rebind_owner(
                 execution,
@@ -230,16 +233,38 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
                 succeeded.request_id,
                 owner_token,
             )
+            schemas: dict[Literal["initial", "final"], dict[str, Any]] = {
+                "final": materials.output_schema
+            }
+            if materials.evaluation is not None:
+                schemas = {
+                    "initial": materials.output_schema,
+                    "final": materials.evaluation.final_output_schema,
+                }
+            recovery_stage, recovery_output = self._recovery.inspect(
+                execution,
+                context,
+                succeeded,
+                succeeded.request_id,
+                schemas,
+            )
         self._workflow.start(node_run_id)
         return build_recovered_execution(
             node_run_id=node_run_id,
             request=request,
             audit_context=audit_context(execution, self._actor.user_id),
-            output_schema=materials.output_schema,
+            output_schema=(
+                materials.evaluation.final_output_schema
+                if recovery_stage == "final" and materials.evaluation is not None
+                else materials.output_schema
+            ),
             commit_context=context,
             succeeded=succeeded,
             recovery_state=recovery_state,
             owner_token=owner_token,
+            evaluation=_evaluation_plan(materials),
+            recovery_stage=recovery_stage,
+            recovery_output=recovery_output,
         )
 
     def _prepare_frozen_invocation(
@@ -268,6 +293,7 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
             output_schema=materials.output_schema,
             commit_context=context,
             owner_token=owner_token,
+            evaluation=_evaluation_plan(materials),
         )
 
     def _load_frozen_context(
@@ -306,6 +332,9 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
         owner_token, current = self._require_owned_running(execution)
         self._recovery.checkpoint(execution, current, context, owner_token, output, pending)
 
+    def next_model_request_id(self, node_run_id: UUID) -> str:
+        return self._attempts.next_model_request_id(node_run_id)
+
     def commit(self, execution: PreparedNodeExecution) -> CommittedNodeExecution:
         context = execution.commit_context
         if context is None:
@@ -340,7 +369,7 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
             workflow=self._workflow,
             fault_injector=self._fault_injector,
         )
-        self._session.delete(fact)
+        self._recovery.discard(current.node_run_id)
         self._session.flush()
         return result
 
@@ -398,3 +427,13 @@ class SqlAlchemyNodeExecutionTransaction(NodeExecutionTransaction):
 
 def _ignore_fault_stage(_stage: str) -> None:
     return None
+
+
+def _evaluation_plan(materials: RuntimeNodeMaterials) -> TextEvaluationPlan | None:
+    if materials.evaluation is None:
+        return None
+    return TextEvaluationPlan(
+        prompt_template=materials.evaluation.prompt_template,
+        output_schema=materials.evaluation.output_schema,
+        final_output_schema=materials.evaluation.final_output_schema,
+    )

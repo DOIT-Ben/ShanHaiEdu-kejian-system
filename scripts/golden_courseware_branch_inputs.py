@@ -225,6 +225,31 @@ def _intro_generate_options_output(case: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def build_intro_generation_stage_outputs(
+    final_output: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Split a deterministic final option set into candidate and scoring model outputs."""
+
+    candidates = copy.deepcopy(final_output)
+    candidates.pop("recommendation_summary", None)
+    evaluations: list[dict[str, Any]] = []
+    for option in cast(list[dict[str, Any]], candidates["options"]):
+        evaluations.append(
+            {
+                "option_key": option["option_key"],
+                "recommendation_score": option.pop("recommendation_score"),
+                "recommendation_reason": option.pop("recommendation_reason"),
+                "risks": option.pop("risks"),
+            }
+        )
+        option.pop("secondary_tendencies", None)
+    scoring = {
+        "evaluations": evaluations,
+        "recommendation_summary": copy.deepcopy(final_output["recommendation_summary"]),
+    }
+    return candidates, scoring
+
+
 def build_golden_branch_source_outputs(case: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """Build exact planning outputs without fabricating provider media facts."""
 

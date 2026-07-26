@@ -86,7 +86,7 @@ flowchart TD
 
 教师退回后，服务器从exact生成版本建立受#131策略约束的baseline draft；合法字段编辑提交为新的不可变ArtifactVersion，锁定字段不能通过用户或system actor绕过。旧版本的passing报告和人工gate不能批准新版本；每次返修必须创建更高`run_no`的validate与approval gate并重新校验。`request_changes`永久退休当前exact gate；批准时Artifact指针、Approval、gate终态、stale传播和事件在一个事务提交。一个课时的失败、返修、批准或stale不读取或改写其他LessonUnit。
 
-每课时默认同时生成三类九套导入设计：单个节点读取批准课时、知识点、学习目标、内容边界、不得提前讲授、年级/年龄、教材证据摘要和可选教师偏好，一次生成最终九套方案。三种主要倾向各三套并允许辅助倾向交叉；方案集作为独立附录产物，教师可以稍后选择，不阻塞教案和PPT。
+每课时默认生成三类九套导入设计：教师只启动一次，单个NodeRun和GenerationJob先调用Model Gateway生成科普、应用、故事各三套未评分候选，再独立调用一次Model Gateway统一评价exact九套，为每套返回分数、推荐理由和适配风险并形成唯一全局推荐。评分不得漏评、多评或改写候选正文；方案集作为独立附录产物，教师可以稍后选择，不阻塞教案和PPT。
 
 ## 3. PPT流程
 

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 from collections import Counter
+from copy import deepcopy
 from pathlib import Path
 from uuid import UUID
 
 import httpx
+import pytest
 from pydantic import SecretStr
 from sqlalchemy import func, select
 
@@ -19,10 +21,13 @@ from apps.api.model_gateway.audit import SqlAlchemyAttemptAuditSink
 from apps.api.model_gateway.audit_models import GenerationAttempt
 from apps.api.model_gateway.contracts import ModelCapability
 from apps.api.model_gateway.gateway import ModelGateway
-from apps.api.node_execution.fake import DeterministicNodeOutputProvider
+from apps.api.node_execution.fake import DeterministicNodeOutputSequenceProvider
 from apps.api.settings import Settings
 from apps.api.workflows.models import NodeRun
-from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
+from scripts.golden_courseware_branch_inputs import (
+    build_golden_branch_source_outputs,
+    build_intro_generation_stage_outputs,
+)
 from tests.fakes.identity import override_test_identity
 from tests.fakes.object_storage import FakeObjectStorage
 from tests.integration.test_lesson_division_runtime import (
@@ -34,8 +39,10 @@ ROOT = Path(__file__).resolve().parents[2]
 GOLDEN_CASE = ROOT / "contracts/fixtures/golden-projects/numbers-1-to-5/golden-project.json"
 
 
+@pytest.mark.parametrize("retry_scoring", [False, True])
 async def test_intro_worker_persists_one_exact_nine_option_job_and_isolates_lessons(
     migrated_database_url: str,
+    retry_scoring: bool,
 ) -> None:
     engine = build_engine(migrated_database_url)
     factory = build_session_factory(engine)
@@ -92,7 +99,16 @@ async def test_intro_worker_persists_one_exact_nine_option_job_and_isolates_less
     app = create_app(settings=settings, object_storage=FakeObjectStorage())
     override_test_identity(app, prepared.actor)
     transport = httpx.ASGITransport(app=app)
-    provider = DeterministicNodeOutputProvider(outputs["intro.generate_options"])
+    stage_outputs = build_intro_generation_stage_outputs(outputs["intro.generate_options"])
+    if retry_scoring:
+        invalid_scoring = deepcopy(stage_outputs[1])
+        invalid_scoring["evaluations"][0]["option_key"] = invalid_scoring["evaluations"][1][
+            "option_key"
+        ]
+        provider_outputs = (stage_outputs[0], invalid_scoring, stage_outputs[1])
+    else:
+        provider_outputs = stage_outputs
+    provider = DeterministicNodeOutputSequenceProvider(provider_outputs)
     gateway = ModelGateway(
         {ModelCapability.TEXT_STRUCTURED_CREATIVE_EDUCATION: provider},
         audit_sink=SqlAlchemyAttemptAuditSink(factory),
@@ -170,7 +186,7 @@ async def test_intro_worker_persists_one_exact_nine_option_job_and_isolates_less
         app.state.database_engine.dispose()
 
     assert outcome == "succeeded", failure_facts
-    assert provider.calls == 1
+    assert provider.calls == (3 if retry_scoring else 2)
     assert first_jobs.status_code == 200, first_jobs.text
     assert second_jobs.status_code == 200, second_jobs.text
     assert [item["id"] for item in first_jobs.json()["data"]["items"]] == [str(job_id)]
@@ -206,14 +222,11 @@ async def test_intro_worker_persists_one_exact_nine_option_job_and_isolates_less
             )
             == 1
         )
-        assert (
-            session.scalar(
-                select(func.count())
-                .select_from(GenerationAttempt)
-                .where(GenerationAttempt.generation_job_id == job_id)
-            )
-            == 1
-        )
+        assert session.scalar(
+            select(func.count())
+            .select_from(GenerationAttempt)
+            .where(GenerationAttempt.generation_job_id == job_id)
+        ) == (3 if retry_scoring else 2)
         assert (
             session.scalar(
                 select(func.count())

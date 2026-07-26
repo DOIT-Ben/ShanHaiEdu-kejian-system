@@ -247,8 +247,6 @@ def _validate_intro(case: dict[str, Any]) -> None:
             _fail("GOLDEN_INTRO_SOURCE_INVALID", "default_nine forbids an existing source")
         if counts != Counter({"science": 3, "application": 3, "story": 3}):
             _fail("GOLDEN_INTRO_TENDENCY_COUNT_INVALID", "primary tendencies must be three each")
-        if not any(len(option["secondary_tendencies"]) >= 2 for option in options):
-            _fail("GOLDEN_INTRO_TENDENCY_CROSS_MISSING", "golden options need crossed tendencies")
     elif generation_mode == "refine_existing":
         if len(source_refs) != 1:
             _fail("GOLDEN_INTRO_SOURCE_INVALID", "refine_existing requires one exact source")
@@ -270,8 +268,6 @@ def _validate_intro(case: dict[str, Any]) -> None:
             _fail("GOLDEN_INTRO_LESSON_SOURCE_INVALID", "intro option lesson trace differs")
         if option["knowledge_point"] != target_lesson["teaching_focus"]:
             _fail("GOLDEN_INTRO_KNOWLEDGE_SOURCE_INVALID", "intro option knowledge trace differs")
-        if option["primary_tendency"] in option["secondary_tendencies"]:
-            _fail("GOLDEN_INTRO_TENDENCY_OVERLAP", "primary tendency cannot repeat as secondary")
         if not forbidden.issubset(set(cast(list[str], option["must_not_preteach"]))):
             _fail(
                 "GOLDEN_INTRO_KNOWLEDGE_BOUNDARY_INVALID",

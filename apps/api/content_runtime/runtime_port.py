@@ -30,10 +30,18 @@ class RuntimeDefinitionError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class TextEvaluationMaterials:
+    prompt_template: Mapping[str, Any]
+    output_schema: dict[str, Any]
+    final_output_schema: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
 class RuntimeNodeMaterials:
     definition: RuntimeNodeDefinition
     prompt_template: Mapping[str, Any]
     output_schema: dict[str, Any]
+    evaluation: TextEvaluationMaterials | None = None
 
 
 class WorkflowFactsReader(Protocol):
@@ -76,6 +84,11 @@ class SqlAlchemyRuntimeDefinitionReader:
         spec = _mapping(template.get("spec"))
         output_key = _reference_key(spec, "output_definition_ref")
         content_definition = self._content_definition(package_ids, output_key)
+        evaluation = self._evaluation_materials(
+            package_ids,
+            spec,
+            final_output_schema=content_definition.schema_json,
+        )
         definition = RuntimeNodeDefinition(
             content_release_id=release.id,
             workflow_definition_version_id=execution.workflow_definition_version_id,
@@ -93,7 +106,37 @@ class SqlAlchemyRuntimeDefinitionReader:
         return RuntimeNodeMaterials(
             definition=definition,
             prompt_template=prompt,
-            output_schema=content_definition.schema_json,
+            output_schema=(
+                content_definition.schema_json
+                if evaluation is None
+                else self._content_definition(
+                    package_ids,
+                    _reference_key(
+                        _mapping(spec["evaluation_stage"]),
+                        "candidate_output_definition_ref",
+                    ),
+                ).schema_json
+            ),
+            evaluation=evaluation,
+        )
+
+    def _evaluation_materials(
+        self,
+        package_ids: tuple[UUID, ...],
+        spec: Mapping[str, Any],
+        *,
+        final_output_schema: dict[str, Any],
+    ) -> TextEvaluationMaterials | None:
+        raw = spec.get("evaluation_stage")
+        if raw is None:
+            return None
+        stage = _mapping(raw)
+        prompt_key = _reference_key(stage, "prompt_template_ref")
+        output_key = _reference_key(stage, "output_definition_ref")
+        return TextEvaluationMaterials(
+            prompt_template=self._package_item(package_ids, prompt_key, "prompt_template"),
+            output_schema=self._content_definition(package_ids, output_key).schema_json,
+            final_output_schema=final_output_schema,
         )
 
     def _require_release(self, release_id: UUID) -> ContentRelease:

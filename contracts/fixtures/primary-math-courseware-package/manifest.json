@@ -2,9 +2,9 @@
   "format_version": "1.0",
   "package_key": "shanhai.primary_math.courseware",
   "name": "小学数学标准课件生产内容包",
-  "semantic_version": "1.5.1",
+  "semantic_version": "1.5.2",
   "runtime_constraint": ">=0.1.0 <1.0.0",
-  "change_summary": "在不可变1.5.0基础上前向强化十二部分教案的教材范围与评价证据引用约束，并收紧三类九套的方案键、媒介与数值输出约束；旧Release与既有项目绑定保持不变。",
+  "change_summary": "在不可变1.5.1基础上把三类九套改为候选生成与独立统一评分两个受审计阶段，删除辅助倾向字段与跨倾向门禁；旧Release与既有项目绑定保持不变。",
   "dependencies": [],
   "items": [
     {
@@ -103,14 +103,14 @@
       "kind": "content_definition",
       "path": "items/intro-generate-options-output.json",
       "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
-      "sha256": "16ef79ffae29ed44a6c82b2b1b0a7a6b2489be2b205459e27694671bfcbfe674"
+      "sha256": "7a7b6b53647f59d393c9072ee2008469149c4e2cd22f680dbed7c7149fc41a1f"
     },
     {
       "item_key": "intro.generate_options.prompt",
       "kind": "prompt_template",
       "path": "items/intro-generate-options-prompt.json",
       "schema_id": "https://shanhaiedu.local/contracts/prompt-template.schema.json",
-      "sha256": "4a38faaeec92bcd61151eb172a3517e4b00024b04986260cf0ad7342b4e3486d"
+      "sha256": "bbb9e92a871bd7dabe9731a437de4af3c014d6e131744cc0eb0741a52536cd03"
     },
     {
       "item_key": "intro.generate_options.projection",
@@ -120,11 +120,32 @@
       "sha256": "6cde708609bdb98894c71b7ec31888ef7f033a32ae8deaf3e98c3f24091ca30e"
     },
     {
+      "item_key": "intro.generate_options.candidates.output",
+      "kind": "content_definition",
+      "path": "items/intro-generate-options-candidates-output.json",
+      "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
+      "sha256": "974f6e2b44c65c3ca05b1dde64caa964341708479d7a47b8a6fd5edda793bf51"
+    },
+    {
+      "item_key": "intro.generate_options.evaluation.output",
+      "kind": "content_definition",
+      "path": "items/intro-generate-options-evaluation-output.json",
+      "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
+      "sha256": "a1437a3981df6552126be4871f40f7963273d1a0a7ccdd8de11c3beb6d9ce44c"
+    },
+    {
+      "item_key": "intro.generate_options.evaluation.prompt",
+      "kind": "prompt_template",
+      "path": "items/intro-generate-options-evaluation-prompt.json",
+      "schema_id": "https://shanhaiedu.local/contracts/prompt-template.schema.json",
+      "sha256": "ae78330ec87e99e9fd1662fe7903a6f9e0a279b778cc47eb64c6210d17de4f90"
+    },
+    {
       "item_key": "intro.generate_options",
       "kind": "generation_template",
       "path": "items/intro-generate-options-generation.json",
       "schema_id": "https://shanhaiedu.local/contracts/generation-template.schema.json",
-      "sha256": "b898282ebe7917d0b454694906d62feea1bf580e37073a9c6c61cba8ba9dad06"
+      "sha256": "d892383a6375cc908bbefb41cc3e8ad20b26682c22c518a9175066c86f28dd3f"
     },
     {
       "item_key": "ppt.content_analyze.input",

@@ -2,16 +2,16 @@
   "api_version": "shanhai.edu/v1",
   "kind": "content_definition",
   "metadata": {
-    "key": "intro.generate_options.output",
-    "name": "课程驱动导入方案输出",
+    "key": "intro.generate_options.candidates.output",
+    "name": "课程驱动导入方案候选输出",
     "domain": "primary_math",
     "locale": "zh-CN"
   },
   "spec": {
-    "definition_key": "intro.generate_options.output",
-    "title": "课程驱动导入方案输出",
-    "description": "独立评分后的一套或三类九套完整导入方案、0或1个exact来源版本、唯一全局推荐和可冻结选择快照。",
-    "definition_role": "artifact",
+    "definition_key": "intro.generate_options.candidates.output",
+    "title": "课程驱动导入方案候选输出",
+    "description": "第一阶段生成的exact候选池，不含任何自评分、推荐理由、适配风险或推荐结论。",
+    "definition_role": "intermediate",
     "fields": [
       {
         "field_key": "option_set_key",
@@ -50,8 +50,7 @@
         "deletable": false,
         "visibility": "hidden",
         "min_items": 0,
-        "max_items": 1,
-        "generation_instruction": "default_nine固定为空；refine_existing固定一个exact ArtifactVersion ID"
+        "max_items": 1
       },
       {
         "field_key": "source_lesson_unit_key",
@@ -82,10 +81,10 @@
       },
       {
         "field_key": "options",
-        "label": "导入方案",
+        "label": "未评分导入候选",
         "type": "repeatable",
         "required": true,
-        "editable": true,
+        "editable": false,
         "deletable": false,
         "repeatable": true,
         "min_items": 1,
@@ -147,7 +146,7 @@
             "label": "标题",
             "type": "text",
             "required": true,
-            "editable": true,
+            "editable": false,
             "deletable": false
           },
           {
@@ -155,7 +154,7 @@
             "label": "课程驱动创意概念",
             "type": "rich_text",
             "required": true,
-            "editable": true,
+            "editable": false,
             "deletable": false
           },
           {
@@ -163,7 +162,7 @@
             "label": "钩子",
             "type": "rich_text",
             "required": true,
-            "editable": true,
+            "editable": false,
             "deletable": false
           },
           {
@@ -171,7 +170,7 @@
             "label": "观看价值",
             "type": "rich_text",
             "required": true,
-            "editable": true,
+            "editable": false,
             "deletable": false
           },
           {
@@ -179,7 +178,7 @@
             "label": "建议媒介",
             "type": "enum",
             "required": true,
-            "editable": true,
+            "editable": false,
             "deletable": false,
             "options": [
               {
@@ -213,7 +212,7 @@
             "label": "建议时长",
             "type": "number",
             "required": true,
-            "editable": true,
+            "editable": false,
             "deletable": false,
             "validation_rules": [
               {
@@ -229,7 +228,7 @@
             "label": "课程关联",
             "type": "rich_text",
             "required": true,
-            "editable": true,
+            "editable": false,
             "deletable": false
           },
           {
@@ -237,7 +236,7 @@
             "label": "课堂第一问",
             "type": "rich_text",
             "required": true,
-            "editable": true,
+            "editable": false,
             "deletable": false
           },
           {
@@ -245,7 +244,7 @@
             "label": "交接时刻",
             "type": "rich_text",
             "required": true,
-            "editable": true,
+            "editable": false,
             "deletable": false
           },
           {
@@ -260,64 +259,6 @@
             "field_key": "fit_reason",
             "label": "适配理由",
             "type": "rich_text",
-            "required": true,
-            "editable": true,
-            "deletable": false
-          },
-          {
-            "field_key": "risks",
-            "label": "风险",
-            "type": "list",
-            "required": true,
-            "editable": true,
-            "deletable": false
-          },
-          {
-            "field_key": "recommendation_score",
-            "label": "推荐分",
-            "type": "number",
-            "required": true,
-            "editable": false,
-            "deletable": false,
-            "validation_rules": [
-              {
-                "minimum": 1
-              },
-              {
-                "maximum": 100
-              }
-            ]
-          },
-          {
-            "field_key": "recommendation_reason",
-            "label": "推荐理由",
-            "type": "rich_text",
-            "required": true,
-            "editable": false,
-            "deletable": false
-          }
-        ]
-      },
-      {
-        "field_key": "recommendation_summary",
-        "label": "推荐结论",
-        "type": "group",
-        "required": true,
-        "editable": false,
-        "deletable": false,
-        "children": [
-          {
-            "field_key": "recommended_option_key",
-            "label": "最高推荐方案",
-            "type": "reference",
-            "required": true,
-            "editable": false,
-            "deletable": false
-          },
-          {
-            "field_key": "single_highest_score",
-            "label": "最高分唯一",
-            "type": "boolean",
             "required": true,
             "editable": false,
             "deletable": false

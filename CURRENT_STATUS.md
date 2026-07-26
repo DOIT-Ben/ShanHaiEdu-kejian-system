@@ -1,7 +1,7 @@
 # 当前项目状态
 
 当前阶段：阶段1后端基座以及R1教材范围、课时划分、十二部分教案和三类九套四个教师可见文本结果已经合并；当前只执行受控真实文本Provider教师黄金项目与最终R1收口。
-> 最后核验：2026-07-26。
+> 最后核验：2026-07-27。
 > 当前任务：[Issue #241](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/241)，Draft PR [#242](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/242)；只复用现有Model Gateway和生产Worker完成受控真实文本Provider验收、脱敏receipt与最终收口。
 
 ## 当前可演示成果
@@ -34,11 +34,12 @@
 - [Issue #239](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/239)已经由[PR #240](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/240)完成主线状态收口并关闭。
 - [Issue #241](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/241)是当前唯一P0实施入口；生产Worker已经核验会在未注入测试模型时通过现有`build_real_text_gateway()`调用真实文本Provider，本任务只补受控黄金项目、脱敏receipt和必要的验收接线。
 - Draft PR [#242](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/242)从`origin/main`独立开发；普通CI继续使用确定性Fake，真实Provider只通过显式受控命令执行。
-- #242当前前向内容包为`1.5.1`：保持不可变`1.5.0`和既有项目绑定不变，收紧十二部分教案的教材范围、教材证据和评价证据裸键约束，并固定三类九套的方案键格式、六种媒介枚举、时长与推荐分边界；自动课时划分在输入充分时不得制造无关待确认问题，教师页面可查看、编辑或清空真实待确认问题；结构化文本输出预算为12,288 tokens，Provider本地超时上限为300秒。
-- 当前分支的内容合同、PostgreSQL发布不变量、Fake Worker真实API浏览器链、active OpenAPI/生成客户端、Python质量门禁、生产前端`release:check`、仓库治理和密钥扫描已经通过；这些本地结果不能替代真实Provider passed receipt。
-- 当前分支的真实API浏览器验收只在真实模式且exact三类九套Job以`MODEL_TIMEOUT`失败时允许教师页面重试一次，不改变生产Worker、状态机或通用Provider行为；最新Fake Worker复验仍为2条教师流程全部通过。
+- #242当前前向内容包为`1.5.2`：保持不可变`1.5.0`、`1.5.1`和既有项目绑定不变，将`intro.generate_options`收口为同一NodeRun/GenerationJob内的两次串行Model Gateway调用：第一阶段只生成science、application、story各三套未评分候选，第二阶段独立覆盖exact九个`option_key`统一评分，返回每套分数、推荐理由、适配风险和唯一全局推荐。
+- `secondary_tendencies`及跨倾向阻塞门禁已从现行Schema、内容包和运行质量合同删除；第一阶段禁止自评分，第二阶段不得漏评、多评或改写候选正文。正常成功为1个Job、2个成功GenerationAttempt；首轮评分非法时同一Job有界重投一次，只重跑评分并复用已持久化候选，成功时共3个Attempt。
+- active OpenAPI与生成的TypeScript客户端已按`1.5.2`现行Schema重新生成；当前分支worktree已通过核心单元/合同121项、PostgreSQL内容包与Worker 79项、完整合同235项（2项合法skip）、11个PostgreSQL backend selector、5个真实API浏览器selector、前端76文件264项单测、120个stories 296项检查、生产build、默认Playwright 21项和runtime Playwright 8项。
+- 当前分支的真实API浏览器验收只在真实模式且exact三类九套Job以`MODEL_TIMEOUT`失败时允许教师页面重试一次，不改变生产Worker、状态机或通用Provider行为；Ruff format/check、Pyright、仓库治理、密钥扫描和`git diff --check`也已通过，测试只使用Fake Worker，没有调用真实Provider。
 - 最新一次经明确授权的受控黄金项目中，三个真实Provider请求均首次返回HTTP 200且没有触发重试：`lesson_plan.generate`在86.269秒成功返回4,321 prompt、5,538 completion、9,859 total tokens；`intro.generate_options`在232.371秒成功返回2,417 prompt、7,528 completion、9,945 total tokens；`lesson.division.generate`在21.876秒成功返回1,806 prompt、1,207 completion、3,013 total tokens。
-- 十二部分教案完成生成、教师编辑保存、质量检查和exact ArtifactVersion批准；课时划分教师链通过。三类九套完成生成、展示、教师编辑保存与提交，但确定性质量门禁以`INTRO_TENDENCY_DISTRIBUTION_INVALID`和`INTRO_COURSE_ANCHOR_INVALID`拒绝：九套的三类数量为3/3/3，但没有方案声明至少两个次级倾向；生成的`source_knowledge_point`与冻结课时`teaching_focus`不相等，虽然九套方案的知识点都与生成的source值一致。
+- 十二部分教案完成真实生成、教师编辑保存、质量检查和exact ArtifactVersion批准；课时划分教师链通过。上一次三类九套运行使用已被最新Decision取代的“单次生成内自评分 + 跨倾向”合同；其`INTRO_TENDENCY_DISTRIBUTION_INVALID`不再是产品缺陷，而`INTRO_COURSE_ANCHOR_INVALID`由`1.5.2`第一阶段exact绑定批准LessonUnit `teaching_focus`防止。该旧运行不能作为新合同的passed receipt。
 - 本轮真实API浏览器最终为1 passed、1 failed；失败发生在三类九套质量检查，第二课时隔离生成尚未执行，未生成passed receipt。诊断数据库`shanhai_r1_real_67f3c03ef62c`、locator、脱敏Provider用量和Playwright失败证据已保留，固定端口和测试进程均已清空。
 - Parent [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)仍保持开放；只有受控真实文本Provider通过现有Model Gateway形成脱敏证据后，才能执行最终R1 release收口并关闭父任务。
 - [Draft PR #222](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/222)冻结为固定WIP代码来源，不新增代码、不直接合并；[Draft PR #230](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/230)暂停，不转Ready、不默认合并。#223至#229只保留为参考清单，不再强制串行。
@@ -46,16 +47,16 @@
 ## 当前阻塞
 
 - 当前没有已知的Session/CSRF、PostgreSQL、Worker、active OpenAPI或生产页面实现阻塞；四个教师文本结果及完整真实API浏览器链已经进入`main`。
-- Parent #11的最终release门禁仍缺受控真实文本Provider passed receipt。Provider生成路由、生产Worker和三个真实请求均已成功；当前阻塞已收敛为`1.5.1`三类九套生成合同没有确保质量门禁要求的exact课时教学重点与跨倾向语义，不能把结构Schema通过或Job succeeded冒充教师验收通过。
-- 必须先用红测试固定上述两个真实失败形状，再做最小生成合同/执行校验修复并通过Fake、PostgreSQL、合同、生产前端和CI；不得放宽现有质量门禁，也不得把真实模型内容写入仓库测试夹具。
+- Parent #11的最终release门禁仍缺新`1.5.2`合同下的受控真实文本Provider passed receipt。候选生成、独立统一评分、exact键覆盖、有界评分重投和Attempt对账已通过本地门禁；当前剩余工程门禁是提交推送、绑定新Head的生成客户端复验和全量CI，不能把结构Schema通过、Job succeeded或Fake链通过冒充教师验收通过。
+- 任一阶段失败都不得写最终ArtifactVersion；普通CI仍只允许确定性Fake，不得把真实模型内容写入仓库测试夹具。
 - #242必须保持Draft，不转Ready、不合并；不得把十二部分教案单项成功、Fake浏览器通过、本地或CI全门禁通过表述为真实Provider黄金项目完成。再次调用Provider前必须获得新的明确授权，不能等价重复调用。
 - [Issue #233](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/233)单独跟踪`origin/main`既有Stage1 E2E旧`impact_scope` fixture；该测试债不改变#231验收结果，也不在救援PR内顺手修复。
 - [Issue #237](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/237)单独跟踪文件长度后置项；PPT、图片、视频、TTS、通用查询/审批/状态机、SSE重构和全仓技术债均不在#241范围。
 
 ## 下一个阶段出口
 
-1. #242保持Draft和blocked；保留本轮诊断数据库、locator、真实Provider用量与页面失败证据，提交并推送当前状态证据。
-2. 为`INTRO_TENDENCY_DISTRIBUTION_INVALID`和`INTRO_COURSE_ANCHOR_INVALID`增加不含真实模型正文的红测试，最小收紧三类九套生成合同/执行校验，并通过相关本地门禁和新Head全量CI。
+1. #242保持Draft和blocked；提交并推送已通过本地门禁的`1.5.2`合同、内容包、Worker、receipt、生成客户端、测试和现行文档同步。
+2. 在提交后的exact Head运行生产前端`release:check`，确认生成物与Head一致，并等待全量CI通过。
 3. CI通过且再次获得明确授权后，使用现有生产Worker与Model Gateway运行一个受控教师黄金项目；不得额外发送模型探针或在失败后无差别重复调用。
 4. 独立reviewer绑定#242最终base/head后Squash Merge，再从干净`origin/main`复验并关闭#241与Parent #11。
 5. 清理#241分支、worktree与临时运行资源；后续仍以教师可见结果为合并单位，不恢复#223至#229的技术层严格串行关系。

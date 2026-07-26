@@ -175,17 +175,17 @@ def test_unique_recommendation_and_no_preteach_fail_closed() -> None:
     }
 
 
-def test_cross_tendency_and_child_safety_fail_closed() -> None:
+def test_secondary_tendencies_are_not_required_but_child_safety_still_fails_closed() -> None:
     content = _content("default_nine")
     options = cast(list[dict[str, Any]], content["options"])
     for option in options:
-        option["secondary_tendencies"] = []
+        option.pop("secondary_tendencies", None)
     options[0]["hook"] = "安排儿童独自使用明火完成实验"
 
     outcome = IntroOptionSchemaQualityValidator().validate(_context(content))
 
     codes = {str(item["code"]) for item in outcome.findings}
-    assert "INTRO_TENDENCY_DISTRIBUTION_INVALID" in codes
+    assert "INTRO_TENDENCY_DISTRIBUTION_INVALID" not in codes
     assert "INTRO_CHILD_SAFETY_INVALID" in codes
 
 
@@ -226,6 +226,8 @@ def _assert_anchor_finding(content: dict[str, Any], code: str) -> None:
 def _content(mode: str) -> dict[str, Any]:
     case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
     content = build_golden_branch_source_outputs(case)["intro.generate_options"]
+    for option in cast(list[dict[str, Any]], content["options"]):
+        option.pop("secondary_tendencies", None)
     if mode == "default_nine":
         return content
     content["generation_mode"] = "refine_existing"

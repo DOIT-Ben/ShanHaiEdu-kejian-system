@@ -44,8 +44,8 @@ def test_current_release_preserves_both_ppt_deterministic_outputs() -> None:
     package = validate_content_package(PACKAGE_PATH, contracts_root=CONTRACTS)
     registered = BUILTIN_WORKFLOW_REGISTRY.load(catalog)
 
-    assert catalog["semantic_version"] == "1.5.1"
-    assert source["package"]["semantic_version"] == "1.5.1"
+    assert catalog["semantic_version"] == "1.5.2"
+    assert source["package"]["semantic_version"] == "1.5.2"
     assert {item["output_key"] for item in source["deterministic_outputs"]} == {
         "ppt.pages.assemble.output",
         "pptx.export.output",

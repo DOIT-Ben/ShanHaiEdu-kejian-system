@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_receipt_serializes_only_the_allowlisted_provider_and_exact_fact_fields() -> None:
-    ids = [uuid4() for _ in range(40)]
+    ids = [uuid4() for _ in range(45)]
     receipt = R1ProviderAcceptanceReceipt.model_validate(
         {
             "schema_version": 1,
@@ -105,11 +105,12 @@ def test_receipt_serializes_only_the_allowlisted_provider_and_exact_fact_fields(
                     (29, 3, 19, 20),
                     (30, 0, 21, 22),
                     (31, 0, 23, 24),
+                    (33, 0, 23, 24),
                     (32, 0, 25, 26),
                 )
             ],
             "selection": {
-                "selection_id": ids[33],
+                "selection_id": ids[34],
                 "artifact_version_id": ids[16],
                 "source_approval_id": ids[18],
                 "option_key": "science-1",

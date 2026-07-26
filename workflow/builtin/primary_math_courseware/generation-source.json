@@ -3,9 +3,9 @@
   "package": {
     "package_key": "shanhai.primary_math.courseware",
     "name": "小学数学标准课件生产内容包",
-    "semantic_version": "1.5.1",
+    "semantic_version": "1.5.2",
     "runtime_constraint": ">=0.1.0 <1.0.0",
-    "change_summary": "在不可变1.5.0基础上前向强化十二部分教案的教材范围与评价证据引用约束，并收紧三类九套的方案键、媒介与数值输出约束；旧Release与既有项目绑定保持不变。"
+    "change_summary": "在不可变1.5.1基础上把三类九套改为候选生成与独立统一评分两个受审计阶段，删除辅助倾向字段与跨倾向门禁；旧Release与既有项目绑定保持不变。"
   },
   "styles": [
     {
@@ -571,7 +571,7 @@
     {
       "template_key": "intro.generate_options",
       "title": "课程驱动导入方案",
-      "description": "以已批准课时、知识边界、最小教材证据和教师偏好，在一次生成中产出一套或三类九套最终课堂导入方案；完善已有创意时绑定一个exact来源版本。",
+      "description": "以已批准课时、知识边界、最小教材证据和教师偏好先生成候选，再独立统一评分形成最终课堂导入方案；完善已有创意时绑定一个exact来源版本。",
       "model_capability": "text.structured.creative_education",
       "input": {
         "description": "输入生成方式和最小课程种子；不接收完整教案、PPT或视频产物。",
@@ -596,7 +596,7 @@
         ]
       },
       "output": {
-        "description": "一套或三类九套完整导入方案、0或1个exact来源版本、默认路径唯一最高推荐分和可冻结选择快照。",
+        "description": "独立评分后的一套或三类九套完整导入方案、0或1个exact来源版本、唯一全局推荐和可冻结选择快照。",
         "definition_role": "artifact",
         "fields": [
           {"field_key": "option_set_key", "label": "方案集键", "type": "text", "required": true, "editable": false, "deletable": false, "visibility": "hidden"},
@@ -620,7 +620,6 @@
               {"field_key": "lesson_unit_key", "label": "来源课时键", "type": "reference", "required": true, "editable": false, "deletable": false},
               {"field_key": "knowledge_point", "label": "知识点", "type": "text", "required": true, "editable": false, "deletable": false},
               {"field_key": "primary_tendency", "label": "主要创作倾向", "type": "enum", "required": true, "editable": false, "deletable": false, "options": [{"value": "science", "label": "科普"}, {"value": "application", "label": "应用"}, {"value": "story", "label": "故事"}]},
-              {"field_key": "secondary_tendencies", "label": "辅助创作倾向", "type": "list", "required": true, "editable": true, "deletable": false},
               {"field_key": "title", "label": "标题", "type": "text", "required": true, "editable": true, "deletable": false},
               {"field_key": "creative_concept", "label": "课程驱动创意概念", "type": "rich_text", "required": true, "editable": true, "deletable": false},
               {"field_key": "hook", "label": "钩子", "type": "rich_text", "required": true, "editable": true, "deletable": false},
@@ -651,11 +650,96 @@
           }
         ]
       },
+      "evaluation_stage": {
+        "candidate_output": {
+          "description": "第一阶段生成的exact候选池，不含任何自评分、推荐理由、适配风险或推荐结论。",
+          "definition_role": "intermediate",
+          "fields": [
+            {"field_key": "option_set_key", "label": "方案集键", "type": "text", "required": true, "editable": false, "deletable": false, "visibility": "hidden"},
+            {"field_key": "generation_mode", "label": "生成方式", "type": "enum", "required": true, "editable": false, "deletable": false, "visibility": "hidden", "options": [{"value": "default_nine", "label": "三类九套"}, {"value": "refine_existing", "label": "完善已有创意"}]},
+            {"field_key": "source_intro_option_version_refs", "label": "已有创意来源版本", "type": "list", "required": true, "editable": false, "deletable": false, "visibility": "hidden", "min_items": 0, "max_items": 1},
+            {"field_key": "source_lesson_unit_key", "label": "来源课时键", "type": "reference", "required": true, "editable": false, "deletable": false, "visibility": "hidden"},
+            {"field_key": "source_knowledge_point", "label": "来源知识点", "type": "text", "required": true, "editable": false, "deletable": false, "visibility": "hidden"},
+            {"field_key": "source_material_evidence_keys", "label": "来源教材证据", "type": "list", "required": true, "editable": false, "deletable": false, "visibility": "hidden"},
+            {
+              "field_key": "options",
+              "label": "未评分导入候选",
+              "type": "repeatable",
+              "required": true,
+              "editable": false,
+              "deletable": false,
+              "repeatable": true,
+              "min_items": 1,
+              "max_items": 9,
+              "children": [
+                {"field_key": "option_key", "label": "方案键", "type": "text", "required": true, "editable": false, "deletable": false, "validation_rules": [{"pattern": "^INTRO-(SCI|APP|STO)-[0-9]{2}$"}]},
+                {"field_key": "lesson_unit_key", "label": "来源课时键", "type": "reference", "required": true, "editable": false, "deletable": false},
+                {"field_key": "knowledge_point", "label": "知识点", "type": "text", "required": true, "editable": false, "deletable": false},
+                {"field_key": "primary_tendency", "label": "主要创作倾向", "type": "enum", "required": true, "editable": false, "deletable": false, "options": [{"value": "science", "label": "科普"}, {"value": "application", "label": "应用"}, {"value": "story", "label": "故事"}]},
+                {"field_key": "title", "label": "标题", "type": "text", "required": true, "editable": false, "deletable": false},
+                {"field_key": "creative_concept", "label": "课程驱动创意概念", "type": "rich_text", "required": true, "editable": false, "deletable": false},
+                {"field_key": "hook", "label": "钩子", "type": "rich_text", "required": true, "editable": false, "deletable": false},
+                {"field_key": "viewer_value", "label": "观看价值", "type": "rich_text", "required": true, "editable": false, "deletable": false},
+                {"field_key": "suggested_medium", "label": "建议媒介", "type": "enum", "required": true, "editable": false, "deletable": false, "options": [{"value": "video", "label": "视频"}, {"value": "image", "label": "图片"}, {"value": "physical_object", "label": "实物"}, {"value": "question", "label": "问题"}, {"value": "performance", "label": "课堂表演"}, {"value": "mixed", "label": "组合媒介"}]},
+                {"field_key": "duration_seconds", "label": "建议时长", "type": "number", "required": true, "editable": false, "deletable": false, "validation_rules": [{"minimum": 10}, {"maximum": 600}]},
+                {"field_key": "course_anchor", "label": "课程关联", "type": "rich_text", "required": true, "editable": false, "deletable": false},
+                {"field_key": "classroom_first_question", "label": "课堂第一问", "type": "rich_text", "required": true, "editable": false, "deletable": false},
+                {"field_key": "handoff_moment", "label": "交接时刻", "type": "rich_text", "required": true, "editable": false, "deletable": false},
+                {"field_key": "must_not_preteach", "label": "不得提前讲授", "type": "list", "required": true, "editable": false, "deletable": false},
+                {"field_key": "fit_reason", "label": "适配理由", "type": "rich_text", "required": true, "editable": false, "deletable": false}
+              ]
+            }
+          ]
+        },
+        "output": {
+          "description": "第二阶段对exact候选池逐套给出的统一评分、推荐理由、适配风险和全局推荐。",
+          "definition_role": "intermediate",
+          "fields": [
+            {
+              "field_key": "evaluations",
+              "label": "候选评分",
+              "type": "repeatable",
+              "required": true,
+              "editable": false,
+              "deletable": false,
+              "repeatable": true,
+              "min_items": 1,
+              "max_items": 9,
+              "children": [
+                {"field_key": "option_key", "label": "方案键", "type": "reference", "required": true, "editable": false, "deletable": false},
+                {"field_key": "recommendation_score", "label": "推荐分", "type": "number", "required": true, "editable": false, "deletable": false, "validation_rules": [{"minimum": 1}, {"maximum": 100}]},
+                {"field_key": "recommendation_reason", "label": "推荐理由", "type": "rich_text", "required": true, "editable": false, "deletable": false},
+                {"field_key": "risks", "label": "适配风险", "type": "list", "required": true, "editable": false, "deletable": false}
+              ]
+            },
+            {
+              "field_key": "recommendation_summary",
+              "label": "全局推荐结论",
+              "type": "group",
+              "required": true,
+              "editable": false,
+              "deletable": false,
+              "children": [
+                {"field_key": "recommended_option_key", "label": "最高推荐方案", "type": "reference", "required": true, "editable": false, "deletable": false},
+                {"field_key": "single_highest_score", "label": "最高分唯一", "type": "boolean", "required": true, "editable": false, "deletable": false}
+              ]
+            }
+          ]
+        },
+        "prompt": {
+          "role": "你是独立的课堂导入候选评审者，只评价已给出的候选，不参与候选创作。",
+          "task": "把exact候选池作为一个整体，使用同一标准逐套返回option_key、1至100推荐分、推荐理由和适配风险，并给出唯一全局推荐。不得添加、删除、重写或复述候选正文。",
+          "method": "从课程锚点准确性、学生认知启动价值、不得提前讲授、媒介可实施性、课堂交接自然度和儿童安全六个维度统一比较全部候选；三类只是候选的主要倾向，不按类别分别评冠军。",
+          "quality_gate": "必须覆盖输入的exact option_key集合且每键恰好一次；不得输出候选正文或新候选；最高分必须唯一，recommended_option_key必须指向该唯一最高分方案。",
+          "context_bindings": [],
+          "max_chars": 20000
+        }
+      },
       "prompt": {
-        "role": "你是小学数学课程驱动的课堂导入方案设计师，擅长从知识点、学习目标、教材证据和不得提前讲授边界中设计科普、应用、故事倾向可交叉的创意方案。",
-        "task": "读取目标课时稳定键、知识点、一句话学习目标、教学内容边界、must_not_preteach、年级或年龄段、教材证据摘要及可选教师创意、媒介和时长偏好，在一次调用中直接生成最终intro_option_set。default_nine禁止已有创意来源并生成九套；refine_existing必须基于一个exact已有方案版本只完善一套。不要生成教案正文、PPT、分镜、旁白、字幕、资产、Provider参数或费用。",
-        "method": "先提取课程种子，再从可观察现象、真实任务、人物或主体目标等不同角度生成创意；课程依据必须从创意形成开始参与，不能在完成后补贴课题词。每套同时形成主要与辅助倾向、创意概念、钩子、观看价值、课程关联、课堂第一问、交接时刻、不得提前讲授、媒介、时长、适配、风险和推荐结论。science、application、story只是主要倾向，辅助倾向可以交叉。",
-        "quality_gate": "default_nine来源版本为0、主要倾向各恰好三套且至少一套包含两个以上辅助倾向；refine_existing来源版本恰好1且方案恰好1套。每套必须可追溯目标课时、知识点和教材证据，创意与课程依据存在实质关联；不得提前讲出需要学生发现的定义、写法、方法或结论；default_nine最高推荐分必须唯一；不得把三种倾向解释为互斥类别；输出不含完整教案、PPT、视频产物、Provider和费用。",
+        "role": "你是小学数学课程驱动的课堂导入候选设计师，负责生成科普、应用、故事三种主要倾向的候选，不参与评分。",
+        "task": "读取目标课时稳定键、exact teaching_focus、一句话学习目标、教学内容边界、must_not_preteach、年级或年龄段、教材证据摘要及可选教师创意、媒介和时长偏好，只生成未评分候选池。default_nine禁止已有创意来源并生成九套；refine_existing必须基于一个exact已有方案版本只完善一套。不得输出推荐分、推荐理由、适配风险、推荐结论、教案正文、PPT、分镜、旁白、字幕、资产、Provider参数或费用。",
+        "method": "直接把批准LessonUnit的teaching_focus原样写入source_knowledge_point和每套knowledge_point，不得概括、改写或替换。再从可观察现象、真实任务、人物或主体目标等不同角度形成候选；课程依据必须从创意形成开始参与，不能在完成后补贴课题词。每套只形成主要倾向、创意概念、钩子、观看价值、课程关联、课堂第一问、交接时刻、不得提前讲授、媒介、时长和适配理由。",
+        "quality_gate": "default_nine来源版本为0、主要倾向science、application、story各恰好三套且option_key为INTRO-SCI-01至03、INTRO-APP-01至03、INTRO-STO-01至03；refine_existing来源版本恰好1且方案恰好1套。source_knowledge_point和每套knowledge_point必须exact等于批准LessonUnit的teaching_focus；每套必须可追溯目标课时和教材证据；不得提前讲出需要学生发现的定义、写法、方法或结论；不得自评分或输出推荐结论。",
         "context_bindings": [
           {"binding_key": "approved_lesson_unit", "source": "lesson_division.approved_version", "required": true, "exposure": "full", "max_items": 1, "max_bytes": 200000},
           {"binding_key": "approved_material", "source": "material.approved_parse", "required": true, "exposure": "summary", "max_items": 50, "max_bytes": 300000},

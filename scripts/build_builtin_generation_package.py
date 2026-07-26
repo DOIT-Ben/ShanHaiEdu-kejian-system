@@ -100,6 +100,10 @@ def _build_node_items(
     output_ref = {"item_key": output_key, "kind": "content_definition"}
     prompt_ref = {"item_key": prompt_key, "kind": "prompt_template"}
     projection_ref = {"item_key": projection_key, "kind": "projection_template"}
+    evaluation_source = cast(Mapping[str, Any] | None, node.get("evaluation_stage"))
+    candidate_output_key = f"{template_key}.candidates.output"
+    evaluation_output_key = f"{template_key}.evaluation.output"
+    evaluation_prompt_key = f"{template_key}.evaluation.prompt"
 
     input_source = cast(Mapping[str, Any], node["input"])
     output_source = cast(Mapping[str, Any], node["output"])
@@ -113,36 +117,12 @@ def _build_node_items(
     }
     if "conditional_requirements" in input_source:
         input_spec["conditional_requirements"] = input_source["conditional_requirements"]
-    prompt_sections = [
-        {
-            "section_key": "role",
-            "layer": "role",
-            "content": prompt_source["role"],
-            "editable": False,
-            "visible_to_teacher": True,
-        },
-        {
-            "section_key": "task",
-            "layer": "task",
-            "content": prompt_source["task"],
-            "editable": True,
-            "visible_to_teacher": True,
-        },
-        {
-            "section_key": "method",
-            "layer": "method",
-            "content": prompt_source["method"],
-            "editable": False,
-            "visible_to_teacher": False,
-        },
-        {
-            "section_key": "quality_gate",
-            "layer": "quality_gate",
-            "content": prompt_source["quality_gate"],
-            "editable": False,
-            "visible_to_teacher": False,
-        },
-    ]
+    prompt_sections = _prompt_sections(prompt_source)
+    prompt_output_ref = (
+        {"item_key": candidate_output_key, "kind": "content_definition"}
+        if evaluation_source is not None
+        else output_ref
+    )
 
     generated_items = [
         _item(
@@ -173,7 +153,7 @@ def _build_node_items(
                 "description": description,
                 "model_capability": capability,
                 "input_definition_ref": input_ref,
-                "output_definition_ref": output_ref,
+                "output_definition_ref": prompt_output_ref,
                 "sections": prompt_sections,
                 "context_bindings": prompt_source["context_bindings"],
                 "user_edit_policy": {
@@ -197,33 +177,98 @@ def _build_node_items(
                 "teacher_visible": projection_source.get("teacher_visible", True),
             },
         ),
-        _item(
-            "generation_template",
-            template_key,
-            title,
-            {
-                "template_key": template_key,
-                "title": title,
-                "description": description,
-                "model_capability": capability,
-                "input_definition_ref": input_ref,
-                "prompt_template_ref": prompt_ref,
-                "output_definition_ref": output_ref,
-                "style_preset_refs": [
-                    {"item_key": key, "kind": "style_preset"}
-                    for key in cast(list[str], node.get("style_preset_refs", []))
-                ],
-                "projection_refs": [
-                    {"role": role, "template_ref": projection_ref}
-                    for role in cast(list[str], projection_source["roles"])
-                ],
-            },
-        ),
     ]
+    generation_spec: dict[str, Any] = {
+        "template_key": template_key,
+        "title": title,
+        "description": description,
+        "model_capability": capability,
+        "input_definition_ref": input_ref,
+        "prompt_template_ref": prompt_ref,
+        "output_definition_ref": output_ref,
+        "style_preset_refs": [
+            {"item_key": key, "kind": "style_preset"}
+            for key in cast(list[str], node.get("style_preset_refs", []))
+        ],
+        "projection_refs": [
+            {"role": role, "template_ref": projection_ref}
+            for role in cast(list[str], projection_source["roles"])
+        ],
+    }
+    if evaluation_source is not None:
+        candidate_source = cast(Mapping[str, Any], evaluation_source["candidate_output"])
+        evaluation_output_source = cast(Mapping[str, Any], evaluation_source["output"])
+        evaluation_prompt_source = cast(Mapping[str, Any], evaluation_source["prompt"])
+        candidate_ref = {"item_key": candidate_output_key, "kind": "content_definition"}
+        evaluation_output_ref = {
+            "item_key": evaluation_output_key,
+            "kind": "content_definition",
+        }
+        evaluation_prompt_ref = {
+            "item_key": evaluation_prompt_key,
+            "kind": "prompt_template",
+        }
+        generated_items.extend(
+            [
+                _item(
+                    "content_definition",
+                    candidate_output_key,
+                    f"{title}候选输出",
+                    {
+                        "definition_key": candidate_output_key,
+                        "title": f"{title}候选输出",
+                        "description": candidate_source["description"],
+                        "definition_role": candidate_source["definition_role"],
+                        "fields": candidate_source["fields"],
+                    },
+                ),
+                _item(
+                    "content_definition",
+                    evaluation_output_key,
+                    f"{title}评分输出",
+                    {
+                        "definition_key": evaluation_output_key,
+                        "title": f"{title}评分输出",
+                        "description": evaluation_output_source["description"],
+                        "definition_role": evaluation_output_source["definition_role"],
+                        "fields": evaluation_output_source["fields"],
+                    },
+                ),
+                _item(
+                    "prompt_template",
+                    evaluation_prompt_key,
+                    f"{title}独立评分Prompt",
+                    {
+                        "template_key": evaluation_prompt_key,
+                        "title": f"{title}独立评分Prompt",
+                        "description": "独立统一评价 exact 候选池, 不改写候选正文。",
+                        "model_capability": capability,
+                        "input_definition_ref": input_ref,
+                        "output_definition_ref": evaluation_output_ref,
+                        "sections": _prompt_sections(evaluation_prompt_source),
+                        "context_bindings": [],
+                        "user_edit_policy": {
+                            "mode": "replace_editable_layer",
+                            "max_chars": evaluation_prompt_source["max_chars"],
+                        },
+                    },
+                ),
+            ]
+        )
+        generation_spec["evaluation_stage"] = {
+            "candidate_output_definition_ref": candidate_ref,
+            "prompt_template_ref": evaluation_prompt_ref,
+            "output_definition_ref": evaluation_output_ref,
+        }
+    generated_items.append(_item("generation_template", template_key, title, generation_spec))
+
+    suffixes = ["input", "output", "prompt", "projection"]
+    if evaluation_source is not None:
+        suffixes.extend(["candidates-output", "evaluation-output", "evaluation-prompt"])
+    suffixes.append("generation")
 
     files: list[dict[str, Any]] = []
     manifest_items: list[dict[str, Any]] = []
-    suffixes = ["input", "output", "prompt", "projection", "generation"]
     for item, suffix in zip(generated_items, suffixes, strict=True):
         _append_item(
             items=files,
@@ -233,6 +278,39 @@ def _build_node_items(
             contracts_root=contracts_root,
         )
     return files, manifest_items
+
+
+def _prompt_sections(prompt_source: Mapping[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "section_key": "role",
+            "layer": "role",
+            "content": prompt_source["role"],
+            "editable": False,
+            "visible_to_teacher": True,
+        },
+        {
+            "section_key": "task",
+            "layer": "task",
+            "content": prompt_source["task"],
+            "editable": True,
+            "visible_to_teacher": True,
+        },
+        {
+            "section_key": "method",
+            "layer": "method",
+            "content": prompt_source["method"],
+            "editable": False,
+            "visible_to_teacher": False,
+        },
+        {
+            "section_key": "quality_gate",
+            "layer": "quality_gate",
+            "content": prompt_source["quality_gate"],
+            "editable": False,
+            "visible_to_teacher": False,
+        },
+    ]
 
 
 def _build_deterministic_output_item(output: Mapping[str, Any]) -> dict[str, Any]:

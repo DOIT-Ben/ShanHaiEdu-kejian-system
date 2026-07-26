@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def test_material_scope_has_a_published_human_gate_artifact_contract() -> None:
     source = load_builtin_courseware_release(ROOT)
 
-    assert source.semantic_version == "1.5.1"
+    assert source.semantic_version == "1.5.2"
     definition = source.items["material.scope_review.output"]
     assert definition["kind"] == "content_definition"
     assert definition["spec"]["definition_key"] == "material.scope_review.output"

@@ -131,7 +131,7 @@ def test_lesson_division_prompt_preserves_reference_method_and_scope() -> None:
 
 def test_lesson_plan_prompt_preserves_exact_scope_and_assessment_references() -> None:
     source = load_json(SOURCE)
-    assert source["package"]["semantic_version"] == "1.5.1"
+    assert source["package"]["semantic_version"] == "1.5.2"
     lesson_plan = next(
         node for node in source["nodes"] if node["template_key"] == "lesson_plan.generate"
     )
@@ -464,7 +464,7 @@ def test_course_grounded_intro_options_keep_one_current_contract() -> None:
     assert Counter(option["primary_tendency"] for option in options) == Counter(
         {"science": 3, "application": 3, "story": 3}
     )
-    assert any(len(option["secondary_tendencies"]) >= 2 for option in options)
+    assert all("secondary_tendencies" not in option for option in options)
     assert all(option["creative_concept"] for option in options)
     assert all(option["lesson_unit_key"] == target_lesson["lesson_unit_key"] for option in options)
     assert all(option["knowledge_point"] == target_lesson["teaching_focus"] for option in options)
@@ -493,6 +493,30 @@ def test_course_grounded_intro_options_keep_one_current_contract() -> None:
 
     output_fields = {field["field_key"] for field in generate_options["output"]["fields"]}
     assert {"generation_mode", "source_intro_option_version_refs"} <= output_fields
+
+    evaluation_stage = generate_options["evaluation_stage"]
+    assert set(evaluation_stage) == {"candidate_output", "prompt", "output"}
+    generation_template = load_json(PACKAGE / "items" / "intro-generate-options-generation.json")[
+        "spec"
+    ]
+    assert generation_template["output_definition_ref"] == {
+        "item_key": "intro.generate_options.output",
+        "kind": "content_definition",
+    }
+    assert generation_template["evaluation_stage"] == {
+        "candidate_output_definition_ref": {
+            "item_key": "intro.generate_options.candidates.output",
+            "kind": "content_definition",
+        },
+        "prompt_template_ref": {
+            "item_key": "intro.generate_options.evaluation.prompt",
+            "kind": "prompt_template",
+        },
+        "output_definition_ref": {
+            "item_key": "intro.generate_options.evaluation.output",
+            "kind": "content_definition",
+        },
+    }
 
 
 def test_intro_generation_schema_enforces_teacher_editable_fields() -> None:

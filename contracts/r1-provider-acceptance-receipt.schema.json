@@ -42,8 +42,8 @@
     },
     "attempts": {
       "type": "array",
-      "minItems": 4,
-      "maxItems": 4,
+      "minItems": 5,
+      "maxItems": 5,
       "items": {"$ref": "#/$defs/attempt"}
     },
     "selection": {"$ref": "#/$defs/selection"},

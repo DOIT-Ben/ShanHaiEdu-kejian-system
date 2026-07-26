@@ -22,8 +22,8 @@ from apps.api.intro_options.quality_legacy import (
 
 INTRO_OPTION_SCHEMA_REF = ValidatorRef(
     key="validator.intro.option_set_schema",
-    semantic_version="1.1.0",
-    implementation_digest="d60f89477c8db4c3f116fa7e524b8b8688e4f5403cc8cb137b0f1d56a170e6e4",
+    semantic_version="1.2.0",
+    implementation_digest="c5a107c5515eddf305d48d73eb7005db5097b9a32134eea834824f70e7d375da",
 )
 INTRO_SINGLE_ANCHOR_REF = ValidatorRef(
     key="validator.intro.single_anchor",
@@ -65,14 +65,7 @@ class IntroOptionSchemaQualityValidator:
             if self._enforce_default_nine_identity:
                 findings.extend(default_nine_identity_findings(options))
             tendencies = Counter(option.get("primary_tendency") for option in options)
-            has_cross_tendency = any(
-                len(set(_string_sequence(option.get("secondary_tendencies")))) >= 2
-                for option in options
-            )
-            if (
-                tendencies != Counter({"science": 3, "application": 3, "story": 3})
-                or not has_cross_tendency
-            ):
+            if tendencies != Counter({"science": 3, "application": 3, "story": 3}):
                 findings.append(
                     _finding(
                         "INTRO_TENDENCY_DISTRIBUTION_INVALID",

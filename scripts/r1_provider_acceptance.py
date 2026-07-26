@@ -142,7 +142,7 @@ class R1ProviderAcceptanceReceipt(_StrictModel):
     provider: ProviderEvidence
     artifacts: list[ArtifactEvidence] = Field(min_length=3, max_length=3)
     jobs: list[JobEvidence] = Field(min_length=4, max_length=4)
-    attempts: list[AttemptEvidence] = Field(min_length=4, max_length=4)
+    attempts: list[AttemptEvidence] = Field(min_length=5, max_length=5)
     selection: SelectionEvidence
     isolation: IsolationEvidence
 
@@ -231,12 +231,13 @@ def build_receipt(
         artifact_by_kind[kind] = artifact_fact
         approval_by_kind[kind] = approval
         job_evidence.append(_job_evidence(job, node_key=node_key))
-        attempt_evidence.append(
+        attempt_evidence.extend(
             _attempt_evidence(
                 session,
                 job,
                 expected_provider=expected_provider,
                 configured_model=configured_model,
+                expected_count=2 if node_key == "intro.generate_options" else 1,
             )
         )
 
@@ -248,7 +249,7 @@ def build_receipt(
         node_key=APPROVED_NODES["lesson_plan"],
     )
     job_evidence.append(_job_evidence(isolation_job, node_key=APPROVED_NODES["lesson_plan"]))
-    attempt_evidence.append(
+    attempt_evidence.extend(
         _attempt_evidence(
             session,
             isolation_job,
@@ -413,18 +414,40 @@ def _attempt_evidence(
     *,
     expected_provider: str,
     configured_model: str,
-) -> AttemptEvidence:
+    expected_count: int = 1,
+) -> list[AttemptEvidence]:
     attempts = list(
         session.scalars(
-            select(GenerationAttempt).where(
+            select(GenerationAttempt)
+            .where(
                 GenerationAttempt.generation_job_id == job.id,
                 GenerationAttempt.status == "succeeded",
             )
+            .order_by(GenerationAttempt.attempt_no)
         )
     )
-    if len(attempts) != 1:
+    if len(attempts) != expected_count:
         raise R1ProviderAcceptanceError("R1_ACCEPTANCE_ATTEMPT_CARDINALITY_INVALID")
-    attempt = attempts[0]
+    return [
+        _single_attempt_evidence(
+            session,
+            job,
+            attempt,
+            expected_provider=expected_provider,
+            configured_model=configured_model,
+        )
+        for attempt in attempts
+    ]
+
+
+def _single_attempt_evidence(
+    session: Session,
+    job: GenerationJob,
+    attempt: GenerationAttempt,
+    *,
+    expected_provider: str,
+    configured_model: str,
+) -> AttemptEvidence:
     usage = session.scalar(
         select(UsageRecord).where(UsageRecord.generation_attempt_id == attempt.id)
     )
