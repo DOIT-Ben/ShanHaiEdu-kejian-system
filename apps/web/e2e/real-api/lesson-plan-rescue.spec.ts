@@ -8,6 +8,8 @@ function requiredEnvironment(name: string) {
 
 const accessCode = requiredEnvironment("SHANHAI_E2E_ACCESS_CODE");
 const apiBaseUrl = process.env.SHANHAI_E2E_API_BASE_URL ?? "http://127.0.0.1:58080/api/v2";
+const realProviderMode = process.env.SHANHAI_R1_WORKER_MODE === "real";
+const generationTimeout = realProviderMode ? 300_000 : 60_000;
 
 async function login(page: Page) {
   await page.goto("/login");
@@ -17,7 +19,7 @@ async function login(page: Page) {
 }
 
 test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(realProviderMode ? 900_000 : 180_000);
   await login(page);
   await page.getByRole("link", { name: "继续制作十二部分教案验收" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "十二部分教案验收" })).toBeVisible();
@@ -26,7 +28,7 @@ test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }
   await expect(page.getByRole("heading", { level: 1, name: "教材与课时划分" })).toBeVisible();
   await page.getByRole("link").filter({ hasText: "issue-125-material.pdf" }).click();
   await expect(page.getByText(/已保存范围：物理页 .*教师已确认/)).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: "课时划分" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "课时划分" })).toBeVisible();
   await expect(page.getByLabel("课题名称")).toHaveValue("1～5的认识");
   await expect(page.getByText(/已批准版本/)).toBeVisible();
   await page.getByRole("link", { name: "返回项目" }).click();
@@ -52,7 +54,7 @@ test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }
   const accepted = (await (await startedResponse).json()) as { data: { job_id: string } };
   await expect(page.getByRole("progressbar", { name: /任务进度/ })).toBeVisible();
   await expect(page.getByText("Lesson-plan generation completed")).toBeVisible({
-    timeout: 60_000,
+    timeout: generationTimeout,
   });
   await expect(page.getByLabel(/^一、教学内容 课题 \d+$/)).toBeVisible();
 
@@ -133,7 +135,7 @@ test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }
   const introAccepted = (await (await introStartResponse).json()) as { data: { job_id: string } };
   await expect(page.getByRole("progressbar", { name: /任务进度/ })).toBeVisible();
   await expect(page.getByText("Intro-options generation completed")).toBeVisible({
-    timeout: 60_000,
+    timeout: generationTimeout,
   });
   const introBody = page.getByLabel("方案正文").first();
   await expect(introBody).toBeVisible();
@@ -245,6 +247,43 @@ test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }
   await expect(page.getByText("生成完成后，十二部分教案会显示在这里。")).toBeVisible();
   await expect(page.getByRole("progressbar")).toHaveCount(0);
 
+  const secondStartedResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      /\/api\/v2\/node-runs\/[0-9a-f-]+\/start$/.test(response.url()),
+  );
+  await page.getByRole("button", { name: "生成十二部分教案" }).click();
+  const secondAccepted = (await (await secondStartedResponse).json()) as {
+    data: { job_id: string };
+  };
+  await expect(page.getByRole("progressbar", { name: /任务进度/ })).toBeVisible();
+  await expect(page.getByText("Lesson-plan generation completed")).toBeVisible({
+    timeout: generationTimeout,
+  });
+  await expect(page.getByLabel(/^一、教学内容 课题 \d+$/)).toBeVisible();
+
+  const secondGeneratedJob = await page.evaluate(
+    async ({ baseUrl, jobId }) => {
+      const response = await fetch(`${baseUrl}/generation-jobs/${jobId}`, {
+        credentials: "include",
+      });
+      return (await response.json()) as {
+        data: {
+          lesson_unit_id: string;
+          result_artifact_version_id: string;
+          status: string;
+        };
+      };
+    },
+    { baseUrl: apiBaseUrl, jobId: secondAccepted.data.job_id },
+  );
+  expect(secondGeneratedJob.data.status).toBe("succeeded");
+  expect(secondGeneratedJob.data.lesson_unit_id).toBe(secondLessonId);
+  expect(secondGeneratedJob.data.result_artifact_version_id).toBeTruthy();
+  expect(secondGeneratedJob.data.result_artifact_version_id).not.toBe(
+    generatedJob.data.result_artifact_version_id,
+  );
+
   const secondFacts = await page.evaluate(
     async ({ baseUrl, lessonId, projectId: exactProjectId }) => {
       const [artifactResponse, jobsResponse, introArtifactResponse, introJobsResponse] =
@@ -276,8 +315,8 @@ test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }
     },
     { baseUrl: apiBaseUrl, lessonId: secondLessonId, projectId },
   );
-  expect(secondFacts.artifact.data.artifact).toBeNull();
-  expect(secondFacts.jobs.data.items).toEqual([]);
+  expect(secondFacts.artifact.data.artifact).not.toBeNull();
+  expect(secondFacts.jobs.data.items).toHaveLength(1);
   expect(secondFacts.introArtifact.data.artifact).toBeNull();
   expect(secondFacts.introJobs.data.items).toEqual([]);
 

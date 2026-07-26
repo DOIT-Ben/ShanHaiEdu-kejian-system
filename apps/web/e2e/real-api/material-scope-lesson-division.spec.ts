@@ -10,6 +10,8 @@ function requiredEnvironment(name: string) {
 
 const accessCode = requiredEnvironment("SHANHAI_E2E_ACCESS_CODE");
 const apiBaseUrl = process.env.SHANHAI_E2E_API_BASE_URL ?? "http://127.0.0.1:58080/api/v2";
+const realProviderMode = process.env.SHANHAI_R1_WORKER_MODE === "real";
+const generationTimeout = realProviderMode ? 300_000 : 60_000;
 
 async function login(page: Page) {
   await page.goto("/login");
@@ -21,7 +23,7 @@ async function login(page: Page) {
 test("teacher_completes_exact_material_scope_and_lesson_division_with_real_api", async ({
   page,
 }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(realProviderMode ? 900_000 : 180_000);
   await login(page);
   await page.getByRole("link", { name: "继续制作教材范围与课时划分验收" }).click();
   await expect(
@@ -87,7 +89,7 @@ test("teacher_completes_exact_material_scope_and_lesson_division_with_real_api",
   const accepted = (await (await divisionStartResponse).json()) as { data: { job_id: string } };
   await expect(page.getByRole("progressbar", { name: /任务进度/ })).toBeVisible();
   await expect(page.getByRole("progressbar", { name: "任务进度 100%" })).toBeVisible({
-    timeout: 60_000,
+    timeout: generationTimeout,
   });
   await expect(page.getByLabel("课题名称")).toBeVisible();
 

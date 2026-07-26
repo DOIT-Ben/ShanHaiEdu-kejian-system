@@ -1,8 +1,8 @@
 # 当前项目状态
 
-当前阶段：阶段1后端基座以及R1教材范围、课时划分、十二部分教案和三类九套四个教师可见文本结果已经合并；当前只做合并后状态收口，并保留受控真实文本Provider最终门禁。
+当前阶段：阶段1后端基座以及R1教材范围、课时划分、十二部分教案和三类九套四个教师可见文本结果已经合并；当前只执行受控真实文本Provider教师黄金项目与最终R1收口。
 > 最后核验：2026-07-26。
-> 当前任务：[Issue #239](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/239)；只修正#235合并后的主线状态与清理事实，不修改业务实现。
+> 当前任务：[Issue #241](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/241)，Draft PR [#242](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/242)；只复用现有Model Gateway和生产Worker完成受控真实文本Provider验收、脱敏receipt与最终收口。
 
 ## 当前可演示成果
 
@@ -31,7 +31,9 @@
 
 ## 当前工作
 
-- [Issue #239](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/239)只负责把#235/#238合并、main复验和下一门禁写回本文件，并在合并后清理#235与#239的本地现场。
+- [Issue #239](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/239)已经由[PR #240](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/240)完成主线状态收口并关闭。
+- [Issue #241](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/241)是当前唯一P0实施入口；生产Worker已经核验会在未注入测试模型时通过现有`build_real_text_gateway()`调用真实文本Provider，本任务只补受控黄金项目、脱敏receipt和必要的验收接线。
+- Draft PR [#242](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/242)从`origin/main`独立开发；普通CI继续使用确定性Fake，真实Provider只通过显式受控命令执行。
 - Parent [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)仍保持开放；只有受控真实文本Provider通过现有Model Gateway形成脱敏证据后，才能执行最终R1 release收口并关闭父任务。
 - [Draft PR #222](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/222)冻结为固定WIP代码来源，不新增代码、不直接合并；[Draft PR #230](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/230)暂停，不转Ready、不默认合并。#223至#229只保留为参考清单，不再强制串行。
 
@@ -40,18 +42,18 @@
 - 当前没有已知的Session/CSRF、PostgreSQL、Worker、active OpenAPI或生产页面实现阻塞；四个教师文本结果及完整真实API浏览器链已经进入`main`。
 - Parent #11的最终release门禁仍缺受控真实文本Provider实测证据；普通CI确定性Fake和真实API浏览器通过均不能冒充真实Provider完成。
 - [Issue #233](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/233)单独跟踪`origin/main`既有Stage1 E2E旧`impact_scope` fixture；该测试债不改变#231验收结果，也不在救援PR内顺手修复。
-- [Issue #237](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/237)单独跟踪文件长度后置项；PPT、图片、视频、TTS、通用查询/审批/状态机、SSE重构和全仓技术债均不在#239范围。
+- [Issue #237](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/237)单独跟踪文件长度后置项；PPT、图片、视频、TTS、通用查询/审批/状态机、SSE重构和全仓技术债均不在#241范围。
 
 ## 下一个阶段出口
 
-1. 合并#239，确认`CURRENT_STATUS.md`、GitHub Issue/PR和main只保留一套当前状态，并清理#235/#239本地现场。
-2. 在Parent #11下建立或领取唯一教师可见的受控真实文本Provider验收任务，只复用现有Model Gateway和已合并四个文本结果，不扩展媒体或通用平台。
-3. 受控Provider、脱敏审计、完整真实API浏览器链和main复验同时通过后，才更新最终release状态并关闭#11。
-4. 后续仍以教师可见结果为合并单位，不恢复#223至#229的技术层严格串行关系。
+1. #241先通过receipt合同、PostgreSQL失败关闭、active OpenAPI/生成客户端、生产前端和真实API浏览器门禁。
+2. 使用现有生产Worker与Model Gateway执行一个受控真实文本Provider教师黄金项目，并用exact Project、LessonUnit、ArtifactVersion、GenerationJob、Attempt、Approval和IntroSelection形成脱敏receipt。
+3. 独立reviewer绑定#242最终base/head后Squash Merge，再从干净`origin/main`复验并关闭#241与Parent #11。
+4. 清理#241分支、worktree与临时运行资源；后续仍以教师可见结果为合并单位，不恢复#223至#229的技术层严格串行关系。
 
 ## 接手提示
 
 1. 先读`README.md`、`AGENTS.md`、`docs/governance/项目记忆与接手索引.md`和本文件。
-2. #239是唯一实时docs收口入口；#231、#234和#235已经完成四个教师文本结果，禁止恢复按技术层严格串行的旧执行方式。
+2. #241是唯一实时R1验收入口；#231、#234和#235已经完成四个教师文本结果，禁止恢复按技术层严格串行的旧执行方式。
 3. #222继续冻结、#230继续暂停；#223至#229只作参考，不得从中恢复通用查询、审批、状态机或SSE重构。
-4. 下一任务必须先核验#11的受控真实文本Provider缺口；生产Session/CSRF、Artifact、LessonPlanRuntime、GenerationJob、Worker、SSE、QualityReport、Approval和Model Gateway全部复用，不建设第二套系统。
+4. #241必须复用生产Session/CSRF、Artifact、LessonPlanRuntime、GenerationJob、Worker、SSE、QualityReport、Approval和Model Gateway，不建设第二套系统；receipt不得包含密钥、Prompt或模型正文。

@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 import tempfile
 from pathlib import Path
+from typing import cast
 from uuid import UUID
 
 from pypdf import PdfWriter
@@ -26,6 +28,7 @@ ISOLATION_PROJECT_TITLE = "教材范围隔离验收"
 E2E_TEXTBOOK_NAME = "shanhai-r1-e2e-textbook.pdf"
 PDF_PAGE_TEXTS = ("R1 evidence page 1", "R1 evidence page 2", "R1 evidence page 3")
 ROOT = Path(__file__).resolve().parents[1]
+ACCEPTANCE_LOCATOR_ENV = "SHANHAI_R1_ACCEPTANCE_LOCATOR"
 
 
 def _required(name: str) -> str:
@@ -62,6 +65,36 @@ def _write_controlled_textbook() -> Path:
     return destination
 
 
+def _extend_acceptance_locator(lesson_division_project_id: UUID) -> None:
+    configured = os.environ.get(ACCEPTANCE_LOCATOR_ENV)
+    if not configured:
+        return
+    destination = Path(configured)
+    if not destination.is_absolute():
+        raise RuntimeError(f"{ACCEPTANCE_LOCATOR_ENV} must be an absolute path")
+    resolved = destination.resolve()
+    if resolved.is_relative_to(ROOT):
+        raise RuntimeError("the R1 acceptance locator must remain outside the repository")
+    try:
+        raw_payload: object = json.loads(resolved.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise RuntimeError("the R1 lesson acceptance locator must exist first") from error
+    if not isinstance(raw_payload, dict):
+        raise RuntimeError("the R1 lesson acceptance locator is incomplete")
+    payload = cast(dict[str, object], raw_payload)
+    if set(payload) != {
+        "project_id",
+        "lesson_unit_id",
+        "isolation_lesson_unit_id",
+    }:
+        raise RuntimeError("the R1 lesson acceptance locator is incomplete")
+    payload["lesson_division_project_id"] = str(lesson_division_project_id)
+    resolved.write_text(
+        json.dumps(payload, ensure_ascii=True, separators=(",", ":")),
+        encoding="utf-8",
+    )
+
+
 def main() -> int:
     engine = build_engine(_required("SHANHAI_DATABASE_URL"))
     factory = build_session_factory(engine)
@@ -83,8 +116,9 @@ def main() -> int:
                 load_builtin_courseware_release(ROOT),
                 published_by=actor.principal_id,
             )
+            lesson_division_project_id: UUID | None = None
             for title in (PRIMARY_PROJECT_TITLE, ISOLATION_PROJECT_TITLE):
-                ProjectRepository(session, actor).create(
+                project = ProjectRepository(session, actor).create(
                     CreateProjectRequest(
                         grade="一年级",
                         knowledge_point="1-5的认识",
@@ -92,6 +126,11 @@ def main() -> int:
                         title=title,
                     )
                 )
+                if title == PRIMARY_PROJECT_TITLE:
+                    lesson_division_project_id = project.id
+        if lesson_division_project_id is None:
+            raise RuntimeError("the R1 lesson-division project was not created")
+        _extend_acceptance_locator(lesson_division_project_id)
         textbook = _write_controlled_textbook()
         print(f"r1 material scope projects and controlled PDF seeded: {textbook}", flush=True)
         return 0

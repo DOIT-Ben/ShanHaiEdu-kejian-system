@@ -11,6 +11,7 @@
 - `sse-event.schema.json`：统一事件信封。
 - `creation-lifecycle-event.schema.json`：提示词版本、候选采用、项目写回和下游stale传播事件。
 - `workflow-node-status.schema.json`：节点状态枚举。
+- `r1-provider-acceptance-receipt.schema.json`：受控真实文本Provider黄金项目的脱敏exact事实验收凭据。
 - `intro-option-set.schema.json`：课程驱动的一套/三类九套导入设计、0/1 exact来源版本和课程追溯。
 - `ppt-page-spec.schema.json`：PPT逐页四层结构、白底和可编辑内容合同。
 - `video-shot.schema.json`：细分镜、垫图引用和6至30秒逻辑生成合同。
