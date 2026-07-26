@@ -639,6 +639,19 @@ def test_creation_package_non_field_sources_and_valid_output_pointer_are_not_rej
     validate_catalog_source(builtin_courseware_source, catalog)
 
 
+def restore_lesson_plan_output_before_1_5_1(items: dict[str, dict[str, Any]]) -> None:
+    output = items["lesson_plan.generate.output"]
+    process = next(
+        field for field in output["spec"]["fields"] if field["field_key"] == "teaching_process"
+    )
+    process_assessment = next(
+        field
+        for field in process["children"]
+        if field["field_key"] == "process_assessment_evidence"
+    )
+    process_assessment.pop("description", None)
+
+
 def legacy_courseware_release(
     source: BuiltinCoursewareReleaseSource,
 ) -> BuiltinCoursewareReleaseSource:
@@ -654,6 +667,7 @@ def legacy_courseware_release(
         fixture_path = LEGACY_RELEASE_FIXTURE_ROOT / entry["path"]
         if fixture_path.exists():
             items[entry["item_key"]] = load_json_object(fixture_path)
+    restore_lesson_plan_output_before_1_5_1(items)
     if set(items) != set(entries):
         raise AssertionError("legacy package item inventory differs from the published snapshot")
     for item_key, entry in entries.items():
@@ -833,15 +847,7 @@ def release_1_5_courseware_release(
     if canonical_json_sha256(prompt) != RELEASE_1_5_LESSON_PLAN_PROMPT_SHA256:
         raise AssertionError("1.5.0 lesson-plan Prompt differs from the published snapshot")
     output = items["lesson_plan.generate.output"]
-    process = next(
-        field for field in output["spec"]["fields"] if field["field_key"] == "teaching_process"
-    )
-    process_assessment = next(
-        field
-        for field in process["children"]
-        if field["field_key"] == "process_assessment_evidence"
-    )
-    process_assessment.pop("description")
+    restore_lesson_plan_output_before_1_5_1(items)
     if canonical_json_sha256(output) != RELEASE_1_5_LESSON_PLAN_OUTPUT_SHA256:
         raise AssertionError("1.5.0 lesson-plan output differs from the published snapshot")
     catalog = deepcopy(source.workflow_catalog)
