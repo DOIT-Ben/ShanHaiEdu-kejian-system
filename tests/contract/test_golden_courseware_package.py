@@ -116,6 +116,16 @@ def test_lesson_division_prompt_preserves_reference_method_and_scope() -> None:
     assert "一个核心学习结果" in prompt
     assert "不重叠、不遗漏" in prompt
     assert "不要同时生成详细教案" in prompt
+    assert "自动划分" in prompt
+    assert "unresolved_questions设为空数组" in prompt
+
+    coverage = next(
+        field for field in division["output"]["fields"] if field["field_key"] == "coverage_check"
+    )
+    unresolved = next(
+        field for field in coverage["children"] if field["field_key"] == "unresolved_questions"
+    )
+    assert unresolved["editable"] is True
 
 
 def test_lesson_plan_prompt_preserves_exact_scope_and_assessment_references() -> None:

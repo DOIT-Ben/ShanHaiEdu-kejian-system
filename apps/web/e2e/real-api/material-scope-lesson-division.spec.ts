@@ -113,6 +113,11 @@ test("teacher_completes_exact_material_scope_and_lesson_division_with_real_api",
   expect(generatedJob.data.result_artifact_version_id).toBeTruthy();
 
   await page.getByLabel("课题名称").fill("1～5的认识（教师修订）");
+  const unresolvedQuestions = page.getByRole("textbox", { name: "待确认问题（每行一项）" });
+  await expect(unresolvedQuestions).toBeVisible();
+  if ((await unresolvedQuestions.inputValue()).trim()) {
+    await unresolvedQuestions.fill("");
+  }
   const saveResponse = page.waitForResponse(
     (response) =>
       response.request().method() === "PUT" &&

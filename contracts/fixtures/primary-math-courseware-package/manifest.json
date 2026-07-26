@@ -33,14 +33,14 @@
       "kind": "content_definition",
       "path": "items/lesson-division-generate-output.json",
       "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
-      "sha256": "5b5cc8bd1efee1a3b1a817a55f4a8a57ba7a720dced84d2d4561f97c914f979c"
+      "sha256": "0529b4e3be8615e52d0de2f35675383fc2a66f8de74b7c59c54dff9b1c3f805b"
     },
     {
       "item_key": "lesson.division.generate.prompt",
       "kind": "prompt_template",
       "path": "items/lesson-division-generate-prompt.json",
       "schema_id": "https://shanhaiedu.local/contracts/prompt-template.schema.json",
-      "sha256": "53271e4e0b409236444ffafc3e93200d9fcbb7bf1f1947e338e42f106abbf93e"
+      "sha256": "962b03394d6617465a8fa6bc23c4a403ba666d9e61baf8a0b0aedba0a7810652"
     },
     {
       "item_key": "lesson.division.generate.projection",

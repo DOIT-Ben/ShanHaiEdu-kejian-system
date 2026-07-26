@@ -240,7 +240,7 @@
             "label": "待确认问题",
             "type": "list",
             "required": true,
-            "editable": false,
+            "editable": true,
             "deletable": false
           }
         ]

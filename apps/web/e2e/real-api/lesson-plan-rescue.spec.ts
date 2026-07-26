@@ -26,6 +26,36 @@ async function expectGenerationProgress(page: Page) {
   );
 }
 
+type GenerationJobFacts = {
+  error_code: string | null;
+  lesson_unit_id: string | null;
+  result_artifact_version_id: string | null;
+  status: string;
+  workflow_node_key: string | null;
+};
+
+async function getGenerationJob(page: Page, jobId: string) {
+  return page.evaluate(
+    async ({ baseUrl, exactJobId }) => {
+      const response = await fetch(`${baseUrl}/generation-jobs/${exactJobId}`, {
+        credentials: "include",
+      });
+      const body = (await response.json()) as { data: GenerationJobFacts };
+      return body.data;
+    },
+    { baseUrl: apiBaseUrl, exactJobId: jobId },
+  );
+}
+
+async function waitForTerminalJob(page: Page, jobId: string) {
+  await expect
+    .poll(async () => (await getGenerationJob(page, jobId)).status, {
+      timeout: generationTimeout,
+    })
+    .toMatch(/^(?:succeeded|failed|cancelled)$/);
+  return getGenerationJob(page, jobId);
+}
+
 test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }) => {
   test.setTimeout(realProviderMode ? 900_000 : 180_000);
   await login(page);
@@ -140,34 +170,32 @@ test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }
       /\/api\/v2\/node-runs\/[0-9a-f-]+\/start$/.test(response.url()),
   );
   await page.getByRole("button", { name: "生成三类九套" }).click();
-  const introAccepted = (await (await introStartResponse).json()) as { data: { job_id: string } };
+  let introAccepted = (await (await introStartResponse).json()) as { data: { job_id: string } };
   await expectGenerationProgress(page);
+  let introJob = await waitForTerminalJob(page, introAccepted.data.job_id);
+  if (realProviderMode && introJob.status === "failed" && introJob.error_code === "MODEL_TIMEOUT") {
+    const retryStartResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        /\/api\/v2\/node-runs\/[0-9a-f-]+\/start$/.test(response.url()),
+    );
+    const retryButton = page.getByRole("button", { name: "生成三类九套" });
+    await expect(retryButton).toBeEnabled();
+    await retryButton.click();
+    introAccepted = (await (await retryStartResponse).json()) as { data: { job_id: string } };
+    await expectGenerationProgress(page);
+    introJob = await waitForTerminalJob(page, introAccepted.data.job_id);
+  }
+  expect(introJob.status).toBe("succeeded");
   await expect(page.getByText("Intro-options generation completed")).toBeVisible({
     timeout: generationTimeout,
   });
   const introBody = page.getByLabel("方案正文").first();
   await expect(introBody).toBeVisible();
 
-  const introJob = await page.evaluate(
-    async ({ baseUrl, jobId }) => {
-      const response = await fetch(`${baseUrl}/generation-jobs/${jobId}`, {
-        credentials: "include",
-      });
-      return (await response.json()) as {
-        data: {
-          lesson_unit_id: string;
-          result_artifact_version_id: string;
-          status: string;
-          workflow_node_key: string;
-        };
-      };
-    },
-    { baseUrl: apiBaseUrl, jobId: introAccepted.data.job_id },
-  );
-  expect(introJob.data.status).toBe("succeeded");
-  expect(introJob.data.workflow_node_key).toBe("intro.generate_options");
-  expect(introJob.data.lesson_unit_id).toBe(firstLessonId);
-  expect(introJob.data.result_artifact_version_id).toBeTruthy();
+  expect(introJob.workflow_node_key).toBe("intro.generate_options");
+  expect(introJob.lesson_unit_id).toBe(firstLessonId);
+  expect(introJob.result_artifact_version_id).toBeTruthy();
 
   await introBody.fill("教师编辑后的课堂导入方案正文");
   const introSaveResponse = page.waitForResponse(

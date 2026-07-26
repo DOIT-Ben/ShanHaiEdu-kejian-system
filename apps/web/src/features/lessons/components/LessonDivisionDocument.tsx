@@ -34,6 +34,14 @@ function lessonUnits(content: DivisionContent): LessonUnit[] {
     : [];
 }
 
+function coverageCheck(content: DivisionContent) {
+  return recordValue(content.coverage_check) ?? {};
+}
+
+function unresolvedQuestions(content: DivisionContent) {
+  return stringList(coverageCheck(content).unresolved_questions);
+}
+
 export function lessonDivisionContentReady(content: DivisionContent | undefined) {
   if (!content) return false;
   const units = lessonUnits(content);
@@ -62,6 +70,7 @@ export function LessonDivisionDocument({ content }: { content: DivisionContent }
       </p>
     );
   }
+  const questions = unresolvedQuestions(content);
   return (
     <div className="space-y-4">
       {lessonUnits(content).map((unit, index) => (
@@ -98,6 +107,16 @@ export function LessonDivisionDocument({ content }: { content: DivisionContent }
           </dl>
         </article>
       ))}
+      {questions.length ? (
+        <section className="border-t border-[var(--sh-line-subtle)] pt-4">
+          <h3 className="font-semibold text-[var(--sh-ink-strong)]">待确认问题</h3>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-[var(--sh-ink-default)]">
+            {questions.map((question) => (
+              <li key={question}>{question}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -111,6 +130,7 @@ export function LessonDivisionDraftEditor({
 }) {
   if (!lessonDivisionContentReady(content)) return <LessonDivisionDocument content={content} />;
   const units = lessonUnits(content);
+  const coverage = coverageCheck(content);
   const updateUnit = (index: number, update: Partial<LessonUnit>) => {
     onChange({
       ...content,
@@ -180,6 +200,25 @@ export function LessonDivisionDraftEditor({
           </div>
         </section>
       ))}
+      <label className="block text-xs font-medium text-[var(--sh-ink-muted)]">
+        待确认问题（每行一项）
+        <textarea
+          className="mt-1 min-h-24 w-full resize-y rounded-[var(--sh-radius-control)] border border-[var(--sh-line-default)] px-3 py-2 text-sm leading-6"
+          onChange={(event) =>
+            onChange({
+              ...content,
+              coverage_check: {
+                ...coverage,
+                unresolved_questions: event.target.value
+                  .split(/\r?\n/u)
+                  .map((item) => item.trim())
+                  .filter(Boolean),
+              },
+            })
+          }
+          value={unresolvedQuestions(content).join("\n")}
+        />
+      </label>
     </div>
   );
 }
