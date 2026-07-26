@@ -42,14 +42,14 @@
 ## 当前阻塞
 
 - 当前没有已知的Session/CSRF、PostgreSQL、Worker、active OpenAPI或生产页面实现阻塞；四个教师文本结果及完整真实API浏览器链已经进入`main`。
-- Parent #11的最终release门禁仍缺受控真实文本Provider passed receipt。一次真实教案生成在160.288秒返回并通过Schema，但过程评价证据把裸键拼接成描述而未通过质量门禁；当前`1.5.1`已经以红绿回归修复该Prompt和字段说明。修复后的受控调用在242.459秒收到上游HTTP 408，生产Worker正确落库为`MODEL_TIMEOUT`，因此尚未取得可批准教案，也不能继续三类九套、第二课时和最终receipt。
-- #242必须保持Draft，不转Ready、不合并；不得把此前Schema通过、课时划分成功、Fake浏览器通过或本地全门禁通过表述为真实Provider验收完成。连续真实调用已经分别暴露质量引用错误和上游超时，下一次调用前必须先确认Provider路由稳定或明确新的受控重试决定，不能等价重复调用。
+- Parent #11的最终release门禁仍缺受控真实文本Provider passed receipt。`1.5.1`已经以红绿回归修复此前的评价证据裸键错误；获得新的受控重试决定后，真实课时划分在24.316秒成功，但十二部分教案在300.111秒达到本地上限并由生产Worker落库为`MODEL_TIMEOUT`，因此仍未取得可批准教案，也未继续三类九套、第二课时或receipt。
+- #242必须保持Draft，不转Ready、不合并；不得把课时划分成功、Fake浏览器通过、本地或CI全门禁通过表述为真实Provider验收完成。新的受控重试仍证明Provider长结构化请求不稳定；再次调用前必须先确认Provider路由稳定或获得另一项明确决定，不能等价重复调用。
 - [Issue #233](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/233)单独跟踪`origin/main`既有Stage1 E2E旧`impact_scope` fixture；该测试债不改变#231验收结果，也不在救援PR内顺手修复。
 - [Issue #237](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/237)单独跟踪文件长度后置项；PPT、图片、视频、TTS、通用查询/审批/状态机、SSE重构和全仓技术债均不在#241范围。
 
 ## 下一个阶段出口
 
-1. 将当前`1.5.1`修复、测试和脱敏失败事实推送到#242，保持Draft并等待CI；失败诊断数据库、locator、原始浏览器附件和Redis临时键均须保持已清理。
+1. #242保持Draft和blocked；`1.5.1`修复、脱敏失败事实与资源清理证据保留在同一PR，任何新Head都必须重新通过CI。
 2. Provider路由稳定或重试决定明确后，使用现有生产Worker与Model Gateway执行一个受控真实文本Provider教师黄金项目，并用exact Project、LessonUnit、ArtifactVersion、GenerationJob、Attempt、Approval和IntroSelection形成脱敏passed receipt。
 3. 独立reviewer绑定#242最终base/head后Squash Merge，再从干净`origin/main`复验并关闭#241与Parent #11。
 4. 清理#241分支、worktree与临时运行资源；后续仍以教师可见结果为合并单位，不恢复#223至#229的技术层严格串行关系。
