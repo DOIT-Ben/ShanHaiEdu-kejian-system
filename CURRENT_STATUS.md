@@ -34,20 +34,23 @@
 - [Issue #239](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/239)已经由[PR #240](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/240)完成主线状态收口并关闭。
 - [Issue #241](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/241)是当前唯一P0实施入口；生产Worker已经核验会在未注入测试模型时通过现有`build_real_text_gateway()`调用真实文本Provider，本任务只补受控黄金项目、脱敏receipt和必要的验收接线。
 - Draft PR [#242](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/242)从`origin/main`独立开发；普通CI继续使用确定性Fake，真实Provider只通过显式受控命令执行。
+- #242当前前向内容包为`1.5.1`：保持不可变`1.5.0`和既有项目绑定不变，收紧十二部分教案的教材范围、教材证据和评价证据裸键约束；结构化文本输出预算为12,288 tokens，Provider本地超时上限为300秒。
+- 当前分支的内容合同、PostgreSQL发布不变量、Fake Worker真实API浏览器链、active OpenAPI/生成客户端、Python质量门禁、生产前端`release:check`、仓库治理和密钥扫描已经通过；这些本地结果不能替代真实Provider passed receipt。
 - Parent [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)仍保持开放；只有受控真实文本Provider通过现有Model Gateway形成脱敏证据后，才能执行最终R1 release收口并关闭父任务。
 - [Draft PR #222](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/222)冻结为固定WIP代码来源，不新增代码、不直接合并；[Draft PR #230](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/230)暂停，不转Ready、不默认合并。#223至#229只保留为参考清单，不再强制串行。
 
 ## 当前阻塞
 
 - 当前没有已知的Session/CSRF、PostgreSQL、Worker、active OpenAPI或生产页面实现阻塞；四个教师文本结果及完整真实API浏览器链已经进入`main`。
-- Parent #11的最终release门禁仍缺受控真实文本Provider实测证据；普通CI确定性Fake和真实API浏览器通过均不能冒充真实Provider完成。
+- Parent #11的最终release门禁仍缺受控真实文本Provider passed receipt。一次真实教案生成在160.288秒返回并通过Schema，但过程评价证据把裸键拼接成描述而未通过质量门禁；当前`1.5.1`已经以红绿回归修复该Prompt和字段说明。修复后的受控调用在242.459秒收到上游HTTP 408，生产Worker正确落库为`MODEL_TIMEOUT`，因此尚未取得可批准教案，也不能继续三类九套、第二课时和最终receipt。
+- #242必须保持Draft，不转Ready、不合并；不得把此前Schema通过、课时划分成功、Fake浏览器通过或本地全门禁通过表述为真实Provider验收完成。连续真实调用已经分别暴露质量引用错误和上游超时，下一次调用前必须先确认Provider路由稳定或明确新的受控重试决定，不能等价重复调用。
 - [Issue #233](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/233)单独跟踪`origin/main`既有Stage1 E2E旧`impact_scope` fixture；该测试债不改变#231验收结果，也不在救援PR内顺手修复。
 - [Issue #237](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/237)单独跟踪文件长度后置项；PPT、图片、视频、TTS、通用查询/审批/状态机、SSE重构和全仓技术债均不在#241范围。
 
 ## 下一个阶段出口
 
-1. #241先通过receipt合同、PostgreSQL失败关闭、active OpenAPI/生成客户端、生产前端和真实API浏览器门禁。
-2. 使用现有生产Worker与Model Gateway执行一个受控真实文本Provider教师黄金项目，并用exact Project、LessonUnit、ArtifactVersion、GenerationJob、Attempt、Approval和IntroSelection形成脱敏receipt。
+1. 将当前`1.5.1`修复、测试和脱敏失败事实推送到#242，保持Draft并等待CI；失败诊断数据库、locator、原始浏览器附件和Redis临时键均须保持已清理。
+2. Provider路由稳定或重试决定明确后，使用现有生产Worker与Model Gateway执行一个受控真实文本Provider教师黄金项目，并用exact Project、LessonUnit、ArtifactVersion、GenerationJob、Attempt、Approval和IntroSelection形成脱敏passed receipt。
 3. 独立reviewer绑定#242最终base/head后Squash Merge，再从干净`origin/main`复验并关闭#241与Parent #11。
 4. 清理#241分支、worktree与临时运行资源；后续仍以教师可见结果为合并单位，不恢复#223至#229的技术层严格串行关系。
 

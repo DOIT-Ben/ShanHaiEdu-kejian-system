@@ -2,9 +2,9 @@
   "format_version": "1.0",
   "package_key": "shanhai.primary_math.courseware",
   "name": "小学数学标准课件生产内容包",
-  "semantic_version": "1.5.0",
+  "semantic_version": "1.5.1",
   "runtime_constraint": ">=0.1.0 <1.0.0",
-  "change_summary": "在不可变1.4.0基础上前向修正三类九套真实教材证据兼容与方案唯一性校验；旧Release与既有项目绑定保持不变。",
+  "change_summary": "在不可变1.5.0基础上前向强化十二部分教案的教材范围与评价证据引用约束；旧Release与既有项目绑定保持不变。",
   "dependencies": [],
   "items": [
     {
@@ -68,14 +68,14 @@
       "kind": "content_definition",
       "path": "items/lesson-plan-generate-output.json",
       "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
-      "sha256": "5ecbbef08390810ddedf0ae84e30592ab49978dec213900d254bcb0604f1a733"
+      "sha256": "2ecd920248426f4d007907a665de6c97af04d499fe98f3c15d66480c08e0305d"
     },
     {
       "item_key": "lesson_plan.generate.prompt",
       "kind": "prompt_template",
       "path": "items/lesson-plan-generate-prompt.json",
       "schema_id": "https://shanhaiedu.local/contracts/prompt-template.schema.json",
-      "sha256": "749b1baad411fb74272e0e253147f551186523494c8e5ce59ac5029cf3d05e8b"
+      "sha256": "21ed70a55061159167cafd895a5635c2e99a6e16c7e31a4e1e9b70fde3214fd6"
     },
     {
       "item_key": "lesson_plan.generate.projection",

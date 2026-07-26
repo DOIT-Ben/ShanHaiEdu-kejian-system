@@ -14,8 +14,16 @@ const generationTimeout = realProviderMode ? 300_000 : 60_000;
 async function login(page: Page) {
   await page.goto("/login");
   await page.getByLabel("学校访问码").fill(accessCode);
-  await page.getByRole("button", { name: "登录" }).click();
+  await page.getByRole("button", { name: "登录", exact: true }).click();
   await expect(page).toHaveURL(/\/app\/projects$/);
+}
+
+async function expectGenerationProgress(page: Page) {
+  await expect(page.getByRole("progressbar", { name: /任务进度/ })).toHaveAttribute(
+    "aria-valuenow",
+    /^(?:0|[1-9]\d?|100)$/,
+    { timeout: generationTimeout },
+  );
 }
 
 test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }) => {
@@ -52,7 +60,7 @@ test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }
   );
   await page.getByRole("button", { name: "生成十二部分教案" }).click();
   const accepted = (await (await startedResponse).json()) as { data: { job_id: string } };
-  await expect(page.getByRole("progressbar", { name: /任务进度/ })).toBeVisible();
+  await expectGenerationProgress(page);
   await expect(page.getByText("Lesson-plan generation completed")).toBeVisible({
     timeout: generationTimeout,
   });
@@ -133,7 +141,7 @@ test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }
   );
   await page.getByRole("button", { name: "生成三类九套" }).click();
   const introAccepted = (await (await introStartResponse).json()) as { data: { job_id: string } };
-  await expect(page.getByRole("progressbar", { name: /任务进度/ })).toBeVisible();
+  await expectGenerationProgress(page);
   await expect(page.getByText("Intro-options generation completed")).toBeVisible({
     timeout: generationTimeout,
   });
@@ -256,7 +264,7 @@ test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }
   const secondAccepted = (await (await secondStartedResponse).json()) as {
     data: { job_id: string };
   };
-  await expect(page.getByRole("progressbar", { name: /任务进度/ })).toBeVisible();
+  await expectGenerationProgress(page);
   await expect(page.getByText("Lesson-plan generation completed")).toBeVisible({
     timeout: generationTimeout,
   });

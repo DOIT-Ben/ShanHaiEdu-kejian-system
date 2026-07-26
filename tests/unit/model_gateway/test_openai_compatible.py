@@ -4,7 +4,7 @@ import json
 
 import httpx
 import pytest
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
 from apps.api.model_gateway.contracts import (
     GatewayErrorCode,
@@ -38,6 +38,19 @@ def provider(handler) -> OpenAICompatibleTextProvider:
         ),
         client=client,
     )
+
+
+def test_config_supports_long_structured_generation_timeout() -> None:
+    values = {
+        "provider_name": "provider-test",
+        "base_url": "https://provider.test/api/v1",
+        "model": "provider/model",
+        "api_key": SecretStr("test-only-key"),
+    }
+
+    assert OpenAICompatibleConfig(**values, timeout_seconds=300).timeout_seconds == 300
+    with pytest.raises(ValidationError):
+        OpenAICompatibleConfig(**values, timeout_seconds=301)
 
 
 async def test_adapter_validates_success_and_usage() -> None:

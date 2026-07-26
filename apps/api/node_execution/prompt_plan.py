@@ -28,6 +28,7 @@ from .boundaries import validate_execution_boundary
 
 _PLATFORM_SAFETY = "Enforce tenant isolation, platform safety, and the published output contract."
 _PROVIDER_FORMAT = "Return exactly one JSON object and no commentary."
+_STRUCTURED_TEXT_MAX_OUTPUT_TOKENS = 12_288
 
 
 class NodePromptPlanError(ValueError):
@@ -92,7 +93,7 @@ def compile_node_prompt(
         capability=contract.capability,
         request_id=request_id,
         prompt=prompt.compiled_prompt,
-        max_output_tokens=128_000,
+        max_output_tokens=_STRUCTURED_TEXT_MAX_OUTPUT_TOKENS,
         temperature=0,
     )
     audit = ModelAuditContext(

@@ -492,6 +492,7 @@
           {
             "field_key": "process_assessment_evidence",
             "label": "评价证据",
+            "description": "数组元素必须是关联目标assessment_evidence_keys中已声明的原样裸键字符串，例如AE1-COUNT；不得拼接冒号、解释或评价描述。",
             "type": "list",
             "required": true,
             "editable": true,

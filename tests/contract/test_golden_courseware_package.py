@@ -118,6 +118,24 @@ def test_lesson_division_prompt_preserves_reference_method_and_scope() -> None:
     assert "不要同时生成详细教案" in prompt
 
 
+def test_lesson_plan_prompt_preserves_exact_scope_and_assessment_references() -> None:
+    source = load_json(SOURCE)
+    assert source["package"]["semantic_version"] == "1.5.1"
+    lesson_plan = next(
+        node for node in source["nodes"] if node["template_key"] == "lesson_plan.generate"
+    )
+    prompt = "\n".join(
+        lesson_plan["prompt"][key] for key in ("role", "task", "method", "quality_gate")
+    )
+
+    assert "material_scope原文逐字复制" in prompt
+    assert "只能使用approved_lesson_unit.lesson_unit.evidence_refs" in prompt
+    assert "只能引用该环节关联目标已声明的评价证据键" in prompt
+    assert "覆盖每个目标与其每个评价证据键的组合" in prompt
+    assert "数组元素必须是原样裸键字符串" in prompt
+    assert "禁止拼接冒号" in prompt
+
+
 def test_lesson_plan_content_definition_has_exact_twelve_sections() -> None:
     package = validate_content_package(PACKAGE, contracts_root=CONTRACTS)
     lesson_plan_output = package.items["lesson_plan.generate.output"]["spec"]
@@ -135,6 +153,16 @@ def test_lesson_plan_content_definition_has_exact_twelve_sections() -> None:
         "differentiated_homework",
         "teaching_reflection",
     ]
+    teaching_process = next(
+        field for field in lesson_plan_output["fields"] if field["field_key"] == "teaching_process"
+    )
+    process_assessment = next(
+        field
+        for field in teaching_process["children"]
+        if field["field_key"] == "process_assessment_evidence"
+    )
+    assert "原样裸键字符串" in process_assessment["description"]
+    assert "不得拼接冒号" in process_assessment["description"]
 
 
 def test_golden_case_matches_schema_and_business_invariants() -> None:

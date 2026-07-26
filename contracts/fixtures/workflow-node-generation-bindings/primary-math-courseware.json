@@ -2,7 +2,7 @@
   "api_version": "shanhai.workflow-node-generation-binding/v2",
   "catalog_key": "primary_math.courseware",
   "workflow_key": "primary_math.courseware",
-  "semantic_version": "1.5.0",
+  "semantic_version": "1.5.1",
   "nodes": [
     {
       "node_key": "material.file_validate",

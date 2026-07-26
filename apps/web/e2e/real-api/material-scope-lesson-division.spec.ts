@@ -16,7 +16,7 @@ const generationTimeout = realProviderMode ? 300_000 : 60_000;
 async function login(page: Page) {
   await page.goto("/login");
   await page.getByLabel("学校访问码").fill(accessCode);
-  await page.getByRole("button", { name: "登录" }).click();
+  await page.getByRole("button", { name: "登录", exact: true }).click();
   await expect(page).toHaveURL(/\/app\/projects$/);
 }
 
@@ -87,7 +87,11 @@ test("teacher_completes_exact_material_scope_and_lesson_division_with_real_api",
   );
   await page.getByRole("button", { name: "生成课时划分" }).click();
   const accepted = (await (await divisionStartResponse).json()) as { data: { job_id: string } };
-  await expect(page.getByRole("progressbar", { name: /任务进度/ })).toBeVisible();
+  await expect(page.getByRole("progressbar", { name: /任务进度/ })).toHaveAttribute(
+    "aria-valuenow",
+    /^(?:0|[1-9]\d?|100)$/,
+    { timeout: generationTimeout },
+  );
   await expect(page.getByRole("progressbar", { name: "任务进度 100%" })).toBeVisible({
     timeout: generationTimeout,
   });

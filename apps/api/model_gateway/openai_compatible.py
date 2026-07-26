@@ -31,7 +31,7 @@ class OpenAICompatibleConfig(BaseModel):
     base_url: str = Field(min_length=1)
     model: str = Field(min_length=1, max_length=160)
     api_key: SecretStr
-    timeout_seconds: float = Field(gt=0, le=120)
+    timeout_seconds: float = Field(gt=0, le=300)
 
 
 class _Usage(BaseModel):
