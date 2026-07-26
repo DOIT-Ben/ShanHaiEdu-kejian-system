@@ -91,7 +91,7 @@ async def test_intro_option_prepare_is_idempotent_and_exactly_lesson_scoped(
             )
     finally:
         app.state.database_engine.dispose()
-        engine.dispose()
+    engine.dispose()
 
     assert created.status_code == 200, created.text
     assert replayed.status_code == 200, replayed.text
@@ -119,6 +119,65 @@ async def test_intro_option_prepare_is_idempotent_and_exactly_lesson_scoped(
             )
             == 1
         )
+
+
+async def test_intro_quality_accepts_real_parser_pages_only_evidence(
+    migrated_database_url: str,
+) -> None:
+    engine = build_engine(migrated_database_url)
+    factory = build_session_factory(engine)
+    case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
+    flat_evidence = cast(list[dict[str, Any]], case["material_evidence"])
+    pages_content: dict[str, object] = {
+        "knowledge_boundary": case["knowledge_boundary"],
+        "pages": [
+            {
+                "image_references": [],
+                "page_number": 1,
+                "text_blocks": [
+                    {
+                        "block_id": item["evidence_key"],
+                        "text": item.get("summary", "evidence"),
+                    }
+                    for item in flat_evidence
+                ],
+            }
+        ],
+        "source": case["source"],
+    }
+    prepared = await _generate_default_nine(factory, material_content=pages_content)
+
+    settings = Settings(
+        _env_file=None,
+        environment="test",
+        database_url=SecretStr(migrated_database_url),
+        session_access_code=None,
+        session_allowed_origins=[],
+        session_csrf_secret=None,
+        session_teacher_principal_id=None,
+    )
+    app = create_app(settings=settings, object_storage=FakeObjectStorage())
+    override_test_identity(app, prepared.actor)
+    transport = httpx.ASGITransport(app=app)
+    try:
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            quality = await client.post(
+                "/api/v2/lessons/"
+                f"{prepared.lesson_unit_id}/intro-options/artifact-versions/"
+                f"{prepared.version_id}/quality-validations",
+                headers={"Idempotency-Key": "r1-intro-pages-only-quality"},
+            )
+            assert quality.status_code == 202, quality.text
+            report = execute_artifact_quality_node(
+                migrated_database_url,
+                UUID(quality.json()["data"]["node_run_id"]),
+                runtime_quality_validator_registry(),
+            )
+    finally:
+        app.state.database_engine.dispose()
+        engine.dispose()
+
+    assert report is not None and report.conclusion == "passed", report
 
 
 async def test_intro_options_restore_edit_quality_exact_approval_and_selection(

@@ -10,6 +10,7 @@ type IntroOptionsGenerationPanelProps = {
   onRevisionChange: (value: string) => void;
   onStart: () => void;
   pending: boolean;
+  regenerationAllowed: boolean;
   revision: string;
 };
 
@@ -21,6 +22,7 @@ export function IntroOptionsGenerationPanel({
   onRevisionChange,
   onStart,
   pending,
+  regenerationAllowed,
   revision,
 }: IntroOptionsGenerationPanelProps) {
   return (
@@ -34,12 +36,19 @@ export function IntroOptionsGenerationPanel({
               : "生成科普、应用、故事各三套方案。"}
           </p>
         </div>
-        <Button disabled={!canWrite || pending || jobLive || artifactReady} onClick={onStart}>
+        <Button
+          disabled={!canWrite || pending || jobLive || (artifactReady && !regenerationAllowed)}
+          onClick={onStart}
+        >
           <RefreshCw aria-hidden="true" />
-          {artifactReady ? "九套方案已生成" : "生成三类九套"}
+          {regenerationAllowed
+            ? "重新生成三类九套"
+            : artifactReady
+              ? "九套方案已生成"
+              : "生成三类九套"}
         </Button>
       </div>
-      {!artifactReady ? (
+      {!artifactReady || regenerationAllowed ? (
         <label className="mt-4 block text-sm font-medium text-[var(--sh-ink-default)]">
           本次生成要求
           <textarea

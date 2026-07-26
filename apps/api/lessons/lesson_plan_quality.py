@@ -17,6 +17,7 @@ from apps.api.lessons.lesson_plan_domain import (
     LessonPlanDefinition,
     LessonPlanSliceError,
 )
+from apps.api.lessons.material_evidence import material_evidence_keys
 
 LESSON_PLAN_SCHEMA_REF = ValidatorRef(
     key="validator.lesson_plan.schema",
@@ -25,13 +26,13 @@ LESSON_PLAN_SCHEMA_REF = ValidatorRef(
 )
 LESSON_PLAN_SCOPE_REF = ValidatorRef(
     key="validator.lesson_plan.scope",
-    semantic_version="1.0.0",
-    implementation_digest="72de7b0aa6677502ef36f29339badaf432b37c0b0409e22236efd5b03f99b68b",
+    semantic_version="1.1.0",
+    implementation_digest="117d447f4a032fc2b7cdaf809ba8b84de99eaeddb8cc007093ed83e23c2a68b9",
 )
 LESSON_PLAN_TEACHING_QUALITY_REF = ValidatorRef(
     key="validator.lesson_plan.teaching_quality",
-    semantic_version="1.0.0",
-    implementation_digest="10296a5dfb1da0fdd73f8be5bf04fd597b37f934ef492dbe58edd7ac58afbdf2",
+    semantic_version="1.1.0",
+    implementation_digest="a9b19c72861e863ef3a551d58f846be47c6bb358e2dbb59315fc474b152329e6",
 )
 
 
@@ -125,7 +126,7 @@ def _scope(context: QualityValidationContext) -> ApprovedLessonPlanScope:
         )
     unit = _exact_lesson(division, lesson_key)
     evidence_refs = _strings(unit.get("evidence_refs"))
-    material_evidence = _material_evidence_keys(material)
+    material_evidence = material_evidence_keys(material)
     if not evidence_refs or not set(evidence_refs) <= material_evidence:
         raise LessonPlanSliceError(
             "MATERIAL_EVIDENCE_INVALID: lesson evidence is outside the exact material parse"
@@ -175,19 +176,6 @@ def _exact_lesson(division: Mapping[str, Any], lesson_key: str) -> Mapping[str, 
             "LESSON_SCOPE_INVALID: approved division has no exact target lesson"
         )
     return unit
-
-
-def _material_evidence_keys(material: Mapping[str, Any]) -> set[str]:
-    raw = material.get("material_evidence")
-    if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes, bytearray)):
-        return set()
-    return {
-        cast(str, cast(Mapping[str, Any], item).get("evidence_key"))
-        for item in cast(Sequence[object], raw)
-        if isinstance(item, Mapping)
-        and isinstance(cast(Mapping[str, Any], item).get("evidence_key"), str)
-        and cast(str, cast(Mapping[str, Any], item).get("evidence_key")).strip()
-    }
 
 
 def _strings(value: object) -> tuple[str, ...]:

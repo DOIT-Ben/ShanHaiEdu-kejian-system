@@ -589,10 +589,17 @@ async def test_quality_failure_rolls_back_report_terminal_and_event_atomically(
 
 async def _generate_default_nine(
     factory: sessionmaker[Session],
+    *,
+    material_content: dict[str, object] | None = None,
 ) -> PreparedIntroOption:
     case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
     outputs = build_golden_branch_source_outputs(case)
-    division = await _prepare_approval(factory, case, outputs["lesson.division.generate"])
+    division = await _prepare_approval(
+        factory,
+        case,
+        outputs["lesson.division.generate"],
+        material_content=material_content,
+    )
     with factory() as session, session.begin():
         ArtifactService(session, division.actor).review(
             division.version_id,

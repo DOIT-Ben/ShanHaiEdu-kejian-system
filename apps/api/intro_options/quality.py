@@ -17,13 +17,13 @@ from apps.api.artifact_quality.registry import InMemoryQualityValidatorRegistry
 
 INTRO_OPTION_SCHEMA_REF = ValidatorRef(
     key="validator.intro.option_set_schema",
-    semantic_version="1.0.0",
-    implementation_digest="2049fe72e70c9c5280e011cfd131b47d7444128973c4e7163c2c51d08d18a379",
+    semantic_version="1.1.0",
+    implementation_digest="d60f89477c8db4c3f116fa7e524b8b8688e4f5403cc8cb137b0f1d56a170e6e4",
 )
 INTRO_SINGLE_ANCHOR_REF = ValidatorRef(
     key="validator.intro.single_anchor",
-    semantic_version="1.1.0",
-    implementation_digest="f37001db813669d7148ac43d25045472c0c4b84427df414e303f4a99e5b40220",
+    semantic_version="1.2.0",
+    implementation_digest="c63f73f6b74e54bf0a69ca7770f13a76e56bb6f092cf523d2eb2d612eae5ca06",
 )
 INTRO_UNIQUE_RECOMMENDATION_REF = ValidatorRef(
     key="validator.intro.unique_recommendation",
@@ -48,6 +48,7 @@ class IntroOptionSchemaQualityValidator:
                 _finding("INTRO_SOURCE_CARDINALITY_INVALID", "source count mismatches mode")
             )
         if mode == "default_nine":
+            findings.extend(_default_nine_identity_findings(options))
             tendencies = Counter(option.get("primary_tendency") for option in options)
             has_cross_tendency = any(
                 len(set(_string_sequence(option.get("secondary_tendencies")))) >= 2
@@ -206,13 +207,79 @@ def _string_sequence(value: object) -> tuple[str, ...]:
 
 
 def _material_evidence_keys(material: Mapping[str, Any] | None) -> set[str]:
-    raw = material.get("material_evidence") if material is not None else None
+    if material is None:
+        return set()
+    return _flat_evidence_keys(material.get("material_evidence")) | _page_evidence_keys(
+        material.get("pages")
+    )
+
+
+def _flat_evidence_keys(evidence: object) -> set[str]:
     values: set[str] = set()
-    for item in _mapping_sequence(raw):
+    for item in _mapping_sequence(evidence):
         key = item.get("evidence_key")
         if type(key) is str and key.strip():
             values.add(key)
     return values
+
+
+def _page_evidence_keys(pages: object) -> set[str]:
+    values: set[str] = set()
+    for page in _mapping_sequence(pages):
+        for collection_name, key_name in (
+            ("text_blocks", "block_id"),
+            ("image_references", "image_id"),
+        ):
+            for item in _mapping_sequence(page.get(collection_name)):
+                key = item.get(key_name)
+                if type(key) is str and key.strip():
+                    values.add(key)
+    return values
+
+
+def _default_nine_identity_findings(
+    options: list[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    prefixes = {
+        "science": "INTRO-SCI-",
+        "application": "INTRO-APP-",
+        "story": "INTRO-STO-",
+    }
+    option_keys = [option.get("option_key") for option in options]
+    key_invalid = (
+        any(type(key) is not str or not key.strip() for key in option_keys)
+        or len(option_keys) != len(set(option_keys))
+        or any(
+            not isinstance(key, str)
+            or not isinstance(tendency, str)
+            or tendency not in prefixes
+            or not key.startswith(prefixes[tendency])
+            for key, tendency in (
+                (option.get("option_key"), option.get("primary_tendency")) for option in options
+            )
+        )
+    )
+    findings: list[dict[str, Any]] = []
+    if key_invalid:
+        findings.append(
+            _finding(
+                "INTRO_OPTION_KEY_INVALID",
+                "option keys must be unique and match their primary tendency",
+            )
+        )
+    concepts = [
+        "".join(value.split()).casefold()
+        for value in (option.get("creative_concept") for option in options)
+        if type(value) is str and value.strip()
+    ]
+    if len(concepts) == len(options) and len(concepts) != len(set(concepts)):
+        findings.append(
+            _finding(
+                "INTRO_OPTION_CONTENT_DUPLICATED",
+                "creative concepts must be distinct after normalization",
+            )
+        )
+    return findings
 
 
 def _lesson_boundary_findings(

@@ -51,6 +51,7 @@ export function IntroOptionsWorkflowPanel({
   const currentQualityReport =
     qualityReport?.artifact_version_id === submittedVersionId ? qualityReport : undefined;
   const qualityPassed = currentQualityReport?.conclusion === "passed";
+  const regenerationAllowed = currentQualityReport?.conclusion === "failed";
   const qualityMutation = useIntroOptionsQualityMutation({
     artifact,
     etag,
@@ -122,6 +123,7 @@ export function IntroOptionsWorkflowPanel({
         onRevisionChange={setRevision}
         onStart={() => generationMutation.mutate(revision)}
         pending={generationMutation.isPending}
+        regenerationAllowed={regenerationAllowed}
         revision={revision}
       />
 

@@ -17,9 +17,19 @@ async function login(page: Page) {
 }
 
 test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   await login(page);
   await page.getByRole("link", { name: "继续制作十二部分教案验收" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "十二部分教案验收" })).toBeVisible();
+
+  await page.getByRole("link", { name: "教材与解析" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "教材与课时划分" })).toBeVisible();
+  await page.getByRole("link").filter({ hasText: "issue-125-material.pdf" }).click();
+  await expect(page.getByText(/已保存范围：物理页 .*教师已确认/)).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "课时划分" })).toBeVisible();
+  await expect(page.getByLabel("课题名称")).toHaveValue("1～5的认识");
+  await expect(page.getByText(/已批准版本/)).toBeVisible();
+  await page.getByRole("link", { name: "返回项目" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "十二部分教案验收" })).toBeVisible();
 
   const firstLesson = page
@@ -32,30 +42,6 @@ test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }
   if (!firstLessonId || !projectId) throw new Error("Lesson workbench URL is missing exact IDs");
   expect(firstLessonId).toBeTruthy();
   expect(projectId).toBeTruthy();
-
-  const upstreamFacts = await page.evaluate(
-    async ({ baseUrl, exactProjectId }) => {
-      const [scopeResponse, divisionResponse] = await Promise.all([
-        fetch(`${baseUrl}/projects/${exactProjectId}/material-scope/artifact`, {
-          credentials: "include",
-        }),
-        fetch(`${baseUrl}/projects/${exactProjectId}/lesson-division/artifact`, {
-          credentials: "include",
-        }),
-      ]);
-      return {
-        division: (await divisionResponse.json()) as {
-          data: { artifact: { current_approved_version: { id: string } } | null };
-        },
-        scope: (await scopeResponse.json()) as {
-          data: { artifact: { current_approved_version: { id: string } } | null };
-        },
-      };
-    },
-    { baseUrl: apiBaseUrl, exactProjectId: projectId },
-  );
-  expect(upstreamFacts.scope.data.artifact?.current_approved_version.id).toBeTruthy();
-  expect(upstreamFacts.division.data.artifact?.current_approved_version.id).toBeTruthy();
 
   const startedResponse = page.waitForResponse(
     (response) =>

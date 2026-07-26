@@ -3,9 +3,9 @@
   "package": {
     "package_key": "shanhai.primary_math.courseware",
     "name": "小学数学标准课件生产内容包",
-    "semantic_version": "1.4.0",
+    "semantic_version": "1.5.0",
     "runtime_constraint": ">=0.1.0 <1.0.0",
-    "change_summary": "在不可变1.3.0基础上前向补齐教材范围ContentDefinition与human-gate Artifact批准合同；旧Release与既有项目绑定保持不变。"
+    "change_summary": "在不可变1.4.0基础上前向修正三类九套真实教材证据兼容与方案唯一性校验；旧Release与既有项目绑定保持不变。"
   },
   "styles": [
     {

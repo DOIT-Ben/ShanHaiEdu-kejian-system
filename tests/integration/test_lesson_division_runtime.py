@@ -907,6 +907,8 @@ async def _prepare_approval(
     actor: ActorContext | None = None,
     approved_evidence_keys: tuple[str, ...] | None = None,
     add_second_parse: bool = False,
+    material_content: dict[str, object] | None = None,
+    material_scope_page_range: tuple[int, int] | None = None,
     project_title: str = "Lesson division runtime",
 ) -> PreparedApproval:
     with factory() as session, session.begin():
@@ -934,7 +936,16 @@ async def _prepare_approval(
             case,
             approved_evidence_keys=approved_evidence_keys,
             add_second_parse=add_second_parse,
+            material_content=material_content,
+            material_scope_page_range=material_scope_page_range,
         )
+        if material_scope_page_range is not None:
+            ArtifactService(session, resolved_actor).review(
+                scope_version_id,
+                action="approve",
+                comment="Approve the exact material scope for the R1 rescue browser fixture.",
+                request_id="r1-rescue-e2e-approve-material-scope",
+            )
         nodes = LessonDivisionRuntimeService(session, resolved_actor).initialize(project.id)
     execution = NodeExecutionService(
         SqlAlchemyNodeExecutionTransactionFactory(factory, resolved_actor),
@@ -999,6 +1010,8 @@ def _seed_material_and_scope(
     approved_evidence_keys: tuple[str, ...] | None,
     include_exact_parse_binding: bool = True,
     add_second_parse: bool = False,
+    material_content: dict[str, object] | None = None,
+    material_scope_page_range: tuple[int, int] | None = None,
 ) -> tuple[UUID, UUID]:
     asset = FileAsset(
         id=new_uuid7(),
@@ -1053,7 +1066,7 @@ def _seed_material_and_scope(
     )
     session.add(material)
     session.flush()
-    material_content = {
+    resolved_material_content = material_content or {
         "source": case["source"],
         "material_evidence": case["material_evidence"],
         "knowledge_boundary": case["knowledge_boundary"],
@@ -1068,9 +1081,9 @@ def _seed_material_and_scope(
         status="succeeded",
         parser_name="issue-125-fake",
         parser_version="1",
-        content_json=material_content,
+        content_json=resolved_material_content,
         page_count=3,
-        text_checksum=canonical_content_hash(material_content),
+        text_checksum=canonical_content_hash(resolved_material_content),
         validation_report_json={"valid": True},
         error_code=None,
         created_at=utc_now(),
@@ -1082,7 +1095,7 @@ def _seed_material_and_scope(
     session.add(parse)
     session.flush()
     if add_second_parse:
-        second_content = deepcopy(material_content)
+        second_content = deepcopy(resolved_material_content)
         second_content["parse_revision"] = 2
         session.add(
             MaterialParseVersion(
@@ -1120,6 +1133,13 @@ def _seed_material_and_scope(
         "lesson_type_preferences": ["new_learning"],
         "special_requirements": "Keep the approved knowledge boundary.",
     }
+    if material_scope_page_range is not None:
+        scope_content.update(
+            {
+                "page_start": material_scope_page_range[0],
+                "page_end": material_scope_page_range[1],
+            }
+        )
     if include_exact_parse_binding:
         scope_content.update(
             {
@@ -1127,6 +1147,19 @@ def _seed_material_and_scope(
                 "material_parse_version_id": str(parse.id),
             }
         )
+    scope_definition_id = definition_id
+    if material_scope_page_range is not None:
+        source_definition = session.get(ContentDefinitionVersion, definition_id)
+        assert source_definition is not None
+        scope_definition = session.scalar(
+            select(ContentDefinitionVersion).where(
+                ContentDefinitionVersion.content_package_version_id
+                == source_definition.content_package_version_id,
+                ContentDefinitionVersion.definition_key == "material.scope_review.output",
+            )
+        )
+        assert scope_definition is not None
+        scope_definition_id = scope_definition.id
     scope = Artifact(
         id=new_uuid7(),
         organization_id=actor.organization_id,
@@ -1135,8 +1168,8 @@ def _seed_material_and_scope(
         branch_key="project",
         artifact_key="material-scope",
         artifact_type="material_scope",
-        content_definition_version_id=definition_id,
-        status="approved",
+        content_definition_version_id=scope_definition_id,
+        status=("in_review" if material_scope_page_range is not None else "approved"),
         stale_reason_json=None,
         created_by=actor.principal_id,
         updated_by=actor.principal_id,
@@ -1160,5 +1193,9 @@ def _seed_material_and_scope(
     )
     session.add(scope_version)
     session.flush()
-    scope.current_approved_version_id = scope_version.id
+    if material_scope_page_range is not None:
+        scope.current_submitted_version_id = scope_version.id
+    else:
+        scope.current_approved_version_id = scope_version.id
+    session.flush()
     return parse.id, scope_version.id

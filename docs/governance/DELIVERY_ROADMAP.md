@@ -160,7 +160,7 @@ exact已选导入方案 + 一个正式关键帧
 → 项目课堂导入视频槽位
 ```
 
-当前不可变`1.4.0`中的`video.shots.generate`要求`artifact:video_fine_storyboard`、`contract:video_style`并依赖`video.fine_storyboard.generate`，不能直接用于该切片。#205必须生成`1.5.0`前向候选：该节点只冻结exact `intro_selection.snapshot`与教师上传或选择的一个租户内、clean、正式`shot_keyframe`图片版本，成为视频分支入口；不要求先建设图片生成或Artifact批准链。风格使用发布内固定预设，候选数固定为1，输出继续沿用现有视频候选、采用和项目槽位合同。旧`1.0.0`至`1.4.0`及既有项目绑定不变，只有新建或显式升级的MVP项目可绑定`1.5.0`。
+当前不可变`1.4.0`中的`video.shots.generate`要求`artifact:video_fine_storyboard`、`contract:video_style`并依赖`video.fine_storyboard.generate`，不能直接用于该切片。#205必须基于#235的`1.5.0`生成`1.6.0`前向候选：该节点只冻结exact `intro_selection.snapshot`与教师上传或选择的一个租户内、clean、正式`shot_keyframe`图片版本，成为视频分支入口；不要求先建设图片生成或Artifact批准链。风格使用发布内固定预设，候选数固定为1，输出继续沿用现有视频候选、采用和项目槽位合同。旧`1.0.0`至`1.5.0`及既有项目绑定不变，只有新建或显式升级的MVP项目可绑定`1.6.0`。
 
 后续完整链在同一NodeRun、GenerationResult/Adoption、FileAssetVersion和项目槽位上扩展：
 

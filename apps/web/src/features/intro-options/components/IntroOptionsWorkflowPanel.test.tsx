@@ -5,6 +5,7 @@ import goldenProject from "../../../../../../contracts/fixtures/golden-projects/
 
 const workflow = vi.hoisted(() => ({
   artifact: undefined as Record<string, unknown> | undefined,
+  generationMutate: vi.fn(),
   latestApproval: undefined as Record<string, unknown> | undefined,
   qualityMutate: vi.fn(),
   qualityReport: undefined as Record<string, unknown> | undefined,
@@ -52,7 +53,7 @@ vi.mock("@/features/intro-options/hooks/useIntroOptionsWorkflow", () => ({
   useIntroOptionsGenerationMutation: () => ({
     error: undefined,
     isPending: false,
-    mutate: vi.fn(),
+    mutate: workflow.generationMutate,
   }),
   useIntroOptionsJobRuntime: () => ({
     job: undefined,
@@ -88,6 +89,7 @@ describe("IntroOptionsWorkflowPanel", () => {
   beforeEach(() => {
     workflow.artifact = artifact("version-new", "version-old");
     workflow.latestApproval = { action: "approve", artifact_version_id: "version-old" };
+    workflow.generationMutate.mockReset();
     workflow.qualityMutate.mockReset();
     workflow.qualityReport = undefined;
   });
@@ -111,5 +113,18 @@ describe("IntroOptionsWorkflowPanel", () => {
 
     expect(screen.getByRole("button", { name: "运行质量检查" })).toBeEnabled();
     expect(screen.queryByText("检查通过，可以批准当前版本")).not.toBeInTheDocument();
+  });
+
+  it("allows a new generation after the exact submitted version fails quality", () => {
+    workflow.qualityReport = {
+      artifact_version_id: "version-new",
+      conclusion: "failed",
+    };
+    render(<IntroOptionsWorkflowPanel lessonId="lesson-1" projectId="project-1" />);
+
+    const regenerate = screen.getByRole("button", { name: "重新生成三类九套" });
+    expect(regenerate).toBeEnabled();
+    fireEvent.click(regenerate);
+    expect(workflow.generationMutate).toHaveBeenCalledWith("");
   });
 });
