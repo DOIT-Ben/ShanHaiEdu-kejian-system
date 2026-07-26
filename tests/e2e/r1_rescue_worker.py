@@ -1,4 +1,4 @@
-"""Run the real queue/worker path with a deterministic lesson-plan model for browser CI."""
+"""Run the real queue/worker path with deterministic R1 text outputs for browser CI."""
 
 from __future__ import annotations
 
@@ -42,7 +42,9 @@ class R1RescueNodeOutputProvider:
         self._outputs = outputs
 
     async def complete(self, request: TextModelRequest) -> TextProviderResult:
-        if '"lesson_plan_key"' in request.prompt:
+        if request.capability == ModelCapability.TEXT_STRUCTURED_CREATIVE_EDUCATION:
+            node_key = "intro.generate_options"
+        elif '"lesson_plan_key"' in request.prompt:
             node_key = "lesson_plan.generate"
         elif '"division_key"' in request.prompt:
             node_key = "lesson.division.generate"
@@ -90,7 +92,10 @@ def main() -> int:
     outputs["lesson.division.generate"]["lesson_units"][0]["evidence_refs"] = ["p2-text-1"]
     provider = R1RescueNodeOutputProvider(outputs)
     gateway = ModelGateway(
-        {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: provider},
+        {
+            ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: provider,
+            ModelCapability.TEXT_STRUCTURED_CREATIVE_EDUCATION: provider,
+        },
         audit_sink=SqlAlchemyAttemptAuditSink(factory),
     )
 

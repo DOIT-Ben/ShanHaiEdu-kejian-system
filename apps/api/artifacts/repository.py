@@ -59,6 +59,25 @@ class ArtifactRepository:
             )
         )
 
+    def intro_options_for_lesson(
+        self,
+        project_id: UUID,
+        lesson_unit_id: UUID,
+    ) -> tuple[Artifact, ...]:
+        return tuple(
+            self._session.scalars(
+                self._visible_artifacts()
+                .where(
+                    Artifact.project_id == project_id,
+                    Artifact.lesson_unit_id == lesson_unit_id,
+                    Artifact.artifact_type == "intro_option_set",
+                    Artifact.branch_key == "intro_options",
+                )
+                .order_by(Artifact.id)
+                .limit(2)
+            )
+        )
+
     def get_draft(
         self,
         artifact_id: UUID,

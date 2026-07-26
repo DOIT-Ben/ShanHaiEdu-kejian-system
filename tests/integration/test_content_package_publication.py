@@ -74,6 +74,32 @@ RELEASE_1_3_WORKFLOW_CHECKSUM = "f3cd43a907eaf5d3b11c3d16352cbeae542a46a7ea2c970
 RELEASE_1_3_CHANGE_SUMMARY = (
     "前向发布PPT页面装配与PPTX导出的确定性输出定义，并保持旧Release与既有项目绑定不变。"  # noqa: RUF001
 )
+RELEASE_1_4_PACKAGE_CHECKSUM = "af33618377f6f83801582889e7bfc607849320119fc1a2ae932513686cbfcd47"
+RELEASE_1_4_WORKFLOW_CHECKSUM = "ffbc093cd188b45aee2d8c49481f2ddec71a77da6e40fe4e7b5ef63d10a36d0f"
+RELEASE_1_4_CHANGE_SUMMARY = (
+    "在不可变1.3.0基础上前向补齐教材范围ContentDefinition与human-gate Artifact批准合同；"  # noqa: RUF001
+    "旧Release与既有项目绑定保持不变。"
+)
+RELEASE_1_4_INTRO_OPTION_SCHEMA = {
+    "key": "validator.intro.option_set_schema",
+    "semantic_version": "1.0.0",
+    "implementation_digest": "2049fe72e70c9c5280e011cfd131b47d7444128973c4e7163c2c51d08d18a379",
+}
+RELEASE_1_4_INTRO_SINGLE_ANCHOR = {
+    "key": "validator.intro.single_anchor",
+    "semantic_version": "1.1.0",
+    "implementation_digest": "f37001db813669d7148ac43d25045472c0c4b84427df414e303f4a99e5b40220",
+}
+RELEASE_1_4_LESSON_PLAN_SCOPE = {
+    "key": "validator.lesson_plan.scope",
+    "semantic_version": "1.0.0",
+    "implementation_digest": "72de7b0aa6677502ef36f29339badaf432b37c0b0409e22236efd5b03f99b68b",
+}
+RELEASE_1_4_LESSON_PLAN_TEACHING_QUALITY = {
+    "key": "validator.lesson_plan.teaching_quality",
+    "semantic_version": "1.0.0",
+    "implementation_digest": "10296a5dfb1da0fdd73f8be5bf04fd597b37f934ef492dbe58edd7ac58afbdf2",
+}
 PREVIOUS_INTRO_SINGLE_ANCHOR = {
     "key": "validator.intro.single_anchor",
     "semantic_version": "1.0.0",
@@ -104,6 +130,29 @@ def replace_validator_ref(
 ) -> None:
     index = next(index for index, ref in enumerate(refs) if ref.get("key") == replacement["key"])
     refs[index] = {**refs[index], **replacement}
+
+
+def restore_release_1_4_validators(catalog: dict[str, Any]) -> None:
+    intro_generate = package_node(catalog, "intro.generate_options")
+    intro_validate = package_node(catalog, "intro.validate")
+    replace_validator_ref(intro_generate["validator_refs"], RELEASE_1_4_INTRO_OPTION_SCHEMA)
+    for refs in (
+        intro_validate["validator_refs"],
+        intro_validate["quality_report_persistence"]["validator_refs"],
+        catalog["validator_descriptors"],
+    ):
+        replace_validator_ref(refs, RELEASE_1_4_INTRO_OPTION_SCHEMA)
+        replace_validator_ref(refs, RELEASE_1_4_INTRO_SINGLE_ANCHOR)
+    lesson_plan_generate = package_node(catalog, "lesson_plan.generate")
+    lesson_plan_validate = package_node(catalog, "lesson_plan.validate")
+    for refs in (
+        lesson_plan_generate["validator_refs"],
+        lesson_plan_validate["validator_refs"],
+        lesson_plan_validate["quality_report_persistence"]["validator_refs"],
+        catalog["validator_descriptors"],
+    ):
+        replace_validator_ref(refs, RELEASE_1_4_LESSON_PLAN_SCOPE)
+        replace_validator_ref(refs, RELEASE_1_4_LESSON_PLAN_TEACHING_QUALITY)
 
 
 def validate_catalog_source(
@@ -668,6 +717,7 @@ def release_1_2_courseware_release(
 
     catalog = deepcopy(source.workflow_catalog)
     catalog["semantic_version"] = "1.2.0"
+    restore_release_1_4_validators(catalog)
     for node_key in (
         "lesson.division.generate",
         "lesson_plan.generate",
@@ -709,6 +759,7 @@ def release_1_3_courseware_release(
     items = {item_key: deepcopy(source.items[item_key]) for item_key in entries}
     catalog = deepcopy(source.workflow_catalog)
     catalog["semantic_version"] = "1.3.0"
+    restore_release_1_4_validators(catalog)
     package_node(catalog, "material.scope_review").pop("output_persistence")
     package_checksum = canonical_json_sha256(manifest)
     workflow_checksum = hashlib.sha256(canonical_catalog_json(catalog)).hexdigest()
@@ -722,6 +773,31 @@ def release_1_3_courseware_release(
         manifest=manifest,
         items=items,
         manifest_entries=entries,
+        workflow_catalog=catalog,
+        package_checksum=package_checksum,
+        workflow_checksum=workflow_checksum,
+    )
+
+
+def release_1_4_courseware_release(
+    source: BuiltinCoursewareReleaseSource,
+) -> BuiltinCoursewareReleaseSource:
+    manifest = deepcopy(source.manifest)
+    manifest["semantic_version"] = "1.4.0"
+    manifest["change_summary"] = RELEASE_1_4_CHANGE_SUMMARY
+    catalog = deepcopy(source.workflow_catalog)
+    catalog["semantic_version"] = "1.4.0"
+    restore_release_1_4_validators(catalog)
+    package_checksum = canonical_json_sha256(manifest)
+    workflow_checksum = hashlib.sha256(canonical_catalog_json(catalog)).hexdigest()
+    if (
+        package_checksum != RELEASE_1_4_PACKAGE_CHECKSUM
+        or workflow_checksum != RELEASE_1_4_WORKFLOW_CHECKSUM
+    ):
+        raise AssertionError("1.4.0 release checksum differs from the published snapshot")
+    return replace(
+        source,
+        manifest=manifest,
         workflow_catalog=catalog,
         package_checksum=package_checksum,
         workflow_checksum=workflow_checksum,
@@ -876,14 +952,14 @@ def test_golden_release_is_published_from_validated_fixtures_and_is_idempotent(
         assert second.created is False
         assert second == first.as_existing()
         assert publication_counts(session) == counts_after_first
-        assert source.semantic_version == "1.4.0"
-        assert source.manifest["semantic_version"] == "1.4.0"
-        assert source.workflow_catalog["semantic_version"] == "1.4.0"
-        assert source.release_key == f"{source.package_key}@1.4.0"
+        assert source.semantic_version == "1.5.0"
+        assert source.manifest["semantic_version"] == "1.5.0"
+        assert source.workflow_catalog["semantic_version"] == "1.5.0"
+        assert source.release_key == f"{source.package_key}@1.5.0"
         assert package_version is not None
-        assert package_version.semantic_version == "1.4.0"
+        assert package_version.semantic_version == "1.5.0"
         assert package_version.manifest_json == source.manifest
-        assert package_version.manifest_json["semantic_version"] == "1.4.0"
+        assert package_version.manifest_json["semantic_version"] == "1.5.0"
         assert package_version.checksum == source.package_checksum
         assert release is not None and release.status == "published"
         assert release.release_key == source.release_key
@@ -1021,11 +1097,11 @@ def test_forward_publication_preserves_legacy_release_and_project_bindings(
         assert current_result.content_release_id != old_release.id
         assert current_result.workflow_definition_version_id != old_workflow.id
         assert current_package_version.content_package_id == old_package.id
-        assert current_package_version.semantic_version == source.semantic_version == "1.4.0"
+        assert current_package_version.semantic_version == source.semantic_version == "1.5.0"
         assert current_package_version.manifest_json == source.manifest
         assert current_package_version.checksum == source.package_checksum
         assert current_release.release_key == source.release_key
-        assert current_release.release_key == f"{source.package_key}@1.4.0"
+        assert current_release.release_key == f"{source.package_key}@1.5.0"
         assert current_workflow.graph_json == source.workflow_catalog
         assert current_workflow.checksum == source.workflow_checksum
         assert old_result.content_release_id == old_project.content_release_id
@@ -1170,8 +1246,9 @@ def test_release_1_4_preserves_1_3_rows_and_existing_project_binding(
     migrated_database_url: str,
 ) -> None:
     factory = build_session_factory(build_engine(migrated_database_url))
-    source = load_builtin_courseware_release(ROOT)
-    previous = release_1_3_courseware_release(source)
+    current_source = load_builtin_courseware_release(ROOT)
+    source = release_1_4_courseware_release(current_source)
+    previous = release_1_3_courseware_release(current_source)
 
     with factory() as session, session.begin():
         actor = seed_test_actor(session)
@@ -1200,6 +1277,57 @@ def test_release_1_4_preserves_1_3_rows_and_existing_project_binding(
         assert previous.package_checksum == RELEASE_1_3_PACKAGE_CHECKSUM
         assert previous.workflow_checksum == RELEASE_1_3_WORKFLOW_CHECKSUM
         assert source.semantic_version == "1.4.0"
+        assert previous_result.content_release_id != current_result.content_release_id
+        assert (
+            current.content_release_id,
+            current.workflow_definition_version_id,
+        ) == (
+            current_result.content_release_id,
+            current_result.workflow_definition_version_id,
+        )
+        session.expire_all()
+        session.refresh(existing)
+        assert (
+            existing.content_release_id,
+            existing.workflow_definition_version_id,
+        ) == previous_binding
+        assert snapshot_publication_rows(session, previous_result) == previous_snapshot
+
+
+def test_release_1_5_preserves_1_4_rows_and_existing_project_binding(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    source = load_builtin_courseware_release(ROOT)
+    previous = release_1_4_courseware_release(source)
+
+    with factory() as session, session.begin():
+        actor = seed_test_actor(session)
+        previous_result = ContentReleasePublisher(session).publish(
+            previous,
+            published_by=actor.principal_id,
+        )
+        existing = ProjectRepository(session, actor).create(
+            CreateProjectRequest(title="Bound to 1.4.0", knowledge_point="One half")
+        )
+        previous_snapshot = snapshot_publication_rows(session, previous_result)
+        previous_binding = (
+            existing.content_release_id,
+            existing.workflow_definition_version_id,
+        )
+
+        current_result = ContentReleasePublisher(session).publish(
+            source,
+            published_by=actor.principal_id,
+        )
+        current = ProjectRepository(session, actor).create(
+            CreateProjectRequest(title="Bound to 1.5.0", knowledge_point="One half")
+        )
+
+        assert previous.semantic_version == "1.4.0"
+        assert previous.package_checksum == RELEASE_1_4_PACKAGE_CHECKSUM
+        assert previous.workflow_checksum == RELEASE_1_4_WORKFLOW_CHECKSUM
+        assert source.semantic_version == "1.5.0"
         assert previous_result.content_release_id != current_result.content_release_id
         assert (
             current.content_release_id,

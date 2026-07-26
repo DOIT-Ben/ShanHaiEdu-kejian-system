@@ -183,6 +183,17 @@ class LessonPlanArtifactEnvelope(BaseModel):
     request_id: str
 
 
+class IntroOptionArtifactRead(BaseModel):
+    artifact: ArtifactRead | None
+    quality_report: LessonPlanQualityReportRead | None
+    latest_approval: ApprovalRead | None
+
+
+class IntroOptionArtifactEnvelope(BaseModel):
+    data: IntroOptionArtifactRead
+    request_id: str
+
+
 class MaterialScopeArtifactRead(BaseModel):
     artifact: ArtifactRead | None
     latest_approval: ApprovalRead | None

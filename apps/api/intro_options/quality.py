@@ -14,16 +14,21 @@ from apps.api.artifact_quality.contracts import (
     ValidatorRef,
 )
 from apps.api.artifact_quality.registry import InMemoryQualityValidatorRegistry
+from apps.api.intro_options.quality_identity import default_nine_identity_findings
+from apps.api.intro_options.quality_legacy import (
+    LEGACY_INTRO_OPTION_SCHEMA_REF,
+    LEGACY_INTRO_SINGLE_ANCHOR_REF,
+)
 
 INTRO_OPTION_SCHEMA_REF = ValidatorRef(
     key="validator.intro.option_set_schema",
-    semantic_version="1.0.0",
-    implementation_digest="2049fe72e70c9c5280e011cfd131b47d7444128973c4e7163c2c51d08d18a379",
+    semantic_version="1.1.0",
+    implementation_digest="d60f89477c8db4c3f116fa7e524b8b8688e4f5403cc8cb137b0f1d56a170e6e4",
 )
 INTRO_SINGLE_ANCHOR_REF = ValidatorRef(
     key="validator.intro.single_anchor",
-    semantic_version="1.1.0",
-    implementation_digest="f37001db813669d7148ac43d25045472c0c4b84427df414e303f4a99e5b40220",
+    semantic_version="1.2.0",
+    implementation_digest="c63f73f6b74e54bf0a69ca7770f13a76e56bb6f092cf523d2eb2d612eae5ca06",
 )
 INTRO_UNIQUE_RECOMMENDATION_REF = ValidatorRef(
     key="validator.intro.unique_recommendation",
@@ -33,6 +38,15 @@ INTRO_UNIQUE_RECOMMENDATION_REF = ValidatorRef(
 
 
 class IntroOptionSchemaQualityValidator:
+    def __init__(
+        self,
+        *,
+        ref: ValidatorRef = INTRO_OPTION_SCHEMA_REF,
+        enforce_default_nine_identity: bool = True,
+    ) -> None:
+        self._ref = ref
+        self._enforce_default_nine_identity = enforce_default_nine_identity
+
     def validate(self, context: QualityValidationContext) -> ValidatorOutcome:
         content = context.source_content
         findings = _schema_findings(context)
@@ -48,6 +62,8 @@ class IntroOptionSchemaQualityValidator:
                 _finding("INTRO_SOURCE_CARDINALITY_INVALID", "source count mismatches mode")
             )
         if mode == "default_nine":
+            if self._enforce_default_nine_identity:
+                findings.extend(default_nine_identity_findings(options))
             tendencies = Counter(option.get("primary_tendency") for option in options)
             has_cross_tendency = any(
                 len(set(_string_sequence(option.get("secondary_tendencies")))) >= 2
@@ -77,13 +93,22 @@ class IntroOptionSchemaQualityValidator:
                 _finding("INTRO_CHILD_SAFETY_INVALID", "option contains unsafe child activity")
             )
         return _outcome(
-            INTRO_OPTION_SCHEMA_REF,
+            self._ref,
             findings,
             {"generation_mode": mode, "option_count": len(options)},
         )
 
 
 class IntroSingleAnchorQualityValidator:
+    def __init__(
+        self,
+        *,
+        ref: ValidatorRef = INTRO_SINGLE_ANCHOR_REF,
+        include_page_evidence: bool = True,
+    ) -> None:
+        self._ref = ref
+        self._include_page_evidence = include_page_evidence
+
     def validate(self, context: QualityValidationContext) -> ValidatorOutcome:
         content = context.source_content
         lesson_key = context.lesson_key
@@ -109,7 +134,10 @@ class IntroSingleAnchorQualityValidator:
             )
         )
         declared_evidence = set(_string_sequence(content.get("source_material_evidence_keys")))
-        available_evidence = _material_evidence_keys(material)
+        available_evidence = _material_evidence_keys(
+            material,
+            include_pages=self._include_page_evidence,
+        )
         lesson_evidence: set[str] = (
             set(_string_sequence(unit.get("evidence_refs"))) if unit is not None else set()
         )
@@ -118,7 +146,7 @@ class IntroSingleAnchorQualityValidator:
                 _finding("INTRO_MATERIAL_EVIDENCE_INVALID", "evidence is outside frozen inputs")
             )
         return _outcome(
-            INTRO_SINGLE_ANCHOR_REF,
+            self._ref,
             findings,
             {"lesson_key": lesson_key, "evidence_keys": sorted(declared_evidence)},
         )
@@ -164,6 +192,14 @@ def intro_runtime_quality_validator_registry() -> InMemoryQualityValidatorRegist
             INTRO_OPTION_SCHEMA_REF: IntroOptionSchemaQualityValidator(),
             INTRO_SINGLE_ANCHOR_REF: IntroSingleAnchorQualityValidator(),
             INTRO_UNIQUE_RECOMMENDATION_REF: IntroUniqueRecommendationQualityValidator(),
+            LEGACY_INTRO_OPTION_SCHEMA_REF: IntroOptionSchemaQualityValidator(
+                ref=LEGACY_INTRO_OPTION_SCHEMA_REF,
+                enforce_default_nine_identity=False,
+            ),
+            LEGACY_INTRO_SINGLE_ANCHOR_REF: IntroSingleAnchorQualityValidator(
+                ref=LEGACY_INTRO_SINGLE_ANCHOR_REF,
+                include_page_evidence=False,
+            ),
         }
     )
 
@@ -205,13 +241,39 @@ def _string_sequence(value: object) -> tuple[str, ...]:
     return cast(tuple[str, ...], values)
 
 
-def _material_evidence_keys(material: Mapping[str, Any] | None) -> set[str]:
-    raw = material.get("material_evidence") if material is not None else None
+def _material_evidence_keys(
+    material: Mapping[str, Any] | None,
+    *,
+    include_pages: bool = True,
+) -> set[str]:
+    if material is None:
+        return set()
+    values = _flat_evidence_keys(material.get("material_evidence"))
+    if include_pages:
+        values |= _page_evidence_keys(material.get("pages"))
+    return values
+
+
+def _flat_evidence_keys(evidence: object) -> set[str]:
     values: set[str] = set()
-    for item in _mapping_sequence(raw):
+    for item in _mapping_sequence(evidence):
         key = item.get("evidence_key")
         if type(key) is str and key.strip():
             values.add(key)
+    return values
+
+
+def _page_evidence_keys(pages: object) -> set[str]:
+    values: set[str] = set()
+    for page in _mapping_sequence(pages):
+        for collection_name, key_name in (
+            ("text_blocks", "block_id"),
+            ("image_references", "image_id"),
+        ):
+            for item in _mapping_sequence(page.get(collection_name)):
+                key = item.get(key_name)
+                if type(key) is str and key.strip():
+                    values.add(key)
     return values
 
 

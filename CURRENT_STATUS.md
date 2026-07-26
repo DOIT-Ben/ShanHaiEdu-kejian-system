@@ -1,8 +1,8 @@
 # 当前项目状态
 
 当前阶段：阶段1十二部分教案、教材范围与课时划分两个教师纵向结果已经合并；当前推进三类九套与最终R1教师验收闭环。
-> 最后核验：2026-07-25。
-> 当前任务：[Issue #235](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/235)；#234合并并完成main复验后已经解除本任务阻塞，尚未创建实现分支或Pull Request。
+> 最后核验：2026-07-26。
+> 当前任务：[Issue #235](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/235)；实现分支`feat/235-intro-options`与[Draft PR #238](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/238)已经建立，当前处于纵向实现与验证阶段。
 
 ## 当前可演示成果
 
@@ -30,7 +30,7 @@
 
 - [Issue #235](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/235)以“三类各三套课堂导入方案 -> 教师编辑采用 -> 质量检查 -> 批准exact版本 -> 刷新恢复 -> 最终R1浏览器验收”为下一个单一教师结果。
 - 当前main已经具备#231十二部分教案和#234教材范围/课时划分两个纵向结果；#235只补三类九套所需的LessonUnit窄接口、现有Worker接线和生产页面，不重写上游能力。
-- #235尚未创建实现分支或Pull Request；开始时必须从完成合并后复验的最新`origin/main`建立短分支。
+- [Draft PR #238](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/238)正在接通LessonUnit级三类九套生成、exact Artifact/Job查询、编辑保存、质量检查、exact批准、采用和刷新恢复；在完整门禁与独立base/head审查前保持Draft。
 - [Draft PR #222](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/222)冻结为固定WIP代码来源，不新增代码、不直接合并；[Draft PR #230](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/230)暂停，不转Ready、不默认合并。#223至#229只保留为参考清单，不再强制串行。
 
 ## 当前阻塞
@@ -42,10 +42,10 @@
 
 ## 下一个阶段出口
 
-1. 用PostgreSQL红测试固定三类各三套、采用方案、Job、ArtifactVersion和LessonUnit的exact绑定、幂等与租户/项目/课时隔离。
-2. 接通最小active API、现有Worker和LessonUnit页面，完成编辑采用、质量检查、exact批准与刷新恢复。
-3. 用一个真实API Playwright贯通教材范围、课时划分、十二部分教案和三类九套，不调用媒体Provider。
-4. 通过OpenAPI生成客户端、前后端质量门禁和独立base/head审查后合并#235，并从干净`origin/main`完成最终R1教师验收。
+1. 完成三类九套PostgreSQL集成、active OpenAPI生成客户端和生产前端门禁。
+2. 用一个真实API Playwright贯通教材范围、课时划分、十二部分教案和三类九套，不调用媒体Provider。
+3. 由未参与实现的只读reviewer绑定exact base/head，关闭发现后将PR转Ready并合并。
+4. 从干净`origin/main`复验全部delivery slice，形成最终R1教师可演示结果并清理任务分支与worktree。
 
 ## 接手提示
 

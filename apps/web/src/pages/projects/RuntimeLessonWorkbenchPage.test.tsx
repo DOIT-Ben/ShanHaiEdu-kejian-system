@@ -9,6 +9,13 @@ import { useProjectEvents } from "@/shared/api/useProjectEvents";
 
 vi.mock("@/shared/api/useProjectEvents", () => ({ useProjectEvents: vi.fn() }));
 const lessonPlanPanelMock = vi.hoisted(() => vi.fn());
+const introOptionsPanelMock = vi.hoisted(() => vi.fn());
+vi.mock("@/features/intro-options/components/IntroOptionsWorkflowPanel", () => ({
+  IntroOptionsWorkflowPanel: (props: { lessonId: string; projectId: string }) => {
+    introOptionsPanelMock(props);
+    return <div data-testid="intro-options-workflow" />;
+  },
+}));
 vi.mock("@/features/lessons/components/LessonPlanWorkflowPanel", () => ({
   LessonPlanWorkflowPanel: (props: { lessonId: string; projectId: string }) => {
     lessonPlanPanelMock(props);
@@ -43,6 +50,7 @@ function renderPage(stepKey = "lesson_plan") {
 describe("RuntimeLessonWorkbenchPage", () => {
   beforeEach(() => {
     lessonPlanPanelMock.mockClear();
+    introOptionsPanelMock.mockClear();
     vi.spyOn(projectsApi, "getProject").mockResolvedValue({
       id: projectId,
       title: "认识百分数",
@@ -59,6 +67,12 @@ describe("RuntimeLessonWorkbenchPage", () => {
         branches: [
           {
             branch_key: "lesson_plan",
+            enabled: true,
+            settings: {},
+            workflow_status: "not_ready",
+          },
+          {
+            branch_key: "intro_options",
             enabled: true,
             settings: {},
             workflow_status: "not_ready",
@@ -101,6 +115,15 @@ describe("RuntimeLessonWorkbenchPage", () => {
     expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("课堂 PPT");
     expect(screen.queryByTestId("lesson-plan-workflow")).not.toBeInTheDocument();
     expect(lessonPlanPanelMock).not.toHaveBeenCalled();
+  });
+
+  it("只在课堂导入分支挂载三类九套闭环", async () => {
+    renderPage("intro_options");
+
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("课堂导入");
+    expect(screen.getByTestId("intro-options-workflow")).toBeVisible();
+    expect(introOptionsPanelMock).toHaveBeenCalledWith({ lessonId, projectId });
+    expect(screen.queryByTestId("lesson-plan-workflow")).not.toBeInTheDocument();
   });
 
   it("旧连字符路由与未知步骤都不会泄漏内部键", async () => {

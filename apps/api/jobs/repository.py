@@ -63,6 +63,28 @@ class GenerationJobRepository:
             )
         )
 
+    def list_intro_option_jobs(
+        self,
+        project_id: UUID,
+        lesson_unit_id: UUID,
+        *,
+        limit: int = 100,
+    ) -> list[GenerationJob]:
+        return list(
+            self._session.scalars(
+                select(GenerationJob)
+                .where(
+                    GenerationJob.organization_id == self._organization_id,
+                    GenerationJob.project_id == project_id,
+                    GenerationJob.lesson_unit_id == lesson_unit_id,
+                    GenerationJob.workflow_node_key == "intro.generate_options",
+                    GenerationJob.deleted_at.is_(None),
+                )
+                .order_by(GenerationJob.id.desc())
+                .limit(limit)
+            )
+        )
+
     def list_lesson_division_jobs(
         self,
         project_id: UUID,

@@ -150,8 +150,10 @@ class NodeRunStartService:
         node_key: str,
         lesson_unit_id: UUID | None,
     ) -> None:
-        supported = (node_key == "lesson_plan.generate" and lesson_unit_id is not None) or (
-            node_key == "lesson.division.generate" and lesson_unit_id is None
+        supported = (
+            (node_key == "lesson_plan.generate" and lesson_unit_id is not None)
+            or (node_key == "lesson.division.generate" and lesson_unit_id is None)
+            or (node_key == "intro.generate_options" and lesson_unit_id is not None)
         )
         if not supported:
             raise ApiError(

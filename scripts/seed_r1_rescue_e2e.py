@@ -7,6 +7,7 @@ import asyncio
 import json
 import os
 from pathlib import Path
+from typing import cast
 from uuid import UUID
 
 from sqlalchemy import select
@@ -20,7 +21,7 @@ from apps.api.ids import new_uuid7
 from apps.api.lessons.models import LessonBranchConfig, LessonUnit
 from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
 from tests.integration.test_lesson_division_runtime import (
-    _prepare_approval,  # pyright: ignore[reportPrivateUsage]
+    _prepare_approval,  # pyright: ignore[reportPrivateUsage, reportUnknownVariableType]
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,6 +34,58 @@ def _required(name: str) -> str:
     if not value:
         raise RuntimeError(f"{name} is required")
     return value
+
+
+def _build_material_content(case: dict[str, object]) -> dict[str, object]:
+    raw_evidence = case.get("material_evidence")
+    if not isinstance(raw_evidence, list) or not raw_evidence:
+        raise RuntimeError("the golden case material evidence is unavailable")
+
+    records: list[tuple[int, str, str, str]] = []
+    for raw_item in cast(list[object], raw_evidence):
+        if not isinstance(raw_item, dict):
+            raise RuntimeError("the golden case material evidence is invalid")
+        item = cast(dict[str, object], raw_item)
+        page_index = item.get("pdf_page_index")
+        evidence_key = item.get("evidence_key")
+        locator = item.get("locator")
+        supported_claim = item.get("supported_claim")
+        if (
+            type(page_index) is not int
+            or not isinstance(evidence_key, str)
+            or not isinstance(locator, str)
+            or not isinstance(supported_claim, str)
+        ):
+            raise RuntimeError("the golden case material evidence is invalid")
+        records.append((page_index, evidence_key, locator, supported_claim))
+
+    source_page_indexes = sorted({record[0] for record in records})
+    if not source_page_indexes:
+        raise RuntimeError("the golden case material evidence has no physical pages")
+    page_number_by_index = {
+        source_page_index: page_number
+        for page_number, source_page_index in enumerate(source_page_indexes, start=1)
+    }
+    pages = [
+        {
+            "page_number": page_number_by_index[source_page_index],
+            "text_blocks": [
+                {
+                    "block_id": evidence_key,
+                    "text": f"{locator}: {supported_claim}",
+                }
+                for page_index, evidence_key, locator, supported_claim in records
+                if page_index == source_page_index
+            ],
+            "image_references": [],
+        }
+        for source_page_index in source_page_indexes
+    ]
+    return {
+        "source": case["source"],
+        "knowledge_boundary": case["knowledge_boundary"],
+        "pages": pages,
+    }
 
 
 async def seed() -> None:
@@ -53,11 +106,15 @@ async def seed() -> None:
 
         case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
         outputs = build_golden_branch_source_outputs(case)
+        material_content = _build_material_content(case)
+        material_pages = cast(list[object], material_content["pages"])
         prepared = await _prepare_approval(
             factory,
             case,
             outputs["lesson.division.generate"],
             actor=actor,
+            material_content=material_content,
+            material_scope_page_range=(1, len(material_pages)),
             project_title=PROJECT_TITLE,
         )
         with factory() as session, session.begin():

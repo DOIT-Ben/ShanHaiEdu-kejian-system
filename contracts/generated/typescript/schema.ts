@@ -281,6 +281,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/lessons/{lesson_id}/intro-options/node-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 准备指定课时的三类九套导入方案生成节点 */
+        post: operations["prepareIntroOptionGeneration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lessons/{lesson_id}/intro-options/artifact-versions/{artifact_version_id}/quality-validations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 对指定课时的导入方案版本执行质量检查 */
+        post: operations["startIntroOptionQualityValidation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/lessons/{lesson_id}/intro-selections": {
         parameters: {
             query?: never;
@@ -545,6 +579,40 @@ export interface paths {
         };
         /** 查询指定课时的教案生成任务 */
         get: operations["listLessonPlanGenerationJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/lessons/{lesson_id}/intro-options/artifact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 恢复指定课时的导入方案、质量报告和审批事实 */
+        get: operations["getIntroOptionArtifact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/lessons/{lesson_id}/intro-options/generation-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 查询指定课时的导入方案生成任务 */
+        get: operations["listIntroOptionGenerationJobs"];
         put?: never;
         post?: never;
         delete?: never;
@@ -963,6 +1031,12 @@ export interface components {
         IntroOptionsEnvelope: {
             data: components["schemas"]["IntroOptions"];
             request_id: string;
+        };
+        PrepareIntroOptionGenerationRequest: {
+            /** @enum {string} */
+            generation_mode: "default_nine" | "refine_existing";
+            /** Format: uuid */
+            source_artifact_version_id: string | null;
         };
         SelectIntroOptionRequest: {
             /** Format: uuid */
@@ -1882,6 +1956,14 @@ export interface components {
             };
             request_id: string;
         };
+        IntroOptionArtifactEnvelope: {
+            data: {
+                artifact: components["schemas"]["Artifact"] | null;
+                quality_report: components["schemas"]["LessonPlanQualityReport"] | null;
+                latest_approval: components["schemas"]["Approval"] | null;
+            };
+            request_id: string;
+        };
         MaterialScopeArtifactEnvelope: {
             data: {
                 artifact: components["schemas"]["Artifact"] | null;
@@ -2653,6 +2735,63 @@ export interface operations {
             "4XX": components["responses"]["Error"];
         };
     };
+    prepareIntroOptionGeneration: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                lesson_id: components["parameters"]["LessonId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrepareIntroOptionGenerationRequest"];
+            };
+        };
+        responses: {
+            /** @description Exact Intro option NodeRun prepared */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeRunEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    startIntroOptionQualityValidation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                lesson_id: components["parameters"]["LessonId"];
+                artifact_version_id: components["parameters"]["ArtifactVersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exact Intro option quality NodeRun accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedNodeRunEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
     selectLessonIntroOption: {
         parameters: {
             query?: never;
@@ -3052,6 +3191,54 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Exact lesson-plan GenerationJobs from PostgreSQL */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerationJobListEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    getIntroOptionArtifact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+                lesson_id: components["parameters"]["LessonId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exact Intro option aggregate from PostgreSQL */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntroOptionArtifactEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    listIntroOptionGenerationJobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+                lesson_id: components["parameters"]["LessonId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exact Intro option GenerationJobs from PostgreSQL */
             200: {
                 headers: {
                     [name: string]: unknown;

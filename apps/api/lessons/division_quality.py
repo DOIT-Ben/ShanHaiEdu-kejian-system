@@ -6,12 +6,14 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
+from apps.api.lessons.material_evidence import material_evidence_keys
+
 
 def coverage_findings(
     content: Mapping[str, Any],
     supporting_inputs: Mapping[str, Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
-    material_keys = _material_evidence_keys(supporting_inputs)
+    material_keys = material_evidence_keys(supporting_inputs.get("content:material_evidence"))
     approved_values = _approved_scope_evidence_keys(supporting_inputs)
     approved = set(approved_values or ())
     referenced = _referenced_evidence_keys(content)
@@ -135,54 +137,6 @@ def _approved_scope_evidence_keys(
     if not values or len(set(values)) != len(values) or list(values) != sorted(values):
         return None
     return values
-
-
-def _material_evidence_keys(
-    supporting_inputs: Mapping[str, Mapping[str, Any]],
-) -> set[str]:
-    material = supporting_inputs.get("content:material_evidence")
-    if material is None:
-        return set()
-    return _flat_evidence_keys(material.get("material_evidence")) | _page_evidence_keys(
-        material.get("pages")
-    )
-
-
-def _flat_evidence_keys(evidence: object) -> set[str]:
-    if not isinstance(evidence, Sequence) or isinstance(evidence, (str, bytes, bytearray)):
-        return set()
-    keys: set[str] = set()
-    for item in cast(Sequence[object], evidence):
-        if not isinstance(item, Mapping):
-            continue
-        key = cast(Mapping[str, Any], item).get("evidence_key")
-        if isinstance(key, str) and key.strip():
-            keys.add(key)
-    return keys
-
-
-def _page_evidence_keys(pages: object) -> set[str]:
-    if not isinstance(pages, Sequence) or isinstance(pages, (str, bytes, bytearray)):
-        return set()
-    keys: set[str] = set()
-    for raw_page in cast(Sequence[object], pages):
-        if not isinstance(raw_page, Mapping):
-            continue
-        page = cast(Mapping[str, Any], raw_page)
-        for collection_name, key_name in (
-            ("text_blocks", "block_id"),
-            ("image_references", "image_id"),
-        ):
-            items = page.get(collection_name)
-            if not isinstance(items, Sequence) or isinstance(items, (str, bytes, bytearray)):
-                continue
-            for raw_item in cast(Sequence[object], items):
-                if not isinstance(raw_item, Mapping):
-                    continue
-                key = cast(Mapping[str, Any], raw_item).get(key_name)
-                if isinstance(key, str) and key.strip():
-                    keys.add(key)
-    return keys
 
 
 def _valid_teacher_constraints(scope: Mapping[str, Any]) -> bool:
