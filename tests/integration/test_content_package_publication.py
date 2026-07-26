@@ -106,6 +106,7 @@ RELEASE_1_5_LESSON_PLAN_PROMPT_SHA256 = (
 RELEASE_1_5_LESSON_PLAN_OUTPUT_SHA256 = (
     "5ecbbef08390810ddedf0ae84e30592ab49978dec213900d254bcb0604f1a733"
 )
+RELEASE_1_5_INTRO_OUTPUT_SHA256 = "b9cc12772863821d328889319cd958108f49f4d5af296839869bce237099cd0a"
 RELEASE_1_5_LESSON_PLAN_METHOD = (
     "先确定本课前置基础、核心学习结果、后续衔接和不得提前讲授内容；再写可观察、可评价且有成功标准的目标，"  # noqa: RUF001
     "并让每个目标同时绑定教学环节和评价证据。按设定课时长度设计学习启动、核心探究、应用或评价、课堂收束，"  # noqa: RUF001
@@ -683,6 +684,16 @@ def restore_lesson_division_before_1_5_1(items: dict[str, dict[str, Any]]) -> No
     unresolved["editable"] = False
 
 
+def restore_intro_output_before_1_5_1(items: dict[str, dict[str, Any]]) -> None:
+    output = items["intro.generate_options.output"]
+    options = next(field for field in output["spec"]["fields"] if field["field_key"] == "options")
+    children = {field["field_key"]: field for field in options["children"]}
+    children["option_key"].pop("validation_rules", None)
+    children["suggested_medium"].pop("options", None)
+    children["duration_seconds"].pop("validation_rules", None)
+    children["recommendation_score"].pop("validation_rules", None)
+
+
 def legacy_courseware_release(
     source: BuiltinCoursewareReleaseSource,
 ) -> BuiltinCoursewareReleaseSource:
@@ -878,6 +889,10 @@ def release_1_5_courseware_release(
         entry for entry in manifest["items"] if entry["item_key"] == "lesson_plan.generate.output"
     )
     output_entry["sha256"] = RELEASE_1_5_LESSON_PLAN_OUTPUT_SHA256
+    intro_output_entry = next(
+        entry for entry in manifest["items"] if entry["item_key"] == "intro.generate_options.output"
+    )
+    intro_output_entry["sha256"] = RELEASE_1_5_INTRO_OUTPUT_SHA256
     entries = {entry["item_key"]: entry for entry in manifest["items"]}
     items = deepcopy(source.items)
     restore_lesson_division_before_1_5_1(items)
@@ -905,6 +920,10 @@ def release_1_5_courseware_release(
     restore_lesson_plan_output_before_1_5_1(items)
     if canonical_json_sha256(output) != RELEASE_1_5_LESSON_PLAN_OUTPUT_SHA256:
         raise AssertionError("1.5.0 lesson-plan output differs from the published snapshot")
+    intro_output = items["intro.generate_options.output"]
+    restore_intro_output_before_1_5_1(items)
+    if canonical_json_sha256(intro_output) != RELEASE_1_5_INTRO_OUTPUT_SHA256:
+        raise AssertionError("1.5.0 intro output differs from the published snapshot")
     catalog = deepcopy(source.workflow_catalog)
     catalog["semantic_version"] = "1.5.0"
     package_checksum = canonical_json_sha256(manifest)

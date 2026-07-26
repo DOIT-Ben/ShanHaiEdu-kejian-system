@@ -97,7 +97,12 @@
             "type": "text",
             "required": true,
             "editable": false,
-            "deletable": false
+            "deletable": false,
+            "validation_rules": [
+              {
+                "pattern": "^INTRO-(SCI|APP|STO)-[0-9]{2}$"
+              }
+            ]
           },
           {
             "field_key": "lesson_unit_key",
@@ -183,7 +188,33 @@
             "type": "enum",
             "required": true,
             "editable": true,
-            "deletable": false
+            "deletable": false,
+            "options": [
+              {
+                "value": "video",
+                "label": "视频"
+              },
+              {
+                "value": "image",
+                "label": "图片"
+              },
+              {
+                "value": "physical_object",
+                "label": "实物"
+              },
+              {
+                "value": "question",
+                "label": "问题"
+              },
+              {
+                "value": "performance",
+                "label": "课堂表演"
+              },
+              {
+                "value": "mixed",
+                "label": "组合媒介"
+              }
+            ]
           },
           {
             "field_key": "duration_seconds",
@@ -191,7 +222,15 @@
             "type": "number",
             "required": true,
             "editable": true,
-            "deletable": false
+            "deletable": false,
+            "validation_rules": [
+              {
+                "minimum": 10
+              },
+              {
+                "maximum": 600
+              }
+            ]
           },
           {
             "field_key": "course_anchor",
@@ -247,7 +286,15 @@
             "type": "number",
             "required": true,
             "editable": false,
-            "deletable": false
+            "deletable": false,
+            "validation_rules": [
+              {
+                "minimum": 1
+              },
+              {
+                "maximum": 100
+              }
+            ]
           },
           {
             "field_key": "recommendation_reason",

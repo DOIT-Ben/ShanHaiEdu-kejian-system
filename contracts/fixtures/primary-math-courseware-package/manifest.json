@@ -4,7 +4,7 @@
   "name": "小学数学标准课件生产内容包",
   "semantic_version": "1.5.1",
   "runtime_constraint": ">=0.1.0 <1.0.0",
-  "change_summary": "在不可变1.5.0基础上前向强化十二部分教案的教材范围与评价证据引用约束；旧Release与既有项目绑定保持不变。",
+  "change_summary": "在不可变1.5.0基础上前向强化十二部分教案的教材范围与评价证据引用约束，并收紧三类九套的方案键、媒介与数值输出约束；旧Release与既有项目绑定保持不变。",
   "dependencies": [],
   "items": [
     {
@@ -103,7 +103,7 @@
       "kind": "content_definition",
       "path": "items/intro-generate-options-output.json",
       "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
-      "sha256": "b9cc12772863821d328889319cd958108f49f4d5af296839869bce237099cd0a"
+      "sha256": "16ef79ffae29ed44a6c82b2b1b0a7a6b2489be2b205459e27694671bfcbfe674"
     },
     {
       "item_key": "intro.generate_options.prompt",

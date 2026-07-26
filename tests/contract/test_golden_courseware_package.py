@@ -9,6 +9,7 @@ from typing import Any, cast
 import pytest
 from jsonschema import Draft202012Validator, FormatChecker
 
+from apps.api.content_runtime.definition_projection import build_content_json_schema
 from scripts.build_builtin_generation_package import build_package
 from scripts.golden_courseware_branch_inputs import (
     GOLDEN_PLANNING_NODE_KEYS,
@@ -492,6 +493,26 @@ def test_course_grounded_intro_options_keep_one_current_contract() -> None:
 
     output_fields = {field["field_key"] for field in generate_options["output"]["fields"]}
     assert {"generation_mode", "source_intro_option_version_refs"} <= output_fields
+
+
+def test_intro_generation_schema_enforces_teacher_editable_fields() -> None:
+    output_definition = load_json(PACKAGE / "items" / "intro-generate-options-output.json")
+    schema = build_content_json_schema(output_definition["spec"])
+    option_properties = schema["properties"]["options"]["items"]["properties"]
+
+    assert option_properties["option_key"]["pattern"] == "^INTRO-(SCI|APP|STO)-[0-9]{2}$"
+    assert option_properties["suggested_medium"]["enum"] == [
+        "video",
+        "image",
+        "physical_object",
+        "question",
+        "performance",
+        "mixed",
+    ]
+    assert option_properties["duration_seconds"]["minimum"] == 10
+    assert option_properties["duration_seconds"]["maximum"] == 600
+    assert option_properties["recommendation_score"]["minimum"] == 1
+    assert option_properties["recommendation_score"]["maximum"] == 100
 
 
 def test_retired_intro_contract_tokens_are_absent_from_current_tree() -> None:
