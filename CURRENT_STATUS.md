@@ -1,8 +1,8 @@
 # 当前项目状态
 
-当前阶段：阶段1后端基座以及R1教材范围、课时划分、十二部分教案和三类九套四个教师可见文本结果已经合并；当前只执行受控真实文本Provider教师黄金项目与最终R1收口。
+当前阶段：阶段1后端基座以及R1教材范围、课时划分、十二部分教案和三类九套四个教师可见文本结果已经完成；受控真实文本Provider教师黄金项目已通过，R1已经完成并收口。
 > 最后核验：2026-07-27。
-> 当前任务：[Issue #241](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/241)，Draft PR [#242](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/242)；只复用现有Model Gateway和生产Worker完成受控真实文本Provider验收、脱敏receipt与最终收口。
+> 当前任务：R1没有活跃实施任务；后续任务必须重新通过教师可见结果Issue领取，不恢复按技术层横向拆分。
 
 ## 当前可演示成果
 
@@ -28,42 +28,40 @@
 - [Issue #231](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/231)已经由[PR #232](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/232)Squash Merge并关闭；合并提交`5e56ac4`的repository governance、真实API、前端和后端/PostgreSQL main工作流全部通过。
 - [Issue #234](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/234)已经由[PR #236](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/236)交付并关闭；生产页面、active OpenAPI、FastAPI、现有Worker、生成客户端、PostgreSQL集成测试和真实API Playwright共同形成教材范围与课时划分教师闭环。
 - [Issue #235](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/235)已经由[PR #238](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/238)Squash Merge并关闭；三类九套生成、编辑、质量检查、exact批准、唯一采用、刷新恢复和最终R1真实API浏览器链已经进入`main`，独立reviewer绑定最终base/head且P0/P1/P2/P3均为0。
+- [Issue #241](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/241)的`1.5.3`受控真实文本Provider教师黄金项目已经通过：生产Worker经现有Model Gateway完成5次`NewAPI -> deepseek`流式请求，两个真实API浏览器场景`2 passed (8.2m)`，并生成Schema有效的脱敏passed receipt。
+- 本次receipt包含3个正式Artifact、4个exact GenerationJob、5个GenerationAttempt、exact Approval与唯一Intro选择事实；SHA-256为`46c5bb6f13add7dea7d7002004ee6cf554893be74b280d259f6e7af43f912e21`，不包含密钥、Prompt或模型正文。
 
 ## 当前工作
 
 - [Issue #239](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/239)已经由[PR #240](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/240)完成主线状态收口并关闭。
-- [Issue #241](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/241)是当前唯一P0实施入口；生产Worker已经核验会在未注入测试模型时通过现有`build_real_text_gateway()`调用真实文本Provider，本任务只补受控黄金项目、脱敏receipt和必要的验收接线。
-- Draft PR [#242](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/242)从`origin/main`独立开发；普通CI继续使用确定性Fake，真实Provider只通过显式受控命令执行。
-- #242当前前向内容包为`1.5.3`：保持不可变`1.5.2`及既有项目绑定不变，将`validator.intro.single_anchor`前向升级为`1.2.1`；课堂实际呈现字段继续扫描冻结主题，教师侧`fit_reason`不再作为课堂内容扫描，旧`1.2.0`和`1.1.0`仍按原行为注册。
+- [Issue #241](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/241)已经由[PR #242](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/242)交付；生产Worker在未注入测试模型时通过现有`build_real_text_gateway()`调用真实文本Provider，普通CI继续使用确定性Fake。
+- #242只增加受控黄金项目、脱敏receipt、现有Provider流式接线和验收发现的最小质量修复，没有建设新的Provider平台、Worker队列、状态机或治理框架。
+- #242前向内容包为`1.5.3`：保持不可变`1.5.2`及既有项目绑定不变，将`validator.intro.single_anchor`前向升级为`1.2.1`；课堂实际呈现字段继续扫描冻结主题，教师侧`fit_reason`不再作为课堂内容扫描，旧`1.2.0`和`1.1.0`仍按原行为注册。
 - `secondary_tendencies`及跨倾向阻塞门禁已从现行Schema、内容包和运行质量合同删除；第一阶段禁止自评分，第二阶段不得漏评、多评或改写候选正文。正常成功为1个Job、2个成功GenerationAttempt；首轮评分非法时同一Job有界重投一次，只重跑评分并复用已持久化候选，成功时共3个Attempt。
-- `1.5.3`不改变active OpenAPI、生成TypeScript客户端、Worker、Job、Artifact、Approval或页面合同；当前分支已通过940项完整单元/合同测试和95项相关PostgreSQL内容包、Intro runtime、Worker与质量运行时测试。发布回归固定`1.5.2`的package/workflow checksum，并验证旧发布行与既有项目绑定不变。
-- 当前分支的真实API浏览器验收只在真实模式且exact三类九套Job以`MODEL_TIMEOUT`失败时允许教师页面重试一次，不改变生产Worker、状态机或通用Provider行为；Ruff format/check、Pyright、仓库治理、密钥扫描和`git diff --check`也已通过，测试只使用Fake Worker，没有调用真实Provider。
-- exact Head `b6796f5c6cbe977adfb78c0c5566465e54593a30`的8个CI检查全部通过；OpenAI-compatible文本Provider已改为服务端消费并聚合SSE，必须同时取得正文、finish reason、usage和`[DONE]`，截断、坏JSON、身份漂移或usage缺失均失败关闭。
-- 经明确授权运行的`1.5.2`真实流式黄金项目中，四次Provider请求均为HTTP 200：十二部分教案161.358秒（4,339 prompt、10,467 completion）、Intro候选84.574秒（2,257 prompt、4,425 completion）、Intro独立评分83.901秒（3,592 prompt、4,130 completion）、课时划分14.388秒（1,787 prompt、708 completion）。流式已排除此前上游HTTP 408阻塞；300秒是单次读取等待上限，不是请求总时长。
-- 本次真实API浏览器最终为1 passed、1 failed；唯一失败是`INTRO_PRETEACH_VIOLATION`把`INTRO-APP-03.fit_reason`中的“理货任务不涉及比较大小或序数”误判为预教。模型内容、候选数量、三类分布和独立评分均不是失败原因；尚未形成passed receipt，也没有在本次前向修复后再次调用Provider。
-- Parent [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)仍保持开放；只有受控真实文本Provider通过现有Model Gateway形成脱敏证据后，才能执行最终R1 release收口并关闭父任务。
+- `1.5.3`不改变active OpenAPI、生成TypeScript客户端、Worker、Job、Artifact、Approval或页面合同；交付分支通过940项完整单元/合同测试和95项相关PostgreSQL内容包、Intro runtime、Worker与质量运行时测试。发布回归固定`1.5.2`的package/workflow checksum，并验证旧发布行与既有项目绑定不变。
+- 真实API浏览器验收只在真实模式且exact三类九套Job以`MODEL_TIMEOUT`失败时允许教师页面重试一次，不改变生产Worker、状态机或通用Provider行为；Ruff format/check、Pyright、仓库治理、密钥扫描和`git diff --check`也已通过。
+- OpenAI-compatible文本Provider由服务端消费并聚合SSE，必须同时取得正文、finish reason、usage和`[DONE]`，截断、坏JSON、身份漂移或usage缺失均失败关闭。
+- `1.5.3`修复后的全新黄金项目最终为`2 passed`：主课时十二部分教案、三类九套生成与独立统一评分、第二课时隔离，以及教材范围与课时划分均通过；不存在`INTRO_PRETEACH_VIOLATION`或其他质量finding。
+- 本次5次Provider调用均HTTP 200：主课时教案139.867秒、Intro候选68.644秒、Intro评分49.465秒、隔离课时教案179.881秒、课时划分18.473秒；合计16,520 prompt tokens和28,826 completion tokens。
+- Parent [Issue #11](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/11)的最终R1 release门禁已经由受控真实文本Provider passed receipt满足。
 - [Draft PR #222](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/222)冻结为固定WIP代码来源，不新增代码、不直接合并；[Draft PR #230](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/230)暂停，不转Ready、不默认合并。#223至#229只保留为参考清单，不再强制串行。
 
 ## 当前阻塞
 
-- 当前没有已知的Session/CSRF、PostgreSQL、Worker、active OpenAPI或生产页面实现阻塞；四个教师文本结果及完整真实API浏览器链已经进入`main`。
-- Parent #11的最终release门禁仍缺`1.5.3`合同下的受控真实文本Provider passed receipt。流式、候选生成、独立统一评分、exact键覆盖、有界评分重投和Attempt对账均已有通过证据；当前需先让`1.5.3`修复通过exact Head CI与独立审查，再取得新的明确授权运行全新黄金项目。
-- 任一阶段失败都不得写最终ArtifactVersion；普通CI仍只允许确定性Fake，不得把真实模型内容写入仓库测试夹具。
-- #242必须保持Draft，不转Ready、不合并；不得把十二部分教案单项成功、Fake浏览器通过、本地或CI全门禁通过表述为真实Provider黄金项目完成。再次调用Provider前必须获得新的明确授权，不能等价重复调用。
+- 当前没有已知的Session/CSRF、PostgreSQL、Worker、active OpenAPI、生产页面或真实文本Provider验收阻塞。
+- 真实黄金项目已经生成passed receipt；不再调用Provider。普通CI继续只允许确定性Fake，不得把真实模型内容写入仓库测试夹具。
 - [Issue #233](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/233)单独跟踪`origin/main`既有Stage1 E2E旧`impact_scope` fixture；该测试债不改变#231验收结果，也不在救援PR内顺手修复。
 - [Issue #237](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/237)单独跟踪文件长度后置项；PPT、图片、视频、TTS、通用查询/审批/状态机、SSE重构和全仓技术债均不在#241范围。
 
 ## 下一个阶段出口
 
-1. 完成`1.5.3`本地质量门禁，提交推送并等待新exact Head CI；#242继续保持Draft和blocked。
-2. 由同一独立reviewer复核最终base/head，确认新旧validator身份、1.5.2不可变重建和质量误判修复没有P0/P1。
-3. 再次获得明确授权后，使用现有生产Worker与Model Gateway运行一个全新受控教师黄金项目；不得把旧失败Job改写为成功或无差别重复调用。
-4. 真实黄金项目通过并形成脱敏receipt后，更新#242证据、转Ready并Squash Merge，再从干净`origin/main`复验并关闭#241与Parent #11。
-5. 清理#241分支、worktree与临时运行资源；后续仍以教师可见结果为合并单位，不恢复#223至#229的技术层严格串行关系。
+1. R1没有继续开发项；后续工作必须按新的教师可见结果建立独立Issue和短分支。
+2. #222继续冻结、#230继续暂停；#223至#229仅作参考，不恢复技术层严格串行关系。
+3. PPT、图片、视频、TTS和其他媒体能力仍不在本轮范围，必须单独决策和验收。
 
 ## 接手提示
 
 1. 先读`README.md`、`AGENTS.md`、`docs/governance/项目记忆与接手索引.md`和本文件。
-2. #241是唯一实时R1验收入口；#231、#234和#235已经完成四个教师文本结果，禁止恢复按技术层严格串行的旧执行方式。
+2. #231、#234、#235和#241已经完成R1四个教师文本结果及真实Provider验收，禁止恢复按技术层严格串行的旧执行方式。
 3. #222继续冻结、#230继续暂停；#223至#229只作参考，不得从中恢复通用查询、审批、状态机或SSE重构。
-4. #241必须复用生产Session/CSRF、Artifact、LessonPlanRuntime、GenerationJob、Worker、SSE、QualityReport、Approval和Model Gateway，不建设第二套系统；receipt不得包含密钥、Prompt或模型正文。
+4. R1已经复用生产Session/CSRF、Artifact、LessonPlanRuntime、GenerationJob、Worker、SSE、QualityReport、Approval和Model Gateway；receipt不得包含密钥、Prompt或模型正文。
