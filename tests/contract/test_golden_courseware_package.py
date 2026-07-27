@@ -131,7 +131,7 @@ def test_lesson_division_prompt_preserves_reference_method_and_scope() -> None:
 
 def test_lesson_plan_prompt_preserves_exact_scope_and_assessment_references() -> None:
     source = load_json(SOURCE)
-    assert source["package"]["semantic_version"] == "1.5.2"
+    assert source["package"]["semantic_version"] == "1.5.3"
     lesson_plan = next(
         node for node in source["nodes"] if node["template_key"] == "lesson_plan.generate"
     )

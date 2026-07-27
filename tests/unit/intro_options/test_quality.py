@@ -21,6 +21,7 @@ from apps.api.intro_options.quality import (
 from apps.api.intro_options.quality_legacy import (
     LEGACY_INTRO_OPTION_SCHEMA_REF,
     LEGACY_INTRO_SINGLE_ANCHOR_REF,
+    PREVIOUS_INTRO_SINGLE_ANCHOR_REF,
 )
 from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
 
@@ -214,6 +215,23 @@ def test_course_anchor_rejects_frozen_later_topic_in_intro_content() -> None:
     options[0]["creative_concept"] = "观察两组信号并比较大小"
 
     _assert_anchor_finding(content, "INTRO_PRETEACH_VIOLATION")
+
+
+def test_course_anchor_allows_teacher_fit_reason_to_restate_frozen_boundary() -> None:
+    content = _content("default_nine")
+    options = cast(list[dict[str, Any]], content["options"])
+    options[0]["fit_reason"] = "理货任务不涉及比较大小或序数，只在1～5范围内建立对应。"  # noqa: RUF001
+
+    outcome = IntroSingleAnchorQualityValidator().validate(_context(content))
+    previous = IntroSingleAnchorQualityValidator(
+        ref=PREVIOUS_INTRO_SINGLE_ANCHOR_REF,
+        scan_teacher_fit_reason=True,
+    ).validate(_context(content))
+
+    assert outcome.passed is True, outcome.findings
+    assert previous.validator == PREVIOUS_INTRO_SINGLE_ANCHOR_REF
+    assert previous.passed is False
+    assert "INTRO_PRETEACH_VIOLATION" in {str(item["code"]) for item in previous.findings}
 
 
 def _assert_anchor_finding(content: dict[str, Any], code: str) -> None:

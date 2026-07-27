@@ -46,7 +46,7 @@
 | `classroom_first_question` | 结束后教师提出的第一问 |
 | `handoff_moment` | 短片或活动停止、教师接回课堂的具体时刻 |
 | `must_not_preteach` | 不得提前给出的定义、方法、结论和探究步骤 |
-| `fit_reason` / `risks` | 适配理由与风险 |
+| `fit_reason` / `risks` | 面向教师的适配理由与风险，不是课堂实际呈现内容 |
 | `recommendation_score` / `recommendation_reason` | 推荐分与依据 |
 
 ## 5. 选择协议
@@ -72,6 +72,7 @@
 - 每套都能追溯目标课时、知识点和教材证据，课程关联参与创意形成。
 - 九套不是只换标题、角色或场景；第一阶段不得自评分。
 - 第二阶段必须覆盖exact候选键且不得改写候选正文；最高推荐分和全局推荐必须唯一。
-- 不提前讲出课堂需要学生发现的内容。
+- `title`、`creative_concept`、`hook`、`viewer_value`、`course_anchor`、`classroom_first_question`和`handoff_moment`不得提前讲出课堂需要学生发现的内容。
+- 教师侧`fit_reason`可以用否定语义重申讲授边界，不作为课堂预教内容扫描；这不放宽方案正文与`must_not_preteach`的一致性校验。
 - 不因小学受众默认使用儿童、教师、教室或卡通角色。
 - 方案中不包含分镜、旁白、字幕、资产清单、Provider参数或费用策略。

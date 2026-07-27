@@ -2,9 +2,9 @@
   "format_version": "1.0",
   "package_key": "shanhai.primary_math.courseware",
   "name": "小学数学标准课件生产内容包",
-  "semantic_version": "1.5.2",
+  "semantic_version": "1.5.3",
   "runtime_constraint": ">=0.1.0 <1.0.0",
-  "change_summary": "在不可变1.5.1基础上把三类九套改为候选生成与独立统一评分两个受审计阶段，删除辅助倾向字段与跨倾向门禁；旧Release与既有项目绑定保持不变。",
+  "change_summary": "在不可变1.5.2基础上前向修正三类九套质量校验对教师适配说明中讲授边界复述的误判；旧Release与既有项目绑定保持不变。",
   "dependencies": [],
   "items": [
     {
