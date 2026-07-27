@@ -4674,7 +4674,6 @@ components:
         - lesson_unit_key
         - knowledge_point
         - primary_tendency
-        - secondary_tendencies
         - title
         - creative_concept
         - hook
@@ -4701,13 +4700,6 @@ components:
           minLength: 1
         primary_tendency:
           $ref: '#/components/schemas/tendency'
-        secondary_tendencies:
-          type: array
-          minItems: 1
-          maxItems: 2
-          uniqueItems: true
-          items:
-            $ref: '#/components/schemas/tendency'
         title:
           type: string
           minLength: 1
@@ -4767,7 +4759,7 @@ components:
       $schema: https://json-schema.org/draft/2020-12/schema
       $id: https://shanhaiedu.local/contracts/intro-option-set.schema.json
       title: IntroOptionSet
-      description: 由最小课程种子直接生成的一套或三类九套课堂导入方案。业务校验器额外保证主要倾向分布、课程追溯、辅助倾向交叉和最高推荐分唯一。
+      description: 由最小课程种子生成并经独立统一评分的一套或三类九套课堂导入方案。业务校验器额外保证主要倾向分布、课程追溯和最高推荐分唯一。
       type: object
       additionalProperties: false
       required:
@@ -4857,7 +4849,6 @@ components:
             - lesson_unit_key
             - knowledge_point
             - primary_tendency
-            - secondary_tendencies
             - title
             - creative_concept
             - hook
@@ -4884,13 +4875,6 @@ components:
               minLength: 1
             primary_tendency:
               $ref: '#/components/schemas/tendency'
-            secondary_tendencies:
-              type: array
-              minItems: 1
-              maxItems: 2
-              uniqueItems: true
-              items:
-                $ref: '#/components/schemas/tendency'
             title:
               type: string
               minLength: 1

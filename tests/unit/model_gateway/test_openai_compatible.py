@@ -4,7 +4,7 @@ import json
 
 import httpx
 import pytest
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
 from apps.api.model_gateway.contracts import (
     GatewayErrorCode,
@@ -40,26 +40,68 @@ def provider(handler) -> OpenAICompatibleTextProvider:
     )
 
 
+def stream_response(*events: dict[str, object], done: bool = True) -> httpx.Response:
+    lines = [f"data: {json.dumps(event)}\n\n" for event in events]
+    if done:
+        lines.append("data: [DONE]\n\n")
+    return httpx.Response(
+        200,
+        headers={"Content-Type": "text/event-stream"},
+        text="".join(lines),
+    )
+
+
+def success_events(
+    *,
+    model: str = "provider/actual-model",
+    cost: float | str = 0.001,
+) -> tuple[dict[str, object], ...]:
+    return (
+        {
+            "id": "provider-request-1",
+            "model": model,
+            "choices": [{"delta": {"content": "SMOKE"}, "finish_reason": None}],
+        },
+        {
+            "id": "provider-request-1",
+            "model": model,
+            "choices": [{"delta": {"content": "_OK"}, "finish_reason": "stop"}],
+        },
+        {
+            "id": "provider-request-1",
+            "model": model,
+            "choices": [],
+            "usage": {
+                "prompt_tokens": 5,
+                "completion_tokens": 2,
+                "total_tokens": 7,
+                "cost": cost,
+            },
+        },
+    )
+
+
+def test_config_supports_long_structured_generation_timeout() -> None:
+    values = {
+        "provider_name": "provider-test",
+        "base_url": "https://provider.test/api/v1",
+        "model": "provider/model",
+        "api_key": SecretStr("test-only-key"),
+    }
+
+    assert OpenAICompatibleConfig(**values, timeout_seconds=300).timeout_seconds == 300
+    with pytest.raises(ValidationError):
+        OpenAICompatibleConfig(**values, timeout_seconds=301)
+
+
 async def test_adapter_validates_success_and_usage() -> None:
     def handler(http_request: httpx.Request) -> httpx.Response:
         body = json.loads(http_request.content)
         assert http_request.url == "https://provider.test/api/v1/chat/completions"
         assert body["model"] == "provider/model"
-        assert body["stream"] is False
-        return httpx.Response(
-            200,
-            json={
-                "id": "provider-request-1",
-                "model": "provider/actual-model",
-                "choices": [{"message": {"content": "SMOKE_OK"}, "finish_reason": "stop"}],
-                "usage": {
-                    "prompt_tokens": 5,
-                    "completion_tokens": 2,
-                    "total_tokens": 7,
-                    "cost": 0.001,
-                },
-            },
-        )
+        assert body["stream"] is True
+        assert body["stream_options"] == {"include_usage": True}
+        return stream_response(*success_events())
 
     result = await provider(handler).complete(request())
 
@@ -111,20 +153,7 @@ async def test_adapter_rejects_audit_metadata_outside_database_bounds(
     cost: float | str,
 ) -> None:
     def handler(_request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200,
-            json={
-                "id": "provider-request-out-of-bounds",
-                "model": model,
-                "choices": [{"message": {"content": "SMOKE_OK"}, "finish_reason": "stop"}],
-                "usage": {
-                    "prompt_tokens": 5,
-                    "completion_tokens": 2,
-                    "total_tokens": 7,
-                    "cost": cost,
-                },
-            },
-        )
+        return stream_response(*success_events(model=model, cost=cost))
 
     with pytest.raises(ModelGatewayError) as captured:
         await provider(handler).complete(request())
@@ -158,11 +187,11 @@ async def test_http_timeout_maps_to_platform_timeout() -> None:
     "choice",
     [
         {
-            "message": {"content": None, "refusal": "request refused"},
+            "delta": {"content": None, "refusal": "request refused"},
             "finish_reason": "stop",
         },
         {
-            "message": {"content": None},
+            "delta": {"content": None},
             "finish_reason": "error",
             "error": {"metadata": {"error_type": "refusal"}},
         },
@@ -170,21 +199,69 @@ async def test_http_timeout_maps_to_platform_timeout() -> None:
 )
 async def test_adapter_maps_choice_level_refusal(choice: dict[str, object]) -> None:
     def handler(_request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200,
-            json={
+        return stream_response(
+            {
                 "id": "provider-request-refusal",
                 "model": "provider/actual-model",
                 "choices": [choice],
-                "usage": {
-                    "prompt_tokens": 5,
-                    "completion_tokens": 0,
-                    "total_tokens": 5,
-                },
-            },
+            }
         )
 
     with pytest.raises(ModelGatewayError) as captured:
         await provider(handler).complete(request())
 
     assert captured.value.code == GatewayErrorCode.REJECTED
+
+
+async def test_adapter_rejects_truncated_stream_without_done_marker() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return stream_response(*success_events(), done=False)
+
+    with pytest.raises(ModelGatewayError) as captured:
+        await provider(handler).complete(request())
+
+    assert captured.value.code == GatewayErrorCode.INVALID_RESPONSE
+
+
+async def test_adapter_rejects_stream_without_usage() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return stream_response(*success_events()[:2])
+
+    with pytest.raises(ModelGatewayError) as captured:
+        await provider(handler).complete(request())
+
+    assert captured.value.code == GatewayErrorCode.INVALID_RESPONSE
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("id", "provider-request-2"),
+        ("model", "provider/different-model"),
+    ],
+)
+async def test_adapter_rejects_stream_identity_changes(field: str, value: str) -> None:
+    events = list(success_events())
+    events[1] = {**events[1], field: value}
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return stream_response(*events)
+
+    with pytest.raises(ModelGatewayError) as captured:
+        await provider(handler).complete(request())
+
+    assert captured.value.code == GatewayErrorCode.INVALID_RESPONSE
+
+
+async def test_adapter_rejects_malformed_sse_json() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"Content-Type": "text/event-stream"},
+            text="data: {not-json}\n\ndata: [DONE]\n\n",
+        )
+
+    with pytest.raises(ModelGatewayError) as captured:
+        await provider(handler).complete(request())
+
+    assert captured.value.code == GatewayErrorCode.INVALID_RESPONSE

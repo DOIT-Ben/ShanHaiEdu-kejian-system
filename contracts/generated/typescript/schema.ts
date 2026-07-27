@@ -2063,7 +2063,6 @@ export interface components {
             lesson_unit_key: string;
             knowledge_point: string;
             primary_tendency: components["schemas"]["tendency"];
-            secondary_tendencies: components["schemas"]["tendency"][];
             title: string;
             creative_concept: string;
             hook: string;
@@ -2082,7 +2081,7 @@ export interface components {
         };
         /**
          * IntroOptionSet
-         * @description 由最小课程种子直接生成的一套或三类九套课堂导入方案。业务校验器额外保证主要倾向分布、课程追溯、辅助倾向交叉和最高推荐分唯一。
+         * @description 由最小课程种子生成并经独立统一评分的一套或三类九套课堂导入方案。业务校验器额外保证主要倾向分布、课程追溯和最高推荐分唯一。
          */
         "intro-option-set.schema": {
             /** Format: uuid */
@@ -2109,7 +2108,6 @@ export interface components {
                     lesson_unit_key: string;
                     knowledge_point: string;
                     primary_tendency: components["schemas"]["tendency"];
-                    secondary_tendencies: components["schemas"]["tendency"][];
                     title: string;
                     creative_concept: string;
                     hook: string;

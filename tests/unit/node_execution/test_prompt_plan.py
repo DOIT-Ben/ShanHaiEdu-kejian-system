@@ -148,6 +148,7 @@ def test_compiles_hidden_schema_and_declared_context_into_one_request() -> None:
 
     assert plan.request.capability.value == "text.structured.zh_primary_math"
     assert plan.request.prompt == plan.prompt.compiled_prompt
+    assert plan.request.max_output_tokens == 12_288
     assert plan.prompt.request_schema == OUTPUT_SCHEMA
     assert plan.prompt.preview.editable_prompt == (
         'Generate the published output.\n\n{"context":[{"approved":true}]}'

@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shanhaiedu.example/contracts/r1-provider-acceptance-receipt.schema.json",
+  "title": "R1 controlled real text Provider acceptance receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "conclusion",
+    "utc",
+    "project_id",
+    "lesson_division_project_id",
+    "lesson_unit_id",
+    "isolation_lesson_unit_id",
+    "provider",
+    "artifacts",
+    "jobs",
+    "attempts",
+    "selection",
+    "isolation"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "conclusion": {"const": "passed"},
+    "utc": {"type": "string", "format": "date-time"},
+    "project_id": {"$ref": "#/$defs/uuid"},
+    "lesson_division_project_id": {"$ref": "#/$defs/uuid"},
+    "lesson_unit_id": {"$ref": "#/$defs/uuid"},
+    "isolation_lesson_unit_id": {"$ref": "#/$defs/uuid"},
+    "provider": {"$ref": "#/$defs/provider"},
+    "artifacts": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {"$ref": "#/$defs/artifact"}
+    },
+    "jobs": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {"$ref": "#/$defs/job"}
+    },
+    "attempts": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {"$ref": "#/$defs/attempt"}
+    },
+    "selection": {"$ref": "#/$defs/selection"},
+    "isolation": {"$ref": "#/$defs/isolation"}
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "configured_model"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 80},
+        "configured_model": {"type": "string", "minLength": 1, "maxLength": 160}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "project_id",
+        "lesson_unit_id",
+        "artifact_id",
+        "generated_version_id",
+        "approved_version_id",
+        "content_hash",
+        "quality_report_id",
+        "quality_evidence_hash",
+        "approval_id"
+      ],
+      "properties": {
+        "kind": {"enum": ["lesson_division", "lesson_plan", "intro_option_set"]},
+        "project_id": {"$ref": "#/$defs/uuid"},
+        "lesson_unit_id": {
+          "oneOf": [{"$ref": "#/$defs/uuid"}, {"type": "null"}]
+        },
+        "artifact_id": {"$ref": "#/$defs/uuid"},
+        "generated_version_id": {"$ref": "#/$defs/uuid"},
+        "approved_version_id": {"$ref": "#/$defs/uuid"},
+        "content_hash": {"$ref": "#/$defs/hash"},
+        "quality_report_id": {"$ref": "#/$defs/uuid"},
+        "quality_evidence_hash": {"$ref": "#/$defs/hash"},
+        "approval_id": {"$ref": "#/$defs/uuid"}
+      }
+    },
+    "job": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "job_id",
+        "project_id",
+        "lesson_unit_id",
+        "node_run_id",
+        "node_key",
+        "result_artifact_version_id",
+        "status"
+      ],
+      "properties": {
+        "job_id": {"$ref": "#/$defs/uuid"},
+        "project_id": {"$ref": "#/$defs/uuid"},
+        "lesson_unit_id": {
+          "oneOf": [{"$ref": "#/$defs/uuid"}, {"type": "null"}]
+        },
+        "node_run_id": {"$ref": "#/$defs/uuid"},
+        "node_key": {
+          "enum": ["lesson.division.generate", "lesson_plan.generate", "intro.generate_options"]
+        },
+        "result_artifact_version_id": {"$ref": "#/$defs/uuid"},
+        "status": {"const": "succeeded"}
+      }
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_units", "output_units", "actual_cost", "currency"],
+      "properties": {
+        "input_units": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+        "output_units": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+        "actual_cost": {"type": ["string", "null"], "pattern": "^[0-9]+(?:\\.[0-9]+)?$"},
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"}
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attempt_id",
+        "project_id",
+        "generation_job_id",
+        "node_run_id",
+        "capability",
+        "provider",
+        "configured_model",
+        "actual_model",
+        "request_id",
+        "provider_request_id",
+        "request_hash",
+        "latency_ms",
+        "usage"
+      ],
+      "properties": {
+        "attempt_id": {"$ref": "#/$defs/uuid"},
+        "project_id": {"$ref": "#/$defs/uuid"},
+        "generation_job_id": {"$ref": "#/$defs/uuid"},
+        "node_run_id": {"$ref": "#/$defs/uuid"},
+        "capability": {"type": "string", "minLength": 1, "maxLength": 160},
+        "provider": {"type": "string", "minLength": 1, "maxLength": 80},
+        "configured_model": {"type": "string", "minLength": 1, "maxLength": 160},
+        "actual_model": {"type": "string", "minLength": 1, "maxLength": 160},
+        "request_id": {"type": "string", "minLength": 1, "maxLength": 160},
+        "provider_request_id": {"type": "string", "minLength": 1, "maxLength": 255},
+        "request_hash": {"$ref": "#/$defs/hash"},
+        "latency_ms": {"type": "integer", "minimum": 0},
+        "usage": {"$ref": "#/$defs/usage"}
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selection_id", "artifact_version_id", "source_approval_id", "option_key"],
+      "properties": {
+        "selection_id": {"$ref": "#/$defs/uuid"},
+        "artifact_version_id": {"$ref": "#/$defs/uuid"},
+        "source_approval_id": {"$ref": "#/$defs/uuid"},
+        "option_key": {"type": "string", "minLength": 1, "maxLength": 80}
+      }
+    },
+    "isolation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lesson_unit_id",
+        "lesson_plan_artifact_id",
+        "lesson_plan_version_id",
+        "lesson_plan_content_hash",
+        "lesson_plan_job_id",
+        "lesson_plan_node_run_id",
+        "intro_artifact_count",
+        "intro_job_count"
+      ],
+      "properties": {
+        "lesson_unit_id": {"$ref": "#/$defs/uuid"},
+        "lesson_plan_artifact_id": {"$ref": "#/$defs/uuid"},
+        "lesson_plan_version_id": {"$ref": "#/$defs/uuid"},
+        "lesson_plan_content_hash": {"$ref": "#/$defs/hash"},
+        "lesson_plan_job_id": {"$ref": "#/$defs/uuid"},
+        "lesson_plan_node_run_id": {"$ref": "#/$defs/uuid"},
+        "intro_artifact_count": {"const": 0},
+        "intro_job_count": {"const": 0}
+      }
+    }
+  }
+}

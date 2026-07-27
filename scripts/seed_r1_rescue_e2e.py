@@ -19,6 +19,8 @@ from apps.api.identity.models import Principal
 from apps.api.identity.repository import IdentityRepository
 from apps.api.ids import new_uuid7
 from apps.api.lessons.models import LessonBranchConfig, LessonUnit
+from apps.api.workflows.lesson_fanout import LessonWorkflowFanoutService
+from apps.api.workflows.lesson_fanout_contracts import LessonFanoutTarget
 from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
 from tests.integration.test_lesson_division_runtime import (
     _prepare_approval,  # pyright: ignore[reportPrivateUsage, reportUnknownVariableType]
@@ -27,6 +29,7 @@ from tests.integration.test_lesson_division_runtime import (
 ROOT = Path(__file__).resolve().parents[1]
 GOLDEN_CASE = ROOT / "contracts/fixtures/golden-projects/numbers-1-to-5/golden-project.json"
 PROJECT_TITLE = "十二部分教案验收"
+ACCEPTANCE_LOCATOR_ENV = "SHANHAI_R1_ACCEPTANCE_LOCATOR"
 
 
 def _required(name: str) -> str:
@@ -88,6 +91,36 @@ def _build_material_content(case: dict[str, object]) -> dict[str, object]:
     }
 
 
+def _write_acceptance_locator(
+    *,
+    project_id: UUID,
+    lesson_unit_id: UUID,
+    isolation_lesson_unit_id: UUID,
+) -> None:
+    configured = os.environ.get(ACCEPTANCE_LOCATOR_ENV)
+    if not configured:
+        return
+    destination = Path(configured)
+    if not destination.is_absolute():
+        raise RuntimeError(f"{ACCEPTANCE_LOCATOR_ENV} must be an absolute path")
+    resolved = destination.resolve()
+    if resolved.is_relative_to(ROOT):
+        raise RuntimeError("the R1 acceptance locator must remain outside the repository")
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    resolved.write_text(
+        json.dumps(
+            {
+                "project_id": str(project_id),
+                "lesson_unit_id": str(lesson_unit_id),
+                "isolation_lesson_unit_id": str(isolation_lesson_unit_id),
+            },
+            ensure_ascii=True,
+            separators=(",", ":"),
+        ),
+        encoding="utf-8",
+    )
+
+
 async def seed() -> None:
     engine = build_engine(_required("SHANHAI_DATABASE_URL"))
     factory = build_session_factory(engine)
@@ -141,8 +174,8 @@ async def seed() -> None:
                 lesson_key="LESSON-RESCUE-002",
                 position=2,
                 title="第二课时隔离验证",
-                scope_summary="仅用于验证教案、任务、进度和批准状态不会串课时。",
-                objective_summary="保持独立空状态, 不读取第一课时教案。",
+                scope_summary="用于验证两个课时分别生成教案且任务与产物不会串线。",
+                objective_summary="独立生成本课时教案, 不读取第一课时教案。",
                 estimated_minutes=40,
                 source_division_version_id=prepared.version_id,
                 status="active",
@@ -151,18 +184,41 @@ async def seed() -> None:
             )
             session.add(second)
             session.flush()
+            first_lesson_id = first.id
+            isolation_lesson_id = second.id
+            branch_enabled: dict[str, bool] = {}
             for branch_key in ("lesson_plan", "intro_options", "ppt", "video"):
+                enabled = branch_key == "lesson_plan"
+                branch_enabled[branch_key] = enabled
                 session.add(
                     LessonBranchConfig(
                         id=new_uuid7(),
                         lesson_unit_id=second.id,
                         branch_key=branch_key,
-                        enabled=branch_key == "lesson_plan",
+                        enabled=enabled,
                         settings_json={},
                         created_by=actor.principal_id,
                         updated_by=actor.principal_id,
                     )
                 )
+            fanout = LessonWorkflowFanoutService(
+                session,
+                actor,
+            ).synchronize_lesson_configuration(
+                prepared.project_id,
+                LessonFanoutTarget(
+                    lesson_unit_id=second.id,
+                    branch_enabled=branch_enabled,
+                ),
+                request_id="r1-rescue-e2e-second-lesson-fanout",
+            )
+            if fanout is None:
+                raise RuntimeError("the rescue workflow run is unavailable for the second lesson")
+        _write_acceptance_locator(
+            project_id=prepared.project_id,
+            lesson_unit_id=first_lesson_id,
+            isolation_lesson_unit_id=isolation_lesson_id,
+        )
         print("r1 rescue browser fixture seeded", flush=True)
     finally:
         engine.dispose()

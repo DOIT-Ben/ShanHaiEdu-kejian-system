@@ -28,6 +28,7 @@ from .boundaries import validate_execution_boundary
 
 _PLATFORM_SAFETY = "Enforce tenant isolation, platform safety, and the published output contract."
 _PROVIDER_FORMAT = "Return exactly one JSON object and no commentary."
+_STRUCTURED_TEXT_MAX_OUTPUT_TOKENS = 12_288
 
 
 class NodePromptPlanError(ValueError):
@@ -92,7 +93,7 @@ def compile_node_prompt(
         capability=contract.capability,
         request_id=request_id,
         prompt=prompt.compiled_prompt,
-        max_output_tokens=128_000,
+        max_output_tokens=_STRUCTURED_TEXT_MAX_OUTPUT_TOKENS,
         temperature=0,
     )
     audit = ModelAuditContext(
@@ -114,15 +115,18 @@ def _resolve_contract(
     prompt_spec = _required_mapping(prompt_template.get("spec"))
     prompt_ref = _required_mapping(generation_spec.get("prompt_template_ref"))
     output_ref = _required_mapping(generation_spec.get("output_definition_ref"))
+    initial_output_ref = _initial_output_ref(generation_spec, output_ref)
     policy = _required_mapping(binding.get("context_policy"))
     prompt_key = prompt_ref.get("item_key")
     capability_value = generation_spec.get("model_capability")
-    if not _contract_identities_match(
+    if output_ref.get(
+        "item_key"
+    ) != definition.content_definition_item_key or not _contract_identities_match(
         definition,
         binding,
         prompt_spec,
         prompt_key,
-        output_ref,
+        initial_output_ref,
         capability_value,
     ):
         raise NodePromptPlanError(
@@ -168,10 +172,22 @@ def _contract_identities_match(
         and prompt_spec.get("template_key") == prompt_key
         and prompt_spec.get("model_capability") == capability
         and binding.get("model_capability") == capability
-        and output_ref.get("item_key") == definition.content_definition_item_key
         and _required_mapping(prompt_spec.get("output_definition_ref")).get("item_key")
-        == definition.content_definition_item_key
+        == output_ref.get("item_key")
     )
+
+
+def _initial_output_ref(
+    generation_spec: Mapping[str, Any],
+    final_output_ref: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    raw_stage = generation_spec.get("evaluation_stage")
+    if raw_stage is None:
+        if final_output_ref.get("item_key") is None:
+            raise TypeError("final output reference is invalid")
+        return final_output_ref
+    stage = _required_mapping(raw_stage)
+    return _required_mapping(stage.get("candidate_output_definition_ref"))
 
 
 def _prompt_sections(value: object) -> tuple[PromptSection, ...]:

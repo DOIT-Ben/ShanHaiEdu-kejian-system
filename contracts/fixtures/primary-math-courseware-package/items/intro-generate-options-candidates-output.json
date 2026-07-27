@@ -1,0 +1,270 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "intro.generate_options.candidates.output",
+    "name": "课程驱动导入方案候选输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "intro.generate_options.candidates.output",
+    "title": "课程驱动导入方案候选输出",
+    "description": "第一阶段生成的exact候选池，不含任何自评分、推荐理由、适配风险或推荐结论。",
+    "definition_role": "intermediate",
+    "fields": [
+      {
+        "field_key": "option_set_key",
+        "label": "方案集键",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "visibility": "hidden"
+      },
+      {
+        "field_key": "generation_mode",
+        "label": "生成方式",
+        "type": "enum",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "visibility": "hidden",
+        "options": [
+          {
+            "value": "default_nine",
+            "label": "三类九套"
+          },
+          {
+            "value": "refine_existing",
+            "label": "完善已有创意"
+          }
+        ]
+      },
+      {
+        "field_key": "source_intro_option_version_refs",
+        "label": "已有创意来源版本",
+        "type": "list",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "visibility": "hidden",
+        "min_items": 0,
+        "max_items": 1
+      },
+      {
+        "field_key": "source_lesson_unit_key",
+        "label": "来源课时键",
+        "type": "reference",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "visibility": "hidden"
+      },
+      {
+        "field_key": "source_knowledge_point",
+        "label": "来源知识点",
+        "type": "text",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "visibility": "hidden"
+      },
+      {
+        "field_key": "source_material_evidence_keys",
+        "label": "来源教材证据",
+        "type": "list",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "visibility": "hidden"
+      },
+      {
+        "field_key": "options",
+        "label": "未评分导入候选",
+        "type": "repeatable",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "repeatable": true,
+        "min_items": 1,
+        "max_items": 9,
+        "children": [
+          {
+            "field_key": "option_key",
+            "label": "方案键",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "validation_rules": [
+              {
+                "pattern": "^INTRO-(SCI|APP|STO)-[0-9]{2}$"
+              }
+            ]
+          },
+          {
+            "field_key": "lesson_unit_key",
+            "label": "来源课时键",
+            "type": "reference",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "knowledge_point",
+            "label": "知识点",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "primary_tendency",
+            "label": "主要创作倾向",
+            "type": "enum",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "options": [
+              {
+                "value": "science",
+                "label": "科普"
+              },
+              {
+                "value": "application",
+                "label": "应用"
+              },
+              {
+                "value": "story",
+                "label": "故事"
+              }
+            ]
+          },
+          {
+            "field_key": "title",
+            "label": "标题",
+            "type": "text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "creative_concept",
+            "label": "课程驱动创意概念",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "hook",
+            "label": "钩子",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "viewer_value",
+            "label": "观看价值",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "suggested_medium",
+            "label": "建议媒介",
+            "type": "enum",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "options": [
+              {
+                "value": "video",
+                "label": "视频"
+              },
+              {
+                "value": "image",
+                "label": "图片"
+              },
+              {
+                "value": "physical_object",
+                "label": "实物"
+              },
+              {
+                "value": "question",
+                "label": "问题"
+              },
+              {
+                "value": "performance",
+                "label": "课堂表演"
+              },
+              {
+                "value": "mixed",
+                "label": "组合媒介"
+              }
+            ]
+          },
+          {
+            "field_key": "duration_seconds",
+            "label": "建议时长",
+            "type": "number",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "validation_rules": [
+              {
+                "minimum": 10
+              },
+              {
+                "maximum": 600
+              }
+            ]
+          },
+          {
+            "field_key": "course_anchor",
+            "label": "课程关联",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "classroom_first_question",
+            "label": "课堂第一问",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "handoff_moment",
+            "label": "交接时刻",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "must_not_preteach",
+            "label": "不得提前讲授",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "fit_reason",
+            "label": "适配理由",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      }
+    ]
+  }
+}

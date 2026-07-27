@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
-from dataclasses import dataclass
-from datetime import UTC, datetime
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import cast
 from uuid import UUID
 
 import pytest
@@ -37,20 +38,31 @@ from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, system_actor
 from apps.api.identity.models import Organization
 from apps.api.ids import new_uuid7
+from apps.api.intro_options.generation_pipeline import (
+    build_intro_option_scoring_request,
+    merge_intro_option_scores,
+)
 from apps.api.intro_options.quality import intro_runtime_quality_validator_registry
 from apps.api.intro_options.runtime import IntroOptionRuntimeService
 from apps.api.lessons.models import LessonUnit
 from apps.api.model_gateway.audit import SqlAlchemyAttemptAuditSink
 from apps.api.model_gateway.audit_models import GenerationAttempt, UsageRecord
 from apps.api.model_gateway.gateway import ModelGateway
-from apps.api.node_execution.fake import DeterministicNodeOutputProvider
+from apps.api.node_execution.fake import (
+    DeterministicNodeOutputProvider,
+    DeterministicNodeOutputSequenceProvider,
+)
 from apps.api.node_execution.service import NodeExecutionService
 from apps.api.node_execution.sqlalchemy import SqlAlchemyNodeExecutionTransactionFactory
+from apps.api.node_execution.structured_output import validate_structured_output
 from apps.api.prompt_runtime.models import ContextSnapshot
 from apps.api.reliability.models import EventStreamEntry
 from apps.api.workflows.artifact_input_selection import ARTIFACT_INPUT_SELECTION_KEY
-from apps.api.workflows.models import BranchRun, NodeInputSnapshot, NodeRun
-from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
+from apps.api.workflows.models import BranchRun, NodeExecutionLease, NodeInputSnapshot, NodeRun
+from scripts.golden_courseware_branch_inputs import (
+    build_golden_branch_source_outputs,
+    build_intro_generation_stage_outputs,
+)
 from tests.integration.test_content_package_publication import (
     release_1_4_courseware_release,  # pyright: ignore[reportPrivateUsage]
 )
@@ -388,7 +400,7 @@ async def test_duplicate_generation_delivery_reuses_usage_and_artifact_version(
                 .select_from(GenerationAttempt)
                 .where(GenerationAttempt.node_run_id == prepared.generate_node_id)
             )
-            == 1
+            == 2
         )
         assert (
             session.scalar(
@@ -396,7 +408,7 @@ async def test_duplicate_generation_delivery_reuses_usage_and_artifact_version(
                 .select_from(UsageRecord)
                 .where(UsageRecord.node_run_id == prepared.generate_node_id)
             )
-            == 1
+            == 2
         )
         assert (
             session.scalar(
@@ -563,6 +575,102 @@ async def test_staging_one_lesson_does_not_mutate_another_lesson_entrypoint(
         )
 
 
+async def test_final_scoring_checkpoint_recovers_without_provider_replay(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
+    outputs = build_golden_branch_source_outputs(case)
+    division = await _prepare_approval(factory, case, outputs["lesson.division.generate"])
+    with factory() as session, session.begin():
+        ArtifactService(session, division.actor).review(
+            division.version_id,
+            action="approve",
+            comment="Approve the exact division used by scoring recovery.",
+            request_id="issue-241-approve-scoring-recovery-division",
+        )
+    with factory() as session:
+        lesson = session.scalar(
+            select(LessonUnit).where(
+                LessonUnit.project_id == division.project_id,
+                LessonUnit.lesson_key == "LESSON-001",
+            )
+        )
+        assert lesson is not None
+        lesson_unit_id = lesson.id
+    with factory() as session, session.begin():
+        node_run_id = IntroOptionRuntimeService(session, division.actor).stage_generation(
+            project_id=division.project_id,
+            lesson_unit_id=lesson_unit_id,
+            generation_mode="default_nine",
+            source_artifact_version_id=None,
+        )
+
+    transactions = SqlAlchemyNodeExecutionTransactionFactory(factory, division.actor)
+    with transactions.begin() as transaction:
+        prepared = transaction.prepare(node_run_id, "issue-241-scoring-recovery")
+    assert prepared.evaluation is not None
+    stage_outputs = build_intro_generation_stage_outputs(outputs["intro.generate_options"])
+    initial_provider = DeterministicNodeOutputSequenceProvider(stage_outputs)
+    initial_gateway = ModelGateway(
+        {ModelCapability.TEXT_STRUCTURED_CREATIVE_EDUCATION: initial_provider},
+        audit_sink=SqlAlchemyAttemptAuditSink(factory),
+    )
+    candidate_pending = await initial_gateway.generate_text_pending(
+        prepared.request,
+        audit_context=prepared.audit_context,
+    )
+    candidates = validate_structured_output(
+        candidate_pending.result.text,
+        prepared.output_schema,
+    )
+    with transactions.begin() as transaction:
+        transaction.checkpoint(prepared, candidates, candidate_pending)
+        scoring_request_id = transaction.next_model_request_id(node_run_id)
+
+    scoring_request = build_intro_option_scoring_request(
+        prompt_template=prepared.evaluation.prompt_template,
+        candidates=candidates,
+        output_schema=prepared.evaluation.output_schema,
+        request_id=scoring_request_id,
+    )
+    scoring_pending = await initial_gateway.generate_text_pending(
+        scoring_request,
+        audit_context=prepared.audit_context,
+    )
+    scoring = validate_structured_output(
+        scoring_pending.result.text,
+        prepared.evaluation.output_schema,
+    )
+    merged = merge_intro_option_scores(candidates, scoring)
+    final = replace(
+        prepared,
+        request=scoring_request,
+        output_schema=prepared.evaluation.final_output_schema,
+    )
+    with transactions.begin() as transaction:
+        transaction.checkpoint(final, merged, scoring_pending)
+    with factory() as session, session.begin():
+        lease = session.get(NodeExecutionLease, node_run_id)
+        assert lease is not None
+        lease.lease_expires_at = datetime.now(UTC) - timedelta(seconds=1)
+
+    recovery_provider = DeterministicNodeOutputSequenceProvider(stage_outputs)
+    recovered = await NodeExecutionService(
+        transactions,
+        ModelGateway(
+            {ModelCapability.TEXT_STRUCTURED_CREATIVE_EDUCATION: recovery_provider},
+            audit_sink=SqlAlchemyAttemptAuditSink(factory),
+        ),
+    ).execute(node_run_id, request_id="issue-241-scoring-recovery")
+
+    assert recovery_provider.calls == 0
+    with factory() as session:
+        version = session.get(ArtifactVersion, recovered.artifact_version_id)
+        assert version is not None
+        assert len(version.content_json["options"]) == 9
+
+
 async def test_quality_failure_rolls_back_report_terminal_and_event_atomically(
     migrated_database_url: str,
 ) -> None:
@@ -624,6 +732,16 @@ async def _generate_default_nine(
 ) -> PreparedIntroOption:
     case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
     outputs = build_golden_branch_source_outputs(case)
+    intro_output = outputs["intro.generate_options"]
+    if release_source is not None:
+        intro_output = deepcopy(intro_output)
+        secondary_by_primary = {
+            "science": ["application", "story"],
+            "application": ["science", "story"],
+            "story": ["science", "application"],
+        }
+        for option in cast(list[dict[str, object]], intro_output["options"]):
+            option["secondary_tendencies"] = secondary_by_primary[str(option["primary_tendency"])]
     division = await _prepare_approval(
         factory,
         case,
@@ -658,8 +776,9 @@ async def _generate_default_nine(
         factory,
         division.actor,
         generate_id,
-        outputs["intro.generate_options"],
+        intro_output,
         "default",
+        two_stage=release_source is None,
     )
     with factory() as session:
         version = session.get(ArtifactVersion, committed.artifact_version_id)
@@ -680,15 +799,18 @@ async def _execute(
     node_run_id: UUID,
     output: dict[str, object],
     suffix: str,
+    *,
+    two_stage: bool = True,
 ):
+    provider = (
+        DeterministicNodeOutputSequenceProvider(build_intro_generation_stage_outputs(output))
+        if two_stage
+        else DeterministicNodeOutputProvider(output)
+    )
     return await NodeExecutionService(
         SqlAlchemyNodeExecutionTransactionFactory(factory, actor),
         ModelGateway(
-            {
-                ModelCapability.TEXT_STRUCTURED_CREATIVE_EDUCATION: (
-                    DeterministicNodeOutputProvider(output)
-                )
-            },
+            {ModelCapability.TEXT_STRUCTURED_CREATIVE_EDUCATION: provider},
             audit_sink=SqlAlchemyAttemptAuditSink(factory),
         ),
     ).execute(node_run_id, request_id=f"issue-127-generate-{suffix}")

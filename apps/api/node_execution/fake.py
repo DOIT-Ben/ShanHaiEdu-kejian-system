@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Any
 
@@ -32,6 +32,44 @@ class DeterministicNodeOutputProvider:
         self.calls += 1
         return TextProviderResult(
             text=self._text,
+            provider_request_id=f"fake:{request.request_id}",
+            actual_model=self.model_name,
+            finish_reason="stop",
+            usage=ModelUsage(
+                prompt_tokens=8,
+                completion_tokens=4,
+                total_tokens=12,
+                cost=Decimal("0"),
+            ),
+        )
+
+
+class DeterministicNodeOutputSequenceProvider:
+    provider_name = "deterministic-node-fake"
+    model_name = "node-output-sequence-v1"
+
+    def __init__(self, outputs: Sequence[Mapping[str, Any]]) -> None:
+        if not outputs:
+            raise ValueError("at least one deterministic output is required")
+        self._texts = tuple(
+            json.dumps(
+                output,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            )
+            for output in outputs
+        )
+        self.calls = 0
+
+    async def complete(self, request: TextModelRequest) -> TextProviderResult:
+        if self.calls >= len(self._texts):
+            raise RuntimeError("deterministic output sequence is exhausted")
+        text = self._texts[self.calls]
+        self.calls += 1
+        return TextProviderResult(
+            text=text,
             provider_request_id=f"fake:{request.request_id}",
             actual_model=self.model_name,
             finish_reason="stop",

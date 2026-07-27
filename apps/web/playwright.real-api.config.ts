@@ -13,7 +13,56 @@ const webPort = Number.parseInt(process.env.SHANHAI_E2E_WEB_PORT ?? "44177", 10)
 const apiPort = Number.parseInt(process.env.SHANHAI_E2E_API_PORT ?? "58080", 10);
 const webOrigin = `http://127.0.0.1:${String(webPort)}`;
 const apiOrigin = `http://127.0.0.1:${String(apiPort)}`;
-const rescueWorkerEnabled = process.env.SHANHAI_R1_RESCUE_E2E === "1";
+const legacyRescueWorkerEnabled = process.env.SHANHAI_R1_RESCUE_E2E === "1";
+const workerMode =
+  process.env.SHANHAI_R1_WORKER_MODE?.trim() || (legacyRescueWorkerEnabled ? "fake" : "none");
+
+if (!new Set(["none", "fake", "real"]).has(workerMode)) {
+  throw new Error("SHANHAI_R1_WORKER_MODE must be one of: none, fake, real");
+}
+if (workerMode === "real") {
+  const secretEnvironmentName = requiredEnvironment("SHANHAI_TEXT_PROVIDER_SECRET_ENV");
+  requiredEnvironment("SHANHAI_TEXT_PROVIDER_NAME");
+  requiredEnvironment("SHANHAI_TEXT_PROVIDER_BASE_URL");
+  requiredEnvironment("SHANHAI_TEXT_PROVIDER_MODEL");
+  requiredEnvironment(secretEnvironmentName);
+}
+
+const workerServer =
+  workerMode === "fake"
+    ? {
+        command: "uv run python tests/e2e/r1_rescue_worker.py",
+        cwd: repositoryRoot,
+        env: {
+          ...process.env,
+          SHANHAI_DATABASE_URL: requiredEnvironment("SHANHAI_DATABASE_URL"),
+          SHANHAI_ENVIRONMENT: "test",
+          SHANHAI_REDIS_URL: requiredEnvironment("SHANHAI_REDIS_URL"),
+          SHANHAI_SESSION_ALLOWED_ORIGINS: JSON.stringify([webOrigin]),
+        },
+        reuseExistingServer: false,
+        stderr: "pipe" as const,
+        stdout: "pipe" as const,
+        timeout: 120_000,
+        wait: { stdout: /r1 rescue e2e worker ready/ },
+      }
+    : workerMode === "real"
+      ? {
+          command: "uv run python -m workers.main",
+          cwd: repositoryRoot,
+          env: {
+            ...process.env,
+            SHANHAI_DATABASE_URL: requiredEnvironment("SHANHAI_DATABASE_URL"),
+            SHANHAI_ENVIRONMENT: "test",
+            SHANHAI_REDIS_URL: requiredEnvironment("SHANHAI_REDIS_URL"),
+          },
+          reuseExistingServer: false,
+          stderr: "pipe" as const,
+          stdout: "pipe" as const,
+          timeout: 120_000,
+          wait: { stderr: /worker_booted/ },
+        }
+      : undefined;
 
 export default defineConfig({
   testDir: "./e2e/real-api",
@@ -55,26 +104,7 @@ export default defineConfig({
       timeout: 120_000,
       url: `${webOrigin}/login`,
     },
-    ...(rescueWorkerEnabled
-      ? [
-          {
-            command: "uv run python tests/e2e/r1_rescue_worker.py",
-            cwd: repositoryRoot,
-            env: {
-              ...process.env,
-              SHANHAI_DATABASE_URL: requiredEnvironment("SHANHAI_DATABASE_URL"),
-              SHANHAI_ENVIRONMENT: "test",
-              SHANHAI_REDIS_URL: requiredEnvironment("SHANHAI_REDIS_URL"),
-              SHANHAI_SESSION_ALLOWED_ORIGINS: JSON.stringify([webOrigin]),
-            },
-            reuseExistingServer: false,
-            stderr: "pipe" as const,
-            stdout: "pipe" as const,
-            timeout: 120_000,
-            wait: { stdout: /r1 rescue e2e worker ready/ },
-          },
-        ]
-      : []),
+    ...(workerServer ? [workerServer] : []),
   ],
   projects: [{ name: "real-api-chromium", use: { ...devices["Desktop Chrome"] } }],
 });

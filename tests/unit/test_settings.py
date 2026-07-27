@@ -38,6 +38,14 @@ def test_development_can_boot_without_dependency_configuration() -> None:
     assert settings.object_storage_health_url is None
 
 
+def test_text_provider_timeout_supports_long_structured_generation() -> None:
+    settings = Settings(_env_file=None, text_provider_timeout_seconds=300)
+
+    assert settings.text_provider_timeout_seconds == 300
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, text_provider_timeout_seconds=301)
+
+
 def test_env_example_is_a_loadable_local_quick_start_configuration() -> None:
     settings = Settings(_env_file=Path(".env.example"))
 

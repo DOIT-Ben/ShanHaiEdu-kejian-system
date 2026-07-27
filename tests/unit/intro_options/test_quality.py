@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast
 from uuid import UUID
@@ -17,10 +18,13 @@ from apps.api.intro_options.quality import (
     IntroOptionSchemaQualityValidator,
     IntroSingleAnchorQualityValidator,
     IntroUniqueRecommendationQualityValidator,
+    intro_runtime_quality_validator_registry,
 )
 from apps.api.intro_options.quality_legacy import (
     LEGACY_INTRO_OPTION_SCHEMA_REF,
     LEGACY_INTRO_SINGLE_ANCHOR_REF,
+    PREVIOUS_INTRO_OPTION_SCHEMA_REF,
+    PREVIOUS_INTRO_SINGLE_ANCHOR_REF,
 )
 from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
 
@@ -146,14 +150,27 @@ def test_release_1_4_schema_keeps_its_pre_identity_validation_behavior() -> None
     content = _content("default_nine")
     options = cast(list[dict[str, Any]], content["options"])
     options[1]["option_key"] = options[0]["option_key"]
+    options[0]["secondary_tendencies"] = ["application", "story"]
 
-    outcome = IntroOptionSchemaQualityValidator(
-        ref=LEGACY_INTRO_OPTION_SCHEMA_REF,
-        enforce_default_nine_identity=False,
-    ).validate(_context(content))
+    validator = intro_runtime_quality_validator_registry().resolve(
+        (LEGACY_INTRO_OPTION_SCHEMA_REF,)
+    )[0]
+    outcome = validator.validate(replace(_context(content), source_schema={"type": "object"}))
 
     assert outcome.validator == LEGACY_INTRO_OPTION_SCHEMA_REF
     assert outcome.passed is True, outcome.findings
+
+
+def test_release_1_5_1_schema_keeps_its_cross_tendency_validation_behavior() -> None:
+    validator = intro_runtime_quality_validator_registry().resolve(
+        (PREVIOUS_INTRO_OPTION_SCHEMA_REF,)
+    )[0]
+
+    outcome = validator.validate(_context(_content("default_nine")))
+
+    assert outcome.validator == PREVIOUS_INTRO_OPTION_SCHEMA_REF
+    assert outcome.passed is False
+    assert "INTRO_TENDENCY_DISTRIBUTION_INVALID" in {str(item["code"]) for item in outcome.findings}
 
 
 def test_unique_recommendation_and_no_preteach_fail_closed() -> None:
@@ -175,17 +192,17 @@ def test_unique_recommendation_and_no_preteach_fail_closed() -> None:
     }
 
 
-def test_cross_tendency_and_child_safety_fail_closed() -> None:
+def test_secondary_tendencies_are_not_required_but_child_safety_still_fails_closed() -> None:
     content = _content("default_nine")
     options = cast(list[dict[str, Any]], content["options"])
     for option in options:
-        option["secondary_tendencies"] = []
+        option.pop("secondary_tendencies", None)
     options[0]["hook"] = "安排儿童独自使用明火完成实验"
 
     outcome = IntroOptionSchemaQualityValidator().validate(_context(content))
 
     codes = {str(item["code"]) for item in outcome.findings}
-    assert "INTRO_TENDENCY_DISTRIBUTION_INVALID" in codes
+    assert "INTRO_TENDENCY_DISTRIBUTION_INVALID" not in codes
     assert "INTRO_CHILD_SAFETY_INVALID" in codes
 
 
@@ -216,6 +233,23 @@ def test_course_anchor_rejects_frozen_later_topic_in_intro_content() -> None:
     _assert_anchor_finding(content, "INTRO_PRETEACH_VIOLATION")
 
 
+def test_course_anchor_allows_teacher_fit_reason_to_restate_frozen_boundary() -> None:
+    content = _content("default_nine")
+    options = cast(list[dict[str, Any]], content["options"])
+    options[0]["fit_reason"] = "理货任务不涉及比较大小或序数，只在1～5范围内建立对应。"  # noqa: RUF001
+
+    outcome = IntroSingleAnchorQualityValidator().validate(_context(content))
+    previous = IntroSingleAnchorQualityValidator(
+        ref=PREVIOUS_INTRO_SINGLE_ANCHOR_REF,
+        scan_teacher_fit_reason=True,
+    ).validate(_context(content))
+
+    assert outcome.passed is True, outcome.findings
+    assert previous.validator == PREVIOUS_INTRO_SINGLE_ANCHOR_REF
+    assert previous.passed is False
+    assert "INTRO_PRETEACH_VIOLATION" in {str(item["code"]) for item in previous.findings}
+
+
 def _assert_anchor_finding(content: dict[str, Any], code: str) -> None:
     outcome = IntroSingleAnchorQualityValidator().validate(_context(content))
 
@@ -226,6 +260,8 @@ def _assert_anchor_finding(content: dict[str, Any], code: str) -> None:
 def _content(mode: str) -> dict[str, Any]:
     case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
     content = build_golden_branch_source_outputs(case)["intro.generate_options"]
+    for option in cast(list[dict[str, Any]], content["options"]):
+        option.pop("secondary_tendencies", None)
     if mode == "default_nine":
         return content
     content["generation_mode"] = "refine_existing"

@@ -21,6 +21,7 @@
     "input_definition_ref": {"$ref": "#/$defs/inputRef"},
     "prompt_template_ref": {"$ref": "#/$defs/promptRef"},
     "output_definition_ref": {"$ref": "#/$defs/outputRef"},
+    "evaluation_stage": {"$ref": "#/$defs/evaluationStage"},
     "style_preset_refs": {
       "type": "array",
       "uniqueItems": true,
@@ -80,6 +81,20 @@
         {"$ref": "#/$defs/itemRef"},
         {"properties": {"kind": {"const": "projection_template"}}}
       ]
+    },
+    "evaluationStage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_output_definition_ref",
+        "prompt_template_ref",
+        "output_definition_ref"
+      ],
+      "properties": {
+        "candidate_output_definition_ref": {"$ref": "#/$defs/outputRef"},
+        "prompt_template_ref": {"$ref": "#/$defs/promptRef"},
+        "output_definition_ref": {"$ref": "#/$defs/outputRef"}
+      }
     }
   }
 }

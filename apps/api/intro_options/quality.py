@@ -16,24 +16,22 @@ from apps.api.artifact_quality.contracts import (
 from apps.api.artifact_quality.registry import InMemoryQualityValidatorRegistry
 from apps.api.intro_options.quality_identity import default_nine_identity_findings
 from apps.api.intro_options.quality_legacy import (
+    INTRO_UNIQUE_RECOMMENDATION_REF,
     LEGACY_INTRO_OPTION_SCHEMA_REF,
     LEGACY_INTRO_SINGLE_ANCHOR_REF,
+    PREVIOUS_INTRO_OPTION_SCHEMA_REF,
+    PREVIOUS_INTRO_SINGLE_ANCHOR_REF,
 )
 
 INTRO_OPTION_SCHEMA_REF = ValidatorRef(
     key="validator.intro.option_set_schema",
-    semantic_version="1.1.0",
-    implementation_digest="d60f89477c8db4c3f116fa7e524b8b8688e4f5403cc8cb137b0f1d56a170e6e4",
+    semantic_version="1.2.0",
+    implementation_digest="c5a107c5515eddf305d48d73eb7005db5097b9a32134eea834824f70e7d375da",
 )
 INTRO_SINGLE_ANCHOR_REF = ValidatorRef(
     key="validator.intro.single_anchor",
-    semantic_version="1.2.0",
-    implementation_digest="c63f73f6b74e54bf0a69ca7770f13a76e56bb6f092cf523d2eb2d612eae5ca06",
-)
-INTRO_UNIQUE_RECOMMENDATION_REF = ValidatorRef(
-    key="validator.intro.unique_recommendation",
-    semantic_version="1.0.0",
-    implementation_digest="60469c797f3e35e6089fed2530bac6a3fc4a71dc17377e2325e7b3fd77468c12",
+    semantic_version="1.2.1",
+    implementation_digest="1e6149c7b4fbf75318bf929422801b8579d26b340d812bec21fbe694f6796e20",
 )
 
 
@@ -43,9 +41,11 @@ class IntroOptionSchemaQualityValidator:
         *,
         ref: ValidatorRef = INTRO_OPTION_SCHEMA_REF,
         enforce_default_nine_identity: bool = True,
+        require_cross_tendency: bool = False,
     ) -> None:
         self._ref = ref
         self._enforce_default_nine_identity = enforce_default_nine_identity
+        self._require_cross_tendency = require_cross_tendency
 
     def validate(self, context: QualityValidationContext) -> ValidatorOutcome:
         content = context.source_content
@@ -69,9 +69,8 @@ class IntroOptionSchemaQualityValidator:
                 len(set(_string_sequence(option.get("secondary_tendencies")))) >= 2
                 for option in options
             )
-            if (
-                tendencies != Counter({"science": 3, "application": 3, "story": 3})
-                or not has_cross_tendency
+            if tendencies != Counter({"science": 3, "application": 3, "story": 3}) or (
+                self._require_cross_tendency and not has_cross_tendency
             ):
                 findings.append(
                     _finding(
@@ -105,9 +104,11 @@ class IntroSingleAnchorQualityValidator:
         *,
         ref: ValidatorRef = INTRO_SINGLE_ANCHOR_REF,
         include_page_evidence: bool = True,
+        scan_teacher_fit_reason: bool = False,
     ) -> None:
         self._ref = ref
         self._include_page_evidence = include_page_evidence
+        self._scan_teacher_fit_reason = scan_teacher_fit_reason
 
     def validate(self, context: QualityValidationContext) -> ValidatorOutcome:
         content = context.source_content
@@ -131,6 +132,7 @@ class IntroSingleAnchorQualityValidator:
                 lesson_key=lesson_key,
                 knowledge=knowledge,
                 options=options,
+                scan_teacher_fit_reason=self._scan_teacher_fit_reason,
             )
         )
         declared_evidence = set(_string_sequence(content.get("source_material_evidence_keys")))
@@ -190,15 +192,25 @@ def intro_runtime_quality_validator_registry() -> InMemoryQualityValidatorRegist
     return InMemoryQualityValidatorRegistry(
         {
             INTRO_OPTION_SCHEMA_REF: IntroOptionSchemaQualityValidator(),
+            PREVIOUS_INTRO_OPTION_SCHEMA_REF: IntroOptionSchemaQualityValidator(
+                ref=PREVIOUS_INTRO_OPTION_SCHEMA_REF,
+                require_cross_tendency=True,
+            ),
             INTRO_SINGLE_ANCHOR_REF: IntroSingleAnchorQualityValidator(),
+            PREVIOUS_INTRO_SINGLE_ANCHOR_REF: IntroSingleAnchorQualityValidator(
+                ref=PREVIOUS_INTRO_SINGLE_ANCHOR_REF,
+                scan_teacher_fit_reason=True,
+            ),
             INTRO_UNIQUE_RECOMMENDATION_REF: IntroUniqueRecommendationQualityValidator(),
             LEGACY_INTRO_OPTION_SCHEMA_REF: IntroOptionSchemaQualityValidator(
                 ref=LEGACY_INTRO_OPTION_SCHEMA_REF,
                 enforce_default_nine_identity=False,
+                require_cross_tendency=True,
             ),
             LEGACY_INTRO_SINGLE_ANCHOR_REF: IntroSingleAnchorQualityValidator(
                 ref=LEGACY_INTRO_SINGLE_ANCHOR_REF,
                 include_page_evidence=False,
+                scan_teacher_fit_reason=True,
             ),
         }
     )
@@ -283,6 +295,7 @@ def _lesson_boundary_findings(
     lesson_key: str | None,
     knowledge: object,
     options: list[Mapping[str, Any]],
+    scan_teacher_fit_reason: bool,
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     teaching_focus = unit.get("teaching_focus") if unit is not None else None
@@ -306,7 +319,12 @@ def _lesson_boundary_findings(
             )
         )
     if preteach_boundary and any(
-        _contains_forbidden_topic(option, preteach_boundary) for option in options
+        _contains_forbidden_topic(
+            option,
+            preteach_boundary,
+            scan_teacher_fit_reason=scan_teacher_fit_reason,
+        )
+        for option in options
     ):
         findings.append(
             _finding("INTRO_PRETEACH_VIOLATION", "option preteaches a frozen later topic")
@@ -321,8 +339,13 @@ def _contains_preteach(value: object) -> bool:
     return any(marker in normalized for marker in ("直接讲出", "提前讲出", "直接给出答案"))
 
 
-def _contains_forbidden_topic(option: Mapping[str, Any], topics: tuple[str, ...]) -> bool:
-    content_fields = (
+def _contains_forbidden_topic(
+    option: Mapping[str, Any],
+    topics: tuple[str, ...],
+    *,
+    scan_teacher_fit_reason: bool,
+) -> bool:
+    classroom_content_fields = (
         "title",
         "creative_concept",
         "hook",
@@ -330,7 +353,11 @@ def _contains_forbidden_topic(option: Mapping[str, Any], topics: tuple[str, ...]
         "course_anchor",
         "classroom_first_question",
         "handoff_moment",
-        "fit_reason",
+    )
+    content_fields = (
+        (*classroom_content_fields, "fit_reason")
+        if scan_teacher_fit_reason
+        else classroom_content_fields
     )
     values = (
         cast(str, option[field]).replace(" ", "")

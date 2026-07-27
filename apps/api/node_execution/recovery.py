@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Mapping
 from datetime import timedelta
-from typing import Any
+from typing import Any, Literal, cast
 from uuid import UUID
 
 from sqlalchemy import select
@@ -92,6 +92,57 @@ class SqlAlchemyRecoveryFactStore:
             )
         fact.owner_token = owner_token
         self._session.flush()
+
+    def inspect(
+        self,
+        execution: WorkflowExecutionContext,
+        context: NodeExecutionCommitContext,
+        succeeded: SucceededAttempt,
+        request_id: str,
+        schemas: Mapping[Literal["initial", "final"], dict[str, Any]],
+    ) -> tuple[Literal["initial", "final"], dict[str, Any]]:
+        fact = self._session.scalar(
+            select(NodeExecutionRecoveryFact).where(
+                NodeExecutionRecoveryFact.organization_id == self._actor.organization_id,
+                NodeExecutionRecoveryFact.project_id == execution.project_id,
+                NodeExecutionRecoveryFact.node_run_id == execution.node_run_id,
+                NodeExecutionRecoveryFact.attempt_id == succeeded.evidence.attempt_id,
+                NodeExecutionRecoveryFact.request_id == request_id,
+            )
+        )
+        if fact is None:
+            raise NodeExecutionError(
+                "NODE_EXECUTION_RESULT_UNAVAILABLE",
+                "the validated recovery fact is unavailable",
+            )
+        if fact.expires_at <= database_wall_clock(self._session):
+            raise NodeExecutionError(
+                "NODE_EXECUTION_RECOVERY_EXPIRED",
+                "the validated recovery fact expired",
+            )
+        stage = next(
+            (
+                key
+                for key, schema in schemas.items()
+                if fact.output_schema_digest == canonical_content_hash(schema)
+            ),
+            None,
+        )
+        if (
+            stage is None
+            or fact.output_hash != canonical_content_hash(fact.output_json)
+            or fact.prompt_snapshot_id != context.snapshots.prompt_snapshot_id
+            or fact.prompt_snapshot_hash != context.snapshots.prompt_hash
+            or fact.context_snapshot_id != context.snapshots.context_snapshot_id
+            or fact.context_snapshot_hash != context.snapshots.context_hash
+            or fact.max_json_bytes != _MAX_RECOVERY_JSON_BYTES
+            or _json_size(fact.output_json) > fact.max_json_bytes
+        ):
+            raise NodeExecutionError(
+                "NODE_EXECUTION_RECOVERY_MISMATCH",
+                "the validated recovery fact does not match the frozen execution",
+            )
+        return cast(Literal["initial", "final"], stage), dict(fact.output_json)
 
     def checkpoint(
         self,
@@ -189,15 +240,15 @@ class SqlAlchemyRecoveryFactStore:
         return fact
 
     def discard(self, node_run_id: UUID) -> None:
-        fact = self._session.scalar(
+        facts = self._session.scalars(
             select(NodeExecutionRecoveryFact)
             .where(
                 NodeExecutionRecoveryFact.organization_id == self._actor.organization_id,
                 NodeExecutionRecoveryFact.node_run_id == node_run_id,
             )
             .with_for_update()
-        )
-        if fact is not None:
+        ).all()
+        for fact in facts:
             self._session.delete(fact)
 
 

@@ -261,6 +261,16 @@
         "max_chars": {"type": "integer", "minimum": 1, "maximum": 100000}
       }
     },
+    "evaluationStage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate_output", "output", "prompt"],
+      "properties": {
+        "candidate_output": {"$ref": "#/$defs/output"},
+        "output": {"$ref": "#/$defs/output"},
+        "prompt": {"$ref": "#/$defs/prompt"}
+      }
+    },
     "projection": {
       "type": "object",
       "additionalProperties": false,
@@ -301,6 +311,7 @@
         "input": {"$ref": "#/$defs/input"},
         "output": {"$ref": "#/$defs/output"},
         "prompt": {"$ref": "#/$defs/prompt"},
+        "evaluation_stage": {"$ref": "#/$defs/evaluationStage"},
         "projection": {"$ref": "#/$defs/projection"}
       }
     }

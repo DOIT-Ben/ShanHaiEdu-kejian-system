@@ -2,9 +2,9 @@
   "format_version": "1.0",
   "package_key": "shanhai.primary_math.courseware",
   "name": "小学数学标准课件生产内容包",
-  "semantic_version": "1.5.0",
+  "semantic_version": "1.5.3",
   "runtime_constraint": ">=0.1.0 <1.0.0",
-  "change_summary": "在不可变1.4.0基础上前向修正三类九套真实教材证据兼容与方案唯一性校验；旧Release与既有项目绑定保持不变。",
+  "change_summary": "在不可变1.5.2基础上前向修正三类九套质量校验对教师适配说明中讲授边界复述的误判；旧Release与既有项目绑定保持不变。",
   "dependencies": [],
   "items": [
     {
@@ -33,14 +33,14 @@
       "kind": "content_definition",
       "path": "items/lesson-division-generate-output.json",
       "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
-      "sha256": "5b5cc8bd1efee1a3b1a817a55f4a8a57ba7a720dced84d2d4561f97c914f979c"
+      "sha256": "0529b4e3be8615e52d0de2f35675383fc2a66f8de74b7c59c54dff9b1c3f805b"
     },
     {
       "item_key": "lesson.division.generate.prompt",
       "kind": "prompt_template",
       "path": "items/lesson-division-generate-prompt.json",
       "schema_id": "https://shanhaiedu.local/contracts/prompt-template.schema.json",
-      "sha256": "53271e4e0b409236444ffafc3e93200d9fcbb7bf1f1947e338e42f106abbf93e"
+      "sha256": "962b03394d6617465a8fa6bc23c4a403ba666d9e61baf8a0b0aedba0a7810652"
     },
     {
       "item_key": "lesson.division.generate.projection",
@@ -68,14 +68,14 @@
       "kind": "content_definition",
       "path": "items/lesson-plan-generate-output.json",
       "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
-      "sha256": "5ecbbef08390810ddedf0ae84e30592ab49978dec213900d254bcb0604f1a733"
+      "sha256": "2ecd920248426f4d007907a665de6c97af04d499fe98f3c15d66480c08e0305d"
     },
     {
       "item_key": "lesson_plan.generate.prompt",
       "kind": "prompt_template",
       "path": "items/lesson-plan-generate-prompt.json",
       "schema_id": "https://shanhaiedu.local/contracts/prompt-template.schema.json",
-      "sha256": "749b1baad411fb74272e0e253147f551186523494c8e5ce59ac5029cf3d05e8b"
+      "sha256": "21ed70a55061159167cafd895a5635c2e99a6e16c7e31a4e1e9b70fde3214fd6"
     },
     {
       "item_key": "lesson_plan.generate.projection",
@@ -103,14 +103,14 @@
       "kind": "content_definition",
       "path": "items/intro-generate-options-output.json",
       "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
-      "sha256": "b9cc12772863821d328889319cd958108f49f4d5af296839869bce237099cd0a"
+      "sha256": "7a7b6b53647f59d393c9072ee2008469149c4e2cd22f680dbed7c7149fc41a1f"
     },
     {
       "item_key": "intro.generate_options.prompt",
       "kind": "prompt_template",
       "path": "items/intro-generate-options-prompt.json",
       "schema_id": "https://shanhaiedu.local/contracts/prompt-template.schema.json",
-      "sha256": "4a38faaeec92bcd61151eb172a3517e4b00024b04986260cf0ad7342b4e3486d"
+      "sha256": "bbb9e92a871bd7dabe9731a437de4af3c014d6e131744cc0eb0741a52536cd03"
     },
     {
       "item_key": "intro.generate_options.projection",
@@ -120,11 +120,32 @@
       "sha256": "6cde708609bdb98894c71b7ec31888ef7f033a32ae8deaf3e98c3f24091ca30e"
     },
     {
+      "item_key": "intro.generate_options.candidates.output",
+      "kind": "content_definition",
+      "path": "items/intro-generate-options-candidates-output.json",
+      "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
+      "sha256": "974f6e2b44c65c3ca05b1dde64caa964341708479d7a47b8a6fd5edda793bf51"
+    },
+    {
+      "item_key": "intro.generate_options.evaluation.output",
+      "kind": "content_definition",
+      "path": "items/intro-generate-options-evaluation-output.json",
+      "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
+      "sha256": "a1437a3981df6552126be4871f40f7963273d1a0a7ccdd8de11c3beb6d9ce44c"
+    },
+    {
+      "item_key": "intro.generate_options.evaluation.prompt",
+      "kind": "prompt_template",
+      "path": "items/intro-generate-options-evaluation-prompt.json",
+      "schema_id": "https://shanhaiedu.local/contracts/prompt-template.schema.json",
+      "sha256": "ae78330ec87e99e9fd1662fe7903a6f9e0a279b778cc47eb64c6210d17de4f90"
+    },
+    {
       "item_key": "intro.generate_options",
       "kind": "generation_template",
       "path": "items/intro-generate-options-generation.json",
       "schema_id": "https://shanhaiedu.local/contracts/generation-template.schema.json",
-      "sha256": "b898282ebe7917d0b454694906d62feea1bf580e37073a9c6c61cba8ba9dad06"
+      "sha256": "d892383a6375cc908bbefb41cc3e8ad20b26682c22c518a9175066c86f28dd3f"
     },
     {
       "item_key": "ppt.content_analyze.input",

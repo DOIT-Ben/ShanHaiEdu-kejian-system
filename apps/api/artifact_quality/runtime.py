@@ -15,6 +15,8 @@ from apps.api.intro_options.quality import (
 from apps.api.intro_options.quality_legacy import (
     LEGACY_INTRO_OPTION_SCHEMA_REF,
     LEGACY_INTRO_SINGLE_ANCHOR_REF,
+    PREVIOUS_INTRO_OPTION_SCHEMA_REF,
+    PREVIOUS_INTRO_SINGLE_ANCHOR_REF,
 )
 from apps.api.lessons.division_runtime import (
     LESSON_DIVISION_COVERAGE_REF,
@@ -48,15 +50,25 @@ _VALIDATORS: dict[ValidatorRef, QualityValidator] = {
         include_page_evidence=False,
     ),
     INTRO_OPTION_SCHEMA_REF: IntroOptionSchemaQualityValidator(),
+    PREVIOUS_INTRO_OPTION_SCHEMA_REF: IntroOptionSchemaQualityValidator(
+        ref=PREVIOUS_INTRO_OPTION_SCHEMA_REF,
+        require_cross_tendency=True,
+    ),
     INTRO_SINGLE_ANCHOR_REF: IntroSingleAnchorQualityValidator(),
+    PREVIOUS_INTRO_SINGLE_ANCHOR_REF: IntroSingleAnchorQualityValidator(
+        ref=PREVIOUS_INTRO_SINGLE_ANCHOR_REF,
+        scan_teacher_fit_reason=True,
+    ),
     INTRO_UNIQUE_RECOMMENDATION_REF: IntroUniqueRecommendationQualityValidator(),
     LEGACY_INTRO_OPTION_SCHEMA_REF: IntroOptionSchemaQualityValidator(
         ref=LEGACY_INTRO_OPTION_SCHEMA_REF,
         enforce_default_nine_identity=False,
+        require_cross_tendency=True,
     ),
     LEGACY_INTRO_SINGLE_ANCHOR_REF: IntroSingleAnchorQualityValidator(
         ref=LEGACY_INTRO_SINGLE_ANCHOR_REF,
         include_page_evidence=False,
+        scan_teacher_fit_reason=True,
     ),
 }
 

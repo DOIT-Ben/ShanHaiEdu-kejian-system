@@ -1,0 +1,59 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "prompt_template",
+  "metadata": {
+    "key": "intro.generate_options.evaluation.prompt",
+    "name": "课程驱动导入方案独立评分Prompt",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "template_key": "intro.generate_options.evaluation.prompt",
+    "title": "课程驱动导入方案独立评分Prompt",
+    "description": "独立统一评价 exact 候选池, 不改写候选正文。",
+    "model_capability": "text.structured.creative_education",
+    "input_definition_ref": {
+      "item_key": "intro.generate_options.input",
+      "kind": "input_definition"
+    },
+    "output_definition_ref": {
+      "item_key": "intro.generate_options.evaluation.output",
+      "kind": "content_definition"
+    },
+    "sections": [
+      {
+        "section_key": "role",
+        "layer": "role",
+        "content": "你是独立的课堂导入候选评审者，只评价已给出的候选，不参与候选创作。",
+        "editable": false,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "task",
+        "layer": "task",
+        "content": "把exact候选池作为一个整体，使用同一标准逐套返回option_key、1至100推荐分、推荐理由和适配风险，并给出唯一全局推荐。不得添加、删除、重写或复述候选正文。",
+        "editable": true,
+        "visible_to_teacher": true
+      },
+      {
+        "section_key": "method",
+        "layer": "method",
+        "content": "从课程锚点准确性、学生认知启动价值、不得提前讲授、媒介可实施性、课堂交接自然度和儿童安全六个维度统一比较全部候选；三类只是候选的主要倾向，不按类别分别评冠军。",
+        "editable": false,
+        "visible_to_teacher": false
+      },
+      {
+        "section_key": "quality_gate",
+        "layer": "quality_gate",
+        "content": "必须覆盖输入的exact option_key集合且每键恰好一次；不得输出候选正文或新候选；最高分必须唯一，recommended_option_key必须指向该唯一最高分方案。",
+        "editable": false,
+        "visible_to_teacher": false
+      }
+    ],
+    "context_bindings": [],
+    "user_edit_policy": {
+      "mode": "replace_editable_layer",
+      "max_chars": 20000
+    }
+  }
+}

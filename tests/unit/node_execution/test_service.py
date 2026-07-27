@@ -26,6 +26,7 @@ from apps.api.node_execution.contracts import (
     CommittedNodeExecution,
     NodeExecutionError,
     PreparedNodeExecution,
+    TextEvaluationPlan,
 )
 from apps.api.node_execution.service import NodeExecutionService
 
@@ -113,6 +114,10 @@ class FakeTransaction:
         assert output == {"title": "Lesson 1"}
         assert pending.result.request_id == execution.request.request_id
 
+    def next_model_request_id(self, node_run_id: UUID) -> str:
+        assert node_run_id == NODE_RUN_ID
+        return "node-execution:10000000-0000-4000-8000-000000000001:2"
+
     def commit(self, execution: PreparedNodeExecution) -> CommittedNodeExecution:
         self.events.append("commit")
         if self.commit_error is not None:
@@ -184,6 +189,44 @@ class RecoveryFailureTransactionFactory(FakeTransactionFactory):
             self.events.append(f"tx{self.transactions}:commit")
 
 
+class EvaluationTransaction(FakeTransaction):
+    def prepare(
+        self,
+        node_run_id: UUID,
+        request_id: str,
+        user_revision: str | None = None,
+    ) -> PreparedNodeExecution:
+        base = super().prepare(node_run_id, request_id, user_revision)
+        return replace(
+            base,
+            evaluation=TextEvaluationPlan(
+                prompt_template={
+                    "spec": {
+                        "model_capability": ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH.value,
+                        "sections": [{"content": "Score the exact candidates."}],
+                    }
+                },
+                output_schema=SCHEMA,
+                final_output_schema=SCHEMA,
+            ),
+        )
+
+
+class EvaluationTransactionFactory(FakeTransactionFactory):
+    @contextmanager
+    def begin(self) -> Iterator[FakeTransaction]:
+        self.transactions += 1
+        self.events.append(f"tx{self.transactions}:open")
+        transaction = EvaluationTransaction(self.events)
+        try:
+            yield transaction
+        except Exception:
+            self.events.append(f"tx{self.transactions}:rollback")
+            raise
+        else:
+            self.events.append(f"tx{self.transactions}:commit")
+
+
 class FakeModel:
     def __init__(
         self,
@@ -234,6 +277,25 @@ class FakeModel:
         self.events.append("model_fail")
 
 
+class EvaluationGatewayFailureModel(FakeModel):
+    async def generate_text_pending(
+        self,
+        request: TextModelRequest,
+        *,
+        cancellation: CancellationToken | None = None,
+        audit_context: ModelAuditContext | None = None,
+    ) -> PendingTextGeneration:
+        if self.calls == 0:
+            return await super().generate_text_pending(
+                request,
+                cancellation=cancellation,
+                audit_context=audit_context,
+            )
+        self.calls += 1
+        self.events.append("model")
+        raise ModelGatewayError(GatewayErrorCode.TIMEOUT, retryable=True)
+
+
 async def test_runs_model_only_between_t1_and_t2() -> None:
     events: list[str] = []
     service = NodeExecutionService(FakeTransactionFactory(events), FakeModel(events))
@@ -253,6 +315,18 @@ async def test_runs_model_only_between_t1_and_t2() -> None:
         "commit",
         "tx3:commit",
     ]
+
+
+async def test_retryable_gateway_error_does_not_repeat_the_scoring_call() -> None:
+    events: list[str] = []
+    model = EvaluationGatewayFailureModel(events)
+    service = NodeExecutionService(EvaluationTransactionFactory(events), model)
+
+    with pytest.raises(NodeExecutionError) as caught:
+        await service.execute(NODE_RUN_ID, request_id="request-89")
+
+    assert caught.value.code == GatewayErrorCode.TIMEOUT.value
+    assert model.calls == 2
 
 
 async def test_passes_teacher_revision_only_into_transactional_preparation() -> None:

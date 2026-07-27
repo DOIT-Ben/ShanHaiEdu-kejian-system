@@ -11,6 +11,8 @@ from apps.api.intro_options.quality import (
 from apps.api.intro_options.quality_legacy import (
     LEGACY_INTRO_OPTION_SCHEMA_REF,
     LEGACY_INTRO_SINGLE_ANCHOR_REF,
+    PREVIOUS_INTRO_OPTION_SCHEMA_REF,
+    PREVIOUS_INTRO_SINGLE_ANCHOR_REF,
 )
 from apps.api.lessons.lesson_plan_quality import (
     LEGACY_LESSON_PLAN_SCOPE_REF,
@@ -45,10 +47,12 @@ def test_runtime_registry_preserves_release_1_4_validator_implementations() -> N
     intro = registry.resolve(
         (
             LEGACY_INTRO_OPTION_SCHEMA_REF,
+            PREVIOUS_INTRO_OPTION_SCHEMA_REF,
             LEGACY_INTRO_SINGLE_ANCHOR_REF,
+            PREVIOUS_INTRO_SINGLE_ANCHOR_REF,
             INTRO_UNIQUE_RECOMMENDATION_REF,
         )
     )
 
     assert len(lesson_plan) == 3
-    assert len(intro) == 3
+    assert len(intro) == 5

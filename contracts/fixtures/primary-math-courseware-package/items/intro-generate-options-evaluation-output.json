@@ -1,0 +1,97 @@
+{
+  "api_version": "shanhai.edu/v1",
+  "kind": "content_definition",
+  "metadata": {
+    "key": "intro.generate_options.evaluation.output",
+    "name": "课程驱动导入方案评分输出",
+    "domain": "primary_math",
+    "locale": "zh-CN"
+  },
+  "spec": {
+    "definition_key": "intro.generate_options.evaluation.output",
+    "title": "课程驱动导入方案评分输出",
+    "description": "第二阶段对exact候选池逐套给出的统一评分、推荐理由、适配风险和全局推荐。",
+    "definition_role": "intermediate",
+    "fields": [
+      {
+        "field_key": "evaluations",
+        "label": "候选评分",
+        "type": "repeatable",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "repeatable": true,
+        "min_items": 1,
+        "max_items": 9,
+        "children": [
+          {
+            "field_key": "option_key",
+            "label": "方案键",
+            "type": "reference",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "recommendation_score",
+            "label": "推荐分",
+            "type": "number",
+            "required": true,
+            "editable": false,
+            "deletable": false,
+            "validation_rules": [
+              {
+                "minimum": 1
+              },
+              {
+                "maximum": 100
+              }
+            ]
+          },
+          {
+            "field_key": "recommendation_reason",
+            "label": "推荐理由",
+            "type": "rich_text",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "risks",
+            "label": "适配风险",
+            "type": "list",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      },
+      {
+        "field_key": "recommendation_summary",
+        "label": "全局推荐结论",
+        "type": "group",
+        "required": true,
+        "editable": false,
+        "deletable": false,
+        "children": [
+          {
+            "field_key": "recommended_option_key",
+            "label": "最高推荐方案",
+            "type": "reference",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          },
+          {
+            "field_key": "single_highest_score",
+            "label": "最高分唯一",
+            "type": "boolean",
+            "required": true,
+            "editable": false,
+            "deletable": false
+          }
+        ]
+      }
+    ]
+  }
+}

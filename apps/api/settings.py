@@ -58,7 +58,7 @@ class Settings(BaseSettings):
         default="NEWAPI_TEXT_API_KEY",
         pattern=r"^[A-Z][A-Z0-9_]{2,127}$",
     )
-    text_provider_timeout_seconds: float = Field(default=30, gt=0, le=120)
+    text_provider_timeout_seconds: float = Field(default=30, gt=0, le=300)
     video_provider_name: str | None = None
     video_provider_base_url: HttpUrl | None = None
     video_provider_model: str | None = None

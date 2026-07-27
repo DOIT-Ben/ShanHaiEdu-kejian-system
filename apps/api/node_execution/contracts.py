@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 from uuid import UUID
 
 from apps.api.model_gateway.contracts import (
@@ -42,6 +43,13 @@ class NodeExecutionCommitContext:
 
 
 @dataclass(frozen=True, slots=True)
+class TextEvaluationPlan:
+    prompt_template: Mapping[str, Any]
+    output_schema: dict[str, Any]
+    final_output_schema: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
 class PreparedNodeExecution:
     node_run_id: UUID
     request: TextModelRequest
@@ -53,6 +61,9 @@ class PreparedNodeExecution:
     commit_context: NodeExecutionCommitContext | None = None
     committed_result: CommittedNodeExecution | None = None
     recovery_available: bool = False
+    evaluation: TextEvaluationPlan | None = None
+    recovery_stage: Literal["initial", "final"] | None = None
+    recovery_output: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +89,8 @@ class NodeExecutionTransaction(Protocol):
         output: dict[str, Any],
         pending: PendingTextGeneration,
     ) -> None: ...
+
+    def next_model_request_id(self, node_run_id: UUID) -> str: ...
 
     def commit(self, execution: PreparedNodeExecution) -> CommittedNodeExecution: ...
 

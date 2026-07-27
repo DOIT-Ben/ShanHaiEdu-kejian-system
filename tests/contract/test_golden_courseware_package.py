@@ -9,6 +9,7 @@ from typing import Any, cast
 import pytest
 from jsonschema import Draft202012Validator, FormatChecker
 
+from apps.api.content_runtime.definition_projection import build_content_json_schema
 from scripts.build_builtin_generation_package import build_package
 from scripts.golden_courseware_branch_inputs import (
     GOLDEN_PLANNING_NODE_KEYS,
@@ -116,6 +117,34 @@ def test_lesson_division_prompt_preserves_reference_method_and_scope() -> None:
     assert "一个核心学习结果" in prompt
     assert "不重叠、不遗漏" in prompt
     assert "不要同时生成详细教案" in prompt
+    assert "自动划分" in prompt
+    assert "unresolved_questions设为空数组" in prompt
+
+    coverage = next(
+        field for field in division["output"]["fields"] if field["field_key"] == "coverage_check"
+    )
+    unresolved = next(
+        field for field in coverage["children"] if field["field_key"] == "unresolved_questions"
+    )
+    assert unresolved["editable"] is True
+
+
+def test_lesson_plan_prompt_preserves_exact_scope_and_assessment_references() -> None:
+    source = load_json(SOURCE)
+    assert source["package"]["semantic_version"] == "1.5.3"
+    lesson_plan = next(
+        node for node in source["nodes"] if node["template_key"] == "lesson_plan.generate"
+    )
+    prompt = "\n".join(
+        lesson_plan["prompt"][key] for key in ("role", "task", "method", "quality_gate")
+    )
+
+    assert "material_scope原文逐字复制" in prompt
+    assert "只能使用approved_lesson_unit.lesson_unit.evidence_refs" in prompt
+    assert "只能引用该环节关联目标已声明的评价证据键" in prompt
+    assert "覆盖每个目标与其每个评价证据键的组合" in prompt
+    assert "数组元素必须是原样裸键字符串" in prompt
+    assert "禁止拼接冒号" in prompt
 
 
 def test_lesson_plan_content_definition_has_exact_twelve_sections() -> None:
@@ -135,6 +164,16 @@ def test_lesson_plan_content_definition_has_exact_twelve_sections() -> None:
         "differentiated_homework",
         "teaching_reflection",
     ]
+    teaching_process = next(
+        field for field in lesson_plan_output["fields"] if field["field_key"] == "teaching_process"
+    )
+    process_assessment = next(
+        field
+        for field in teaching_process["children"]
+        if field["field_key"] == "process_assessment_evidence"
+    )
+    assert "原样裸键字符串" in process_assessment["description"]
+    assert "不得拼接冒号" in process_assessment["description"]
 
 
 def test_golden_case_matches_schema_and_business_invariants() -> None:
@@ -425,7 +464,7 @@ def test_course_grounded_intro_options_keep_one_current_contract() -> None:
     assert Counter(option["primary_tendency"] for option in options) == Counter(
         {"science": 3, "application": 3, "story": 3}
     )
-    assert any(len(option["secondary_tendencies"]) >= 2 for option in options)
+    assert all("secondary_tendencies" not in option for option in options)
     assert all(option["creative_concept"] for option in options)
     assert all(option["lesson_unit_key"] == target_lesson["lesson_unit_key"] for option in options)
     assert all(option["knowledge_point"] == target_lesson["teaching_focus"] for option in options)
@@ -454,6 +493,50 @@ def test_course_grounded_intro_options_keep_one_current_contract() -> None:
 
     output_fields = {field["field_key"] for field in generate_options["output"]["fields"]}
     assert {"generation_mode", "source_intro_option_version_refs"} <= output_fields
+
+    evaluation_stage = generate_options["evaluation_stage"]
+    assert set(evaluation_stage) == {"candidate_output", "prompt", "output"}
+    generation_template = load_json(PACKAGE / "items" / "intro-generate-options-generation.json")[
+        "spec"
+    ]
+    assert generation_template["output_definition_ref"] == {
+        "item_key": "intro.generate_options.output",
+        "kind": "content_definition",
+    }
+    assert generation_template["evaluation_stage"] == {
+        "candidate_output_definition_ref": {
+            "item_key": "intro.generate_options.candidates.output",
+            "kind": "content_definition",
+        },
+        "prompt_template_ref": {
+            "item_key": "intro.generate_options.evaluation.prompt",
+            "kind": "prompt_template",
+        },
+        "output_definition_ref": {
+            "item_key": "intro.generate_options.evaluation.output",
+            "kind": "content_definition",
+        },
+    }
+
+
+def test_intro_generation_schema_enforces_teacher_editable_fields() -> None:
+    output_definition = load_json(PACKAGE / "items" / "intro-generate-options-output.json")
+    schema = build_content_json_schema(output_definition["spec"])
+    option_properties = schema["properties"]["options"]["items"]["properties"]
+
+    assert option_properties["option_key"]["pattern"] == "^INTRO-(SCI|APP|STO)-[0-9]{2}$"
+    assert option_properties["suggested_medium"]["enum"] == [
+        "video",
+        "image",
+        "physical_object",
+        "question",
+        "performance",
+        "mixed",
+    ]
+    assert option_properties["duration_seconds"]["minimum"] == 10
+    assert option_properties["duration_seconds"]["maximum"] == 600
+    assert option_properties["recommendation_score"]["minimum"] == 1
+    assert option_properties["recommendation_score"]["maximum"] == 100
 
 
 def test_retired_intro_contract_tokens_are_absent_from_current_tree() -> None:

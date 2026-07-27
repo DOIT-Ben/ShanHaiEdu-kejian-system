@@ -10,7 +10,7 @@
   "spec": {
     "definition_key": "intro.generate_options.output",
     "title": "课程驱动导入方案输出",
-    "description": "一套或三类九套完整导入方案、0或1个exact来源版本、默认路径唯一最高推荐分和可冻结选择快照。",
+    "description": "独立评分后的一套或三类九套完整导入方案、0或1个exact来源版本、唯一全局推荐和可冻结选择快照。",
     "definition_role": "artifact",
     "fields": [
       {
@@ -97,7 +97,12 @@
             "type": "text",
             "required": true,
             "editable": false,
-            "deletable": false
+            "deletable": false,
+            "validation_rules": [
+              {
+                "pattern": "^INTRO-(SCI|APP|STO)-[0-9]{2}$"
+              }
+            ]
           },
           {
             "field_key": "lesson_unit_key",
@@ -138,14 +143,6 @@
             ]
           },
           {
-            "field_key": "secondary_tendencies",
-            "label": "辅助创作倾向",
-            "type": "list",
-            "required": true,
-            "editable": true,
-            "deletable": false
-          },
-          {
             "field_key": "title",
             "label": "标题",
             "type": "text",
@@ -183,7 +180,33 @@
             "type": "enum",
             "required": true,
             "editable": true,
-            "deletable": false
+            "deletable": false,
+            "options": [
+              {
+                "value": "video",
+                "label": "视频"
+              },
+              {
+                "value": "image",
+                "label": "图片"
+              },
+              {
+                "value": "physical_object",
+                "label": "实物"
+              },
+              {
+                "value": "question",
+                "label": "问题"
+              },
+              {
+                "value": "performance",
+                "label": "课堂表演"
+              },
+              {
+                "value": "mixed",
+                "label": "组合媒介"
+              }
+            ]
           },
           {
             "field_key": "duration_seconds",
@@ -191,7 +214,15 @@
             "type": "number",
             "required": true,
             "editable": true,
-            "deletable": false
+            "deletable": false,
+            "validation_rules": [
+              {
+                "minimum": 10
+              },
+              {
+                "maximum": 600
+              }
+            ]
           },
           {
             "field_key": "course_anchor",
@@ -247,7 +278,15 @@
             "type": "number",
             "required": true,
             "editable": false,
-            "deletable": false
+            "deletable": false,
+            "validation_rules": [
+              {
+                "minimum": 1
+              },
+              {
+                "maximum": 100
+              }
+            ]
           },
           {
             "field_key": "recommendation_reason",

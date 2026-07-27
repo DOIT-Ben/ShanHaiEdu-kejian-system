@@ -2,7 +2,7 @@
   "api_version": "shanhai.workflow-node-generation-binding/v2",
   "catalog_key": "primary_math.courseware",
   "workflow_key": "primary_math.courseware",
-  "semantic_version": "1.5.0",
+  "semantic_version": "1.5.3",
   "nodes": [
     {
       "node_key": "material.file_validate",
@@ -879,8 +879,8 @@
       "validator_refs": [
         {
           "key": "validator.intro.option_set_schema",
-          "semantic_version": "1.1.0",
-          "implementation_digest": "d60f89477c8db4c3f116fa7e524b8b8688e4f5403cc8cb137b0f1d56a170e6e4"
+          "semantic_version": "1.2.0",
+          "implementation_digest": "c5a107c5515eddf305d48d73eb7005db5097b9a32134eea834824f70e7d375da"
         },
         {
           "key": "validator.intro.tendency_distribution",
@@ -1018,13 +1018,13 @@
       "validator_refs": [
         {
           "key": "validator.intro.option_set_schema",
-          "semantic_version": "1.1.0",
-          "implementation_digest": "d60f89477c8db4c3f116fa7e524b8b8688e4f5403cc8cb137b0f1d56a170e6e4"
+          "semantic_version": "1.2.0",
+          "implementation_digest": "c5a107c5515eddf305d48d73eb7005db5097b9a32134eea834824f70e7d375da"
         },
         {
           "key": "validator.intro.single_anchor",
-          "semantic_version": "1.2.0",
-          "implementation_digest": "c63f73f6b74e54bf0a69ca7770f13a76e56bb6f092cf523d2eb2d612eae5ca06"
+          "semantic_version": "1.2.1",
+          "implementation_digest": "1e6149c7b4fbf75318bf929422801b8579d26b340d812bec21fbe694f6796e20"
         },
         {
           "key": "validator.intro.unique_recommendation",
@@ -1055,13 +1055,13 @@
         "validator_refs": [
           {
             "key": "validator.intro.option_set_schema",
-            "semantic_version": "1.1.0",
-            "implementation_digest": "d60f89477c8db4c3f116fa7e524b8b8688e4f5403cc8cb137b0f1d56a170e6e4"
+            "semantic_version": "1.2.0",
+            "implementation_digest": "c5a107c5515eddf305d48d73eb7005db5097b9a32134eea834824f70e7d375da"
           },
           {
             "key": "validator.intro.single_anchor",
-            "semantic_version": "1.2.0",
-            "implementation_digest": "c63f73f6b74e54bf0a69ca7770f13a76e56bb6f092cf523d2eb2d612eae5ca06"
+            "semantic_version": "1.2.1",
+            "implementation_digest": "1e6149c7b4fbf75318bf929422801b8579d26b340d812bec21fbe694f6796e20"
           },
           {
             "key": "validator.intro.unique_recommendation",
@@ -5133,8 +5133,8 @@
     },
     {
       "key": "validator.intro.option_set_schema",
-      "semantic_version": "1.1.0",
-      "implementation_digest": "d60f89477c8db4c3f116fa7e524b8b8688e4f5403cc8cb137b0f1d56a170e6e4",
+      "semantic_version": "1.2.0",
+      "implementation_digest": "c5a107c5515eddf305d48d73eb7005db5097b9a32134eea834824f70e7d375da",
       "implementation_status": "contract_only"
     },
     {
@@ -5145,8 +5145,8 @@
     },
     {
       "key": "validator.intro.single_anchor",
-      "semantic_version": "1.2.0",
-      "implementation_digest": "c63f73f6b74e54bf0a69ca7770f13a76e56bb6f092cf523d2eb2d612eae5ca06",
+      "semantic_version": "1.2.1",
+      "implementation_digest": "1e6149c7b4fbf75318bf929422801b8579d26b340d812bec21fbe694f6796e20",
       "implementation_status": "contract_only"
     },
     {

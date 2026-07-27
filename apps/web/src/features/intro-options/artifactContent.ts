@@ -22,7 +22,6 @@ function isIntroOption(value: unknown): value is IntroOptionDto {
     typeof value.lesson_unit_key === "string" &&
     typeof value.knowledge_point === "string" &&
     (tendency === "science" || tendency === "application" || tendency === "story") &&
-    isStringArray(value.secondary_tendencies) &&
     typeof value.title === "string" &&
     typeof value.creative_concept === "string" &&
     typeof value.hook === "string" &&
