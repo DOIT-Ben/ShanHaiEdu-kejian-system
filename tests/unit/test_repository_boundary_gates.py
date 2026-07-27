@@ -297,7 +297,7 @@ def test_size_gate_rejects_unowned_trigger_and_owned_net_growth(tmp_path: Path) 
     ]
 
 
-def test_live_size_baseline_is_exactly_four_files_and_twenty_seven_functions(
+def test_live_size_baseline_is_exactly_four_files_and_twenty_six_functions(
     capsys,
 ) -> None:
     files = production_python_files(
@@ -314,10 +314,10 @@ def test_live_size_baseline_is_exactly_four_files_and_twenty_seven_functions(
 
     assert errors == []
     assert len(baseline.oversized_files) == 4
-    assert len(baseline.oversized_functions) == 27
+    assert len(baseline.oversized_functions) == 26
     report = capsys.readouterr().err
     assert report.count("warning: oversized file:") == 4
-    assert report.count("warning: long function:") == 27
+    assert report.count("warning: long function:") == 26
 
 
 def test_live_orm_baseline_exactly_matches_fifty_two_detected_dependencies() -> None:

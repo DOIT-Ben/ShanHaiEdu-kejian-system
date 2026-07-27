@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import asdict
 from uuid import UUID
 
@@ -86,19 +87,31 @@ async def test_openai_compatible_provider_uses_prompt_safe_gateway_audit_port() 
     private_prompt = "PRIVATE_OPENAI_PROMPT"
     private_response = "PRIVATE_OPENAI_RESPONSE"
 
-    def handler(_request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200,
-            json={
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        assert body["stream"] is True
+        assert body["stream_options"] == {"include_usage": True}
+        events = (
+            {
                 "id": "provider-request-1",
                 "model": "provider/actual",
-                "choices": [{"message": {"content": private_response}, "finish_reason": "stop"}],
+                "choices": [{"delta": {"content": private_response}, "finish_reason": "stop"}],
+            },
+            {
+                "id": "provider-request-1",
+                "model": "provider/actual",
+                "choices": [],
                 "usage": {
                     "prompt_tokens": 5,
                     "completion_tokens": 2,
                     "total_tokens": 7,
                 },
             },
+        )
+        return httpx.Response(
+            200,
+            headers={"Content-Type": "text/event-stream"},
+            text="".join(f"data: {json.dumps(event)}\n\n" for event in events) + "data: [DONE]\n\n",
         )
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
