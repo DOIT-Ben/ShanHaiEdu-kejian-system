@@ -330,12 +330,11 @@ def _exact_artifact_and_job(
                 GenerationJob.project_id == project_id,
                 job_lesson_scope,
                 GenerationJob.workflow_node_key == node_key,
-                GenerationJob.status == "succeeded",
                 GenerationJob.deleted_at.is_(None),
             )
         )
     )
-    if len(artifacts) != 1 or len(jobs) != 1:
+    if len(artifacts) != 1 or len(jobs) != 1 or jobs[0].status != "succeeded":
         raise R1ProviderAcceptanceError("R1_ACCEPTANCE_EXACT_FACT_CARDINALITY_INVALID")
     return artifacts[0], jobs[0]
 
@@ -419,14 +418,15 @@ def _attempt_evidence(
     attempts = list(
         session.scalars(
             select(GenerationAttempt)
-            .where(
-                GenerationAttempt.generation_job_id == job.id,
-                GenerationAttempt.status == "succeeded",
-            )
+            .where(GenerationAttempt.generation_job_id == job.id)
             .order_by(GenerationAttempt.attempt_no)
         )
     )
-    if len(attempts) != expected_count:
+    if (
+        len(attempts) != expected_count
+        or any(attempt.status != "succeeded" for attempt in attempts)
+        or tuple(attempt.attempt_no for attempt in attempts) != tuple(range(1, expected_count + 1))
+    ):
         raise R1ProviderAcceptanceError("R1_ACCEPTANCE_ATTEMPT_CARDINALITY_INVALID")
     return [
         _single_attempt_evidence(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast
 from uuid import UUID
@@ -17,10 +18,12 @@ from apps.api.intro_options.quality import (
     IntroOptionSchemaQualityValidator,
     IntroSingleAnchorQualityValidator,
     IntroUniqueRecommendationQualityValidator,
+    intro_runtime_quality_validator_registry,
 )
 from apps.api.intro_options.quality_legacy import (
     LEGACY_INTRO_OPTION_SCHEMA_REF,
     LEGACY_INTRO_SINGLE_ANCHOR_REF,
+    PREVIOUS_INTRO_OPTION_SCHEMA_REF,
     PREVIOUS_INTRO_SINGLE_ANCHOR_REF,
 )
 from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
@@ -147,14 +150,27 @@ def test_release_1_4_schema_keeps_its_pre_identity_validation_behavior() -> None
     content = _content("default_nine")
     options = cast(list[dict[str, Any]], content["options"])
     options[1]["option_key"] = options[0]["option_key"]
+    options[0]["secondary_tendencies"] = ["application", "story"]
 
-    outcome = IntroOptionSchemaQualityValidator(
-        ref=LEGACY_INTRO_OPTION_SCHEMA_REF,
-        enforce_default_nine_identity=False,
-    ).validate(_context(content))
+    validator = intro_runtime_quality_validator_registry().resolve(
+        (LEGACY_INTRO_OPTION_SCHEMA_REF,)
+    )[0]
+    outcome = validator.validate(replace(_context(content), source_schema={"type": "object"}))
 
     assert outcome.validator == LEGACY_INTRO_OPTION_SCHEMA_REF
     assert outcome.passed is True, outcome.findings
+
+
+def test_release_1_5_1_schema_keeps_its_cross_tendency_validation_behavior() -> None:
+    validator = intro_runtime_quality_validator_registry().resolve(
+        (PREVIOUS_INTRO_OPTION_SCHEMA_REF,)
+    )[0]
+
+    outcome = validator.validate(_context(_content("default_nine")))
+
+    assert outcome.validator == PREVIOUS_INTRO_OPTION_SCHEMA_REF
+    assert outcome.passed is False
+    assert "INTRO_TENDENCY_DISTRIBUTION_INVALID" in {str(item["code"]) for item in outcome.findings}
 
 
 def test_unique_recommendation_and_no_preteach_fail_closed() -> None:

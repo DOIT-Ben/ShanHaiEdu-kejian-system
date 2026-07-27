@@ -16,8 +16,10 @@ from apps.api.artifact_quality.contracts import (
 from apps.api.artifact_quality.registry import InMemoryQualityValidatorRegistry
 from apps.api.intro_options.quality_identity import default_nine_identity_findings
 from apps.api.intro_options.quality_legacy import (
+    INTRO_UNIQUE_RECOMMENDATION_REF,
     LEGACY_INTRO_OPTION_SCHEMA_REF,
     LEGACY_INTRO_SINGLE_ANCHOR_REF,
+    PREVIOUS_INTRO_OPTION_SCHEMA_REF,
     PREVIOUS_INTRO_SINGLE_ANCHOR_REF,
 )
 
@@ -31,11 +33,6 @@ INTRO_SINGLE_ANCHOR_REF = ValidatorRef(
     semantic_version="1.2.1",
     implementation_digest="1e6149c7b4fbf75318bf929422801b8579d26b340d812bec21fbe694f6796e20",
 )
-INTRO_UNIQUE_RECOMMENDATION_REF = ValidatorRef(
-    key="validator.intro.unique_recommendation",
-    semantic_version="1.0.0",
-    implementation_digest="60469c797f3e35e6089fed2530bac6a3fc4a71dc17377e2325e7b3fd77468c12",
-)
 
 
 class IntroOptionSchemaQualityValidator:
@@ -44,9 +41,11 @@ class IntroOptionSchemaQualityValidator:
         *,
         ref: ValidatorRef = INTRO_OPTION_SCHEMA_REF,
         enforce_default_nine_identity: bool = True,
+        require_cross_tendency: bool = False,
     ) -> None:
         self._ref = ref
         self._enforce_default_nine_identity = enforce_default_nine_identity
+        self._require_cross_tendency = require_cross_tendency
 
     def validate(self, context: QualityValidationContext) -> ValidatorOutcome:
         content = context.source_content
@@ -66,7 +65,13 @@ class IntroOptionSchemaQualityValidator:
             if self._enforce_default_nine_identity:
                 findings.extend(default_nine_identity_findings(options))
             tendencies = Counter(option.get("primary_tendency") for option in options)
-            if tendencies != Counter({"science": 3, "application": 3, "story": 3}):
+            has_cross_tendency = any(
+                len(set(_string_sequence(option.get("secondary_tendencies")))) >= 2
+                for option in options
+            )
+            if tendencies != Counter({"science": 3, "application": 3, "story": 3}) or (
+                self._require_cross_tendency and not has_cross_tendency
+            ):
                 findings.append(
                     _finding(
                         "INTRO_TENDENCY_DISTRIBUTION_INVALID",
@@ -187,6 +192,10 @@ def intro_runtime_quality_validator_registry() -> InMemoryQualityValidatorRegist
     return InMemoryQualityValidatorRegistry(
         {
             INTRO_OPTION_SCHEMA_REF: IntroOptionSchemaQualityValidator(),
+            PREVIOUS_INTRO_OPTION_SCHEMA_REF: IntroOptionSchemaQualityValidator(
+                ref=PREVIOUS_INTRO_OPTION_SCHEMA_REF,
+                require_cross_tendency=True,
+            ),
             INTRO_SINGLE_ANCHOR_REF: IntroSingleAnchorQualityValidator(),
             PREVIOUS_INTRO_SINGLE_ANCHOR_REF: IntroSingleAnchorQualityValidator(
                 ref=PREVIOUS_INTRO_SINGLE_ANCHOR_REF,
@@ -196,6 +205,7 @@ def intro_runtime_quality_validator_registry() -> InMemoryQualityValidatorRegist
             LEGACY_INTRO_OPTION_SCHEMA_REF: IntroOptionSchemaQualityValidator(
                 ref=LEGACY_INTRO_OPTION_SCHEMA_REF,
                 enforce_default_nine_identity=False,
+                require_cross_tendency=True,
             ),
             LEGACY_INTRO_SINGLE_ANCHOR_REF: IntroSingleAnchorQualityValidator(
                 ref=LEGACY_INTRO_SINGLE_ANCHOR_REF,

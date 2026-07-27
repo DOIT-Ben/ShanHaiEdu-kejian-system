@@ -239,6 +239,7 @@ def test_receipt_does_not_label_the_configured_model_as_the_actual_model() -> No
     )
     attempt = SimpleNamespace(
         id=attempt_id,
+        attempt_no=1,
         organization_id=organization_id,
         project_id=project_id,
         node_run_id=node_run_id,
@@ -249,6 +250,7 @@ def test_receipt_does_not_label_the_configured_model_as_the_actual_model() -> No
         request_hash="a" * 64,
         latency_ms=10,
         capability="text.structured.zh_primary_math",
+        status="succeeded",
     )
     usage = SimpleNamespace(
         organization_id=organization_id,
