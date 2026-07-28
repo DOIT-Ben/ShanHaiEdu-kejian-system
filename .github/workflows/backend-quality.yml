@@ -112,6 +112,13 @@ jobs:
           enable-cache: true
           python-version: "3.12"
 
+      - name: Install media runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          ffmpeg -version
+          ffprobe -version
+
       - name: Install locked dependencies
         run: uv sync --frozen
 

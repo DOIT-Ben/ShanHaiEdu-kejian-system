@@ -67,7 +67,7 @@ def test_published_topology_fanout_is_idempotent_and_respects_branch_configurati
             ("intro.generate_options", "ready"),
             ("lesson_plan.generate", "ready"),
             ("ppt.content_analyze", "disabled"),
-            ("video.master_script.generate", "disabled"),
+            ("video.shots.generate", "disabled"),
         ]
         session.rollback()
 
