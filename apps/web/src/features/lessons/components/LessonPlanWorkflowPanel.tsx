@@ -77,6 +77,7 @@ export function LessonPlanWorkflowPanel({
   ]);
 
   const writeReady = isCsrfTokenAvailable();
+  const generationCancelling = jobRuntime.job?.status === "cancel_requested";
   const jobLive = Boolean(
     jobRuntime.job && !["succeeded", "failed", "cancelled"].includes(jobRuntime.job.status),
   );
@@ -110,66 +111,81 @@ export function LessonPlanWorkflowPanel({
     ? "当前会话只能查看，刷新或重新登录后再执行写操作。"
     : !etag
       ? "教案版本信息尚未就绪，请刷新后再执行写操作。"
-      : undefined;
+      : submittedVersionAwaitingRefresh
+        ? "正在同步刚提交的教案版本，完成后可继续保存或提交。"
+        : qualityPending
+          ? "正在检查当前提交版本，检查完成后可继续保存或提交。"
+          : undefined;
   const generationSettling = jobRuntime.job?.status === "succeeded";
   const generationFailed = jobRuntime.job?.status === "failed";
   const generationCancelled = jobRuntime.job?.status === "cancelled";
   const generationStarting = generationMutation.isPending;
   const generationHeading = generationStarting
     ? "正在启动教案生成"
-    : jobLive
-      ? "正在生成教案"
-      : generationSettling
-        ? "正在载入教案"
-        : generationFailed
-          ? "教案生成未完成"
-          : generationCancelled
-            ? "教案生成已取消"
-            : "尚未生成";
+    : generationCancelling
+      ? "正在取消教案生成"
+      : jobLive
+        ? "正在生成教案"
+        : generationSettling
+          ? "正在载入教案"
+          : generationFailed
+            ? "教案生成未完成"
+            : generationCancelled
+              ? "教案生成已取消"
+              : "尚未生成";
   const generationDescription = generationStarting
     ? "正在创建生成任务，请稍候。"
-    : jobLive
-      ? jobRuntime.job?.progress_message || "系统正在生成十二部分教案。"
-      : generationSettling
-        ? "生成已经完成，正在读取教案正文。"
-        : generationFailed
-          ? "上一次生成没有完成，可调整补充要求后重试。"
-          : generationCancelled
-            ? "上一次生成已取消，可重新启动。"
-            : "当前课时还没有教案正文。";
+    : generationCancelling
+      ? jobRuntime.job?.progress_message || "取消请求已提交，正在等待任务停止。"
+      : jobLive
+        ? jobRuntime.job?.progress_message || "系统正在生成十二部分教案。"
+        : generationSettling
+          ? "生成已经完成，正在读取教案正文。"
+          : generationFailed
+            ? "上一次生成没有完成，可调整补充要求后重试。"
+            : generationCancelled
+              ? "上一次生成已取消，可重新启动。"
+              : "当前课时还没有教案正文。";
   const generationActionLabel = generationStarting
     ? "正在启动"
-    : jobLive
-      ? jobRuntime.job?.status === "queued"
-        ? "等待生成"
-        : "正在生成"
-      : generationSettling
-        ? "正在载入"
-        : generationFailed || generationCancelled
-          ? "重新生成十二部分教案"
-          : "生成十二部分教案";
+    : generationCancelling
+      ? "正在取消"
+      : jobLive
+        ? jobRuntime.job?.status === "queued"
+          ? "等待生成"
+          : "正在生成"
+        : generationSettling
+          ? "正在载入"
+          : generationFailed || generationCancelled
+            ? "重新生成十二部分教案"
+            : "生成十二部分教案";
   const generationStageLabel = generationStarting
     ? "正在启动"
-    : jobLive
-      ? "进行中"
-      : generationSettling
-        ? "已生成"
-        : generationFailed
-          ? "未完成"
-          : generationCancelled
-            ? "已取消"
-            : "待开始";
+    : generationCancelling
+      ? "取消中"
+      : jobLive
+        ? "进行中"
+        : generationSettling
+          ? "已生成"
+          : generationFailed
+            ? "未完成"
+            : generationCancelled
+              ? "已取消"
+              : "待开始";
   const generationPromptHeading = generationStarting
     ? "正在启动十二部分教案"
-    : jobLive
-      ? "十二部分教案生成中"
-      : generationSettling
-        ? "正在载入十二部分教案"
-        : generationFailed || generationCancelled
-          ? "重新生成十二部分教案"
-          : "生成十二部分教案";
+    : generationCancelling
+      ? "正在取消十二部分教案生成"
+      : jobLive
+        ? "十二部分教案生成中"
+        : generationSettling
+          ? "正在载入十二部分教案"
+          : generationFailed || generationCancelled
+            ? "重新生成十二部分教案"
+            : "生成十二部分教案";
   const updateDraftContent = (content: Record<string, unknown>) => {
     saveMutation.reset();
+    submitMutation.reset();
     setDraftContent(content);
   };
 
