@@ -2,7 +2,7 @@
   "api_version": "shanhai.workflow-node-generation-binding/v2",
   "catalog_key": "primary_math.courseware",
   "workflow_key": "primary_math.courseware",
-  "semantic_version": "1.5.3",
+  "semantic_version": "1.6.0",
   "nodes": [
     {
       "node_key": "material.file_validate",
@@ -2830,8 +2830,10 @@
       },
       "execution_scope": "lesson_unit",
       "branch_key": "video",
-      "dependencies": [],
-      "entrypoint": true,
+      "dependencies": [
+        "video.shots.generate"
+      ],
+      "entrypoint": false,
       "output_persistence": {
         "artifact": {
           "identity": {
@@ -3991,7 +3993,7 @@
     },
     {
       "node_key": "video.shots.generate",
-      "title": "逐镜头候选视频生成",
+      "title": "课堂导入黄金短片生成",
       "phase": "video",
       "execution_kind": "model_generation",
       "model_capability": "video.image_to_video.6s_30s",
@@ -4000,8 +4002,8 @@
         "kind": "generation_template"
       },
       "input_contract_refs": [
-        "artifact:video_fine_storyboard",
-        "contract:video_style"
+        "selection:intro",
+        "asset:shot_keyframe"
       ],
       "output_contract_refs": [
         "asset:video_clip_candidates"
@@ -4027,9 +4029,16 @@
         ]
       },
       "context_policy": {
-        "mode": "none",
-        "allowed_sources": [],
-        "forbidden_sources": []
+        "mode": "declared",
+        "allowed_sources": [
+          "intro_selection.snapshot"
+        ],
+        "forbidden_sources": [
+          "lesson_plan.approved_version",
+          "material.approved_parse",
+          "ppt_outline.approved_version",
+          "video_fine_storyboard.approved_version"
+        ]
       },
       "reference_asset_policy": {
         "mode": "required",
@@ -4041,36 +4050,15 @@
               "image"
             ],
             "min_items": 1,
-            "max_items": 3,
+            "max_items": 1,
             "order_mode": "stable_by_role_then_version",
             "allowed_sources": [
-              "artifact_version",
               "asset_slot_current"
             ],
             "provider_exposure": [
               "signed_url",
               "provider_file_id",
               "inline_bytes"
-            ]
-          },
-          {
-            "role_key": "continuity_reference",
-            "requirement": "optional",
-            "media_types": [
-              "image",
-              "video"
-            ],
-            "min_items": 0,
-            "max_items": 2,
-            "order_mode": "stable_by_role_then_version",
-            "allowed_sources": [
-              "artifact_version",
-              "asset_slot_current",
-              "creation_result"
-            ],
-            "provider_exposure": [
-              "signed_url",
-              "provider_file_id"
             ]
           }
         ]
@@ -4087,11 +4075,6 @@
           "implementation_digest": "64bfa8836c9de2d511e3b615487eed450248e70cc9f5d9e5eb75534fa20b7a0f"
         },
         {
-          "key": "validator.video.continuity",
-          "semantic_version": "1.0.0",
-          "implementation_digest": "d571063ed6cecf8a85ebca6c408850c184b3e9b9695794784cec96339ce7b317"
-        },
-        {
           "key": "validator.video.child_safety",
           "semantic_version": "1.0.0",
           "implementation_digest": "e21141aeba8736f3081a7b3e46aa039b87cbdcc081c404b9f74b2b0c7bc520f6"
@@ -4106,10 +4089,8 @@
       },
       "execution_scope": "lesson_unit",
       "branch_key": "video",
-      "dependencies": [
-        "video.fine_storyboard.generate"
-      ],
-      "entrypoint": false,
+      "dependencies": [],
+      "entrypoint": true,
       "output_persistence": {
         "artifact": {
           "identity": {
@@ -4126,16 +4107,7 @@
             "source": "output",
             "pointer": ""
           },
-          "relations": [
-            {
-              "source_binding": "artifact:video_fine_storyboard",
-              "relation_type": "derives_from",
-              "binding_key": "upstream.artifact.video_fine_storyboard",
-              "impact_scope": {
-                "mode": "all"
-              }
-            }
-          ]
+          "relations": []
         }
       }
     },
@@ -4297,7 +4269,8 @@
       "execution_scope": "lesson_unit",
       "branch_key": "video",
       "dependencies": [
-        "video.clips.select"
+        "video.clips.select",
+        "video.master_script.approve"
       ],
       "entrypoint": false,
       "output_persistence": {
@@ -5421,6 +5394,7 @@
     }
   ],
   "external_input_contract_refs": [
+    "asset:shot_keyframe",
     "content:lesson_plan",
     "artifact:intro_option_set_source",
     "material:file_asset"

@@ -275,6 +275,120 @@ test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }
   expect(restoredIntro.data.current_selection.artifact_version_id).toBe(introSubmitted.data.id);
   expect(restoredIntro.data.current_selection.option_key).toBe(selection.data.option_key);
 
+  await page.getByRole("link", { name: "课堂视频" }).click();
+  await expect(page.getByRole("heading", { name: "6 秒黄金切片" })).toBeVisible();
+  await expect(page.getByText("课堂导入已采用")).toBeVisible();
+  await expect(page.getByText("正式关键帧已绑定")).toBeVisible();
+  const videoStartResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.url().endsWith(`/projects/${projectId}/lessons/${firstLessonId}/video/generations`),
+  );
+  await page.getByRole("button", { name: "生成 6 秒短片" }).click();
+  const videoAccepted = (await (await videoStartResponse).json()) as {
+    data: { job_id: string };
+  };
+  await expect(page.getByRole("progressbar", { name: /短片生成进度/ })).toHaveAttribute(
+    "aria-valuenow",
+    /^(?:0|[1-9]\d?|100)$/,
+  );
+  const video = page.getByLabel("6 秒课堂导入短片");
+  await expect(video).toBeVisible({ timeout: generationTimeout });
+
+  const generatedVideo = await page.evaluate(
+    async ({ baseUrl, lessonId, exactProjectId }) => {
+      const response = await fetch(
+        `${baseUrl}/projects/${exactProjectId}/lessons/${lessonId}/video`,
+        { credentials: "include" },
+      );
+      return (await response.json()) as {
+        data: {
+          candidate: {
+            adoption_id: string | null;
+            file_asset_version_id: string;
+            playback_url: string;
+            result_id: string;
+            saved_binding_id: string | null;
+          };
+          job: { id: string; status: string };
+        };
+      };
+    },
+    { baseUrl: apiBaseUrl, exactProjectId: projectId, lessonId: firstLessonId },
+  );
+  expect(generatedVideo.data.job.id).toBe(videoAccepted.data.job_id);
+  expect(generatedVideo.data.job.status).toBe("succeeded");
+  expect(generatedVideo.data.candidate.adoption_id).toBeNull();
+  expect(generatedVideo.data.candidate.saved_binding_id).toBeNull();
+  const playback = await page.evaluate(
+    async ({ baseUrl, path }) => {
+      const response = await fetch(new URL(path, baseUrl), { credentials: "include" });
+      return {
+        byteLength: (await response.arrayBuffer()).byteLength,
+        contentType: response.headers.get("content-type"),
+        status: response.status,
+      };
+    },
+    { baseUrl: apiBaseUrl, path: generatedVideo.data.candidate.playback_url },
+  );
+  expect(playback.status).toBe(200);
+  expect(playback.contentType).toContain("video/mp4");
+  expect(playback.byteLength).toBeGreaterThan(1_000);
+
+  const videoAdoptionResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response
+        .url()
+        .endsWith(
+          `/lessons/${firstLessonId}/video/results/${generatedVideo.data.candidate.result_id}/adoptions`,
+        ),
+  );
+  await page.getByRole("button", { name: "采用这段短片" }).click();
+  const videoAdoption = (await (await videoAdoptionResponse).json()) as {
+    data: { id: string };
+  };
+  const videoSaveResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response
+        .url()
+        .endsWith(`/lessons/${firstLessonId}/video/adoptions/${videoAdoption.data.id}/save`),
+  );
+  await page.getByRole("button", { name: "保存到当前课时" }).click();
+  expect((await videoSaveResponse).status()).toBe(200);
+  await expect(page.getByText("已保存到当前课时")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByText("已保存到当前课时")).toBeVisible();
+  const restoredVideo = await page.evaluate(
+    async ({ baseUrl, lessonId, exactProjectId }) => {
+      const response = await fetch(
+        `${baseUrl}/projects/${exactProjectId}/lessons/${lessonId}/video`,
+        { credentials: "include" },
+      );
+      return (await response.json()) as {
+        data: {
+          candidate: {
+            adoption_id: string;
+            file_asset_version_id: string;
+            result_id: string;
+            saved_binding_id: string;
+          };
+          job: { id: string; status: string };
+        };
+      };
+    },
+    { baseUrl: apiBaseUrl, exactProjectId: projectId, lessonId: firstLessonId },
+  );
+  expect(restoredVideo.data.job).toEqual(generatedVideo.data.job);
+  expect(restoredVideo.data.candidate.result_id).toBe(generatedVideo.data.candidate.result_id);
+  expect(restoredVideo.data.candidate.file_asset_version_id).toBe(
+    generatedVideo.data.candidate.file_asset_version_id,
+  );
+  expect(restoredVideo.data.candidate.adoption_id).toBe(videoAdoption.data.id);
+  expect(restoredVideo.data.candidate.saved_binding_id).toBeTruthy();
+
   await page.getByRole("link", { name: "返回项目" }).click();
   const secondLesson = page
     .getByRole("article")

@@ -11,19 +11,31 @@ from typing import cast
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from apps.api.artifacts.service import ArtifactService
-from apps.api.database import build_engine, build_session_factory
-from apps.api.identity.context import AuthenticatedIdentity
+from apps.api.assets.project_contracts import (
+    AssetCardinality,
+    AssetSlotDeclaration,
+    AssetTargetContract,
+    ReplaceMode,
+)
+from apps.api.assets.project_service import ProjectAssetService
+from apps.api.database import build_engine, build_session_factory, utc_now
+from apps.api.identity.context import ActorContext, AuthenticatedIdentity
 from apps.api.identity.models import Principal
 from apps.api.identity.repository import IdentityRepository
 from apps.api.ids import new_uuid7
 from apps.api.lessons.models import LessonBranchConfig, LessonUnit
 from apps.api.workflows.lesson_fanout import LessonWorkflowFanoutService
 from apps.api.workflows.lesson_fanout_contracts import LessonFanoutTarget
+from apps.api.workflows.models import BranchRun
 from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
 from tests.integration.test_lesson_division_runtime import (
     _prepare_approval,  # pyright: ignore[reportPrivateUsage, reportUnknownVariableType]
+)
+from tests.integration.test_project_asset_bindings import (
+    seed_file_version,  # pyright: ignore[reportUnknownVariableType]
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -121,6 +133,60 @@ def _write_acceptance_locator(
     )
 
 
+def _enable_video_branch_and_bind_keyframe(
+    session: Session,
+    actor: ActorContext,
+    *,
+    project_id: UUID,
+    lesson: LessonUnit,
+) -> None:
+    config = session.scalar(
+        select(LessonBranchConfig).where(
+            LessonBranchConfig.lesson_unit_id == lesson.id,
+            LessonBranchConfig.branch_key == "video",
+        )
+    )
+    branch = session.scalar(
+        select(BranchRun).where(
+            BranchRun.lesson_unit_id == lesson.id,
+            BranchRun.branch_key == "video",
+        )
+    )
+    if config is None or branch is None:
+        raise RuntimeError("the rescue video branch was not materialized")
+    config.enabled = True
+    config.updated_by = actor.principal_id
+    branch.status = "active"
+    branch.started_at = branch.started_at or utc_now()
+    branch.updated_by = actor.principal_id
+
+    version = seed_file_version(session, actor)
+    service = ProjectAssetService(session, actor)
+    slot = service.declare_slot(
+        project_id,
+        AssetSlotDeclaration(
+            slot_key=f"lesson.{lesson.position:02d}.video.keyframe",
+            lesson_unit_id=lesson.id,
+            asset_type="image",
+            cardinality=AssetCardinality.ONE,
+            required=True,
+            target_contract=AssetTargetContract(
+                allowed_mime_types=("image/png",),
+                require_clean_scan=True,
+            ),
+        ),
+        request_id=f"r1-rescue-video-keyframe-slot-{lesson.id}",
+    )
+    service.bind(
+        slot.id,
+        file_asset_version_id=version.id,
+        source_artifact_version_id=None,
+        replace_mode=ReplaceMode.REJECT_IF_OCCUPIED,
+        position=None,
+        request_id=f"r1-rescue-video-keyframe-bind-{lesson.id}",
+    )
+
+
 async def seed() -> None:
     engine = build_engine(_required("SHANHAI_DATABASE_URL"))
     factory = build_session_factory(engine)
@@ -214,6 +280,12 @@ async def seed() -> None:
             )
             if fanout is None:
                 raise RuntimeError("the rescue workflow run is unavailable for the second lesson")
+            _enable_video_branch_and_bind_keyframe(
+                session,
+                actor,
+                project_id=prepared.project_id,
+                lesson=first,
+            )
         _write_acceptance_locator(
             project_id=prepared.project_id,
             lesson_unit_id=first_lesson_id,

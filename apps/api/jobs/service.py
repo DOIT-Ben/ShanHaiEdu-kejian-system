@@ -22,7 +22,9 @@ from apps.api.jobs.state_machine import InvalidJobTransition, require_transition
 from apps.api.reliability.events import EventResource, EventWriter, append_outbox_only
 from apps.api.reliability.idempotency import CommandResult, IdempotencyService
 
-_MODEL_ATTEMPT_JOB_TYPES = frozenset({"creation.item", "creation.batch", "workflow.node"})
+_MODEL_ATTEMPT_JOB_TYPES = frozenset(
+    {"creation.item", "creation.batch", "workflow.node", "video.golden_slice"}
+)
 _MODEL_ATTEMPT_BINDABLE_STATUSES = frozenset({"running"})
 
 
@@ -178,7 +180,11 @@ class GenerationJobService:
         job.lease_owner = worker_id
         job.lease_expires_at = now + timedelta(seconds=lease_seconds)
         job.attempt_count += 1
-        job.progress_message = "Processing deterministic stage-zero task"
+        job.progress_message = (
+            "Starting video generation"
+            if job.job_type == "video.golden_slice"
+            else "Processing deterministic stage-zero task"
+        )
         job.updated_by = self._actor.principal_id
         job.lock_version += 1
         self._append_job_event(job, request_id=f"worker:{worker_id}")
@@ -235,7 +241,13 @@ class GenerationJobService:
         if result_artifact_version_id is not None:
             job.result_artifact_version_id = result_artifact_version_id
         job.progress_percent = 100 if target == "succeeded" else job.progress_percent
-        if job.job_type == "workflow.node":
+        if job.job_type == "video.golden_slice":
+            job.progress_message = {
+                "succeeded": "Video generation completed",
+                "failed": "Video generation failed",
+                "cancelled": "Video generation cancelled",
+            }[target]
+        elif job.job_type == "workflow.node":
             subject = (
                 "Intro-options"
                 if job.workflow_node_key == "intro.generate_options"

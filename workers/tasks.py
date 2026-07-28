@@ -17,6 +17,7 @@ from apps.api.jobs.service import GenerationJobService
 from apps.api.settings import get_settings
 from workers.material_parse import run_material_parse_job
 from workers.node_execution import NodeExecutionJobInFlight, execute_node_execution_job
+from workers.video_generation import execute_video_generation_job
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,14 @@ def run_generation_job(job_id: UUID, *, worker_id: str | None = None) -> str:
     if job_type == "workflow.node":
         return asyncio.run(
             execute_node_execution_job(
+                job_id,
+                worker_id=resolved_worker_id,
+                settings=settings,
+            )
+        )
+    if job_type == "video.golden_slice":
+        return asyncio.run(
+            execute_video_generation_job(
                 job_id,
                 worker_id=resolved_worker_id,
                 settings=settings,

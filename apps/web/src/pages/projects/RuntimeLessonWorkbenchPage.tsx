@@ -6,6 +6,7 @@ import { getLesson } from "@/features/lessons/api/lessonsApi";
 import { LessonPlanWorkflowPanel } from "@/features/lessons/components/LessonPlanWorkflowPanel";
 import { getProject } from "@/features/projects/api/projectsApi";
 import { projectKeys } from "@/features/projects/hooks/useProjectsQuery";
+import { VideoGoldenSliceWorkflowPanel } from "@/features/video-golden-slice/components/VideoGoldenSliceWorkflowPanel";
 import { LessonWorkbenchSummary } from "@/features/workbench/components/LessonWorkbenchSummary";
 import { useProjectEvents } from "@/shared/api/useProjectEvents";
 import { buttonVariants } from "@/shared/ui/Button";
@@ -19,7 +20,7 @@ const stepLabels: Record<string, string> = {
 };
 
 const workbenchSteps = ["lesson_plan", "intro_options", "ppt", "video"] as const;
-const availableSteps = new Set(["lesson_plan", "intro_options"]);
+const availableSteps = new Set(["lesson_plan", "intro_options", "video"]);
 
 export function RuntimeLessonWorkbenchPage() {
   const { lessonId, projectId, stepKey = "lesson_plan" } = useParams();
@@ -131,6 +132,9 @@ export function RuntimeLessonWorkbenchPage() {
         ) : null}
         {branchKey === "intro_options" ? (
           <IntroOptionsWorkflowPanel lessonId={lessonId} projectId={projectId} />
+        ) : null}
+        {branchKey === "video" ? (
+          <VideoGoldenSliceWorkflowPanel lessonId={lessonId} projectId={projectId} />
         ) : null}
         {unavailableStep ? (
           <section

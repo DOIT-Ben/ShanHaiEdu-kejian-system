@@ -1,8 +1,9 @@
 # 当前项目状态
 
-当前阶段：阶段1后端基座以及R1教材范围、课时划分、十二部分教案和三类九套四个教师可见文本结果已经进入`main`；受控真实文本Provider教师黄金项目、独立审查、合并和`main`复验均已完成。约6秒课堂导入短片黄金纵向切片已经暂停，当前先完成其受控媒体relay安全运行形态。
+当前阶段：阶段1后端基座以及R1教材范围、课时划分、十二部分教案和三类九套四个教师可见文本结果已经进入`main`；受控真实文本Provider教师黄金项目、独立审查、合并和`main`复验均已完成。当前正在交付首个教师可见媒体结果：约6秒课堂导入短片黄金纵向切片。
+当前阶段：阶段1后端基座以及R1教材范围、课时划分、十二部分教案和三类九套四个教师可见文本结果已经进入`main`；受控真实文本Provider教师黄金项目、独立审查、合并和`main`复验均已完成。当前正在交付首个教师可见媒体结果：约6秒课堂导入短片黄金纵向切片。
 > 最后核验：2026-07-30。
-> 当前任务：[Issue #165](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/165)由[Draft PR #251](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/251)继续承载；[PR #249](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/249)与[PR #250](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/250)均已合并，第三次受控迁移在`relay-exec-start`门禁失败后完整回滚。当前先核验systemd加载来源与exact运行argv，再经独立审查、明确合并授权和新的明确迁移授权完成安全运行形态。[Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)保持`status:blocked`，[Draft PR #247](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/247)不恢复、不转Ready、不合并。
+> 当前任务：[Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)由[Draft PR #247](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/247)承载；确定性Fake下的真实API教师闭环已经通过，公网NewAPI临时图片节点已完成接线，尚待新final head的独立只读审查、PR CI和另行授权的真实视频Provider验收，不得转Ready或合并。
 
 ## 当前可演示成果
 
@@ -33,11 +34,11 @@
 
 ## 当前工作
 
-- [PR #249](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/249)已以`7120b776`合并root-owned relay/cleanup部署合同；[PR #250](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/250)已以`d89e0b1`合并固定阶段ID和只含阶段、行号、状态码的脱敏失败证据。
-- 第一次迁移因Windows到Linux的CRLF传输失败；第二次LF-safe迁移在未命名启动后门禁失败；第三次迁移精确失败于`phase=relay-exec-start line=167 status=1`。三次均由同一受控wrapper自动回滚，均未调用付费Provider。
-- [Draft PR #251](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/251)是#165当前唯一实现现场：restart后核验systemd `FragmentPath`，并在不输出完整值的前提下验证exact `ExecStart`运行argv，覆盖磁盘unit正确但systemd运行态陈旧的确定性失败场景。
-- 回滚后的生产服务器仍运行迁移前relay；cleanup unit、timer和root-owned`/opt`runtime未安装，Nginx配置通过，signing-secret配置已恢复为唯一且一致。`shanhai-relay`仅作为locked、nologin、无home的system account安全残留存在。
-- [Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)的约6秒课堂导入短片黄金纵向切片保持blocked；[Draft PR #247](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/247)保留为暂停的唯一实现现场。
+- #165的relay/cleanup部署合同、阶段化脱敏失败证据和systemd运行来源门禁已进入`main`；本PR不重复迁移生产服务器，也不调用付费Provider。
+- [Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)正在交付“exact已采用IntroSelection + 同课时正式关键帧 -> 异步生成约6秒MP4 -> 进度/失败可见 -> 播放 -> exact采用 -> LessonUnit槽位写回 -> 刷新恢复”的教师纵向闭环；[Draft PR #247](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/247)是唯一实现现场。
+- #205复用现有Session/CSRF、LessonUnit、IntroSelection、ArtifactVersion、NodeRun、GenerationJob、Worker、Model Gateway、对象存储、FileAssetVersion、GenerationResult/Adoption和生成客户端，没有新增第二套任务、候选、采用、文件或前端DTO。
+- 当前分支已通过active OpenAPI/生成客户端、PostgreSQL视频隔离与采用、Worker MP4校验、前端质量/构建，以及14个backend和5个real API browser delivery selectors；浏览器视频场景使用确定性Fake经FFmpeg形成真实6秒MP4，不代表真实视频Provider验收。
+- #205尚未完成新final head的独立只读subagent绑定审查；真实视频Provider调用也尚未取得新的明确授权。两项完成前PR保持Draft，未经董事长新任务明确授权不得合并。
 - [Issue #239](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/239)已经由[PR #240](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/240)完成主线状态收口并关闭。
 - [Issue #241](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/241)已由[PR #242](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/242)完成技术交付；生产Worker在未注入测试模型时通过现有`build_real_text_gateway()`调用真实文本Provider，普通CI继续使用确定性Fake。
 - #242只增加受控黄金项目、脱敏receipt、现有Provider流式接线和验收发现的最小质量修复，没有建设新的Provider平台、Worker队列、状态机或治理框架。
@@ -53,8 +54,7 @@
 
 ## 当前阻塞
 
-- #165第三次迁移已定位到`relay-exec-start`门禁，但回滚后没有保留新unit的实际systemd运行态输出，不能断言是unit文件、daemon-reload或旧进程问题。[Draft PR #251](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/251)补齐`FragmentPath`与exact argv门禁；其CI、独立审查、明确合并授权、合并和新的明确迁移授权完成前不得进行第四次迁移。
-- #205保持暂停；#165期间不得消耗真实视频Provider调用、生成第二候选或宣称真实Provider验收完成。
+- #205当前没有确定性Fake、PostgreSQL、Worker、active OpenAPI、生产页面或真实API浏览器实现阻塞；真实视频Provider付费验收等待新的明确授权，未授权前不得调用或宣称完成真实Provider验收。
 - 当前没有已知的Session/CSRF、PostgreSQL、Worker、active OpenAPI、生产页面、真实文本Provider验收或R1收口阻塞。
 - 真实黄金项目已经生成passed receipt；不再调用Provider。普通CI继续只允许确定性Fake，不得把真实模型内容写入仓库测试夹具。
 - [Issue #233](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/233)单独跟踪`origin/main`既有Stage1 E2E旧`impact_scope` fixture；该测试债不改变#231验收结果，也不在救援PR内顺手修复。
@@ -62,9 +62,9 @@
 
 ## 下一个阶段出口
 
-1. #165先完成同一独立只读reviewer对PR #251修复delta与最终exact base/head完整diff的复核绑定，关闭P1并处置P2；PR保持Draft，未经董事长明确授权不得合并。
-2. PR #251获批并取得明确合并授权后方可合并；合并后仍须取得新的明确迁移授权，才可按canonical runbook执行一次第四次受控迁移。任一门禁失败只输出脱敏阶段证据、立即回滚并停止，不自动重试。
-3. #165完成并从`main`复验后再单独规划#205；未经董事长明确授权，不恢复、转Ready或合并PR #247，也不调用真实视频Provider。
+1. #205先完成同一独立只读reviewer对最终base/head完整diff的审查绑定，关闭全部P0/P1并处置P2/P3；PR仍保持Draft。
+2. 真实视频Provider最短付费验收必须在调用前取得新的明确授权，并只保存脱敏文件与Usage事实；未经授权继续以确定性Fake为普通开发和CI证据。
+3. 未经董事长在新任务中明确授权，不合并PR #247；完整图片链、母版剧本、粗/细分镜、多镜头、TTS、字幕、混音、时间线和长视频合成继续由后续独立Decision/Issue定界。
 
 ## 接手提示
 

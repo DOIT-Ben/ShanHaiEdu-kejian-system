@@ -73,6 +73,7 @@ def build_real_video_gateway(
     *,
     store: VideoResultStore,
     media_reference_resolver: ProviderMediaReferenceResolver | None = None,
+    audit_sink: AttemptAuditSink | None = None,
 ) -> tuple[ModelGateway, NewApiVideoProvider]:
     if not (
         settings.video_provider_name
@@ -99,6 +100,7 @@ def build_real_video_gateway(
         ModelGateway(
             {},
             video_routes={ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S: provider},
+            audit_sink=audit_sink,
         ),
         provider,
     )

@@ -27,7 +27,7 @@ def test_fanout_plan_consumes_only_published_scope_branch_entrypoint_and_depende
         "intro_options": ("intro.generate_options",),
         "lesson_plan": ("lesson_plan.generate",),
         "ppt": ("ppt.content_analyze",),
-        "video": ("video.master_script.generate",),
+        "video": ("video.shots.generate",),
     }
     assert all(plan.entrypoint_dependencies == ((),) for plan in plans)
 

@@ -621,6 +621,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project_id}/lessons/{lesson_id}/video": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 恢复指定课时的六秒课堂导入短片状态 */
+        get: operations["getLessonVideoGoldenSlice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/lessons/{lesson_id}/video/generations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 从exact导入方案与正式关键帧启动六秒短片生成 */
+        post: operations["startLessonVideoGeneration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/lessons/{lesson_id}/video/results/{result_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 播放exact课堂导入短片候选 */
+        get: operations["playLessonVideoResult"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/lessons/{lesson_id}/video/results/{result_id}/adoptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 采用指定课时的exact短片候选 */
+        post: operations["adoptLessonVideoResult"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project_id}/lessons/{lesson_id}/video/adoptions/{adoption_id}/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 将exact短片采用事实原子写回当前课时槽位 */
+        post: operations["saveLessonVideoAdoption"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{project_id}/artifacts": {
         parameters: {
             query?: never;
@@ -1549,6 +1634,49 @@ export interface components {
             data: {
                 items: components["schemas"]["GenerationJob"][];
             };
+            request_id: string;
+        };
+        StartVideoGenerationRequest: {
+            /** Format: uuid */
+            keyframe_file_asset_version_id: string;
+        };
+        SaveVideoAdoptionRequest: {
+            /** @constant */
+            replace_mode: "replace_active";
+        };
+        VideoGoldenSliceCandidate: {
+            /** Format: uuid */
+            result_id: string;
+            /** Format: uuid */
+            file_asset_version_id: string;
+            /** @constant */
+            mime_type: "video/mp4";
+            byte_size: number;
+            sha256: string;
+            duration_ms: number;
+            playback_url: string;
+            /** Format: uuid */
+            adoption_id: string | null;
+            /** Format: uuid */
+            saved_binding_id: string | null;
+        };
+        VideoGoldenSlice: {
+            /** Format: uuid */
+            project_id: string;
+            /** Format: uuid */
+            lesson_unit_id: string;
+            /** Format: uuid */
+            intro_selection_id: string;
+            /** Format: uuid */
+            intro_artifact_version_id: string;
+            /** Format: uuid */
+            keyframe_file_asset_version_id: string | null;
+            keyframe_slot_key: string | null;
+            job: components["schemas"]["GenerationJob"] | null;
+            candidate: components["schemas"]["VideoGoldenSliceCandidate"] | null;
+        };
+        VideoGoldenSliceEnvelope: {
+            data: components["schemas"]["VideoGoldenSlice"];
             request_id: string;
         };
         DependencyReadiness: {
@@ -3243,6 +3371,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GenerationJobListEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    getLessonVideoGoldenSlice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+                lesson_id: components["parameters"]["LessonId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exact video job, candidate, adoption, and project binding facts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoGoldenSliceEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    startLessonVideoGeneration: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+                lesson_id: components["parameters"]["LessonId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartVideoGenerationRequest"];
+            };
+        };
+        responses: {
+            202: components["responses"]["AcceptedJob"];
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    playLessonVideoResult: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+                lesson_id: components["parameters"]["LessonId"];
+                result_id: components["parameters"]["GenerationResultId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Verified MP4 candidate bytes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "video/mp4": string;
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    adoptLessonVideoResult: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+                lesson_id: components["parameters"]["LessonId"];
+                result_id: components["parameters"]["GenerationResultId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdoptGenerationResultRequest"];
+            };
+        };
+        responses: {
+            /** @description Exact video candidate adopted */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdoptionEnvelope"];
+                };
+            };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    saveLessonVideoAdoption: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+                lesson_id: components["parameters"]["LessonId"];
+                adoption_id: components["parameters"]["AdoptionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveVideoAdoptionRequest"];
+            };
+        };
+        responses: {
+            /** @description Video adoption saved to the immutable lesson target slot */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaveToProjectOperationEnvelope"];
                 };
             };
             "4XX": components["responses"]["Error"];

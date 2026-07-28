@@ -4,7 +4,7 @@
 
 本页用于产品负责人、内容管理员和开发者审查后台生成合同，不是教师端界面文案。
 
-内容包：`shanhai.primary_math.courseware@1.5.3`。
+内容包：`shanhai.primary_math.courseware@1.6.0`。
 
 说明：Task 是教师在创作台可修改的业务指令；Role、Method 和 Quality Gate 由平台固定，防止结构和教学边界被改坏。
 
@@ -82,9 +82,9 @@
 {{fine_storyboard_quality}}
 ```
 
-## 2. 逐镜头候选视频生成 (`video.shots.generate`)
+## 2. 课堂导入黄金短片生成 (`video.shots.generate`)
 
-**做什么：** 按细分镜逐shot生成候选视频，候选通过校验、采用并保存后才形成正式clip。
+**做什么：** 基于exact已采用课堂导入方案与同课时唯一正式关键帧生成一个约6秒MP4候选。
 
 **逻辑模型能力：** `video.image_to_video.6s_30s`  **视觉预设：** `style.primary_math.paper_clay`
 
@@ -92,36 +92,37 @@
 
 | 字段 | 来源 | 必填 | 默认值或说明 |
 | --- | --- | --- | --- |
-| 候选数量 (`shot_candidate_count`) | 教师填写 | 是 | 默认：2 |
-| 逻辑质量档位 (`shot_generation_quality`) | 教师填写 | 是 | 默认：均衡 (`balanced`)；可选：快速、均衡、高质量 |
+| 无 | 本步骤不要求教师额外填写 | - | - |
 
 ### 系统自动带入
 
 | 字段 | 来源 | 必填 | 默认值或说明 |
 | --- | --- | --- | --- |
-| 细分镜shot (`shot_spec_ref`) | 系统设置 | 是 | 按字段合同填写 |
-| 关键帧与连续性参考 (`shot_reference_assets`) | 系统设置 | 是 | 按字段合同填写 |
-| 视频风格合同 (`shot_style_contract_ref`) | 系统设置 | 是 | 按字段合同填写 |
+| 已采用课堂导入方案 (`intro_selection_snapshot`) | 上游自动带入 | 是 | 按字段合同填写 |
+| 候选数量 (`shot_candidate_count`) | 系统设置 | 是 | 默认：1 |
+| 唯一正式关键帧 (`shot_reference_assets`) | 系统设置 | 是 | 按字段合同填写 |
 
-- 无上游业务 Context；生成所需任务包或参考资产由系统字段带入。
+| 上游快照 | 是否必须 | 注入范围 |
+| --- | --- | --- |
+| `intro_selection.snapshot` | 是 | 完整快照 |
 
 ### 实际提示词
 
 **角色（平台固定）**
 
-> 你是服务端逐shot视频生成执行器。
+> 你是服务端课堂导入黄金短片生成执行器。
 
 **任务（教师可修改）**
 
-> 严格按一个已冻结shot合同生成指定数量候选，按image_index顺序传入shot_keyframe和continuity_reference，不改写故事、时长、动作或固定槽位。
+> 严格依据exact已采用课堂导入方案快照与唯一正式shot_keyframe生成一个约6秒候选；保持关键帧主体、构图和纸艺黏土风格，不扩写为多镜头故事。
 
 **方法（平台固定）**
 
-> 通过模型网关选择满足video.image_to_video.6s_30s能力的路由；只传节点允许的参考资产与业务提示词。记录候选键、实际时长、分辨率、帧率、媒体类型、SHA-256和质量标记。候选阶段不创建clip_id；只有校验通过、被采用并原子保存到shot槽位后才形成正式clip。
+> 通过模型网关选择满足video.image_to_video.6s_30s能力的路由；只传exact intro_selection.snapshot、一个shot_keyframe和发布内固定style.primary_math.paper_clay。记录实际时长、分辨率、媒体类型、size与SHA-256；候选只有采用并原子写回课时槽位后才成为正式项目资产。
 
 **质量门禁（平台固定）**
 
-> 输出可播放且时长匹配6至30秒shot合同；首尾状态、主体身份、资产、动作、光线和镜头连续；无文字字幕水印Logo和儿童安全问题；失败只影响当前shot；Provider私有参数和临时URL不进入业务产物。
+> 只输出一个可播放的约6秒MP4；禁止字幕、旁白、水印、Logo、额外镜头和儿童不安全内容；MIME、size、SHA-256、ffprobe或时长校验失败时不形成候选。
 
 ### 结构化输出字段
 

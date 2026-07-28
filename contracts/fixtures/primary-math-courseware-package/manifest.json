@@ -2,9 +2,9 @@
   "format_version": "1.0",
   "package_key": "shanhai.primary_math.courseware",
   "name": "小学数学标准课件生产内容包",
-  "semantic_version": "1.5.3",
+  "semantic_version": "1.6.0",
   "runtime_constraint": ">=0.1.0 <1.0.0",
-  "change_summary": "在不可变1.5.2基础上前向修正三类九套质量校验对教师适配说明中讲授边界复述的误判；旧Release与既有项目绑定保持不变。",
+  "change_summary": "在不可变1.5.3基础上前向发布课堂导入6秒黄金短片入口；只冻结exact导入选择、同课时唯一正式关键帧和固定纸艺黏土风格，旧Release与既有项目绑定保持不变。",
   "dependencies": [],
   "items": [
     {
@@ -677,35 +677,35 @@
       "kind": "input_definition",
       "path": "items/video-shots-generate-input.json",
       "schema_id": "https://shanhaiedu.local/contracts/input-definition.schema.json",
-      "sha256": "f4287a720162efbf1446b5c71d42760366463a1f995f0451697bf2bd041ee749"
+      "sha256": "a8593a3493e17095dacaed8fee9b22faea529f1ef8caf6022097a0f6f6742e7d"
     },
     {
       "item_key": "video.shots.generate.output",
       "kind": "content_definition",
       "path": "items/video-shots-generate-output.json",
       "schema_id": "https://shanhaiedu.local/contracts/content-definition.schema.json",
-      "sha256": "b895b7da15db97e1921b4e2dbed2377c864c369a49762fd90cb94cd76efbfc93"
+      "sha256": "636074d2e5276a4810c1a1ed8de1f38dc03fb8532ab5d17932a9c4ff43bc5d83"
     },
     {
       "item_key": "video.shots.generate.prompt",
       "kind": "prompt_template",
       "path": "items/video-shots-generate-prompt.json",
       "schema_id": "https://shanhaiedu.local/contracts/prompt-template.schema.json",
-      "sha256": "1c02507795764b560182086a94867ddd6e383947da58b0a48966633337fe8ecc"
+      "sha256": "30d0d63c0f025dc14a46623cdb2ad18a56224702a5242e9e05e62aed5b678e1a"
     },
     {
       "item_key": "video.shots.generate.projection",
       "kind": "projection_template",
       "path": "items/video-shots-generate-projection.json",
       "schema_id": "https://shanhaiedu.local/contracts/projection-template.schema.json",
-      "sha256": "be4de484c95db3b8c506d2c361ede3aa68b38faa3dc6e282d878eb34d5517bfb"
+      "sha256": "ec701c639b812705d06ba127df936c36da3f939dcb769fd29dfb1b71b671ac97"
     },
     {
       "item_key": "video.shots.generate",
       "kind": "generation_template",
       "path": "items/video-shots-generate-generation.json",
       "schema_id": "https://shanhaiedu.local/contracts/generation-template.schema.json",
-      "sha256": "a313a2f7eebd3daad7238fa68944dcac1dfe5001d74ff5eb18bbcb41407ab4aa"
+      "sha256": "62c833c3f06c302632984d56ad7b8189d664085e04fa16ed237c98fcaf1e0849"
     },
     {
       "item_key": "audio.plan.generate.input",
