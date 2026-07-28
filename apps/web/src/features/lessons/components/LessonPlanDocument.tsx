@@ -16,8 +16,11 @@ export const lessonPlanSections = [
   ["teaching_reflection", "十二、教学反思"],
 ] as const;
 
-export function lessonPlanSectionId(key: (typeof lessonPlanSections)[number][0]) {
-  return `lesson-plan-section-${key}`;
+export function lessonPlanSectionId(
+  key: (typeof lessonPlanSections)[number][0],
+  idPrefix = "lesson-plan-section",
+) {
+  return `${idPrefix}-${key}`;
 }
 
 export function LessonPlanSectionNavigation() {
@@ -155,7 +158,13 @@ export function lessonPlanContentReady(content: LessonPlanContent | undefined) {
   );
 }
 
-export function LessonPlanDocument({ content }: { content: LessonPlanContent }) {
+export function LessonPlanDocument({
+  content,
+  idPrefix = "lesson-plan-section",
+}: {
+  content: LessonPlanContent;
+  idPrefix?: string;
+}) {
   if (!lessonPlanContentReady(content)) {
     return (
       <p className="text-sm text-[var(--sh-danger)]" role="alert">
@@ -167,7 +176,7 @@ export function LessonPlanDocument({ content }: { content: LessonPlanContent }) 
     <div className="divide-y divide-[var(--sh-line-subtle)]">
       {lessonPlanSections.map(([key, label]) => {
         const lines = visibleLines(content[key], key);
-        const sectionId = lessonPlanSectionId(key);
+        const sectionId = lessonPlanSectionId(key, idPrefix);
         return (
           <section
             aria-labelledby={`${sectionId}-title`}
@@ -199,17 +208,21 @@ export function LessonPlanDocument({ content }: { content: LessonPlanContent }) 
 
 export function LessonPlanDraftEditor({
   content,
+  idPrefix = "lesson-plan-section",
   onChange,
 }: {
   content: LessonPlanContent;
+  idPrefix?: string;
   onChange: (content: LessonPlanContent) => void;
 }) {
-  if (!lessonPlanContentReady(content)) return <LessonPlanDocument content={content} />;
+  if (!lessonPlanContentReady(content)) {
+    return <LessonPlanDocument content={content} idPrefix={idPrefix} />;
+  }
   return (
     <div className="divide-y divide-[var(--sh-line-subtle)]">
       {lessonPlanSections.map(([sectionKey, sectionLabel]) => {
         const fields = editableFields(content[sectionKey], [sectionKey], sectionKey);
-        const sectionId = lessonPlanSectionId(sectionKey);
+        const sectionId = lessonPlanSectionId(sectionKey, idPrefix);
         return (
           <section
             aria-labelledby={`${sectionId}-title`}

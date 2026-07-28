@@ -1,11 +1,14 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { GenerationJobDto } from "@/features/jobs/api/jobsApi";
 import { LessonPlanWorkflowPanel } from "@/features/lessons/components/LessonPlanWorkflowPanel";
 import goldenProject from "../../../../../../contracts/fixtures/golden-projects/numbers-1-to-5/golden-project.json";
 
 const workflow = vi.hoisted(() => ({
   artifact: undefined as Record<string, unknown> | undefined,
+  job: undefined as GenerationJobDto | undefined,
   qualityMutate: vi.fn(),
+  saveReset: vi.fn(),
   saveMutate: vi.fn(),
   submitData: undefined as { id: string } | undefined,
   submitIsPending: false,
@@ -71,7 +74,7 @@ vi.mock("@/features/lessons/hooks/useLessonPlanWorkflow", () => ({
     mutate: vi.fn(),
   }),
   useLessonPlanJobRuntime: () => ({
-    job: undefined,
+    job: workflow.job,
     jobQuery: { error: undefined, isFetching: false, refetch: vi.fn() },
     jobsQuery: { error: undefined, isLoading: false },
     setStartedJobId: vi.fn(),
@@ -85,6 +88,7 @@ vi.mock("@/features/lessons/hooks/useLessonPlanWorkflow", () => ({
     error: undefined,
     isPending: false,
     mutate: workflow.saveMutate,
+    reset: workflow.saveReset,
   }),
   useSubmitLessonPlanDraftMutation: () => ({
     data: workflow.submitData,
@@ -138,7 +142,9 @@ const goldenLessonPlanContent = {
 describe("LessonPlanWorkflowPanel", () => {
   beforeEach(() => {
     workflow.artifact = lessonPlanArtifact("version-old");
+    workflow.job = undefined;
     workflow.qualityMutate.mockReset();
+    workflow.saveReset.mockReset();
     workflow.saveMutate.mockReset();
     workflow.submitData = { id: "version-new" };
     workflow.submitIsPending = true;
@@ -175,6 +181,7 @@ describe("LessonPlanWorkflowPanel", () => {
     fireEvent.change(screen.getByLabelText(/一、教学内容 教学范围/), {
       target: { value: "调整后的本课教学范围" },
     });
+    expect(workflow.saveReset).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole("button", { name: "保存当前草稿" }));
 
     expect(workflow.saveMutate).toHaveBeenCalledWith({
@@ -205,4 +212,50 @@ describe("LessonPlanWorkflowPanel", () => {
     );
     expect(screen.getByRole("button", { name: "运行质量检查" })).toBeVisible();
   });
+
+  it("keeps the empty workbench aligned with the running generation job", () => {
+    workflow.artifact = undefined;
+    workflow.job = generationJob("running");
+    workflow.submitData = undefined;
+    workflow.submitIsPending = false;
+
+    render(<LessonPlanWorkflowPanel lessonId="lesson-1" projectId="project-1" />);
+
+    expect(screen.getByRole("heading", { name: "正在生成教案" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "正在生成" })).toBeDisabled();
+    expect(screen.getByText("进行中")).toBeVisible();
+    expect(screen.queryByText("尚未生成")).not.toBeInTheDocument();
+    expect(screen.queryByText("待开始")).not.toBeInTheDocument();
+  });
+
+  it("offers an explicit retry after the generation job fails", () => {
+    workflow.artifact = undefined;
+    workflow.job = generationJob("failed");
+    workflow.submitData = undefined;
+    workflow.submitIsPending = false;
+
+    render(<LessonPlanWorkflowPanel lessonId="lesson-1" projectId="project-1" />);
+
+    expect(screen.getByRole("heading", { name: "教案生成未完成" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "重新生成十二部分教案" })).toBeEnabled();
+    expect(screen.getByText("未完成")).toBeVisible();
+  });
 });
+
+function generationJob(status: GenerationJobDto["status"]): GenerationJobDto {
+  return {
+    created_at: "2030-01-01T00:00:00Z",
+    error_code: status === "failed" ? "MODEL_TIMEOUT" : null,
+    id: "job-lesson-plan",
+    job_type: "lesson_plan_generation",
+    lesson_unit_id: "lesson-1",
+    node_run_id: null,
+    progress_message: status === "failed" ? "生成超时" : "正在生成教学过程",
+    progress_percent: status === "failed" ? 62 : 46,
+    project_id: "project-1",
+    result_artifact_version_id: null,
+    status,
+    updated_at: "2030-01-01T00:01:00Z",
+    workflow_node_key: null,
+  };
+}

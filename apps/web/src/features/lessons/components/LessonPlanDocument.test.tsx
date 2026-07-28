@@ -51,4 +51,24 @@ describe("LessonPlanDocument", () => {
     const updated = onChange.mock.calls[0]?.[0] as typeof content | undefined;
     expect(updated?.learner_analysis).toEqual(content.learner_analysis);
   });
+
+  it("keeps draft and submitted preview section ids unique in the same document", () => {
+    const { container } = render(
+      <>
+        <LessonPlanDraftEditor
+          content={content}
+          idPrefix="lesson-plan-draft-section"
+          onChange={vi.fn()}
+        />
+        <LessonPlanDocument content={content} idPrefix="lesson-plan-submitted-section" />
+      </>,
+    );
+
+    const ids = Array.from(container.querySelectorAll("[id]"), (element) => element.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(container.querySelector("#lesson-plan-draft-section-teaching_content")).toBeVisible();
+    expect(
+      container.querySelector("#lesson-plan-submitted-section-teaching_content"),
+    ).toBeVisible();
+  });
 });

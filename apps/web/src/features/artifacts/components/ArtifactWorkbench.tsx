@@ -7,6 +7,7 @@ import { StatusBadge } from "@/shared/ui/StatusBadge";
 type ArtifactWorkbenchProps = {
   artifact: ArtifactDto;
   busyAction?: "approve" | "save" | "submit";
+  completedAction?: "approve" | "save" | "submit";
   conflictMessage?: string;
   contentNavigation?: ReactNode;
   draftEditor?: ReactElement;
@@ -20,6 +21,7 @@ type ArtifactWorkbenchProps = {
   title: string;
   variant?: "default" | "document";
   writeDisabled?: boolean;
+  writeDisabledMessage?: string;
 };
 
 function artifactStatus(status: ArtifactDto["status"]): WorkflowStatus {
@@ -31,6 +33,7 @@ function artifactStatus(status: ArtifactDto["status"]): WorkflowStatus {
 export function ArtifactWorkbench({
   artifact,
   busyAction,
+  completedAction,
   conflictMessage,
   contentNavigation,
   draftEditor,
@@ -44,6 +47,7 @@ export function ArtifactWorkbench({
   title,
   variant = "default",
   writeDisabled = false,
+  writeDisabledMessage,
 }: ArtifactWorkbenchProps) {
   const draftBranch = artifact.current_draft?.draft_branch ?? "main";
   const submitted = artifact.current_submitted_version;
@@ -59,8 +63,14 @@ export function ArtifactWorkbench({
         {onSaveDraft ? (
           <Button
             className="min-h-11"
-            disabled={writeDisabled || writePending || !draftContentReady}
+            disabled={
+              writeDisabled || writePending || completedAction === "save" || !draftContentReady
+            }
+            loading={busyAction === "save"}
+            loadingText="正在保存"
             onClick={onSaveDraft}
+            success={completedAction === "save"}
+            successText="保存成功"
           >
             保存草稿
           </Button>
@@ -69,9 +79,17 @@ export function ArtifactWorkbench({
           <Button
             className="min-h-11"
             disabled={
-              writeDisabled || writePending || !artifact.current_draft || !draftContentReady
+              writeDisabled ||
+              writePending ||
+              completedAction === "submit" ||
+              !artifact.current_draft ||
+              !draftContentReady
             }
+            loading={busyAction === "submit"}
+            loadingText="正在提交"
             onClick={() => onSubmit(draftBranch)}
+            success={completedAction === "submit"}
+            successText="提交成功"
             variant="secondary"
           >
             提交当前草稿
@@ -99,8 +117,17 @@ export function ArtifactWorkbench({
           {onApprove ? (
             <Button
               className="mt-4 min-h-11 w-full"
-              disabled={writeDisabled || writePending || !reviewContentReady}
+              disabled={
+                writeDisabled ||
+                writePending ||
+                completedAction === "approve" ||
+                !reviewContentReady
+              }
+              loading={busyAction === "approve"}
+              loadingText="正在批准"
               onClick={() => onApprove(submitted.id)}
+              success={completedAction === "approve"}
+              successText="批准成功"
             >
               批准当前版本
             </Button>
@@ -147,6 +174,11 @@ export function ArtifactWorkbench({
           {draftActions ? (
             <div className="sticky top-[var(--sh-topbar-height)] z-20 -mx-4 mt-4 border-y border-[var(--sh-line-subtle)] bg-[var(--sh-surface-paper)]/95 px-4 py-3 backdrop-blur-[10px] md:-mx-7 md:px-7">
               {draftActions}
+              {writeDisabled && writeDisabledMessage ? (
+                <p className="mt-2 text-sm leading-6 text-[var(--sh-warning-strong)]" role="status">
+                  {writeDisabledMessage}
+                </p>
+              ) : null}
             </div>
           ) : null}
 
@@ -217,7 +249,16 @@ export function ArtifactWorkbench({
             {conflictMessage}
           </p>
         ) : null}
-        {draftActions ? <div className="mt-4">{draftActions}</div> : null}
+        {draftActions ? (
+          <div className="mt-4">
+            {draftActions}
+            {writeDisabled && writeDisabledMessage ? (
+              <p className="mt-2 text-sm leading-6 text-[var(--sh-warning-strong)]" role="status">
+                {writeDisabledMessage}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
       <aside className="h-fit rounded-[var(--sh-radius-md)] border border-[var(--sh-line-subtle)] bg-[var(--sh-surface-elevated)] p-5">

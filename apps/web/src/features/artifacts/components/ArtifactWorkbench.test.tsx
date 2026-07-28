@@ -63,8 +63,41 @@ describe("ArtifactWorkbench", () => {
     );
 
     expect(screen.getByRole("button", { name: "保存草稿" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "提交当前草稿" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "正在提交" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "批准当前版本" })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("正在提交");
+  });
+
+  it("公布保存成功并解释只读状态", () => {
+    const { rerender } = render(
+      <ArtifactWorkbench
+        artifact={artifact}
+        completedAction="save"
+        draftEditor={<textarea aria-label="教案内容" defaultValue="初稿" />}
+        onSaveDraft={vi.fn()}
+        onSubmit={vi.fn()}
+        title="课时教案"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "保存成功" })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("保存成功");
+
+    rerender(
+      <ArtifactWorkbench
+        artifact={artifact}
+        draftEditor={<textarea aria-label="教案内容" defaultValue="初稿" />}
+        onSaveDraft={vi.fn()}
+        onSubmit={vi.fn()}
+        title="课时教案"
+        writeDisabled
+        writeDisabledMessage="当前会话只能查看，刷新或重新登录后再执行写操作。"
+      />,
+    );
+
+    expect(screen.getByText("当前会话只能查看，刷新或重新登录后再执行写操作。")).toBeVisible();
+    expect(screen.getByRole("button", { name: "保存草稿" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "提交当前草稿" })).toBeDisabled();
   });
 
   it("缺少安全内容展示时禁用草稿、提交和批准动作", async () => {

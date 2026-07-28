@@ -40,7 +40,7 @@ function stepClass(current: boolean, interactive: boolean) {
     interactive &&
       !current &&
       "hover:border-l-[var(--sh-brand-300)] hover:bg-[var(--sh-surface-soft)] hover:text-[var(--sh-ink-strong)] focus-visible:outline-none focus-visible:shadow-[var(--sh-shadow-focus)]",
-    !interactive && "cursor-not-allowed opacity-70",
+    !interactive && "cursor-not-allowed",
   );
 }
 
@@ -76,7 +76,12 @@ export function LessonWorkbenchSummary({
               <Icon aria-hidden="true" className="size-4 shrink-0" />
               <span className="min-w-0">
                 <span className="block truncate text-sm font-semibold">{branch.label}</span>
-                <span className="mt-0.5 block text-xs text-[var(--sh-ink-faint)]">
+                <span
+                  className={cn(
+                    "mt-0.5 block text-xs",
+                    current ? "text-[var(--sh-ink-default)]" : "text-[var(--sh-ink-faint)]",
+                  )}
+                >
                   {stepStatus(branch, current)}
                 </span>
               </span>
