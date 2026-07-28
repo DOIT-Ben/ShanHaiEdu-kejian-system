@@ -1,7 +1,7 @@
 type LessonPlanContent = Record<string, unknown>;
 type FieldPath = Array<number | string>;
 
-const lessonPlanSections = [
+export const lessonPlanSections = [
   ["teaching_content", "一、教学内容"],
   ["material_analysis", "二、教材分析"],
   ["learner_analysis", "三、学情分析"],
@@ -15,6 +15,33 @@ const lessonPlanSections = [
   ["differentiated_homework", "十一、分层作业"],
   ["teaching_reflection", "十二、教学反思"],
 ] as const;
+
+export function lessonPlanSectionId(
+  key: (typeof lessonPlanSections)[number][0],
+  idPrefix = "lesson-plan-section",
+) {
+  return `${idPrefix}-${key}`;
+}
+
+export function LessonPlanSectionNavigation() {
+  return (
+    <nav aria-label="教案十二部分目录">
+      <p className="text-xs font-semibold text-[var(--sh-ink-faint)]">教案目录</p>
+      <ol className="mt-3 grid grid-cols-2 gap-1 sm:grid-cols-3 xl:grid-cols-1">
+        {lessonPlanSections.map(([key, label]) => (
+          <li key={key}>
+            <a
+              className="flex min-h-11 items-center rounded-[var(--sh-radius-control)] border-l-2 border-l-transparent px-2.5 py-2 text-xs leading-5 text-[var(--sh-ink-muted)] transition-colors duration-[var(--sh-duration-fast)] hover:border-l-[var(--sh-brand-400)] hover:bg-[var(--sh-surface-soft)] hover:text-[var(--sh-ink-strong)] focus-visible:outline-none focus-visible:shadow-[var(--sh-shadow-focus)] motion-reduce:transition-none"
+              href={`#${lessonPlanSectionId(key)}`}
+            >
+              {label}
+            </a>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
 
 const fieldLabels: Record<string, string> = {
   board_final_content: "板书内容",
@@ -131,7 +158,13 @@ export function lessonPlanContentReady(content: LessonPlanContent | undefined) {
   );
 }
 
-export function LessonPlanDocument({ content }: { content: LessonPlanContent }) {
+export function LessonPlanDocument({
+  content,
+  idPrefix = "lesson-plan-section",
+}: {
+  content: LessonPlanContent;
+  idPrefix?: string;
+}) {
   if (!lessonPlanContentReady(content)) {
     return (
       <p className="text-sm text-[var(--sh-danger)]" role="alert">
@@ -143,9 +176,17 @@ export function LessonPlanDocument({ content }: { content: LessonPlanContent }) 
     <div className="divide-y divide-[var(--sh-line-subtle)]">
       {lessonPlanSections.map(([key, label]) => {
         const lines = visibleLines(content[key], key);
+        const sectionId = lessonPlanSectionId(key, idPrefix);
         return (
-          <section className="py-5 first:pt-0 last:pb-0" key={key}>
-            <h3 className="font-semibold text-[var(--sh-ink-strong)]">{label}</h3>
+          <section
+            aria-labelledby={`${sectionId}-title`}
+            className="scroll-mt-28 py-6 first:pt-0 last:pb-0"
+            id={sectionId}
+            key={key}
+          >
+            <h3 className="font-semibold text-[var(--sh-ink-strong)]" id={`${sectionId}-title`}>
+              {label}
+            </h3>
             {lines.length ? (
               <ul className="mt-3 space-y-2 text-sm leading-6 text-[var(--sh-ink-default)]">
                 {lines.map((line, index) => (
@@ -167,19 +208,31 @@ export function LessonPlanDocument({ content }: { content: LessonPlanContent }) 
 
 export function LessonPlanDraftEditor({
   content,
+  idPrefix = "lesson-plan-section",
   onChange,
 }: {
   content: LessonPlanContent;
+  idPrefix?: string;
   onChange: (content: LessonPlanContent) => void;
 }) {
-  if (!lessonPlanContentReady(content)) return <LessonPlanDocument content={content} />;
+  if (!lessonPlanContentReady(content)) {
+    return <LessonPlanDocument content={content} idPrefix={idPrefix} />;
+  }
   return (
     <div className="divide-y divide-[var(--sh-line-subtle)]">
       {lessonPlanSections.map(([sectionKey, sectionLabel]) => {
         const fields = editableFields(content[sectionKey], [sectionKey], sectionKey);
+        const sectionId = lessonPlanSectionId(sectionKey, idPrefix);
         return (
-          <section className="py-5 first:pt-0 last:pb-0" key={sectionKey}>
-            <h3 className="font-semibold text-[var(--sh-ink-strong)]">{sectionLabel}</h3>
+          <section
+            aria-labelledby={`${sectionId}-title`}
+            className="scroll-mt-28 py-6 first:pt-0 last:pb-0"
+            id={sectionId}
+            key={sectionKey}
+          >
+            <h3 className="font-semibold text-[var(--sh-ink-strong)]" id={`${sectionId}-title`}>
+              {sectionLabel}
+            </h3>
             <div className="mt-3 space-y-3">
               {fields.map((field, index) => {
                 const label = fieldLabels[field.key] ?? "正文内容";
@@ -188,7 +241,7 @@ export function LessonPlanDraftEditor({
                     <span className="text-xs font-medium text-[var(--sh-ink-muted)]">{label}</span>
                     <textarea
                       aria-label={`${sectionLabel} ${label} ${String(index + 1)}`}
-                      className="mt-1 min-h-20 w-full resize-y rounded-[var(--sh-radius-control)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-elevated)] px-3 py-2 text-sm leading-6"
+                      className="mt-1 min-h-20 w-full resize-y rounded-[var(--sh-radius-control)] border border-[var(--sh-line-default)] bg-[var(--sh-surface-paper)] px-3 py-2 text-sm leading-6 text-[var(--sh-ink-default)] outline-none transition-[border-color,box-shadow] duration-[var(--sh-duration-fast)] focus:border-[var(--sh-brand-500)] focus:shadow-[var(--sh-shadow-focus)] motion-reduce:transition-none"
                       onChange={(event) =>
                         onChange(
                           replaceAtPath(

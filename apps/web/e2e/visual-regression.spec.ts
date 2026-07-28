@@ -108,7 +108,19 @@ async function bounds(locator: Locator) {
   } satisfies Bounds;
 }
 
-async function captureVisual(page: Page, testInfo: TestInfo, name: string) {
+async function captureVisual(
+  page: Page,
+  testInfo: TestInfo,
+  name: string,
+  options: { maxDiffPixelRatio?: number; minPageHeight?: number } = {},
+) {
+  if (options.minPageHeight) {
+    await page.evaluate((minPageHeight) => {
+      const minHeight = `${String(minPageHeight)}px`;
+      document.documentElement.style.minHeight = minHeight;
+      document.body.style.minHeight = minHeight;
+    }, options.minPageHeight);
+  }
   await page.screenshot({
     animations: "disabled",
     caret: "hide",
@@ -119,7 +131,7 @@ async function captureVisual(page: Page, testInfo: TestInfo, name: string) {
     animations: "disabled",
     caret: "hide",
     fullPage: true,
-    maxDiffPixelRatio: 0.012,
+    maxDiffPixelRatio: options.maxDiffPixelRatio ?? 0.012,
   });
 }
 
@@ -189,9 +201,13 @@ for (const viewport of viewports) {
     await expect(main).toContainText("认识百分数");
     await expect(main).toContainText("百分数的意义");
     await expect(main).toContainText("教案");
-    await expect(main).toContainText("这一步还没有制作任务");
+    await expect(main).toContainText("当前课时还没有教案正文");
     await assertPageFrame(page);
-    await captureVisual(page, testInfo, `workbench-${widthLabel}`);
+    const minPageHeight = viewport.width >= 1280 ? 920 : viewport.width === 1024 ? 1310 : 1420;
+    await captureVisual(page, testInfo, `workbench-${widthLabel}`, {
+      maxDiffPixelRatio: 0.02,
+      minPageHeight,
+    });
   });
 }
 

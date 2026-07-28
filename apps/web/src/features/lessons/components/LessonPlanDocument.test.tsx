@@ -30,6 +30,10 @@ describe("LessonPlanDocument", () => {
     expect(screen.getByRole("heading", { name: "十二、教学反思" })).toBeVisible();
     expect(screen.getByText("认识百分数的意义")).toBeVisible();
     expect(screen.getByText("学生是否理解关系")).toBeVisible();
+    expect(screen.getByRole("region", { name: "一、教学内容" })).toHaveAttribute(
+      "id",
+      "lesson-plan-section-teaching_content",
+    );
   });
 
   it("updates the exact nested body field without changing other sections", () => {
@@ -46,5 +50,25 @@ describe("LessonPlanDocument", () => {
     });
     const updated = onChange.mock.calls[0]?.[0] as typeof content | undefined;
     expect(updated?.learner_analysis).toEqual(content.learner_analysis);
+  });
+
+  it("keeps draft and submitted preview section ids unique in the same document", () => {
+    const { container } = render(
+      <>
+        <LessonPlanDraftEditor
+          content={content}
+          idPrefix="lesson-plan-draft-section"
+          onChange={vi.fn()}
+        />
+        <LessonPlanDocument content={content} idPrefix="lesson-plan-submitted-section" />
+      </>,
+    );
+
+    const ids = Array.from(container.querySelectorAll("[id]"), (element) => element.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(container.querySelector("#lesson-plan-draft-section-teaching_content")).toBeVisible();
+    expect(
+      container.querySelector("#lesson-plan-submitted-section-teaching_content"),
+    ).toBeVisible();
   });
 });

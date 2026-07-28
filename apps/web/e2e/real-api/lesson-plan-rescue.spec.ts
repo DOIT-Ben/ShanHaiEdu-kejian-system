@@ -163,7 +163,11 @@ test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }
   await expect(page.getByText(/已批准版本/)).toBeVisible();
 
   await page.getByRole("link", { name: /课堂导入/ }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("课堂导入");
+  await expect(page.getByRole("heading", { level: 1, name: "1～5的认识" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /课堂导入/ })).toHaveAttribute(
+    "aria-current",
+    "step",
+  );
   const introStartResponse = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&
@@ -280,7 +284,7 @@ test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }
   if (!secondLessonId) throw new Error("Second lesson workbench URL is missing its exact ID");
   expect(secondLessonId).toBeTruthy();
   expect(secondLessonId).not.toBe(firstLessonId);
-  await expect(page.getByText("生成完成后，十二部分教案会显示在这里。")).toBeVisible();
+  await expect(page.getByText("当前课时还没有教案正文。")).toBeVisible();
   await expect(page.getByRole("progressbar")).toHaveCount(0);
 
   const secondStartedResponse = page.waitForResponse(
