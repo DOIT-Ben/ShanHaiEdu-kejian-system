@@ -18,6 +18,9 @@ const stepLabels: Record<string, string> = {
   video: "课堂视频",
 };
 
+const workbenchSteps = ["lesson_plan", "intro_options", "ppt", "video"] as const;
+const availableSteps = new Set(["lesson_plan", "intro_options"]);
+
 export function RuntimeLessonWorkbenchPage() {
   const { lessonId, projectId, stepKey = "lesson_plan" } = useParams();
   const branchKey = stepKey.replaceAll("-", "_");
@@ -79,8 +82,18 @@ export function RuntimeLessonWorkbenchPage() {
   const project = projectQuery.data;
   if (!project || !lesson) return null;
 
+  const branchByKey = new Map(lesson.branches.map((branch) => [branch.branch_key, branch]));
+  const branches = workbenchSteps.map((key) => ({
+    available: availableSteps.has(key),
+    enabled: branchByKey.get(key)?.enabled ?? false,
+    key,
+    label: stepLabels[key] ?? "当前步骤",
+    to: `/app/projects/${projectId}/lessons/${lesson.id}/work/${key}`,
+  }));
+  const unavailableStep = !availableSteps.has(branchKey);
+
   return (
-    <div className="mx-auto max-w-[1180px] px-4 py-5 md:px-6 lg:px-8">
+    <div className="mx-auto max-w-[1480px] px-3 py-4 sm:px-4 md:px-6 lg:px-8">
       <FocusPageHeader
         action={
           <Link
@@ -91,34 +104,45 @@ export function RuntimeLessonWorkbenchPage() {
             返回项目
           </Link>
         }
-        description={`${project.title} · ${lesson.title} · ${stepLabel}`}
-        title={`${lesson.title} · ${stepLabel}`}
+        description={project.title}
+        status={
+          <span className="rounded-[var(--sh-radius-control)] bg-[var(--sh-brand-50)] px-2.5 py-1 text-xs font-semibold text-[var(--sh-brand-700)]">
+            {stepLabel}
+          </span>
+        }
+        title={lesson.title}
       />
-      <div className="mt-5">
+      <div className="mt-4">
         <LessonWorkbenchSummary
-          branches={lesson.branches.map((branch) => ({
-            enabled: branch.enabled,
-            key: branch.branch_key,
-            label: stepLabels[branch.branch_key] ?? "其他制作分支",
-            to: `/app/projects/${projectId}/lessons/${lesson.id}/work/${branch.branch_key}`,
-          }))}
+          branches={branches}
           currentBranchKey={branchKey}
           durationLabel={
             lesson.estimated_minutes ? `${String(lesson.estimated_minutes)} 分钟` : "课时已建立"
           }
-          lessonTitle={lesson.title}
           objective={lesson.objective_summary || lesson.scope_summary}
-          progressErrorMessage="这一步暂时没有可显示的制作进度。其他项目资料仍可继续查看和编辑。"
-          progressState={
-            branchKey === "lesson_plan" || branchKey === "intro_options" ? "ready" : "error"
-          }
-          statuses={[]}
         />
         {branchKey === "lesson_plan" ? (
           <LessonPlanWorkflowPanel lessonId={lessonId} projectId={projectId} />
         ) : null}
         {branchKey === "intro_options" ? (
           <IntroOptionsWorkflowPanel lessonId={lessonId} projectId={projectId} />
+        ) : null}
+        {unavailableStep ? (
+          <section
+            aria-labelledby="unavailable-step-title"
+            className="border-b border-[var(--sh-line-default)] bg-[var(--sh-surface-paper)] px-5 py-10 md:px-8"
+          >
+            <p className="text-xs font-semibold text-[var(--sh-ink-faint)]">后续制作步骤</p>
+            <h2
+              className="mt-2 text-lg font-semibold text-[var(--sh-ink-strong)]"
+              id="unavailable-step-title"
+            >
+              {stepLabel} 尚未开放
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--sh-ink-muted)]">
+              当前阶段先完成教案与课堂导入。该步骤开放后会继续使用本课时已经批准的内容。
+            </p>
+          </section>
         ) : null}
       </div>
     </div>

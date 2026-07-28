@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import * as lessonsApi from "@/features/lessons/api/lessonsApi";
@@ -93,34 +93,38 @@ describe("RuntimeLessonWorkbenchPage", () => {
   it("只渲染可归属当前课时的事实，不从项目节点键推断进度", async () => {
     renderPage();
 
-    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("百分数的意义");
-    expect(
-      screen.getByText("这一步还没有制作任务。完成前一步后，新的任务会显示在这里。"),
-    ).toBeVisible();
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(/^百分数的意义$/);
+    expect(screen.getByRole("navigation", { name: "课时制作步骤" })).toBeVisible();
+    expect(screen.queryByText(/这一步还没有制作任务/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "制作进度" })).not.toBeInTheDocument();
     expect(screen.getByTestId("lesson-plan-workflow")).toBeVisible();
     expect(lessonPlanPanelMock).toHaveBeenCalledWith({ lessonId, projectId });
     expect(screen.getByRole("link", { name: /返回项目/ })).toHaveAttribute(
       "href",
       `/app/projects/${projectId}`,
     );
-    expect(screen.getByRole("link", { name: /课堂 PPT/ })).toHaveAttribute(
-      "href",
-      `/app/projects/${projectId}/lessons/${lessonId}/work/ppt`,
-    );
+    expect(screen.getByText("课堂 PPT").closest("a")).toBeNull();
+    expect(screen.getAllByText("尚未开放")).toHaveLength(2);
+    expect(screen.getByText("课堂视频")).toBeVisible();
   });
 
   it("只在教案分支挂载教案闭环", async () => {
     renderPage("ppt");
 
-    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("课堂 PPT");
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(/^百分数的意义$/);
     expect(screen.queryByTestId("lesson-plan-workflow")).not.toBeInTheDocument();
     expect(lessonPlanPanelMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "课堂 PPT 尚未开放" })).toBeVisible();
+    expect(screen.getByText(/当前阶段先完成教案与课堂导入/)).toBeVisible();
   });
 
   it("只在课堂导入分支挂载三类九套闭环", async () => {
     renderPage("intro_options");
 
-    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("课堂导入");
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(/^百分数的意义$/);
+    expect(
+      within(screen.getByRole("navigation", { name: "课时制作步骤" })).getByText("当前步骤"),
+    ).toBeVisible();
     expect(screen.getByTestId("intro-options-workflow")).toBeVisible();
     expect(introOptionsPanelMock).toHaveBeenCalledWith({ lessonId, projectId });
     expect(screen.queryByTestId("lesson-plan-workflow")).not.toBeInTheDocument();
@@ -128,12 +132,13 @@ describe("RuntimeLessonWorkbenchPage", () => {
 
   it("旧连字符路由与未知步骤都不会泄漏内部键", async () => {
     const first = renderPage("lesson-plan");
-    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("教案");
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(/^百分数的意义$/);
     expect(screen.queryByText(/lesson-plan/)).not.toBeInTheDocument();
     first.unmount();
 
     renderPage("future-node-v2");
-    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("当前步骤");
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(/^百分数的意义$/);
+    expect(screen.getByText("当前步骤")).toBeVisible();
     expect(screen.queryByText(/future-node-v2/)).not.toBeInTheDocument();
   });
 

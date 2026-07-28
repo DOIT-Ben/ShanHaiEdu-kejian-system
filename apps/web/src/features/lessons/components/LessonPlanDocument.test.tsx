@@ -30,6 +30,10 @@ describe("LessonPlanDocument", () => {
     expect(screen.getByRole("heading", { name: "十二、教学反思" })).toBeVisible();
     expect(screen.getByText("认识百分数的意义")).toBeVisible();
     expect(screen.getByText("学生是否理解关系")).toBeVisible();
+    expect(screen.getByRole("region", { name: "一、教学内容" })).toHaveAttribute(
+      "id",
+      "lesson-plan-section-teaching_content",
+    );
   });
 
   it("updates the exact nested body field without changing other sections", () => {

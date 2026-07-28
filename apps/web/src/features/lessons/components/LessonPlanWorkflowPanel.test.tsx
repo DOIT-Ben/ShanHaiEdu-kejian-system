@@ -18,16 +18,22 @@ vi.mock("@/shared/api/client", () => ({
 
 vi.mock("@/features/artifacts/components/ArtifactWorkbench", () => ({
   ArtifactWorkbench: ({
+    contentNavigation,
     draftEditor,
     onSaveDraft,
     onSubmit,
+    reviewStatus,
   }: {
+    contentNavigation?: React.ReactNode;
     draftEditor?: React.ReactNode;
     onSaveDraft?: () => void;
     onSubmit?: () => void;
+    reviewStatus?: React.ReactNode;
   }) => (
     <div>
+      {contentNavigation}
       {draftEditor}
+      {reviewStatus}
       <button onClick={onSaveDraft} type="button">
         保存当前草稿
       </button>
@@ -178,5 +184,25 @@ describe("LessonPlanWorkflowPanel", () => {
         teaching_scope: "调整后的本课教学范围",
       },
     });
+  });
+
+  it("provides a twelve-part document outline and keeps review actions together", () => {
+    workflow.artifact = lessonPlanArtifact("version-golden", goldenLessonPlanContent);
+    workflow.submitData = undefined;
+    workflow.submitIsPending = false;
+
+    render(<LessonPlanWorkflowPanel lessonId="lesson-1" projectId="project-1" />);
+
+    const outline = screen.getByRole("navigation", { name: "教案十二部分目录" });
+    expect(outline).toBeVisible();
+    expect(screen.getByRole("link", { name: "一、教学内容" })).toHaveAttribute(
+      "href",
+      "#lesson-plan-section-teaching_content",
+    );
+    expect(screen.getByRole("link", { name: "十二、教学反思" })).toHaveAttribute(
+      "href",
+      "#lesson-plan-section-teaching_reflection",
+    );
+    expect(screen.getByRole("button", { name: "运行质量检查" })).toBeVisible();
   });
 });
