@@ -116,8 +116,9 @@ async function captureVisual(
 ) {
   if (options.minPageHeight) {
     await page.evaluate((minPageHeight) => {
-      document.documentElement.style.minHeight = `${minPageHeight}px`;
-      document.body.style.minHeight = `${minPageHeight}px`;
+      const minHeight = `${String(minPageHeight)}px`;
+      document.documentElement.style.minHeight = minHeight;
+      document.body.style.minHeight = minHeight;
     }, options.minPageHeight);
   }
   await page.screenshot({
