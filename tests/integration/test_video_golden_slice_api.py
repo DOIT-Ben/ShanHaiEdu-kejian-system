@@ -7,6 +7,13 @@ from uuid import UUID
 import httpx
 from sqlalchemy import select
 
+from apps.api.assets.project_contracts import (
+    AssetCardinality,
+    AssetSlotDeclaration,
+    AssetTargetContract,
+    ReplaceMode,
+)
+from apps.api.assets.project_service import ProjectAssetService
 from apps.api.database import build_engine, build_session_factory
 from apps.api.identity.models import Organization
 from apps.api.ids import new_uuid7
@@ -171,6 +178,70 @@ async def test_video_start_hides_cross_tenant_keyframes(
             )
         assert response.status_code == 404
         assert response.json()["error"]["code"] == "VIDEO_KEYFRAME_NOT_FOUND"
+    finally:
+        engine.dispose()
+
+
+async def test_video_start_rejects_image_from_non_keyframe_lesson_slot(
+    postgres_database_url: str,
+) -> None:
+    run_migration(postgres_database_url, "head")
+    engine = build_engine(postgres_database_url)
+    factory = build_session_factory(engine)
+    seeded = await seed_video_project(factory, lesson_count=1)
+    lesson = seeded.lessons[0]
+    with factory() as session, session.begin():
+        version = seed_file_version(session, seeded.actor)
+        assets = ProjectAssetService(session, seeded.actor)
+        slot = assets.declare_slot(
+            seeded.project_id,
+            AssetSlotDeclaration(
+                slot_key="lesson.01.ppt.page.01.main_visual",
+                lesson_unit_id=lesson.lesson_id,
+                asset_type="image",
+                cardinality=AssetCardinality.ONE,
+                required=True,
+                target_contract=AssetTargetContract(
+                    allowed_mime_types=("image/png",),
+                    require_clean_scan=True,
+                ),
+            ),
+            request_id="video-wrong-slot-declare",
+        )
+        assets.bind(
+            slot.id,
+            file_asset_version_id=version.id,
+            source_artifact_version_id=None,
+            replace_mode=ReplaceMode.REJECT_IF_OCCUPIED,
+            position=None,
+            request_id="video-wrong-slot-bind",
+        )
+        wrong_version_id = version.id
+    app = create_app(
+        settings=Settings(
+            _env_file=None,
+            environment="test",
+            database_url=postgres_database_url,
+            session_access_code=None,
+            session_allowed_origins=[],
+            session_csrf_secret=None,
+            session_teacher_principal_id=None,
+        ),
+        session_factory=factory,
+    )
+    override_test_identity(app, seeded.actor)
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+            response = await client.post(
+                _start_path(seeded.project_id, lesson.lesson_id),
+                headers={"Idempotency-Key": "video-wrong-slot-start"},
+                json=_start_payload(wrong_version_id),
+            )
+        assert response.status_code == 409
+        assert response.json()["error"]["code"] == "VIDEO_KEYFRAME_INVALID"
     finally:
         engine.dispose()
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -39,6 +40,10 @@ from workers.video_generation_runtime import (
 from workflow.node_state import NodeStatus
 
 logger = logging.getLogger(__name__)
+
+_PROVIDER_REQUEST_WINDOWS = 3
+_VIDEO_PROBE_TIMEOUT_SECONDS = 30
+_VIDEO_PERSISTENCE_MARGIN_SECONDS = 30
 
 
 async def execute_video_generation_job(
@@ -244,10 +249,7 @@ def _claim(
         ).claim(
             job_id,
             worker_id=worker_id,
-            lease_seconds=max(
-                settings.worker_lease_seconds,
-                settings.video_provider_max_wait_seconds + 30,
-            ),
+            lease_seconds=_video_lease_seconds(settings),
         )
         if claimed is None:
             return False
@@ -256,6 +258,17 @@ def _claim(
             NodeStatus.RUNNING,
         )
         return True
+
+
+def _video_lease_seconds(settings: Settings) -> int:
+    execution_upper_bound = math.ceil(
+        settings.video_provider_max_wait_seconds
+        + settings.video_provider_poll_seconds
+        + _PROVIDER_REQUEST_WINDOWS * settings.video_provider_timeout_seconds
+        + _VIDEO_PROBE_TIMEOUT_SECONDS
+        + _VIDEO_PERSISTENCE_MARGIN_SECONDS
+    )
+    return max(settings.worker_lease_seconds, execution_upper_bound)
 
 
 def _initiating_actor(

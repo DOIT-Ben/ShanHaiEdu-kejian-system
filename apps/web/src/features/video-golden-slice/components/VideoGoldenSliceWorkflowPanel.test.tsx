@@ -78,6 +78,19 @@ describe("VideoGoldenSliceWorkflowPanel", () => {
     expect(request?.projectId).toBe(projectId);
   });
 
+  it("关键帧缺失时显示真实状态并禁止启动生成", async () => {
+    vi.spyOn(videoApi, "getVideoGoldenSlice").mockResolvedValue({
+      ...slice(),
+      keyframe_file_asset_version_id: null,
+      keyframe_slot_key: null,
+    });
+    renderPanel();
+
+    expect(await screen.findByText("正式关键帧尚未绑定")).toBeVisible();
+    expect(screen.queryByText("正式关键帧已绑定")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "生成 6 秒短片" })).toBeDisabled();
+  });
+
   it("播放 exact MP4，并按候选采用后写回课时槽位", async () => {
     const user = userEvent.setup();
     vi.spyOn(videoApi, "getVideoGoldenSlice")

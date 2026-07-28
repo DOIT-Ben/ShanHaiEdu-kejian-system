@@ -43,7 +43,11 @@ def persist_success(
     with factory() as session, session.begin():
         jobs = VideoJobPort(session, actor)
         lease = jobs.lock_lease(job_id)
-        if lease is None or not lease.owned_running(worker_id):
+        if lease is None:
+            return _terminal_outcome(lease)
+        if lease.cancel_requested:
+            return _cancel_locked(session, routing, job_id, worker_id=worker_id, settings=settings)
+        if not lease.owned_running(worker_id):
             return _terminal_outcome(lease)
         creation = VideoCreationPort(session, actor)
         if creation.result_for_job(job_id) is not None:

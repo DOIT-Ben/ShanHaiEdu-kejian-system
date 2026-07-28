@@ -1,4 +1,4 @@
-import { CheckCircle2, Film, RefreshCw, Save } from "lucide-react";
+import { CheckCircle2, CircleAlert, Film, RefreshCw, Save } from "lucide-react";
 import { GenerationJobPanel } from "@/features/jobs/components/GenerationJobPanel";
 import { useVideoGoldenSlice } from "@/features/video-golden-slice/hooks/useVideoGoldenSlice";
 import { isCsrfTokenAvailable } from "@/shared/api/client";
@@ -94,8 +94,17 @@ export function VideoGoldenSliceWorkflowPanel({
                 课堂导入已采用
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <CheckCircle2 aria-hidden="true" className="size-4 text-[var(--sh-success)]" />
-                正式关键帧已绑定
+                {slice.keyframe_file_asset_version_id ? (
+                  <>
+                    <CheckCircle2 aria-hidden="true" className="size-4 text-[var(--sh-success)]" />
+                    正式关键帧已绑定
+                  </>
+                ) : (
+                  <>
+                    <CircleAlert aria-hidden="true" className="size-4 text-[var(--sh-warning)]" />
+                    正式关键帧尚未绑定
+                  </>
+                )}
               </span>
             </div>
           </div>

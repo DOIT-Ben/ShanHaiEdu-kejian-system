@@ -11,7 +11,7 @@ from pydantic import SecretStr
 from sqlalchemy import func, select
 
 from apps.api.assets.models import FileAssetVersion
-from apps.api.creation.models import GenerationResult
+from apps.api.creation.models import CreationItem, GenerationResult
 from apps.api.database import build_engine, build_session_factory
 from apps.api.identity.context import system_actor
 from apps.api.jobs.models import GenerationJob
@@ -23,6 +23,7 @@ from apps.api.model_gateway.contracts import (
     GeneratedFileFact,
     ModelCapability,
     ModelUsage,
+    VideoGatewayResult,
     VideoModelRequest,
     VideoOperationStatus,
     VideoPollRequest,
@@ -30,12 +31,15 @@ from apps.api.model_gateway.contracts import (
 )
 from apps.api.model_gateway.gateway import ModelGateway
 from apps.api.settings import Settings
+from apps.api.uploads.storage import ObjectStorage
 from apps.api.workflows.models import NodeRun
 from apps.api.workflows.service import WorkflowRuntimeService
 from tests.fakes.identity import override_test_identity
 from tests.fakes.object_storage import FakeObjectStorage
 from tests.integration.video_golden_slice_support import seed_video_project
+from workers import video_generation as video_worker
 from workers.video_generation import execute_video_generation_job
+from workers.video_generation_persistence import ValidatedVideo
 from workflow.node_state import NodeStatus
 
 
@@ -112,6 +116,19 @@ class StoredVideoFakeProvider:
             actual_model=self.model_name,
             usage=ModelUsage(),
         )
+
+
+def test_video_worker_lease_covers_provider_and_validation_windows() -> None:
+    settings = _settings("postgresql://example.invalid/test").model_copy(
+        update={
+            "worker_lease_seconds": 5,
+            "video_provider_timeout_seconds": 120,
+            "video_provider_poll_seconds": 0.01,
+            "video_provider_max_wait_seconds": 10,
+        }
+    )
+
+    assert video_worker._video_lease_seconds(settings) == 431
 
 
 async def test_video_worker_persists_verified_candidate_and_refreshes_playback(
@@ -197,7 +214,7 @@ async def test_video_worker_persists_verified_candidate_and_refreshes_playback(
                 media_type="video/mp4",
             )
             drifted_playback = await client.get(playback_url)
-        assert claimed_lease_seconds == [40]
+        assert claimed_lease_seconds == [431]
         assert provider.submitted_prompt is not None
         assert "intro_selection.snapshot" in provider.submitted_prompt
         assert str(lesson.intro_selection_id) in provider.submitted_prompt
@@ -296,6 +313,84 @@ async def test_video_worker_synchronizes_pre_execution_cancellation_without_prov
         assert provider.poll_calls == 0
         assert job is not None and job.status == "cancelled"
         assert node is not None and node.status == "cancelled"
+        assert result_count == 0
+    finally:
+        engine.dispose()
+
+
+async def test_video_worker_finalizes_cancellation_after_media_validation(
+    migrated_database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    engine = build_engine(migrated_database_url)
+    factory = build_session_factory(engine)
+    seeded = await seed_video_project(factory, lesson_count=1)
+    storage = FakeObjectStorage()
+    provider = StoredVideoFakeProvider(storage, _six_second_mp4(tmp_path))
+    gateway = ModelGateway(
+        {},
+        video_routes={ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S: provider},
+        audit_sink=SqlAlchemyAttemptAuditSink(factory),
+    )
+    settings = _settings(migrated_database_url)
+    app = create_app(settings=settings, session_factory=factory, object_storage=storage)
+    override_test_identity(app, seeded.actor)
+    lesson = seeded.lessons[0]
+    original_validate = video_worker.validate_video_result
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+            started = await client.post(
+                f"/api/v2/projects/{seeded.project_id}/lessons/{lesson.lesson_id}"
+                "/video/generations",
+                headers={"Idempotency-Key": "video-worker-late-cancel-start"},
+                json={"keyframe_file_asset_version_id": str(lesson.keyframe_file_version_id)},
+            )
+            assert started.status_code == 202, started.text
+            job_id = UUID(started.json()["data"]["job_id"])
+
+            async def validate_then_cancel(
+                result: VideoGatewayResult,
+                *,
+                storage: ObjectStorage,
+                settings: Settings,
+            ) -> ValidatedVideo:
+                validated = await original_validate(result, storage=storage, settings=settings)
+                cancelled = await client.post(
+                    f"/api/v2/generation-jobs/{job_id}/cancel",
+                    headers={"Idempotency-Key": "video-worker-late-cancel-job"},
+                )
+                assert cancelled.status_code == 202, cancelled.text
+                return validated
+
+            monkeypatch.setattr(video_worker, "validate_video_result", validate_then_cancel)
+            outcome = await execute_video_generation_job(
+                job_id,
+                worker_id="video-worker-late-cancel",
+                gateway=gateway,
+                storage=storage,
+                settings=settings,
+            )
+
+        with factory() as session:
+            job = session.get(GenerationJob, job_id)
+            assert job is not None and job.creation_batch_id is not None
+            node = session.get(NodeRun, job.node_run_id)
+            item = session.scalar(
+                select(CreationItem).where(CreationItem.creation_batch_id == job.creation_batch_id)
+            )
+            result_count = session.scalar(
+                select(func.count())
+                .select_from(GenerationResult)
+                .where(GenerationResult.generation_job_id == job_id)
+            )
+        assert outcome == "cancelled"
+        assert job.status == "cancelled"
+        assert node is not None and node.status == "cancelled"
+        assert item is not None and item.status == "ready"
         assert result_count == 0
     finally:
         engine.dispose()

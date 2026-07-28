@@ -85,6 +85,7 @@ class VideoAssetPort:
                 ProjectAssetSlot.project_id == project_id,
                 ProjectAssetSlot.lesson_unit_id == lesson_id,
                 ProjectAssetSlot.asset_type == "image",
+                ProjectAssetSlot.slot_key.like("lesson.%.video.keyframe"),
                 ProjectAssetSlot.status == "satisfied",
                 ProjectAssetSlot.deleted_at.is_(None),
                 AssetBinding.organization_id == self._actor.organization_id,
