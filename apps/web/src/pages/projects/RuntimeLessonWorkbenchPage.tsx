@@ -94,24 +94,29 @@ export function RuntimeLessonWorkbenchPage() {
 
   return (
     <div className="mx-auto max-w-[1480px] px-3 py-4 sm:px-4 md:px-6 lg:px-8">
-      <FocusPageHeader
-        action={
-          <Link
-            className={buttonVariants({ variant: "secondary" })}
-            to={`/app/projects/${projectId}`}
-          >
-            <ArrowLeft aria-hidden="true" />
-            返回项目
-          </Link>
-        }
-        description={project.title}
-        status={
-          <span className="rounded-[var(--sh-radius-control)] bg-[var(--sh-brand-50)] px-2.5 py-1 text-xs font-semibold text-[var(--sh-brand-700)]">
-            {stepLabel}
-          </span>
-        }
-        title={lesson.title}
-      />
+      <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+        <div className="min-w-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
+            <h1 className="break-words text-[22px] font-semibold leading-tight text-[var(--sh-ink-strong)] md:text-[24px]">
+              {lesson.title}
+            </h1>
+            <span className="rounded-[var(--sh-radius-control)] bg-[var(--sh-brand-50)] px-2.5 py-1 text-xs font-semibold text-[var(--sh-brand-700)]">
+              {stepLabel}
+            </span>
+          </div>
+          <p className="mt-1 truncate text-xs leading-5 text-[var(--sh-ink-muted)] md:text-sm">
+            {project.title}
+          </p>
+        </div>
+        <Link
+          aria-label="返回项目"
+          className={buttonVariants({ className: "min-h-11", variant: "secondary" })}
+          to={`/app/projects/${projectId}`}
+        >
+          <ArrowLeft aria-hidden="true" />
+          <span className="hidden min-[480px]:inline">返回项目</span>
+        </Link>
+      </header>
       <div className="mt-4">
         <LessonWorkbenchSummary
           branches={branches}

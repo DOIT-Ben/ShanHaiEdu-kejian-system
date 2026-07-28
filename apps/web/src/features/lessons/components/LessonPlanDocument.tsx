@@ -20,25 +20,19 @@ export function lessonPlanSectionId(key: (typeof lessonPlanSections)[number][0])
   return `lesson-plan-section-${key}`;
 }
 
-export function LessonPlanSectionNavigation({ disabled = false }: { disabled?: boolean }) {
+export function LessonPlanSectionNavigation() {
   return (
     <nav aria-label="教案十二部分目录">
       <p className="text-xs font-semibold text-[var(--sh-ink-faint)]">教案目录</p>
       <ol className="mt-3 grid grid-cols-2 gap-1 sm:grid-cols-3 xl:grid-cols-1">
         {lessonPlanSections.map(([key, label]) => (
           <li key={key}>
-            {disabled ? (
-              <span className="flex min-h-11 items-center px-2.5 py-2 text-xs leading-5 text-[var(--sh-ink-disabled)]">
-                {label}
-              </span>
-            ) : (
-              <a
-                className="flex min-h-11 items-center rounded-[var(--sh-radius-control)] border-l-2 border-l-transparent px-2.5 py-2 text-xs leading-5 text-[var(--sh-ink-muted)] transition-colors duration-[var(--sh-duration-fast)] hover:border-l-[var(--sh-brand-400)] hover:bg-[var(--sh-surface-soft)] hover:text-[var(--sh-ink-strong)] focus-visible:outline-none focus-visible:shadow-[var(--sh-shadow-focus)] motion-reduce:transition-none"
-                href={`#${lessonPlanSectionId(key)}`}
-              >
-                {label}
-              </a>
-            )}
+            <a
+              className="flex min-h-11 items-center rounded-[var(--sh-radius-control)] border-l-2 border-l-transparent px-2.5 py-2 text-xs leading-5 text-[var(--sh-ink-muted)] transition-colors duration-[var(--sh-duration-fast)] hover:border-l-[var(--sh-brand-400)] hover:bg-[var(--sh-surface-soft)] hover:text-[var(--sh-ink-strong)] focus-visible:outline-none focus-visible:shadow-[var(--sh-shadow-focus)] motion-reduce:transition-none"
+              href={`#${lessonPlanSectionId(key)}`}
+            >
+              {label}
+            </a>
           </li>
         ))}
       </ol>

@@ -1,4 +1,4 @@
-import { BookOpenText, Clapperboard, Presentation, Sparkles } from "lucide-react";
+import { BookOpenText, Clapperboard, Lightbulb, Presentation } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 import { Link } from "react-router-dom";
 import { cn } from "@/shared/lib/cn";
@@ -19,7 +19,7 @@ type LessonWorkbenchSummaryProps = {
 };
 
 const stepIcons: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
-  intro_options: Sparkles,
+  intro_options: Lightbulb,
   lesson_plan: BookOpenText,
   ppt: Presentation,
   video: Clapperboard,
@@ -65,7 +65,7 @@ export function LessonWorkbenchSummary({
       </div>
       <nav
         aria-label="课时制作步骤"
-        className="grid grid-cols-1 border-t border-[var(--sh-line-subtle)] min-[520px]:grid-cols-2 xl:grid-cols-4"
+        className="grid grid-cols-2 border-t border-[var(--sh-line-subtle)] xl:grid-cols-4"
       >
         {branches.map((branch) => {
           const current = branch.key === currentBranchKey;

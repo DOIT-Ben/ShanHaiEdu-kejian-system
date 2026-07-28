@@ -58,6 +58,7 @@ export function ArtifactWorkbench({
       <div aria-label="教案操作" className="flex flex-wrap gap-2" role="group">
         {onSaveDraft ? (
           <Button
+            className="min-h-11"
             disabled={writeDisabled || writePending || !draftContentReady}
             onClick={onSaveDraft}
           >
@@ -66,6 +67,7 @@ export function ArtifactWorkbench({
         ) : null}
         {onSubmit ? (
           <Button
+            className="min-h-11"
             disabled={
               writeDisabled || writePending || !artifact.current_draft || !draftContentReady
             }
@@ -96,7 +98,7 @@ export function ArtifactWorkbench({
           ) : null}
           {onApprove ? (
             <Button
-              className="mt-4 w-full"
+              className="mt-4 min-h-11 w-full"
               disabled={writeDisabled || writePending || !reviewContentReady}
               onClick={() => onApprove(submitted.id)}
             >

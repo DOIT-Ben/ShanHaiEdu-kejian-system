@@ -7,6 +7,7 @@ import {
   LessonPlanDraftEditor,
   LessonPlanSectionNavigation,
   lessonPlanContentReady,
+  lessonPlanSections,
 } from "@/features/lessons/components/LessonPlanDocument";
 import {
   useLessonPlanApprovalMutation,
@@ -101,7 +102,7 @@ export function LessonPlanWorkflowPanel({
     <div className="mt-5 border-t border-[var(--sh-line-subtle)] pt-5">
       <p className="text-xs font-semibold text-[var(--sh-ink-faint)]">质量检查</p>
       <Button
-        className="mt-3 w-full"
+        className="mt-3 min-h-11 w-full"
         disabled={
           !writeReady ||
           submittedVersionAwaitingRefresh ||
@@ -205,11 +206,8 @@ export function LessonPlanWorkflowPanel({
           writeDisabled={!writeReady || !etag || qualityPending || submittedVersionAwaitingRefresh}
         />
       ) : (
-        <section className="grid items-start border-y border-[var(--sh-line-default)] bg-[var(--sh-line-subtle)] xl:grid-cols-[190px_minmax(0,1fr)_280px]">
-          <aside className="order-3 bg-[var(--sh-surface-base)] p-4 xl:order-1">
-            <LessonPlanSectionNavigation disabled />
-          </aside>
-          <div className="order-1 min-w-0 border-y border-[var(--sh-line-subtle)] bg-[var(--sh-surface-paper)] px-5 py-7 md:px-8 xl:order-2 xl:border-x xl:border-y-0">
+        <section className="grid border-y border-[var(--sh-line-default)] bg-[var(--sh-line-subtle)] xl:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="order-1 min-w-0 border-b border-[var(--sh-line-subtle)] bg-[var(--sh-surface-paper)] px-5 py-7 md:px-8 xl:border-b-0 xl:border-r">
             <p className="text-xs font-semibold text-[var(--sh-ink-faint)]">教案正文</p>
             <h2 className="mt-2 text-xl font-semibold text-[var(--sh-ink-strong)]">
               生成十二部分教案
@@ -228,7 +226,7 @@ export function LessonPlanWorkflowPanel({
               />
             </label>
             <Button
-              className="mt-5"
+              className="mt-5 min-h-11"
               disabled={!writeReady || generationMutation.isPending || jobLive}
               onClick={() => generationMutation.mutate(revision)}
             >
@@ -245,13 +243,49 @@ export function LessonPlanWorkflowPanel({
                 {runtimeErrorMessage(generationError, "教案生成没有启动，请刷新状态后重试。")}
               </p>
             ) : null}
+            <div className="mt-8 border-t border-[var(--sh-line-subtle)] pt-5">
+              <p className="text-xs font-semibold text-[var(--sh-ink-faint)]">十二部分结构</p>
+              <ol className="mt-3 grid grid-cols-2 gap-x-5 gap-y-1 sm:grid-cols-3">
+                {lessonPlanSections.map(([key, label]) => (
+                  <li
+                    className="flex min-h-9 items-center text-xs leading-5 text-[var(--sh-ink-muted)]"
+                    key={key}
+                  >
+                    {label}
+                  </li>
+                ))}
+              </ol>
+            </div>
           </div>
-          <aside className="order-2 bg-[var(--sh-surface-elevated)] p-5 xl:order-3">
+          <aside className="order-2 self-stretch bg-[var(--sh-surface-elevated)] p-5">
             <p className="text-xs font-semibold text-[var(--sh-ink-faint)]">当前状态</p>
             <h2 className="mt-2 font-semibold text-[var(--sh-ink-strong)]">尚未生成</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--sh-ink-muted)]">
               当前课时还没有教案正文。
             </p>
+            <ol className="mt-5 border-t border-[var(--sh-line-subtle)] pt-3">
+              {["生成教案", "编辑草稿", "质量检查", "教师批准"].map((label, index) => (
+                <li className="flex min-h-11 items-center gap-3 text-sm" key={label}>
+                  <span
+                    className={`grid size-6 shrink-0 place-items-center rounded-full border text-xs font-semibold ${index === 0 ? "border-[var(--sh-brand-400)] bg-[var(--sh-brand-50)] text-[var(--sh-brand-700)]" : "border-[var(--sh-line-default)] text-[var(--sh-ink-faint)]"}`}
+                  >
+                    {index + 1}
+                  </span>
+                  <span
+                    className={
+                      index === 0
+                        ? "font-medium text-[var(--sh-ink-strong)]"
+                        : "text-[var(--sh-ink-muted)]"
+                    }
+                  >
+                    {label}
+                  </span>
+                  <span className="ml-auto text-xs text-[var(--sh-ink-faint)]">
+                    {index === 0 ? "待开始" : "等待"}
+                  </span>
+                </li>
+              ))}
+            </ol>
           </aside>
         </section>
       )}
