@@ -182,6 +182,8 @@ async def test_video_worker_persists_verified_candidate_and_refreshes_playback(
                 storage=storage,
                 settings=settings,
             )
+            assert outcome == "succeeded"
+            assert duplicate == "ignored"
             snapshot = await client.get(
                 f"/api/v2/projects/{seeded.project_id}/lessons/{lesson.lesson_id}/video"
             )
@@ -195,8 +197,6 @@ async def test_video_worker_persists_verified_candidate_and_refreshes_playback(
                 media_type="video/mp4",
             )
             drifted_playback = await client.get(playback_url)
-        assert outcome == "succeeded"
-        assert duplicate == "ignored"
         assert claimed_lease_seconds == [40]
         assert provider.submitted_prompt is not None
         assert "intro_selection.snapshot" in provider.submitted_prompt
@@ -438,6 +438,7 @@ def _settings(database_url: str) -> Settings:
         session_allowed_origins=[],
         session_csrf_secret=None,
         session_teacher_principal_id=None,
+        object_storage_bucket="shanhaiedu",
         video_provider_poll_seconds=0.01,
         video_provider_max_wait_seconds=10,
     )
