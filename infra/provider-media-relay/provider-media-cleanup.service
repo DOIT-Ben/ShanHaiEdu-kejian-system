@@ -6,10 +6,10 @@ After=shanhai-provider-media-relay.service
 Type=oneshot
 User=shanhai-dev
 Group=shanhai-dev
-WorkingDirectory=/srv/shanhaiedu/repository
+WorkingDirectory=/opt/shanhaiedu/provider-media-relay
 EnvironmentFile=/etc/shanhaiedu/provider-media-cleanup.env
 Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStart=/srv/shanhaiedu/repository/.venv/bin/python -m apps.api.cli provider-media-cleanup
+ExecStart=/usr/bin/python3 /opt/shanhaiedu/provider-media-relay/provider_media_relay.py --cleanup
 
 NoNewPrivileges=yes
 PrivateTmp=yes

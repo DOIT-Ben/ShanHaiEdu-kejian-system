@@ -2,6 +2,11 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
+import os
+import subprocess
+import sys
+import time
 from pathlib import Path
 from threading import Thread
 from urllib.error import HTTPError
@@ -13,6 +18,7 @@ from apps.api.provider_media_relay import (
     ProviderMediaRelayConfig,
     ProviderMediaRelayServer,
     ProviderMediaRequestError,
+    cleanup_expired_provider_media,
     resolve_media_request,
     sign_media_path,
 )
@@ -192,6 +198,31 @@ def test_http_relay_serves_valid_image_without_caching(tmp_path: Path) -> None:
         thread.join(timeout=1)
 
 
+def test_standalone_cleanup_needs_no_signing_secret(tmp_path: Path) -> None:
+    stale = tmp_path / f"{'a' * 32}.png"
+    stale.write_bytes(PNG_BYTES)
+    os.utime(stale, (time.time() - 61, time.time() - 61))
+    unrelated = tmp_path / "operator-note.txt"
+    unrelated.write_text("preserve", encoding="utf-8")
+    script = Path(__file__).resolve().parents[2] / "apps/api/provider_media_relay.py"
+    environment = os.environ.copy()
+    environment["SHANHAI_PROVIDER_MEDIA_ROOT"] = str(tmp_path)
+    environment["SHANHAI_PROVIDER_MEDIA_MAX_TTL_SECONDS"] = "60"
+    environment.pop("SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET", None)
+
+    completed = subprocess.run(
+        [sys.executable, "-I", str(script), "--cleanup"],
+        check=True,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert json.loads(completed.stdout) == {"conclusion": "passed", "removed": 1}
+    assert not stale.exists()
+    assert unrelated.read_text(encoding="utf-8") == "preserve"
+
+
 def test_expired_media_cleanup_is_scheduled_independently() -> None:
     root = Path(__file__).resolve().parents[2]
     relay_service = (root / "infra/provider-media-relay/provider-media-relay.service").read_text(
@@ -220,13 +251,19 @@ def test_expired_media_cleanup_is_scheduled_independently() -> None:
     assert "provider-media-relay.env" not in service
     assert "SIGNING_SECRET" not in cleanup_env
     assert "SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET=" not in relay_env
+    assert "WorkingDirectory=/opt/shanhaiedu/provider-media-relay" in service
+    assert (
+        "ExecStart=/usr/bin/python3 "
+        "/opt/shanhaiedu/provider-media-relay/provider_media_relay.py --cleanup"
+    ) in service
+    assert "/srv/shanhaiedu/repository/.venv" not in service
     assert "ReadWritePaths=/srv/shanhaiedu/runtime/provider-media" in service
     assert "OnUnitActiveSec=60s" in timer
     assert "Persistent=true" in timer
     assert "systemctl restart shanhai-provider-media-relay.service" in runbook
     assert "/proc/${relay_pid}/environ" in runbook
-    assert "git rev-parse origin/main" in runbook
-    assert "sha256sum apps/api/provider_media_relay.py" in runbook
+    assert 'git -C "${repository_root}" rev-parse origin/main' in runbook
+    assert 'sha256sum "${relay_staging}"' in runbook
     assert "sha256sum /opt/shanhaiedu/provider-media-relay/provider_media_relay.py" in runbook
     assert "date -u +%Y-%m-%dT%H:%M:%SZ" in runbook
 
@@ -234,26 +271,41 @@ def test_expired_media_cleanup_is_scheduled_independently() -> None:
 def test_relay_deploy_provenance_fails_closed_before_mutation() -> None:
     root = Path(__file__).resolve().parents[2]
     runbook = (root / "infra/provider-media-relay/README.md").read_text(encoding="utf-8")
-    stale_checkout_check = 'test "$(git rev-parse HEAD)" = "${deployment_origin_main_sha}"'
-    dirty_source_check = (
-        'git show "${deployment_origin_main_sha}:apps/api/provider_media_relay.py" '
-        "| cmp --silent - apps/api/provider_media_relay.py"
-    )
-    installed_blob_check = (
-        'git show "${deployment_origin_main_sha}:apps/api/provider_media_relay.py" '
-        "| cmp --silent - /opt/shanhaiedu/provider-media-relay/provider_media_relay.py"
+    fetch = 'sudo -u shanhai-dev -H git -C "${repository_root}" fetch origin --prune'
+    staged_blob = (
+        'git -C "${repository_root}" show '
+        '"${deployment_origin_main_sha}:apps/api/provider_media_relay.py" '
+        '> "${relay_staging}"'
     )
     relay_install = (
-        "install -m 0555 -o root -g root apps/api/provider_media_relay.py "
+        'install -m 0555 -o root -g root "${relay_staging}" '
+        "/opt/shanhaiedu/provider-media-relay/provider_media_relay.py"
+    )
+    installed_blob_check = (
+        'cmp --silent "${relay_staging}" '
         "/opt/shanhaiedu/provider-media-relay/provider_media_relay.py"
     )
     first_mutation = runbook.index("id -u shanhai-relay")
     first_install = runbook.index("install -d -m 0755")
     restart = runbook.index("systemctl restart shanhai-provider-media-relay.service")
 
-    assert runbook.index("set -euo pipefail") < runbook.index(stale_checkout_check)
-    assert runbook.index(stale_checkout_check) < first_mutation < first_install
-    assert runbook.index(dirty_source_check) < first_mutation
+    assert runbook.index("set -euo pipefail") < runbook.index(fetch)
+    assert runbook.index(fetch) < runbook.index(staged_blob) < first_mutation < first_install
     assert runbook.index(relay_install) < runbook.index(installed_blob_check) < restart
-    assert 'test "${relay_source_sha256}" = "${relay_blob_sha256}"' in runbook
+    assert 'test "${relay_staged_sha256}" = "${relay_blob_sha256}"' in runbook
     assert 'test "${relay_installed_sha256}" = "${relay_blob_sha256}"' in runbook
+    assert 'test "$(git rev-parse HEAD)"' not in runbook
+    assert "/srv/shanhaiedu/repository/.venv/bin/python" not in runbook
+    assert "/etc/shanhaiedu/image-video-smoke.env" in runbook
+    assert 'old_url="$(cd "${deployment_staging}"' in runbook
+    assert "provider-media-cleanup-keep.txt" in runbook
+    assert "journalctl -u shanhai-provider-media-relay.service" in runbook
+
+
+def test_cleanup_contract_is_shared_by_runtime_and_model_gateway(tmp_path: Path) -> None:
+    stale = tmp_path / f"{'b' * 32}.webp"
+    stale.write_bytes(PNG_BYTES)
+    os.utime(stale, (time.time() - 61, time.time() - 61))
+
+    assert cleanup_expired_provider_media(tmp_path, ttl_seconds=60, now=time.time()) == 1
+    assert not stale.exists()

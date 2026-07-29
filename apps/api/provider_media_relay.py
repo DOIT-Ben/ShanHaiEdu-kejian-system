@@ -5,15 +5,17 @@ from __future__ import annotations
 import argparse
 import hashlib
 import hmac
+import json
 import logging
 import os
 import re
 import stat
 import time
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from itertools import islice
 from pathlib import Path
 from typing import cast
 from urllib.parse import parse_qs, quote, urlencode, urlsplit
@@ -27,6 +29,8 @@ _ALLOWED_MEDIA_TYPES = {
     ".webp": "image/webp",
 }
 _FILENAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,254}", re.ASCII)
+_OPAQUE_FILENAME = re.compile(r"[0-9a-f]{32}\.(?:png|jpg|webp)", re.ASCII)
+_PARTIAL_FILENAME = re.compile(r"\.provider-media-[0-9a-f]{32}\.partial", re.ASCII)
 _SIGNING_SECRET_PATTERN = re.compile(r"[0-9A-Fa-f]{64}", re.ASCII)
 _PUBLIC_SIGNING_SECRET_PLACEHOLDERS = frozenset(
     {
@@ -192,10 +196,59 @@ def build_relay_config(environ: Mapping[str, str] | None = None) -> ProviderMedi
     )
 
 
-def main() -> int:
+def cleanup_expired_provider_media(
+    relay_root: Path,
+    *,
+    ttl_seconds: int,
+    now: float | None = None,
+    scan_limit: int = 10_000,
+) -> int:
+    """Remove expired opaque relay files without following symlinks."""
+
+    if ttl_seconds < 1 or scan_limit < 1:
+        raise ValueError("provider media cleanup bounds must be positive")
+    root = relay_root.resolve()
+    if not root.is_dir():
+        raise ValueError("relay_root must be an existing directory")
+    cutoff = (time.time() if now is None else now) - ttl_seconds
+    removed = 0
+    candidates = (
+        candidate
+        for candidate in root.iterdir()
+        if (
+            _OPAQUE_FILENAME.fullmatch(candidate.name)
+            or _PARTIAL_FILENAME.fullmatch(candidate.name)
+        )
+        and not candidate.is_symlink()
+    )
+    for candidate in islice(candidates, scan_limit):
+        try:
+            if candidate.is_file() and candidate.stat().st_mtime <= cutoff:
+                candidate.unlink()
+                removed += 1
+        except OSError:
+            continue
+    return removed
+
+
+def run_cleanup(environ: Mapping[str, str] | None = None) -> int:
+    """Run scheduled cleanup from the non-secret cleanup environment."""
+
+    values = os.environ if environ is None else environ
+    root = Path(_required_environment_value(values, "SHANHAI_PROVIDER_MEDIA_ROOT"))
+    ttl_seconds = _environment_int(values, "SHANHAI_PROVIDER_MEDIA_MAX_TTL_SECONDS", 300)
+    removed = cleanup_expired_provider_media(root, ttl_seconds=ttl_seconds)
+    print(json.dumps({"conclusion": "passed", "removed": removed}, ensure_ascii=True))
+    return 0
+
+
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="serve short-lived provider media references")
+    parser.add_argument("--cleanup", action="store_true")
     parser.add_argument("--port", type=int, default=8201)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    if args.cleanup:
+        return run_cleanup()
     if not 1 <= args.port <= 65_535:
         parser.error("--port must be between 1 and 65535")
     server = ProviderMediaRelayServer(args.port, build_relay_config())
