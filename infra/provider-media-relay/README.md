@@ -18,11 +18,13 @@ This service exposes one short-lived, signed PNG/JPEG/WebP GET path to an extern
 Run all deploy steps below in one privileged shell so the pinned `origin/main` SHA and blob hash remain unchanged between preflight, installation, and restart. Any failed command must stop the deployment; do not continue from a failed step.
 
 1. Before `useradd`, `install`, service restart, or Nginx reload, fetch as the repository owner and pin `origin/main`. Stage every installed file directly from that commit's Git objects. This deliberately leaves the canonical checkout's branch, index, and dirty files untouched:
-
    ```bash
    set -euo pipefail
+   umask 077
    repository_root=/srv/shanhaiedu/repository
    producer_env=/etc/shanhaiedu/image-video-smoke.env
+   backup_pointer=/srv/shanhaiedu/backups/provider-media-relay-prechange.current
+   test ! -e "${backup_pointer}"
    test -f "${producer_env}"
    test "$(grep -c '^SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET=' "${producer_env}")" -eq 1
    sudo -u shanhai-dev -H git -C "${repository_root}" fetch origin --prune
@@ -69,7 +71,6 @@ EOF
    ```
 
 2. Create a dedicated relay identity, the runtime directory, and separate relay/cleanup configuration files. The cleanup process must never receive the signing secret:
-
    ```bash
    relay_was_active="$(systemctl is-active shanhai-provider-media-relay.service 2>/dev/null || true)"
    relay_was_enabled="$(systemctl is-enabled shanhai-provider-media-relay.service 2>/dev/null || true)"
@@ -90,6 +91,8 @@ EOF
        cp --preserve=mode,ownership,timestamps "${source}" "${backup_root}/$(basename "${source}")"
      fi
    done
+   printf '%s %s %s %s\n' "${relay_was_active}" "${relay_was_enabled}" "${timer_was_active}" "${timer_was_enabled}" > "${backup_root}/service-state"
+   printf '%s\n' "${backup_root}" > "${backup_pointer}"
    id -u shanhai-relay >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin shanhai-relay
    relay_uid="$(id -u shanhai-relay)"
    uid_min="$(awk '$1 == "UID_MIN" {print $2; exit}' /etc/login.defs)"
@@ -106,11 +109,9 @@ EOF
    install -m 0600 -o root -g root "${relay_env_staging}" /etc/shanhaiedu/provider-media-relay.env
    install -m 0600 -o root -g root "${cleanup_env_staging}" /etc/shanhaiedu/provider-media-cleanup.env
    ```
-
    These checks fail closed if a pre-existing `shanhai-relay` is not a locked system account with no interactive shell or has an existing home directory. The relay runs root-owned installed code as `shanhai-relay` with the `shanhai-dev` group so it can read opaque `0640` relay files without sharing a UID or writable executable code with the producer.
 
 3. Generate 32 random bytes on the server, encode them as exactly 64 hexadecimal characters, and atomically place the same value in the relay and controlled producer environments. The value is passed to the updater on standard input, never printed or placed in a command argument. The cleanup environment remains non-secret:
-
    ```bash
    new_secret="$(openssl rand -hex 32)"
    test "${#new_secret}" -eq 64
@@ -149,11 +150,9 @@ finally:
    test "$(grep -c '^SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET=' /etc/shanhaiedu/provider-media-cleanup.env || true)" -eq 0
    unset new_secret relay_secret producer_secret
    ```
-
    Do not use repeated characters, published examples, placeholders, or values copied from another environment. Keep the dedicated root and TTL no greater than 300 seconds. The previous process ran under the producer UID, so the old secret is treated as exposed and must not be reused.
 
 4. Install the independent expiry-cleanup timer and Nginx location. Back up the exact vhost before modifying it:
-
    ```bash
    install -m 0644 "${relay_service_staging}" /etc/systemd/system/shanhai-provider-media-relay.service
    install -m 0644 "${cleanup_service_staging}" /etc/systemd/system/provider-media-cleanup.service
@@ -163,17 +162,14 @@ finally:
    ```
 
 5. Ensure this line already appears exactly once inside the existing `server {}` block in `/etc/nginx/sites-enabled/newapi.doitbenai.cloud`. Add it only when absent; never duplicate it or edit `/v1/videos` or any existing media route.
-
    ```nginx
    include /etc/nginx/snippets/shanhai-provider-media-relay.conf;
    ```
-
    ```bash
    test "$(grep -Fc 'include /etc/nginx/snippets/shanhai-provider-media-relay.conf;' /etc/nginx/sites-enabled/newapi.doitbenai.cloud)" -eq 1
    ```
 
 6. Before any service restart or Nginx reload, compare the installed `/opt` relay byte-for-byte with the same pinned Git blob and verify its SHA-256. Record only the pinned `origin/main` SHA, the verified blob/installed-file SHA-256, and UTC validation time with the operations evidence for #165. Never include environment contents or the signing secret. Continue to service and Nginx validation only after these provenance checks succeed:
-
    ```bash
    cmp --silent "${relay_staging}" /opt/shanhaiedu/provider-media-relay/provider_media_relay.py
    relay_installed_sha256="$(sha256sum /opt/shanhaiedu/provider-media-relay/provider_media_relay.py | cut -d ' ' -f 1)"
@@ -206,7 +202,6 @@ finally:
 ## HTTPS Smoke
 
 Reuse the runtime-only test frame that returned `200` before rotation. It is not an application asset and must be removed after the check.
-
 ```bash
 set -euo pipefail
 test -f "${smoke_path}"
@@ -214,7 +209,6 @@ test "$(stat -c '%U:%G:%a' "${smoke_path}")" = "shanhai-dev:shanhai-dev:640"
 ```
 
 Generate and consume a URL without printing it or putting it in a shell command line:
-
 ```bash
 set -euo pipefail
 set -a
@@ -234,7 +228,6 @@ The new request must return `200`; its modified form and a freshly signed reques
 ## Cleanup Timer Smoke
 
 Create only strict cleanup candidates plus one unrelated marker, then wait for the enabled timer rather than invoking a generation request:
-
 ```bash
 set -euo pipefail
 cleanup_root=/srv/shanhaiedu/runtime/provider-media
@@ -263,10 +256,17 @@ unset cleanup_root opaque_smoke partial_smoke keep_smoke
 ## Rollback
 
 Stop the new units, restore every replaced file, and return relay/timer enablement and activity to their recorded pre-change states.
-
 ```bash
-systemctl disable --now provider-media-cleanup.timer shanhai-provider-media-relay.service
-test -n "${backup_root:-}"
+set -euo pipefail
+backup_pointer=/srv/shanhaiedu/backups/provider-media-relay-prechange.current
+test -f "${backup_pointer}"
+IFS= read -r backup_root < "${backup_pointer}"
+case "${backup_root}" in /srv/shanhaiedu/backups/provider-media-relay-prechange.*) ;; *) exit 1 ;; esac
+test -d "${backup_root}"
+read -r relay_was_active relay_was_enabled timer_was_active timer_was_enabled < "${backup_root}/service-state"
+for unit in provider-media-cleanup.timer shanhai-provider-media-relay.service; do
+  if systemctl cat "${unit}" >/dev/null 2>&1; then systemctl disable --now "${unit}"; fi
+done
 restore_or_remove() {
   backup_name="$1" destination="$2" mode="$3"
   if test -f "${backup_root}/${backup_name}"; then
@@ -295,6 +295,6 @@ if test -f /etc/systemd/system/provider-media-cleanup.timer; then
 fi
 nginx -t
 systemctl reload nginx
+rm -f -- "${backup_pointer}"
 ```
-
 Keep the root-only environment file and runtime directory private for diagnosis; delete them only through a separately approved credential-rotation and data-cleanup task.

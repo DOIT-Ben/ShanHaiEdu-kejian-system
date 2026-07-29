@@ -332,6 +332,16 @@ def test_relay_deploy_provenance_fails_closed_before_mutation() -> None:
     assert "provider-media-cleanup-keep.txt" in runbook
     assert "journalctl -u shanhai-provider-media-relay.service" in runbook
     rollback = runbook.split("## Rollback", 1)[1]
+    backup_pointer = "/srv/shanhaiedu/backups/provider-media-relay-prechange.current"
+    pointer_write = 'printf \'%s\\n\' "${backup_root}" > "${backup_pointer}"'
+    assert f"backup_pointer={backup_pointer}" in runbook
+    assert 'test ! -e "${backup_pointer}"' in runbook
+    assert runbook.index(pointer_write) < runbook.index("id -u shanhai-relay")
+    assert 'IFS= read -r backup_root < "${backup_pointer}"' in rollback
+    assert (
+        "read -r relay_was_active relay_was_enabled timer_was_active timer_was_enabled" in rollback
+    )
+    assert 'if systemctl cat "${unit}"' in rollback
     assert "relay_was_active" in rollback
     assert "relay_was_enabled" in rollback
     assert "provider_media_relay.py" in rollback
