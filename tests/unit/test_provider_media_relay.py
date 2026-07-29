@@ -223,6 +223,29 @@ def test_standalone_cleanup_needs_no_signing_secret(tmp_path: Path) -> None:
     assert unrelated.read_text(encoding="utf-8") == "preserve"
 
 
+def test_standalone_cleanup_rejects_ttl_above_runtime_limit(tmp_path: Path) -> None:
+    stale = tmp_path / f"{'c' * 32}.jpg"
+    stale.write_bytes(PNG_BYTES)
+    os.utime(stale, (time.time() - 3_602, time.time() - 3_602))
+    script = Path(__file__).resolve().parents[2] / "apps/api/provider_media_relay.py"
+    environment = os.environ.copy()
+    environment["SHANHAI_PROVIDER_MEDIA_ROOT"] = str(tmp_path)
+    environment["SHANHAI_PROVIDER_MEDIA_MAX_TTL_SECONDS"] = "3601"
+    environment.pop("SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET", None)
+
+    completed = subprocess.run(
+        [sys.executable, "-I", str(script), "--cleanup"],
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert completed.returncode != 0
+    assert "between 1 and 3600" in completed.stderr
+    assert stale.exists()
+
+
 def test_expired_media_cleanup_is_scheduled_independently() -> None:
     root = Path(__file__).resolve().parents[2]
     relay_service = (root / "infra/provider-media-relay/provider-media-relay.service").read_text(
@@ -262,7 +285,7 @@ def test_expired_media_cleanup_is_scheduled_independently() -> None:
     assert "Persistent=true" in timer
     assert "systemctl restart shanhai-provider-media-relay.service" in runbook
     assert "/proc/${relay_pid}/environ" in runbook
-    assert 'git -C "${repository_root}" rev-parse origin/main' in runbook
+    assert 'sudo -u shanhai-dev -H git -C "${repository_root}" rev-parse origin/main' in runbook
     assert 'sha256sum "${relay_staging}"' in runbook
     assert "sha256sum /opt/shanhaiedu/provider-media-relay/provider_media_relay.py" in runbook
     assert "date -u +%Y-%m-%dT%H:%M:%SZ" in runbook
@@ -273,7 +296,7 @@ def test_relay_deploy_provenance_fails_closed_before_mutation() -> None:
     runbook = (root / "infra/provider-media-relay/README.md").read_text(encoding="utf-8")
     fetch = 'sudo -u shanhai-dev -H git -C "${repository_root}" fetch origin --prune'
     staged_blob = (
-        'git -C "${repository_root}" show '
+        'sudo -u shanhai-dev -H git -C "${repository_root}" show '
         '"${deployment_origin_main_sha}:apps/api/provider_media_relay.py" '
         '> "${relay_staging}"'
     )
@@ -297,9 +320,23 @@ def test_relay_deploy_provenance_fails_closed_before_mutation() -> None:
     assert 'test "$(git rev-parse HEAD)"' not in runbook
     assert "/srv/shanhaiedu/repository/.venv/bin/python" not in runbook
     assert "/etc/shanhaiedu/image-video-smoke.env" in runbook
-    assert 'old_url="$(cd "${deployment_staging}"' in runbook
+    preflight_url = 'old_url_preflight="$(printf \'%s\' "${old_secret}"'
+    first_mutation = runbook.index('backup_root="$(mktemp -d')
+    assert runbook.index(preflight_url) < runbook.index("curl --fail") < first_mutation
+    assert 'test "${old_secret}" != "${new_secret}"' in runbook
+    assert 'old_url="$(printf \'%s\' "${old_secret}"' in runbook
+    assert runbook.count("PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -c") == 3
+    assert "passwd -S shanhai-relay" in runbook
+    assert "/usr/sbin/nologin" in runbook
+    assert "UID_MIN" in runbook
     assert "provider-media-cleanup-keep.txt" in runbook
     assert "journalctl -u shanhai-provider-media-relay.service" in runbook
+    rollback = runbook.split("## Rollback", 1)[1]
+    assert "relay_was_active" in rollback
+    assert "relay_was_enabled" in rollback
+    assert "provider_media_relay.py" in rollback
+    assert "shanhai-provider-media-relay.conf" in rollback
+    assert "systemctl restart shanhai-provider-media-relay.service" in rollback
 
 
 def test_cleanup_contract_is_shared_by_runtime_and_model_gateway(tmp_path: Path) -> None:

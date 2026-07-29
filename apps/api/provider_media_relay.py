@@ -237,6 +237,8 @@ def run_cleanup(environ: Mapping[str, str] | None = None) -> int:
     values = os.environ if environ is None else environ
     root = Path(_required_environment_value(values, "SHANHAI_PROVIDER_MEDIA_ROOT"))
     ttl_seconds = _environment_int(values, "SHANHAI_PROVIDER_MEDIA_MAX_TTL_SECONDS", 300)
+    if not 1 <= ttl_seconds <= 3_600:
+        raise ValueError("max_ttl_seconds must be between 1 and 3600")
     removed = cleanup_expired_provider_media(root, ttl_seconds=ttl_seconds)
     print(json.dumps({"conclusion": "passed", "removed": removed}, ensure_ascii=True))
     return 0

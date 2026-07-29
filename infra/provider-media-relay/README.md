@@ -26,8 +26,9 @@ Run all deploy steps below in one privileged shell so the pinned `origin/main` S
    test -f "${producer_env}"
    test "$(grep -c '^SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET=' "${producer_env}")" -eq 1
    sudo -u shanhai-dev -H git -C "${repository_root}" fetch origin --prune
-   deployment_origin_main_sha="$(git -C "${repository_root}" rev-parse origin/main)"
+   deployment_origin_main_sha="$(sudo -u shanhai-dev -H git -C "${repository_root}" rev-parse origin/main)"
    deployment_staging="$(mktemp -d)"
+   smoke_path=/srv/shanhaiedu/runtime/provider-media/provider-relay-smoke.png
    relay_staging="${deployment_staging}/provider_media_relay.py"
    relay_service_staging="${deployment_staging}/provider-media-relay.service"
    cleanup_service_staging="${deployment_staging}/provider-media-cleanup.service"
@@ -39,30 +40,41 @@ Run all deploy steps below in one privileged shell so the pinned `origin/main` S
      rm -f -- "${relay_staging}" "${relay_service_staging}" \
        "${cleanup_service_staging}" "${cleanup_timer_staging}" \
        "${relay_env_staging}" "${cleanup_env_staging}" "${nginx_staging}"
+     rm -f -- "${smoke_path}"
      rmdir -- "${deployment_staging}"
    }
    trap cleanup_staging EXIT
-
-   git -C "${repository_root}" show "${deployment_origin_main_sha}:apps/api/provider_media_relay.py" > "${relay_staging}"
-   git -C "${repository_root}" show "${deployment_origin_main_sha}:infra/provider-media-relay/provider-media-relay.service" > "${relay_service_staging}"
-   git -C "${repository_root}" show "${deployment_origin_main_sha}:infra/provider-media-relay/provider-media-cleanup.service" > "${cleanup_service_staging}"
-   git -C "${repository_root}" show "${deployment_origin_main_sha}:infra/provider-media-relay/provider-media-cleanup.timer" > "${cleanup_timer_staging}"
-   git -C "${repository_root}" show "${deployment_origin_main_sha}:infra/provider-media-relay/provider-media-relay.env.example" > "${relay_env_staging}"
-   git -C "${repository_root}" show "${deployment_origin_main_sha}:infra/provider-media-relay/provider-media-cleanup.env.example" > "${cleanup_env_staging}"
-   git -C "${repository_root}" show "${deployment_origin_main_sha}:infra/provider-media-relay/provider-media-relay.nginx.conf" > "${nginx_staging}"
-   relay_blob_sha256="$(git -C "${repository_root}" show "${deployment_origin_main_sha}:apps/api/provider_media_relay.py" | sha256sum | cut -d ' ' -f 1)"
+   sudo -u shanhai-dev -H git -C "${repository_root}" show "${deployment_origin_main_sha}:apps/api/provider_media_relay.py" > "${relay_staging}"
+   sudo -u shanhai-dev -H git -C "${repository_root}" show "${deployment_origin_main_sha}:infra/provider-media-relay/provider-media-relay.service" > "${relay_service_staging}"
+   sudo -u shanhai-dev -H git -C "${repository_root}" show "${deployment_origin_main_sha}:infra/provider-media-relay/provider-media-cleanup.service" > "${cleanup_service_staging}"
+   sudo -u shanhai-dev -H git -C "${repository_root}" show "${deployment_origin_main_sha}:infra/provider-media-relay/provider-media-cleanup.timer" > "${cleanup_timer_staging}"
+   sudo -u shanhai-dev -H git -C "${repository_root}" show "${deployment_origin_main_sha}:infra/provider-media-relay/provider-media-relay.env.example" > "${relay_env_staging}"
+   sudo -u shanhai-dev -H git -C "${repository_root}" show "${deployment_origin_main_sha}:infra/provider-media-relay/provider-media-cleanup.env.example" > "${cleanup_env_staging}"
+   sudo -u shanhai-dev -H git -C "${repository_root}" show "${deployment_origin_main_sha}:infra/provider-media-relay/provider-media-relay.nginx.conf" > "${nginx_staging}"
+   relay_blob_sha256="$(sudo -u shanhai-dev -H git -C "${repository_root}" show "${deployment_origin_main_sha}:apps/api/provider_media_relay.py" | sha256sum | cut -d ' ' -f 1)"
    relay_staged_sha256="$(sha256sum "${relay_staging}" | cut -d ' ' -f 1)"
    test "${relay_staged_sha256}" = "${relay_blob_sha256}"
-   set -a
+   test ! -e "${smoke_path}"
+   base64 -d > "${smoke_path}" <<'EOF'
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mNk+M/wHwAF/gL+3MxZ5wAAAABJRU5ErkJggg==
+EOF
+   chown shanhai-dev:shanhai-dev "${smoke_path}"
+   chmod 0640 "${smoke_path}"
    . /etc/shanhaiedu/provider-media-relay.env
-   set +a
-   old_url="$(cd "${deployment_staging}" && /usr/bin/python3 -c 'from provider_media_relay import sign_media_path; import os, time; print("https://newapi.doitbenai.cloud/_shanhai-provider-media" + sign_media_path("provider-relay-smoke.png", expires_at=int(time.time()) + 300, secret=os.environ["SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET"]))')"
+   old_secret="${SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET}"
    unset SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET
+   old_url_preflight="$(printf '%s' "${old_secret}" | (cd "${deployment_staging}" && PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -c 'from provider_media_relay import sign_media_path; import sys, time; print("https://newapi.doitbenai.cloud/_shanhai-provider-media" + sign_media_path("provider-relay-smoke.png", expires_at=int(time.time()) + 60, secret=sys.stdin.read()))'))"
+   curl --fail --silent --show-error --output /dev/null "${old_url_preflight}"
+   unset old_url_preflight
    ```
 
 2. Create a dedicated relay identity, the runtime directory, and separate relay/cleanup configuration files. The cleanup process must never receive the signing secret:
 
    ```bash
+   relay_was_active="$(systemctl is-active shanhai-provider-media-relay.service 2>/dev/null || true)"
+   relay_was_enabled="$(systemctl is-enabled shanhai-provider-media-relay.service 2>/dev/null || true)"
+   timer_was_active="$(systemctl is-active provider-media-cleanup.timer 2>/dev/null || true)"
+   timer_was_enabled="$(systemctl is-enabled provider-media-cleanup.timer 2>/dev/null || true)"
    backup_root="$(mktemp -d /srv/shanhaiedu/backups/provider-media-relay-prechange.XXXXXX)"
    for source in \
      /opt/shanhaiedu/provider-media-relay/provider_media_relay.py \
@@ -79,6 +91,14 @@ Run all deploy steps below in one privileged shell so the pinned `origin/main` S
      fi
    done
    id -u shanhai-relay >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin shanhai-relay
+   relay_uid="$(id -u shanhai-relay)"
+   uid_min="$(awk '$1 == "UID_MIN" {print $2; exit}' /etc/login.defs)"
+   test -n "${uid_min}" && test "${relay_uid}" -lt "${uid_min}"
+   test "$(getent passwd shanhai-relay | cut -d: -f7)" = "/usr/sbin/nologin"
+   relay_password_state="$(passwd -S shanhai-relay | awk '{print $2}')"
+   case "${relay_password_state}" in L|LK) ;; *) exit 1 ;; esac
+   test ! -d "$(getent passwd shanhai-relay | cut -d: -f6)"
+   unset relay_uid uid_min relay_password_state
    install -d -m 0755 -o root -g root /opt/shanhaiedu/provider-media-relay
    install -m 0555 -o root -g root "${relay_staging}" /opt/shanhaiedu/provider-media-relay/provider_media_relay.py
    install -d -m 0750 -o shanhai-dev -g shanhai-dev /srv/shanhaiedu/runtime/provider-media
@@ -87,20 +107,20 @@ Run all deploy steps below in one privileged shell so the pinned `origin/main` S
    install -m 0600 -o root -g root "${cleanup_env_staging}" /etc/shanhaiedu/provider-media-cleanup.env
    ```
 
-   If `shanhai-relay` already exists, verify it is a locked system account with no interactive shell instead of recreating it. The relay runs root-owned installed code as `shanhai-relay` with the `shanhai-dev` group so it can read opaque `0640` relay files without sharing a UID or writable executable code with the producer.
+   These checks fail closed if a pre-existing `shanhai-relay` is not a locked system account with no interactive shell or has an existing home directory. The relay runs root-owned installed code as `shanhai-relay` with the `shanhai-dev` group so it can read opaque `0640` relay files without sharing a UID or writable executable code with the producer.
 
 3. Generate 32 random bytes on the server, encode them as exactly 64 hexadecimal characters, and atomically place the same value in the relay and controlled producer environments. The value is passed to the updater on standard input, never printed or placed in a command argument. The cleanup environment remains non-secret:
 
    ```bash
    new_secret="$(openssl rand -hex 32)"
    test "${#new_secret}" -eq 64
+   test "${old_secret}" != "${new_secret}"
    printf '\nSHANHAI_PROVIDER_MEDIA_SIGNING_SECRET=%s\n' "${new_secret}" >> /etc/shanhaiedu/provider-media-relay.env
    printf '%s' "${new_secret}" | /usr/bin/python3 -c '
 import os
 from pathlib import Path
 import sys
 import tempfile
-
 path = Path(sys.argv[1])
 secret = sys.stdin.read()
 prefix = "SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET="
@@ -185,15 +205,12 @@ finally:
 
 ## HTTPS Smoke
 
-Create a runtime-only test frame. It is not an application asset and must be removed after the check.
+Reuse the runtime-only test frame that returned `200` before rotation. It is not an application asset and must be removed after the check.
 
 ```bash
 set -euo pipefail
-base64 -d > /srv/shanhaiedu/runtime/provider-media/provider-relay-smoke.png <<'EOF'
-iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mNk+M/wHwAF/gL+3MxZ5wAAAABJRU5ErkJggg==
-EOF
-chown shanhai-dev:shanhai-dev /srv/shanhaiedu/runtime/provider-media/provider-relay-smoke.png
-chmod 0640 /srv/shanhaiedu/runtime/provider-media/provider-relay-smoke.png
+test -f "${smoke_path}"
+test "$(stat -c '%U:%G:%a' "${smoke_path}")" = "shanhai-dev:shanhai-dev:640"
 ```
 
 Generate and consume a URL without printing it or putting it in a shell command line:
@@ -203,15 +220,16 @@ set -euo pipefail
 set -a
 . /etc/shanhaiedu/provider-media-relay.env
 set +a
-url="$(cd /opt/shanhaiedu/provider-media-relay && /usr/bin/python3 -c 'from provider_media_relay import sign_media_path; import os, time; print("https://newapi.doitbenai.cloud/_shanhai-provider-media" + sign_media_path("provider-relay-smoke.png", expires_at=int(time.time()) + 60, secret=os.environ["SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET"]))')"
+url="$(cd /opt/shanhaiedu/provider-media-relay && PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -c 'from provider_media_relay import sign_media_path; import os, time; print("https://newapi.doitbenai.cloud/_shanhai-provider-media" + sign_media_path("provider-relay-smoke.png", expires_at=int(time.time()) + 60, secret=os.environ["SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET"]))')"
+old_url="$(printf '%s' "${old_secret}" | (cd /opt/shanhaiedu/provider-media-relay && PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -c 'from provider_media_relay import sign_media_path; import sys, time; print("https://newapi.doitbenai.cloud/_shanhai-provider-media" + sign_media_path("provider-relay-smoke.png", expires_at=int(time.time()) + 60, secret=sys.stdin.read()))'))"
 curl --fail --silent --show-error --output /dev/null "$url"
 if curl --fail --silent --output /dev/null "${url}x"; then exit 1; fi
 if curl --fail --silent --output /dev/null "${old_url}"; then exit 1; fi
-unset url old_url SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET
-rm -f /srv/shanhaiedu/runtime/provider-media/provider-relay-smoke.png
+unset url old_url old_secret SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET
+rm -f -- "${smoke_path}"
 ```
 
-The valid request must return `200` and the modified request must return `404`. Confirm that no `signature=` value appears in the relay journal or the Nginx access log. Do not call the billable video Provider in this infrastructure issue.
+The new request must return `200`; its modified form and a freshly signed request using the old secret must both return `404`. Confirm that no `signature=` value appears in the relay journal or the Nginx access log. Do not call the billable video Provider in this infrastructure issue.
 
 ## Cleanup Timer Smoke
 
@@ -244,23 +262,37 @@ unset cleanup_root opaque_smoke partial_smoke keep_smoke
 
 ## Rollback
 
-Stop the relay and restore the exact backed-up vhost. Do not leave the public Nginx location pointing at a stopped service.
+Stop the new units, restore every replaced file, and return relay/timer enablement and activity to their recorded pre-change states.
 
 ```bash
 systemctl disable --now provider-media-cleanup.timer shanhai-provider-media-relay.service
 test -n "${backup_root:-}"
-install -m 0644 "${backup_root}/newapi.doitbenai.cloud" /etc/nginx/sites-enabled/newapi.doitbenai.cloud
-for unit in shanhai-provider-media-relay.service provider-media-cleanup.service provider-media-cleanup.timer; do
-  if test -f "${backup_root}/${unit}"; then
-    install -m 0644 "${backup_root}/${unit}" "/etc/systemd/system/${unit}"
+restore_or_remove() {
+  backup_name="$1" destination="$2" mode="$3"
+  if test -f "${backup_root}/${backup_name}"; then
+    install -m "${mode}" "${backup_root}/${backup_name}" "${destination}"
+  else
+    rm -f -- "${destination}"
   fi
+}
+restore_or_remove provider_media_relay.py /opt/shanhaiedu/provider-media-relay/provider_media_relay.py 0555
+restore_or_remove shanhai-provider-media-relay.conf /etc/nginx/snippets/shanhai-provider-media-relay.conf 0644
+restore_or_remove newapi.doitbenai.cloud /etc/nginx/sites-enabled/newapi.doitbenai.cloud 0644
+for unit in shanhai-provider-media-relay.service provider-media-cleanup.service provider-media-cleanup.timer; do
+  restore_or_remove "${unit}" "/etc/systemd/system/${unit}" 0644
 done
 for env_file in provider-media-relay.env provider-media-cleanup.env image-video-smoke.env; do
-  if test -f "${backup_root}/${env_file}"; then
-    install -m 0600 "${backup_root}/${env_file}" "/etc/shanhaiedu/${env_file}"
-  fi
+  restore_or_remove "${env_file}" "/etc/shanhaiedu/${env_file}" 0600
 done
 systemctl daemon-reload
+if test -f /etc/systemd/system/shanhai-provider-media-relay.service; then
+  if test "${relay_was_enabled}" = enabled; then systemctl enable shanhai-provider-media-relay.service; else systemctl disable shanhai-provider-media-relay.service; fi
+  if test "${relay_was_active}" = active; then systemctl restart shanhai-provider-media-relay.service; else systemctl stop shanhai-provider-media-relay.service; fi
+fi
+if test -f /etc/systemd/system/provider-media-cleanup.timer; then
+  if test "${timer_was_enabled}" = enabled; then systemctl enable provider-media-cleanup.timer; else systemctl disable provider-media-cleanup.timer; fi
+  if test "${timer_was_active}" = active; then systemctl start provider-media-cleanup.timer; else systemctl stop provider-media-cleanup.timer; fi
+fi
 nginx -t
 systemctl reload nginx
 ```
