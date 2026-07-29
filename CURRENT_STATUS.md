@@ -1,8 +1,8 @@
 # 当前项目状态
 
-当前阶段：阶段1后端基座以及R1教材范围、课时划分、十二部分教案和三类九套四个教师可见文本结果已经进入`main`；受控真实文本Provider教师黄金项目、独立审查、合并和`main`复验均已完成。
-> 最后核验：2026-07-28。
-> 当前任务：R1没有剩余实现或验收任务；[PR #242](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/242)已合并，merge commit `e0fc7d0`的本地与main push复验均已通过，后续工作必须按教师可见结果另建Issue。
+当前阶段：阶段1后端基座以及R1教材范围、课时划分、十二部分教案和三类九套四个教师可见文本结果已经进入`main`；受控真实文本Provider教师黄金项目、独立审查、合并和`main`复验均已完成。约6秒课堂导入短片黄金纵向切片已经暂停，当前先完成其受控媒体relay安全运行形态。
+> 最后核验：2026-07-29。
+> 当前任务：[Issue #165](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/165)由[Draft PR #249](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/249)承载；先修复不依赖dirty canonical checkout或项目`.venv`的root-owned relay/cleanup部署合同，再经独立审查、合并授权和受控服务器验收完成安全迁移。[Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)保持`status:blocked`，[Draft PR #247](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/247)不恢复、不转Ready、不合并。
 
 ## 当前可演示成果
 
@@ -33,6 +33,9 @@
 
 ## 当前工作
 
+- [Issue #165](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/165)正在修复受控媒体relay部署：relay与独立cleanup共享root-owned标准库`/opt`运行时，安装文件绑定exact fetched `origin/main` Git blob，保留canonical checkout的branch、index和用户dirty files。
+- [Draft PR #249](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/249)是#165的唯一实现现场；live preflight已确认现行relay仍使用`shanhai-dev`和旧worktree，canonical`.venv`为空，独立账号、`/opt`runtime和cleanup timer尚未部署。服务器尚未轮换密钥、重启服务或修改Nginx，也未调用Provider。
+- [Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)的约6秒课堂导入短片黄金纵向切片保持blocked；[Draft PR #247](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/247)保留为暂停的唯一实现现场。
 - [Issue #239](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/239)已经由[PR #240](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/240)完成主线状态收口并关闭。
 - [Issue #241](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/241)已由[PR #242](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/242)完成技术交付；生产Worker在未注入测试模型时通过现有`build_real_text_gateway()`调用真实文本Provider，普通CI继续使用确定性Fake。
 - #242只增加受控黄金项目、脱敏receipt、现有Provider流式接线和验收发现的最小质量修复，没有建设新的Provider平台、Worker队列、状态机或治理框架。
@@ -48,6 +51,8 @@
 
 ## 当前阻塞
 
+- #165 live preflight发现现行cleanup unit依赖空的canonical`.venv`和落后源码；[Draft PR #249](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/249)修复该部署合同。其独立审查、合并授权和合并完成前不得轮换密钥或重启relay。
+- #205保持暂停；#165期间不得消耗真实视频Provider调用、生成第二候选或宣称真实Provider验收完成。
 - 当前没有已知的Session/CSRF、PostgreSQL、Worker、active OpenAPI、生产页面、真实文本Provider验收或R1收口阻塞。
 - 真实黄金项目已经生成passed receipt；不再调用Provider。普通CI继续只允许确定性Fake，不得把真实模型内容写入仓库测试夹具。
 - [Issue #233](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/233)单独跟踪`origin/main`既有Stage1 E2E旧`impact_scope` fixture；该测试债不改变#231验收结果，也不在救援PR内顺手修复。
@@ -55,9 +60,9 @@
 
 ## 下一个阶段出口
 
-1. R1没有继续开发项；后续工作必须按新的教师可见结果建立独立Issue和短分支。
-2. #222继续冻结、#230继续暂停；#223至#229仅作参考，不恢复技术层严格串行关系。
-3. PPT、图片、视频、TTS和其他媒体能力仍不在本轮范围，必须单独决策和验收。
+1. #165先完成未参与实现的独立只读reviewer对PR #249 exact base/head完整diff的审查绑定，关闭全部P0/P1并处置P2/P3；PR保持Draft，未经董事长明确授权不得合并。
+2. PR #249合并后才按canonical runbook执行唯一pre-change备份、独立账号、root-owned runtime、密钥同步轮换、显式restart、Nginx校验、无付费HTTPS smoke和timer自主清理；任一门禁失败立即回滚并停止。
+3. #165完成并从`main`复验后再单独规划#205；未经董事长明确授权，不恢复、转Ready或合并PR #247，也不调用真实视频Provider。
 
 ## 接手提示
 
