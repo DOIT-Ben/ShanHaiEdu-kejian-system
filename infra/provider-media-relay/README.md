@@ -214,8 +214,17 @@ finally:
    systemctl is-active --quiet provider-media-cleanup.timer
    relay_deploy_phase=relay-user
    test "$(systemctl show shanhai-provider-media-relay.service -p User --value)" = "shanhai-relay"
+   relay_deploy_phase=relay-fragment-path
+   relay_fragment_path="$(systemctl show shanhai-provider-media-relay.service -p FragmentPath --value)"
+   test "${relay_fragment_path}" = "/etc/systemd/system/shanhai-provider-media-relay.service"
+   unset relay_fragment_path
    relay_deploy_phase=relay-exec-start
-   systemctl show shanhai-provider-media-relay.service -p ExecStart --value | grep -Fq '/opt/shanhaiedu/provider-media-relay/provider_media_relay.py'
+   relay_exec_start="$(systemctl show shanhai-provider-media-relay.service -p ExecStart --value)"
+   case "${relay_exec_start}" in
+     "{ path=/usr/bin/python3 ; argv[]=/usr/bin/python3 /opt/shanhaiedu/provider-media-relay/provider_media_relay.py --port 8201 ; "*) ;;
+     *) false ;;
+   esac
+   unset relay_exec_start
    relay_deploy_phase=relay-pid-owner
    relay_pid="$(systemctl show shanhai-provider-media-relay.service -p MainPID --value)"
    test "${relay_pid}" -gt 1
@@ -235,6 +244,7 @@ finally:
    ```
 
    The explicit restart is mandatory for an existing active deployment: `enable --now` alone does not replace the old process identity, code path, environment, or signing secret.
+   The `FragmentPath` and `ExecStart` values are held only in shell memory for comparison. They are never printed, including on a failed gate.
 
 ## HTTPS Smoke
 
