@@ -10,7 +10,6 @@
     "apps/api/cli.py",
     "apps/api/model_gateway/factory.py",
     "apps/api/model_gateway/newapi_video.py",
-    "apps/api/model_gateway/newapi_video_files.py",
     "apps/api/model_gateway/newapi_video_submission.py",
     "apps/api/model_gateway/provider_media.py",
     "apps/api/model_gateway/video_smoke_media.py",
@@ -18,8 +17,7 @@
     "docs/backend/03_内容运行时与模型网关.md",
     "tests/unit/model_gateway/test_factory.py",
     "tests/unit/model_gateway/test_newapi_video.py",
-    "tests/unit/model_gateway/test_provider_media.py",
-    "workers/video_generation.py"
+    "tests/unit/model_gateway/test_provider_media.py"
   ],
   "sessions": [
     {
@@ -31,10 +29,10 @@
     }
   ],
   "token_usage": {
-    "input_tokens": 14850760,
+    "input_tokens": 15138021,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 256998564,
-    "output_tokens": 814643,
-    "api_call_count": 1913
+    "cache_read_tokens": 258727076,
+    "output_tokens": 825289,
+    "api_call_count": 1937
   }
 }
