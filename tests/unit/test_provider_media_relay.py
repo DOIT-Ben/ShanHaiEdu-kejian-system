@@ -349,6 +349,56 @@ def test_relay_deploy_provenance_fails_closed_before_mutation() -> None:
     assert "systemctl restart shanhai-provider-media-relay.service" in rollback
 
 
+def test_relay_deploy_post_start_gates_report_only_redacted_phase_and_line() -> None:
+    root = Path(__file__).resolve().parents[2]
+    runbook = (root / "infra/provider-media-relay/README.md").read_text(encoding="utf-8")
+    deploy = runbook.split("## Deploy", 1)[1].split("## HTTPS Smoke", 1)[0]
+
+    assert 'trap \'relay_deploy_error "${LINENO}" "$?"\' ERR' in deploy
+    assert "relay-deploy-failed phase=%s line=%s status=%s\\n" in deploy
+    assert "BASH_COMMAND" not in deploy
+    assert "set -x" not in deploy
+    assert "set -o xtrace" not in deploy
+    assert "bash -x" not in deploy
+
+    post_start_gates = {
+        "cleanup-oneshot-result": (
+            'test "$(systemctl show provider-media-cleanup.service -p Result --value)" = "success"'
+        ),
+        "cleanup-oneshot-status": (
+            'test "$(systemctl show provider-media-cleanup.service -p ExecMainStatus --value)" '
+            '= "0"'
+        ),
+        "relay-active": "systemctl is-active --quiet shanhai-provider-media-relay.service",
+        "cleanup-timer-active": "systemctl is-active --quiet provider-media-cleanup.timer",
+        "relay-user": (
+            'test "$(systemctl show shanhai-provider-media-relay.service -p User --value)" '
+            '= "shanhai-relay"'
+        ),
+        "relay-exec-start": (
+            "systemctl show shanhai-provider-media-relay.service -p ExecStart --value | "
+            "grep -Fq '/opt/shanhaiedu/provider-media-relay/provider_media_relay.py'"
+        ),
+        "relay-pid-owner": (
+            'test "${relay_pid}" -gt 1\n'
+            '   test "$(stat -c \'%U\' "/proc/${relay_pid}")" = "shanhai-relay"'
+        ),
+        "producer-process-isolation": (
+            'if sudo -u shanhai-dev -- cat "/proc/${relay_pid}/environ" '
+            ">/dev/null 2>&1; then false; fi"
+        ),
+        "nginx-config": "nginx -t",
+        "nginx-reload": "systemctl reload nginx",
+    }
+    previous_gate = deploy.index("systemctl restart shanhai-provider-media-relay.service")
+    for phase, command in post_start_gates.items():
+        marker = f"relay_deploy_phase={phase}"
+        marker_index = deploy.index(marker, previous_gate)
+        command_index = deploy.index(command, marker_index)
+        assert marker_index < command_index
+        previous_gate = command_index
+
+
 def test_cleanup_contract_is_shared_by_runtime_and_model_gateway(tmp_path: Path) -> None:
     stale = tmp_path / f"{'b' * 32}.webp"
     stale.write_bytes(PNG_BYTES)

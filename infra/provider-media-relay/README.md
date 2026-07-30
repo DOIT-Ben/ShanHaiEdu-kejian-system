@@ -15,12 +15,22 @@ This service exposes one short-lived, signed PNG/JPEG/WebP GET path to an extern
 
 ## Deploy
 
-Run all deploy steps below in one privileged shell so the pinned `origin/main` SHA and blob hash remain unchanged between preflight, installation, and restart. Any failed command must stop the deployment; do not continue from a failed step.
+Run all deploy steps below in one privileged shell so the pinned `origin/main` SHA and blob hash remain unchanged between preflight, installation, and restart. Any failed command must stop the deployment; do not continue from a failed step. The `ERR` trap emits only a fixed phase identifier, script line number and exit status. It deliberately omits the failed command and all variable values; do not enable `xtrace` while this shell contains signing secrets.
 
 1. Before `useradd`, `install`, service restart, or Nginx reload, fetch as the repository owner and pin `origin/main`. Stage every installed file directly from that commit's Git objects. This deliberately leaves the canonical checkout's branch, index, and dirty files untouched:
    ```bash
    set -euo pipefail
    umask 077
+   relay_deploy_phase=bootstrap
+   relay_deploy_error() {
+     failed_line="$1"
+     failed_status="$2"
+     trap - ERR
+     printf 'relay-deploy-failed phase=%s line=%s status=%s\n' \
+       "${relay_deploy_phase}" "${failed_line}" "${failed_status}" >&2
+     exit "${failed_status}"
+   }
+   trap 'relay_deploy_error "${LINENO}" "$?"' ERR
    repository_root=/srv/shanhaiedu/repository
    producer_env=/etc/shanhaiedu/image-video-smoke.env
    backup_pointer=/srv/shanhaiedu/backups/provider-media-relay-prechange.current
@@ -174,23 +184,39 @@ finally:
    cmp --silent "${relay_staging}" /opt/shanhaiedu/provider-media-relay/provider_media_relay.py
    relay_installed_sha256="$(sha256sum /opt/shanhaiedu/provider-media-relay/provider_media_relay.py | cut -d ' ' -f 1)"
    test "${relay_installed_sha256}" = "${relay_blob_sha256}"
+   relay_deploy_phase=systemd-reload
    systemctl daemon-reload
    systemctl enable shanhai-provider-media-relay.service
+   relay_deploy_phase=relay-restart
    systemctl restart shanhai-provider-media-relay.service
+   relay_deploy_phase=cleanup-oneshot-start
    systemctl start provider-media-cleanup.service
+   relay_deploy_phase=cleanup-oneshot-result
    test "$(systemctl show provider-media-cleanup.service -p Result --value)" = "success"
+   relay_deploy_phase=cleanup-oneshot-status
    test "$(systemctl show provider-media-cleanup.service -p ExecMainStatus --value)" = "0"
+   relay_deploy_phase=cleanup-timer-enable
    systemctl enable --now provider-media-cleanup.timer
+   relay_deploy_phase=relay-active
    systemctl is-active --quiet shanhai-provider-media-relay.service
+   relay_deploy_phase=cleanup-timer-active
    systemctl is-active --quiet provider-media-cleanup.timer
+   relay_deploy_phase=relay-user
    test "$(systemctl show shanhai-provider-media-relay.service -p User --value)" = "shanhai-relay"
+   relay_deploy_phase=relay-exec-start
    systemctl show shanhai-provider-media-relay.service -p ExecStart --value | grep -Fq '/opt/shanhaiedu/provider-media-relay/provider_media_relay.py'
+   relay_deploy_phase=relay-pid-owner
    relay_pid="$(systemctl show shanhai-provider-media-relay.service -p MainPID --value)"
+   test "${relay_pid}" -gt 1
    test "$(stat -c '%U' "/proc/${relay_pid}")" = "shanhai-relay"
-   if sudo -u shanhai-dev -- cat "/proc/${relay_pid}/environ" >/dev/null 2>&1; then exit 1; fi
+   relay_deploy_phase=producer-process-isolation
+   if sudo -u shanhai-dev -- cat "/proc/${relay_pid}/environ" >/dev/null 2>&1; then false; fi
    unset relay_pid
+   relay_deploy_phase=nginx-config
    nginx -t
+   relay_deploy_phase=nginx-reload
    systemctl reload nginx
+   relay_deploy_phase=provenance-output
    validation_time_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
    printf 'origin/main=%s\nrelay-sha256=%s\nvalidated-at=%s\n' \
      "${deployment_origin_main_sha}" "${relay_installed_sha256}" "${validation_time_utc}"
