@@ -2,7 +2,7 @@
 
 当前阶段：阶段1后端基座以及R1教材范围、课时划分、十二部分教案和三类九套四个教师可见文本结果已经进入`main`；受控真实文本Provider教师黄金项目、独立审查、合并和`main`复验均已完成。约6秒课堂导入短片黄金纵向切片已经暂停，当前先完成其受控媒体relay安全运行形态。
 > 最后核验：2026-07-29。
-> 当前任务：[Issue #165](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/165)由[Draft PR #249](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/249)承载；先修复不依赖dirty canonical checkout或项目`.venv`的root-owned relay/cleanup部署合同，再经独立审查、合并授权和受控服务器验收完成安全迁移。[Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)保持`status:blocked`，[Draft PR #247](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/247)不恢复、不转Ready、不合并。
+> 当前任务：[Issue #165](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/165)由[Draft PR #250](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/250)继续承载；[PR #249](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/249)已合并，两次受控迁移均在失败后完整回滚，当前先为启动后门禁补齐脱敏阶段诊断，再经独立审查、合并授权和一次受控服务器迁移完成安全运行形态。[Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)保持`status:blocked`，[Draft PR #247](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/247)不恢复、不转Ready、不合并。
 
 ## 当前可演示成果
 
@@ -33,8 +33,9 @@
 
 ## 当前工作
 
-- [Issue #165](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/165)正在修复受控媒体relay部署：relay与独立cleanup共享root-owned标准库`/opt`运行时，安装文件绑定exact fetched `origin/main` Git blob，保留canonical checkout的branch、index和用户dirty files。
-- [Draft PR #249](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/249)是#165的唯一实现现场；live preflight已确认现行relay仍使用`shanhai-dev`和旧worktree，canonical`.venv`为空，独立账号、`/opt`runtime和cleanup timer尚未部署。服务器尚未轮换密钥、重启服务或修改Nginx，也未调用Provider。
+- [PR #249](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/249)已以`7120b776`合并root-owned relay/cleanup部署合同；第一次迁移因Windows到Linux的CRLF传输失败，第二次LF-safe迁移在relay与cleanup成功启动后由未命名门禁返回`exit 1`，两次均已自动回滚。
+- [Draft PR #250](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/250)是#165当前唯一实现现场：为启动后断言增加固定阶段ID和只含阶段、行号、状态码的失败证据，禁止命令追踪、环境值或secret进入诊断输出。
+- 回滚后的生产服务器仍运行迁移前relay；cleanup unit、timer和root-owned`/opt`runtime未安装，Nginx配置通过，signing-secret配置已恢复为唯一且一致。`shanhai-relay`仅作为locked、nologin、无home的system account安全残留存在。
 - [Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)的约6秒课堂导入短片黄金纵向切片保持blocked；[Draft PR #247](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/247)保留为暂停的唯一实现现场。
 - [Issue #239](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/239)已经由[PR #240](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/240)完成主线状态收口并关闭。
 - [Issue #241](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/241)已由[PR #242](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/242)完成技术交付；生产Worker在未注入测试模型时通过现有`build_real_text_gateway()`调用真实文本Provider，普通CI继续使用确定性Fake。
@@ -51,7 +52,7 @@
 
 ## 当前阻塞
 
-- #165 live preflight发现现行cleanup unit依赖空的canonical`.venv`和落后源码；[Draft PR #249](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/249)修复该部署合同。其独立审查、合并授权和合并完成前不得轮换密钥或重启relay。
+- #165第二次LF-safe迁移只能定位到“relay/cleanup启动成功后、provenance输出前”的静默门禁，现有证据不足以判定唯一失败断言。[Draft PR #250](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/250)通过脱敏阶段ID修复可诊断性；其独立审查、CI、明确合并授权和合并完成前不得进行第三次迁移。
 - #205保持暂停；#165期间不得消耗真实视频Provider调用、生成第二候选或宣称真实Provider验收完成。
 - 当前没有已知的Session/CSRF、PostgreSQL、Worker、active OpenAPI、生产页面、真实文本Provider验收或R1收口阻塞。
 - 真实黄金项目已经生成passed receipt；不再调用Provider。普通CI继续只允许确定性Fake，不得把真实模型内容写入仓库测试夹具。
@@ -60,8 +61,8 @@
 
 ## 下一个阶段出口
 
-1. #165先完成未参与实现的独立只读reviewer对PR #249 exact base/head完整diff的审查绑定，关闭全部P0/P1并处置P2/P3；PR保持Draft，未经董事长明确授权不得合并。
-2. PR #249合并后才按canonical runbook执行唯一pre-change备份、独立账号、root-owned runtime、密钥同步轮换、显式restart、Nginx校验、无付费HTTPS smoke和timer自主清理；任一门禁失败立即回滚并停止。
+1. #165先完成未参与实现的独立只读reviewer对PR #250 exact base/head完整diff的审查绑定，关闭全部P0/P1并处置P2/P3；PR保持Draft，未经董事长明确授权不得合并。
+2. PR #250获批并合并后，按canonical runbook执行一次迁移：唯一pre-change备份、独立账号、root-owned runtime、密钥同步轮换、显式restart、Nginx校验、无付费HTTPS smoke和timer自主清理；任一门禁失败输出脱敏阶段证据、立即回滚并停止。
 3. #165完成并从`main`复验后再单独规划#205；未经董事长明确授权，不恢复、转Ready或合并PR #247，也不调用真实视频Provider。
 
 ## 接手提示

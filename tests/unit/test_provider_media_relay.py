@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -397,6 +398,20 @@ def test_relay_deploy_post_start_gates_report_only_redacted_phase_and_line() -> 
         command_index = deploy.index(command, marker_index)
         assert marker_index < command_index
         previous_gate = command_index
+
+    bootstrap = deploy.split("```bash", 1)[1].split("repository_root=", 1)[0]
+    completed = subprocess.run(
+        ["bash", "-s"],
+        input=(bootstrap + "relay_deploy_phase=relay-user\nfalse\n").encode("utf-8"),
+        check=False,
+        capture_output=True,
+    )
+    assert completed.returncode == 1
+    assert completed.stdout == b""
+    assert re.fullmatch(
+        r"relay-deploy-failed phase=relay-user line=\d+ status=1\n?",
+        completed.stderr.decode("utf-8"),
+    )
 
 
 def test_cleanup_contract_is_shared_by_runtime_and_model_gateway(tmp_path: Path) -> None:
