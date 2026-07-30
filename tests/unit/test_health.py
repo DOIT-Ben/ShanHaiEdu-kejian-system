@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import cast
 
 import httpx
+import pytest
 
 from apps.api.health import (
     DependencyStatus,
@@ -11,7 +13,7 @@ from apps.api.health import (
     build_readiness_service,
     psycopg_dsn,
 )
-from apps.api.logging import JsonFormatter
+from apps.api.logging import JsonFormatter, configure_logging
 from apps.api.main import create_app
 from apps.api.request_context import REQUEST_ID_HEADER, request_id_context
 from apps.api.settings import Settings
@@ -113,8 +115,6 @@ async def test_missing_dependencies_are_reported_independently() -> None:
 
 
 def test_json_log_has_required_context_without_exception_text() -> None:
-    import logging
-
     formatter = JsonFormatter(service="test-service", environment="test")
     token = request_id_context.set("req_log_test")
     try:
@@ -139,3 +139,33 @@ def test_json_log_has_required_context_without_exception_text() -> None:
     assert payload["request_id"] == "req_log_test"
     assert payload["exception_type"] == "RuntimeError"
     assert "secret-value-must-not-appear" not in json.dumps(payload)
+
+
+def test_configure_logging_suppresses_http_client_request_urls(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    private_task_id = "provider-private-task-id"
+    httpx_logger = logging.getLogger("httpx")
+    telemetry_logger = logging.getLogger("apps.api.model_gateway.telemetry")
+    previous_httpx_level = httpx_logger.level
+    try:
+        configure_logging(service="test-service", environment="test", level="INFO")
+        with caplog.at_level(logging.INFO, logger=telemetry_logger.name):
+            httpx_logger.info(
+                "HTTP Request: GET https://provider.test/v1/videos/%s",
+                private_task_id,
+            )
+            telemetry_logger.info(
+                "model_gateway_attempt_completed",
+                extra={"provider_task_hash": "hashed-task-id"},
+            )
+    finally:
+        httpx_logger.setLevel(previous_httpx_level)
+
+    assert private_task_id not in caplog.text
+    assert "model_gateway_attempt_completed" in caplog.text
+    assert any(
+        record.name == telemetry_logger.name
+        and getattr(record, "provider_task_hash", None) == "hashed-task-id"
+        for record in caplog.records
+    )
