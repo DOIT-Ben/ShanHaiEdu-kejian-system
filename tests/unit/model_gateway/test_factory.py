@@ -8,6 +8,7 @@ from apps.api.model_gateway.contracts import (
     ModelGatewayError,
 )
 from apps.api.model_gateway.factory import (
+    build_provider_media_reference_reader,
     build_provider_media_reference_resolver,
     build_real_text_gateway,
 )
@@ -86,3 +87,13 @@ def test_provider_media_resolver_requires_server_only_route_and_secret(
             storage=storage,
         )
     assert missing_secret.value.code == GatewayErrorCode.ROUTE_UNAVAILABLE
+
+
+def test_provider_media_reader_does_not_require_public_relay_configuration() -> None:
+    reader = build_provider_media_reference_reader(
+        Settings(_env_file=None, environment="test"),
+        session=object(),
+        storage=FakeObjectStorage(),
+    )
+
+    assert reader is not None

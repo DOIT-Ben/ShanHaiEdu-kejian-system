@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,6 +30,72 @@ _MAX_PROVIDER_URL_LENGTH = 4096
 
 class ProviderMediaResolutionError(ValueError):
     """Raised when an internal reference cannot become provider transport media."""
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderMediaBlob:
+    content: bytes
+    mime_type: str
+    sha256: str
+
+    @property
+    def size_bytes(self) -> int:
+        return len(self.content)
+
+
+class ProviderMediaReferenceReader:
+    """Reads one validated tenant-scoped image without creating a public URL."""
+
+    def __init__(
+        self,
+        *,
+        asset_reader: ProviderMediaAssetReader,
+        storage: ObjectStorage,
+        max_file_bytes: int,
+    ) -> None:
+        if max_file_bytes < 1:
+            raise ValueError("max_file_bytes must be positive")
+        self._asset_reader = asset_reader
+        self._storage = storage
+        self._max_file_bytes = max_file_bytes
+
+    def read(self, *, organization_id: UUID, reference: MediaReference) -> ProviderMediaBlob:
+        asset = self._asset_reader.get_clean_image_version(
+            organization_id=organization_id,
+            file_version_id=reference.file_version_id,
+        )
+        if asset is None:
+            raise ProviderMediaResolutionError("provider media asset is unavailable")
+        _validate_provider_media_reference(
+            asset,
+            organization_id,
+            reference,
+            max_file_bytes=self._max_file_bytes,
+        )
+        descriptor, temporary = tempfile.mkstemp(
+            prefix="shanhaiedu-provider-media-",
+            suffix=".partial",
+        )
+        os.close(descriptor)
+        path = Path(temporary)
+        try:
+            downloaded = self._storage.download_to_path(
+                bucket=asset.storage_bucket,
+                key=asset.storage_key,
+                destination=path,
+                max_bytes=self._max_file_bytes,
+            )
+            _validate_provider_media_download(path, asset, downloaded)
+            content = path.read_bytes()
+            return ProviderMediaBlob(
+                content=content,
+                mime_type=asset.mime_type,
+                sha256=asset.sha256,
+            )
+        except (OSError, ObjectStorageError) as error:
+            raise ProviderMediaResolutionError("provider media object is unavailable") from error
+        finally:
+            path.unlink(missing_ok=True)
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,14 +191,12 @@ class ProviderMediaReferenceResolver:
         organization_id: UUID,
         reference: MediaReference,
     ) -> None:
-        if (
-            asset.id != reference.file_version_id
-            or asset.organization_id != organization_id
-            or asset.mime_type != reference.mime_type
-            or asset.mime_type not in _MIME_EXTENSIONS
-            or not 0 < asset.byte_size <= self._config.max_file_bytes
-        ):
-            raise ProviderMediaResolutionError("provider media reference is invalid")
+        _validate_provider_media_reference(
+            asset,
+            organization_id,
+            reference,
+            max_file_bytes=self._config.max_file_bytes,
+        )
 
     def _temporary_path(self) -> Path:
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
@@ -151,20 +216,7 @@ class ProviderMediaReferenceResolver:
         asset: ProviderMediaAssetVersion,
         downloaded: ObjectMetadata,
     ) -> None:
-        content = path.read_bytes()
-        size = len(content)
-        digest = hashlib.sha256(content).hexdigest()
-        if (
-            downloaded.bucket != asset.storage_bucket
-            or downloaded.key != asset.storage_key
-            or downloaded.size_bytes != asset.byte_size
-            or _normalized_media_type(downloaded.media_type) != asset.mime_type
-            or downloaded.sha256 != asset.sha256
-            or size != asset.byte_size
-            or digest != asset.sha256
-            or _detect_media_type(content) != asset.mime_type
-        ):
-            raise ProviderMediaResolutionError("provider media object failed integrity validation")
+        _validate_provider_media_download(path, asset, downloaded)
 
     def _filename_for(self, mime_type: str) -> str:
         return f"{uuid4().hex}{_MIME_EXTENSIONS[mime_type]}"
@@ -180,6 +232,44 @@ class ProviderMediaReferenceResolver:
         if len(url) > _MAX_PROVIDER_URL_LENGTH:
             raise ProviderMediaResolutionError("provider media URL exceeds the provider limit")
         return url
+
+
+def _validate_provider_media_reference(
+    asset: ProviderMediaAssetVersion,
+    organization_id: UUID,
+    reference: MediaReference,
+    *,
+    max_file_bytes: int,
+) -> None:
+    if (
+        asset.id != reference.file_version_id
+        or asset.organization_id != organization_id
+        or asset.mime_type != reference.mime_type
+        or asset.mime_type not in _MIME_EXTENSIONS
+        or not 0 < asset.byte_size <= max_file_bytes
+    ):
+        raise ProviderMediaResolutionError("provider media reference is invalid")
+
+
+def _validate_provider_media_download(
+    path: Path,
+    asset: ProviderMediaAssetVersion,
+    downloaded: ObjectMetadata,
+) -> None:
+    content = path.read_bytes()
+    size = len(content)
+    digest = hashlib.sha256(content).hexdigest()
+    if (
+        downloaded.bucket != asset.storage_bucket
+        or downloaded.key != asset.storage_key
+        or downloaded.size_bytes != asset.byte_size
+        or _normalized_media_type(downloaded.media_type) != asset.mime_type
+        or downloaded.sha256 != asset.sha256
+        or size != asset.byte_size
+        or digest != asset.sha256
+        or _detect_media_type(content) != asset.mime_type
+    ):
+        raise ProviderMediaResolutionError("provider media object failed integrity validation")
 
 
 def _detect_media_type(content: bytes) -> str | None:

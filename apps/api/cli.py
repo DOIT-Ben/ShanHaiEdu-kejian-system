@@ -245,7 +245,7 @@ async def _execute_video_smoke(
     gateway, provider = build_real_video_gateway(
         settings,
         store=storage,
-        media_reference_resolver=(media_context.resolver if media_context is not None else None),
+        media_reference_reader=(media_context.reader if media_context is not None else None),
     )
     try:
         submitted = await gateway.submit_video(

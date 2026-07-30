@@ -74,6 +74,11 @@ class Settings(BaseSettings):
         ge=1,
         le=1_073_741_824,
     )
+    video_provider_temporary_file_ttl_seconds: int = Field(
+        default=900,
+        ge=300,
+        le=86_400,
+    )
     provider_media_root: Path | None = None
     provider_media_public_base_url: HttpUrl | None = None
     provider_media_signing_secret_env: str = Field(

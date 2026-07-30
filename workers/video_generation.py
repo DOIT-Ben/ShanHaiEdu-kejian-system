@@ -17,7 +17,7 @@ from apps.api.jobs.worker_port import (
 from apps.api.model_gateway.audit import SqlAlchemyAttemptAuditSink
 from apps.api.model_gateway.contracts import ModelGatewayError, VideoOperationStatus
 from apps.api.model_gateway.factory import (
-    build_provider_media_reference_resolver,
+    build_provider_media_reference_reader,
     build_real_video_gateway,
 )
 from apps.api.model_gateway.gateway import ModelGateway
@@ -69,7 +69,7 @@ async def execute_video_generation_job(
         resolved_gateway = gateway
         if resolved_gateway is None:
             media_session = factory()
-            resolver = build_provider_media_reference_resolver(
+            reader = build_provider_media_reference_reader(
                 resolved_settings,
                 session=media_session,
                 storage=resolved_storage,
@@ -81,7 +81,7 @@ async def execute_video_generation_job(
                     bucket=resolved_settings.object_storage_bucket,
                     max_bytes=resolved_settings.video_provider_max_download_bytes,
                 ),
-                media_reference_resolver=resolver,
+                media_reference_reader=reader,
                 audit_sink=SqlAlchemyAttemptAuditSink(factory),
             )
         return await _execute(

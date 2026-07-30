@@ -25,6 +25,7 @@ from apps.api.model_gateway.openai_compatible import (
     OpenAICompatibleTextProvider,
 )
 from apps.api.model_gateway.provider_media import (
+    ProviderMediaReferenceReader,
     ProviderMediaReferenceResolver,
     ProviderMediaResolverConfig,
 )
@@ -72,7 +73,7 @@ def build_real_video_gateway(
     settings: Settings,
     *,
     store: VideoResultStore,
-    media_reference_resolver: ProviderMediaReferenceResolver | None = None,
+    media_reference_reader: ProviderMediaReferenceReader | None = None,
     audit_sink: AttemptAuditSink | None = None,
 ) -> tuple[ModelGateway, NewApiVideoProvider]:
     if not (
@@ -92,9 +93,10 @@ def build_real_video_gateway(
             api_key=SecretStr(secret),
             timeout_seconds=settings.video_provider_timeout_seconds,
             max_download_bytes=settings.video_provider_max_download_bytes,
+            temporary_file_ttl_seconds=settings.video_provider_temporary_file_ttl_seconds,
         ),
         store=store,
-        media_reference_resolver=media_reference_resolver,
+        media_reference_reader=media_reference_reader,
     )
     return (
         ModelGateway(
@@ -103,6 +105,19 @@ def build_real_video_gateway(
             audit_sink=audit_sink,
         ),
         provider,
+    )
+
+
+def build_provider_media_reference_reader(
+    settings: Settings,
+    *,
+    session: Session,
+    storage: ObjectStorage,
+) -> ProviderMediaReferenceReader:
+    return ProviderMediaReferenceReader(
+        asset_reader=SqlAlchemyProviderMediaAssetReader(session),
+        storage=storage,
+        max_file_bytes=settings.provider_media_max_file_bytes,
     )
 
 
