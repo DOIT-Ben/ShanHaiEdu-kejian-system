@@ -15,11 +15,22 @@ This service exposes one short-lived, signed PNG/JPEG/WebP GET path to an extern
 
 ## Deploy
 
-Run all deploy steps below in one privileged shell so the pinned `origin/main` SHA and blob hash remain unchanged between preflight, installation, and restart. Any failed command must stop the deployment; do not continue from a failed step. The `ERR` trap emits only a fixed phase identifier, script line number and exit status. It deliberately omits the failed command and all variable values; do not enable `xtrace` while this shell contains signing secrets.
+Run all deploy and smoke steps below in one privileged shell so the pinned `origin/main` SHA, blob hash, trap and private variables remain unchanged through validation. Any failed command must stop the deployment; do not continue from a failed step. The `ERR` trap emits only a fixed phase identifier, script line number and exit status. It deliberately omits the failed command and all variable values. The first block actively disables inherited `xtrace` before reading any environment or generating a signing secret.
+
+When the controlling shell is Windows PowerShell, assemble the reviewed blocks into one string, normalize it to LF, encode the UTF-8 bytes, and decode them on the server before Bash parses the script. Do not pipe PowerShell text directly into remote Bash:
+
+```powershell
+$relayScriptBytes = [Text.Encoding]::UTF8.GetBytes(($relayScriptText -replace "`r`n?", "`n"))
+$relayScriptBase64 = [Convert]::ToBase64String($relayScriptBytes)
+ssh $relaySshTarget "printf '%s' '$relayScriptBase64' | base64 -d | bash"
+```
+
+The Base64 payload contains reviewed commands but no signing-secret value; the server generates the secret only after decoding and starting Bash. Check the local block count and `bash -n` result before SSH, and do not enable Bash xtrace.
 
 1. Before `useradd`, `install`, service restart, or Nginx reload, fetch as the repository owner and pin `origin/main`. Stage every installed file directly from that commit's Git objects. This deliberately leaves the canonical checkout's branch, index, and dirty files untouched:
    ```bash
    set -euo pipefail
+   set +x
    umask 077
    relay_deploy_phase=bootstrap
    relay_deploy_error() {
@@ -230,22 +241,31 @@ finally:
 Reuse the runtime-only test frame that returned `200` before rotation. It is not an application asset and must be removed after the check.
 ```bash
 set -euo pipefail
+relay_deploy_phase=https-smoke-file
 test -f "${smoke_path}"
+relay_deploy_phase=https-smoke-permissions
 test "$(stat -c '%U:%G:%a' "${smoke_path}")" = "shanhai-dev:shanhai-dev:640"
 ```
 
 Generate and consume a URL without printing it or putting it in a shell command line:
 ```bash
 set -euo pipefail
+relay_deploy_phase=https-secret-load
 set -a
 . /etc/shanhaiedu/provider-media-relay.env
 set +a
+relay_deploy_phase=https-new-url-sign
 url="$(cd /opt/shanhaiedu/provider-media-relay && PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -c 'from provider_media_relay import sign_media_path; import os, time; print("https://newapi.doitbenai.cloud/_shanhai-provider-media" + sign_media_path("provider-relay-smoke.png", expires_at=int(time.time()) + 60, secret=os.environ["SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET"]))')"
+relay_deploy_phase=https-old-url-sign
 old_url="$(printf '%s' "${old_secret}" | (cd /opt/shanhaiedu/provider-media-relay && PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -c 'from provider_media_relay import sign_media_path; import sys, time; print("https://newapi.doitbenai.cloud/_shanhai-provider-media" + sign_media_path("provider-relay-smoke.png", expires_at=int(time.time()) + 60, secret=sys.stdin.read()))'))"
+relay_deploy_phase=https-new-url-fetch
 curl --fail --silent --show-error --output /dev/null "$url"
-if curl --fail --silent --output /dev/null "${url}x"; then exit 1; fi
-if curl --fail --silent --output /dev/null "${old_url}"; then exit 1; fi
+relay_deploy_phase=https-tampered-url-rejected
+if curl --fail --silent --output /dev/null "${url}x"; then false; fi
+relay_deploy_phase=https-old-url-rejected
+if curl --fail --silent --output /dev/null "${old_url}"; then false; fi
 unset url old_url old_secret SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET
+relay_deploy_phase=https-smoke-remove
 rm -f -- "${smoke_path}"
 ```
 
@@ -260,22 +280,37 @@ cleanup_root=/srv/shanhaiedu/runtime/provider-media
 opaque_smoke="${cleanup_root}/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png"
 partial_smoke="${cleanup_root}/.provider-media-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.partial"
 keep_smoke="${cleanup_root}/provider-media-cleanup-keep.txt"
-test ! -e "${opaque_smoke}" && test ! -e "${partial_smoke}" && test ! -e "${keep_smoke}"
+relay_deploy_phase=cleanup-opaque-absent
+test ! -e "${opaque_smoke}"
+relay_deploy_phase=cleanup-partial-absent
+test ! -e "${partial_smoke}"
+relay_deploy_phase=cleanup-keep-absent
+test ! -e "${keep_smoke}"
+relay_deploy_phase=cleanup-fixture-create
 install -m 0640 -o shanhai-dev -g shanhai-dev /dev/null "${opaque_smoke}"
 install -m 0640 -o shanhai-dev -g shanhai-dev /dev/null "${partial_smoke}"
 install -m 0640 -o shanhai-dev -g shanhai-dev /dev/null "${keep_smoke}"
 touch -d '10 minutes ago' "${opaque_smoke}" "${partial_smoke}" "${keep_smoke}"
+relay_deploy_phase=cleanup-timer-wait
 for _attempt in $(seq 1 90); do
   if test ! -e "${opaque_smoke}" && test ! -e "${partial_smoke}"; then break; fi
   sleep 1
 done
+relay_deploy_phase=cleanup-opaque-removed
 test ! -e "${opaque_smoke}"
+relay_deploy_phase=cleanup-partial-removed
 test ! -e "${partial_smoke}"
+relay_deploy_phase=cleanup-unrelated-preserved
 test -f "${keep_smoke}"
+relay_deploy_phase=cleanup-marker-remove
 rm -f -- "${keep_smoke}"
+relay_deploy_phase=cleanup-oneshot-final-result
 test "$(systemctl show provider-media-cleanup.service -p Result --value)" = "success"
-if journalctl -u shanhai-provider-media-relay.service --since '-10 minutes' --no-pager | grep -Fq 'signature='; then exit 1; fi
-if grep -Fq 'signature=' /var/log/nginx/access.log 2>/dev/null; then exit 1; fi
+relay_deploy_phase=relay-log-redaction
+if journalctl -u shanhai-provider-media-relay.service --since '-10 minutes' --no-pager | grep -Fq 'signature='; then false; fi
+relay_deploy_phase=nginx-log-redaction
+if grep -Fq 'signature=' /var/log/nginx/access.log 2>/dev/null; then false; fi
+relay_deploy_phase=migration-complete
 unset cleanup_root opaque_smoke partial_smoke keep_smoke
 ```
 

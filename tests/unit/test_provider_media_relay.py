@@ -361,6 +361,7 @@ def test_relay_deploy_post_start_gates_report_only_redacted_phase_and_line() -> 
     assert "set -x" not in deploy
     assert "set -o xtrace" not in deploy
     assert "bash -x" not in deploy
+    assert deploy.index("set +x") < deploy.index("producer_env=")
 
     post_start_gates = {
         "cleanup-oneshot-result": (
@@ -412,6 +413,129 @@ def test_relay_deploy_post_start_gates_report_only_redacted_phase_and_line() -> 
         r"relay-deploy-failed phase=relay-user line=\d+ status=1\n?",
         completed.stderr.decode("utf-8"),
     )
+
+    sentinel = "do-not-trace-this-fake-secret"
+    traced = subprocess.run(
+        ["bash", "-x", "-s"],
+        input=(
+            bootstrap
+            + "relay_deploy_phase=xtrace-disabled\n"
+            + f"fake_secret={sentinel}\n"
+            + "false\n"
+        ).encode("utf-8"),
+        check=False,
+        capture_output=True,
+    )
+    assert traced.returncode == 1
+    assert sentinel.encode("utf-8") not in traced.stderr
+
+
+def test_relay_deploy_smokes_keep_exact_phase_diagnostics() -> None:
+    root = Path(__file__).resolve().parents[2]
+    runbook = (root / "infra/provider-media-relay/README.md").read_text(encoding="utf-8")
+    post_start = runbook.split("## HTTPS Smoke", 1)[1].split("## Rollback", 1)[0]
+    gates = {
+        "https-smoke-file": 'test -f "${smoke_path}"',
+        "https-smoke-permissions": (
+            'test "$(stat -c \'%U:%G:%a\' "${smoke_path}")" = "shanhai-dev:shanhai-dev:640"'
+        ),
+        "https-new-url-sign": 'url="$(cd /opt/shanhaiedu/provider-media-relay',
+        "https-old-url-sign": 'old_url="$(printf \'%s\' "${old_secret}"',
+        "https-new-url-fetch": 'curl --fail --silent --show-error --output /dev/null "$url"',
+        "https-tampered-url-rejected": (
+            'if curl --fail --silent --output /dev/null "${url}x"; then false; fi'
+        ),
+        "https-old-url-rejected": (
+            'if curl --fail --silent --output /dev/null "${old_url}"; then false; fi'
+        ),
+        "https-smoke-remove": 'rm -f -- "${smoke_path}"',
+        "cleanup-opaque-absent": 'test ! -e "${opaque_smoke}"',
+        "cleanup-partial-absent": 'test ! -e "${partial_smoke}"',
+        "cleanup-keep-absent": 'test ! -e "${keep_smoke}"',
+        "cleanup-timer-wait": "for _attempt in $(seq 1 90); do",
+        "cleanup-opaque-removed": 'test ! -e "${opaque_smoke}"',
+        "cleanup-partial-removed": 'test ! -e "${partial_smoke}"',
+        "cleanup-unrelated-preserved": 'test -f "${keep_smoke}"',
+        "cleanup-marker-remove": 'rm -f -- "${keep_smoke}"',
+        "cleanup-oneshot-final-result": (
+            'test "$(systemctl show provider-media-cleanup.service -p Result --value)" = "success"'
+        ),
+        "relay-log-redaction": (
+            "if journalctl -u shanhai-provider-media-relay.service --since '-10 minutes' "
+            "--no-pager | grep -Fq 'signature='; then false; fi"
+        ),
+        "nginx-log-redaction": (
+            "if grep -Fq 'signature=' /var/log/nginx/access.log 2>/dev/null; then false; fi"
+        ),
+    }
+    previous_gate = 0
+    for phase, command in gates.items():
+        marker_index = post_start.index(f"relay_deploy_phase={phase}", previous_gate)
+        command_index = post_start.index(command, marker_index)
+        assert marker_index < command_index
+        previous_gate = command_index
+
+    assert "then exit 1" not in post_start
+    assert (
+        'test ! -e "${opaque_smoke}" && test ! -e "${partial_smoke}" && test ! -e "${keep_smoke}"'
+    ) not in post_start
+
+    deploy = runbook.split("## Deploy", 1)[1].split("## HTTPS Smoke", 1)[0]
+    bootstrap = deploy.split("```bash", 1)[1].split("repository_root=", 1)[0]
+    injected = ""
+    for phase in gates:
+        injected += (
+            "(\n"
+            + bootstrap
+            + f"relay_deploy_phase={phase}\n"
+            + "false\n"
+            + ")\n"
+            + "test $? -eq 1 || exit 90\n"
+        )
+    completed = subprocess.run(
+        ["bash", "-s"],
+        input=injected.encode("utf-8"),
+        check=False,
+        capture_output=True,
+    )
+    assert completed.returncode == 0
+    assert completed.stdout == b""
+    reported_phases = []
+    for line in completed.stderr.decode("utf-8").splitlines():
+        match = re.fullmatch(
+            r"relay-deploy-failed phase=([a-z0-9-]+) line=\d+ status=1",
+            line,
+        )
+        assert match is not None, line
+        reported_phases.append(match.group(1))
+    assert reported_phases == list(gates)
+
+
+def test_relay_runbook_pre_rollback_blocks_are_lf_safe_base64_bash() -> None:
+    root = Path(__file__).resolve().parents[2]
+    raw_runbook = (root / "infra/provider-media-relay/README.md").read_bytes()
+    attributes = (root / ".gitattributes").read_text(encoding="utf-8")
+    assert "/infra/provider-media-relay/README.md text eol=lf" in attributes
+    assert b'[Text.Encoding]::UTF8.GetBytes(($relayScriptText -replace "`r`n?", "`n"))' in (
+        raw_runbook
+    )
+    assert b"[Convert]::ToBase64String($relayScriptBytes)" in raw_runbook
+    normalized = raw_runbook.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    pre_rollback = normalized.split(b"## Rollback", 1)[0]
+    blocks = re.findall(rb"^[ ]*```bash\n(.*?)^[ ]*```", pre_rollback, re.MULTILINE | re.DOTALL)
+    assert len(blocks) == 9
+    script = b"\n".join(re.sub(rb"(?m)^   ", b"", block) for block in blocks)
+    payload = base64.b64encode(script)
+    transported = base64.b64decode(payload, validate=True)
+
+    assert b"\r" not in transported
+    completed = subprocess.run(
+        ["bash", "-n"],
+        input=transported,
+        check=False,
+        capture_output=True,
+    )
+    assert completed.returncode == 0, completed.stderr.decode("utf-8")
 
 
 def test_cleanup_contract_is_shared_by_runtime_and_model_gateway(tmp_path: Path) -> None:
