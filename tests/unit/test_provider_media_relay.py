@@ -377,9 +377,17 @@ def test_relay_deploy_post_start_gates_report_only_redacted_phase_and_line() -> 
             'test "$(systemctl show shanhai-provider-media-relay.service -p User --value)" '
             '= "shanhai-relay"'
         ),
+        "relay-fragment-path": (
+            'relay_fragment_path="$(systemctl show '
+            'shanhai-provider-media-relay.service -p FragmentPath --value)"\n'
+            '   test "${relay_fragment_path}" = '
+            '"/etc/systemd/system/shanhai-provider-media-relay.service"'
+        ),
         "relay-exec-start": (
-            "systemctl show shanhai-provider-media-relay.service -p ExecStart --value | "
-            "grep -Fq '/opt/shanhaiedu/provider-media-relay/provider_media_relay.py'"
+            'relay_exec_start="$(systemctl show '
+            'shanhai-provider-media-relay.service -p ExecStart --value)"\n'
+            '   case "${relay_exec_start}" in\n'
+            '     *"/opt/shanhaiedu/provider-media-relay/provider_media_relay.py"*) ;;'
         ),
         "relay-pid-owner": (
             'test "${relay_pid}" -gt 1\n'

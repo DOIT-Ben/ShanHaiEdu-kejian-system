@@ -7,9 +7,9 @@ from pathlib import Path
 
 def test_relay_deploy_fails_closed_when_systemd_runtime_is_stale() -> None:
     root = Path(__file__).resolve().parents[2]
-    service = (
-        root / "infra/provider-media-relay/provider-media-relay.service"
-    ).read_text(encoding="utf-8")
+    service = (root / "infra/provider-media-relay/provider-media-relay.service").read_text(
+        encoding="utf-8"
+    )
     runbook = (root / "infra/provider-media-relay/README.md").read_text(encoding="utf-8")
     deploy = runbook.split("## Deploy", 1)[1].split("## HTTPS Smoke", 1)[0]
 
