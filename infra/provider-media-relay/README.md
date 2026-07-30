@@ -15,12 +15,33 @@ This service exposes one short-lived, signed PNG/JPEG/WebP GET path to an extern
 
 ## Deploy
 
-Run all deploy steps below in one privileged shell so the pinned `origin/main` SHA and blob hash remain unchanged between preflight, installation, and restart. Any failed command must stop the deployment; do not continue from a failed step.
+Run all deploy and smoke steps below in one privileged shell so the pinned `origin/main` SHA, blob hash, trap and private variables remain unchanged through validation. Any failed command must stop the deployment; do not continue from a failed step. The `ERR` trap emits only a fixed phase identifier, script line number and exit status. It deliberately omits the failed command and all variable values. The first block actively disables inherited `xtrace` before reading any environment or generating a signing secret.
+
+When the controlling shell is Windows PowerShell, assemble the reviewed blocks into one string, normalize it to LF, encode the UTF-8 bytes, and decode them on the server before Bash parses the script. Do not pipe PowerShell text directly into remote Bash:
+
+```powershell
+$relayScriptBytes = [Text.Encoding]::UTF8.GetBytes(($relayScriptText -replace "`r`n?", "`n"))
+$relayScriptBase64 = [Convert]::ToBase64String($relayScriptBytes)
+ssh $relaySshTarget "printf '%s' '$relayScriptBase64' | base64 -d | bash"
+```
+
+The Base64 payload contains reviewed commands but no signing-secret value; the server generates the secret only after decoding and starting Bash. Check the local block count and `bash -n` result before SSH, and do not enable Bash xtrace.
 
 1. Before `useradd`, `install`, service restart, or Nginx reload, fetch as the repository owner and pin `origin/main`. Stage every installed file directly from that commit's Git objects. This deliberately leaves the canonical checkout's branch, index, and dirty files untouched:
    ```bash
    set -euo pipefail
+   set +x
    umask 077
+   relay_deploy_phase=bootstrap
+   relay_deploy_error() {
+     failed_line="$1"
+     failed_status="$2"
+     trap - ERR
+     printf 'relay-deploy-failed phase=%s line=%s status=%s\n' \
+       "${relay_deploy_phase}" "${failed_line}" "${failed_status}" >&2
+     exit "${failed_status}"
+   }
+   trap 'relay_deploy_error "${LINENO}" "$?"' ERR
    repository_root=/srv/shanhaiedu/repository
    producer_env=/etc/shanhaiedu/image-video-smoke.env
    backup_pointer=/srv/shanhaiedu/backups/provider-media-relay-prechange.current
@@ -174,23 +195,39 @@ finally:
    cmp --silent "${relay_staging}" /opt/shanhaiedu/provider-media-relay/provider_media_relay.py
    relay_installed_sha256="$(sha256sum /opt/shanhaiedu/provider-media-relay/provider_media_relay.py | cut -d ' ' -f 1)"
    test "${relay_installed_sha256}" = "${relay_blob_sha256}"
+   relay_deploy_phase=systemd-reload
    systemctl daemon-reload
    systemctl enable shanhai-provider-media-relay.service
+   relay_deploy_phase=relay-restart
    systemctl restart shanhai-provider-media-relay.service
+   relay_deploy_phase=cleanup-oneshot-start
    systemctl start provider-media-cleanup.service
+   relay_deploy_phase=cleanup-oneshot-result
    test "$(systemctl show provider-media-cleanup.service -p Result --value)" = "success"
+   relay_deploy_phase=cleanup-oneshot-status
    test "$(systemctl show provider-media-cleanup.service -p ExecMainStatus --value)" = "0"
+   relay_deploy_phase=cleanup-timer-enable
    systemctl enable --now provider-media-cleanup.timer
+   relay_deploy_phase=relay-active
    systemctl is-active --quiet shanhai-provider-media-relay.service
+   relay_deploy_phase=cleanup-timer-active
    systemctl is-active --quiet provider-media-cleanup.timer
+   relay_deploy_phase=relay-user
    test "$(systemctl show shanhai-provider-media-relay.service -p User --value)" = "shanhai-relay"
+   relay_deploy_phase=relay-exec-start
    systemctl show shanhai-provider-media-relay.service -p ExecStart --value | grep -Fq '/opt/shanhaiedu/provider-media-relay/provider_media_relay.py'
+   relay_deploy_phase=relay-pid-owner
    relay_pid="$(systemctl show shanhai-provider-media-relay.service -p MainPID --value)"
+   test "${relay_pid}" -gt 1
    test "$(stat -c '%U' "/proc/${relay_pid}")" = "shanhai-relay"
-   if sudo -u shanhai-dev -- cat "/proc/${relay_pid}/environ" >/dev/null 2>&1; then exit 1; fi
+   relay_deploy_phase=producer-process-isolation
+   if sudo -u shanhai-dev -- cat "/proc/${relay_pid}/environ" >/dev/null 2>&1; then false; fi
    unset relay_pid
+   relay_deploy_phase=nginx-config
    nginx -t
+   relay_deploy_phase=nginx-reload
    systemctl reload nginx
+   relay_deploy_phase=provenance-output
    validation_time_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
    printf 'origin/main=%s\nrelay-sha256=%s\nvalidated-at=%s\n' \
      "${deployment_origin_main_sha}" "${relay_installed_sha256}" "${validation_time_utc}"
@@ -204,22 +241,33 @@ finally:
 Reuse the runtime-only test frame that returned `200` before rotation. It is not an application asset and must be removed after the check.
 ```bash
 set -euo pipefail
+relay_deploy_phase=https-smoke-file
 test -f "${smoke_path}"
+relay_deploy_phase=https-smoke-permissions
 test "$(stat -c '%U:%G:%a' "${smoke_path}")" = "shanhai-dev:shanhai-dev:640"
 ```
 
 Generate and consume a URL without printing it or putting it in a shell command line:
 ```bash
 set -euo pipefail
+relay_deploy_phase=https-secret-load
 set -a
 . /etc/shanhaiedu/provider-media-relay.env
 set +a
+relay_deploy_phase=https-new-url-sign
 url="$(cd /opt/shanhaiedu/provider-media-relay && PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -c 'from provider_media_relay import sign_media_path; import os, time; print("https://newapi.doitbenai.cloud/_shanhai-provider-media" + sign_media_path("provider-relay-smoke.png", expires_at=int(time.time()) + 60, secret=os.environ["SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET"]))')"
+relay_deploy_phase=https-old-url-sign
 old_url="$(printf '%s' "${old_secret}" | (cd /opt/shanhaiedu/provider-media-relay && PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -c 'from provider_media_relay import sign_media_path; import sys, time; print("https://newapi.doitbenai.cloud/_shanhai-provider-media" + sign_media_path("provider-relay-smoke.png", expires_at=int(time.time()) + 60, secret=sys.stdin.read()))'))"
+relay_deploy_phase=https-new-url-fetch
 curl --fail --silent --show-error --output /dev/null "$url"
-if curl --fail --silent --output /dev/null "${url}x"; then exit 1; fi
-if curl --fail --silent --output /dev/null "${old_url}"; then exit 1; fi
-unset url old_url old_secret SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET
+relay_deploy_phase=https-tampered-url-rejected
+tampered_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "${url}x")"
+test "${tampered_status}" = "404"
+relay_deploy_phase=https-old-url-rejected
+old_url_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "${old_url}")"
+test "${old_url_status}" = "404"
+unset url old_url old_secret tampered_status old_url_status SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET
+relay_deploy_phase=https-smoke-remove
 rm -f -- "${smoke_path}"
 ```
 
@@ -234,22 +282,45 @@ cleanup_root=/srv/shanhaiedu/runtime/provider-media
 opaque_smoke="${cleanup_root}/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png"
 partial_smoke="${cleanup_root}/.provider-media-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.partial"
 keep_smoke="${cleanup_root}/provider-media-cleanup-keep.txt"
-test ! -e "${opaque_smoke}" && test ! -e "${partial_smoke}" && test ! -e "${keep_smoke}"
+relay_deploy_phase=cleanup-opaque-absent
+test ! -e "${opaque_smoke}"
+relay_deploy_phase=cleanup-partial-absent
+test ! -e "${partial_smoke}"
+relay_deploy_phase=cleanup-keep-absent
+test ! -e "${keep_smoke}"
+relay_deploy_phase=cleanup-fixture-create
 install -m 0640 -o shanhai-dev -g shanhai-dev /dev/null "${opaque_smoke}"
 install -m 0640 -o shanhai-dev -g shanhai-dev /dev/null "${partial_smoke}"
 install -m 0640 -o shanhai-dev -g shanhai-dev /dev/null "${keep_smoke}"
 touch -d '10 minutes ago' "${opaque_smoke}" "${partial_smoke}" "${keep_smoke}"
+relay_deploy_phase=cleanup-timer-wait
 for _attempt in $(seq 1 90); do
   if test ! -e "${opaque_smoke}" && test ! -e "${partial_smoke}"; then break; fi
   sleep 1
 done
+relay_deploy_phase=cleanup-opaque-removed
 test ! -e "${opaque_smoke}"
+relay_deploy_phase=cleanup-partial-removed
 test ! -e "${partial_smoke}"
+relay_deploy_phase=cleanup-unrelated-preserved
 test -f "${keep_smoke}"
+relay_deploy_phase=cleanup-marker-remove
 rm -f -- "${keep_smoke}"
+relay_deploy_phase=cleanup-oneshot-final-result
 test "$(systemctl show provider-media-cleanup.service -p Result --value)" = "success"
-if journalctl -u shanhai-provider-media-relay.service --since '-10 minutes' --no-pager | grep -Fq 'signature='; then exit 1; fi
-if grep -Fq 'signature=' /var/log/nginx/access.log 2>/dev/null; then exit 1; fi
+relay_deploy_phase=relay-log-read
+relay_journal="$(journalctl -u shanhai-provider-media-relay.service --since '-10 minutes' --no-pager)"
+relay_deploy_phase=relay-log-redaction
+relay_log_status=0
+grep -Fq 'signature=' <<< "${relay_journal}" || relay_log_status=$?
+test "${relay_log_status}" -eq 1
+unset relay_journal relay_log_status
+relay_deploy_phase=nginx-log-redaction
+nginx_log_status=0
+grep -Fq 'signature=' /var/log/nginx/access.log 2>/dev/null || nginx_log_status=$?
+test "${nginx_log_status}" -eq 1
+unset nginx_log_status
+relay_deploy_phase=migration-complete
 unset cleanup_root opaque_smoke partial_smoke keep_smoke
 ```
 
