@@ -1,0 +1,58 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "8420a522322b",
+  "session_id": "019fa983-85fc-7b22-a5d3-e782aee30858",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-30T13:52:57.7159649Z",
+  "branch": "feat/205-video-golden-slice",
+  "checkpoints_count": 1,
+  "save_step_count": 2,
+  "files_touched": [
+    "CURRENT_STATUS.md",
+    "tests/integration/test_video_golden_slice_worker.py",
+    "tests/unit/model_gateway/test_newapi_video.py",
+    "workers/video_generation_runtime.py"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.6-sol",
+  "turn_id": "424902cecf21",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 16568291,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 291130532,
+    "output_tokens": 899212,
+    "api_call_count": 2157
+  },
+  "session_metrics": {
+    "turn_count": 29
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-30T13:52:56.2830658Z",
+    "agent_lines": 0,
+    "agent_removed": 2,
+    "human_added": 10,
+    "human_modified": 1022,
+    "human_removed": 0,
+    "total_committed": 1026,
+    "total_lines_changed": 1034,
+    "agent_percentage": 0.19342359767891684,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 368,
+      "agent_lines_removed": 368
+    }
+  ]
+}
