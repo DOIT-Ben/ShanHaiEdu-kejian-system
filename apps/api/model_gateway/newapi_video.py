@@ -275,6 +275,7 @@ class NewApiVideoProvider:
             headers=self._auth_headers(),
             blob=blob,
             ttl_seconds=self._config.temporary_file_ttl_seconds,
+            minimum_remaining_seconds=self._config.timeout_seconds,
             raise_for_error=_raise_for_error,
         )
 

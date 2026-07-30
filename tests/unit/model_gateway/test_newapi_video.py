@@ -218,8 +218,8 @@ async def test_submit_uploads_one_resolved_private_image_and_sends_file_id() -> 
                     "bytes": len(b"provider-media-test-image"),
                     "mimeType": "image/png",
                     "sha256": hashlib.sha256(b"provider-media-test-image").hexdigest(),
-                    "createdAt": "2026-07-21T00:00:00Z",
-                    "expiresAt": "2026-07-21T00:15:00Z",
+                    "createdAt": "2099-07-21T00:00:00Z",
+                    "expiresAt": "2099-07-21T00:15:00Z",
                 },
             )
         assert http_request.url == "https://gateway.test/v1/videos"
@@ -298,8 +298,8 @@ async def test_submit_rejects_newapi_file_facts_that_do_not_match_uploaded_bytes
                 "bytes": 999,
                 "mimeType": "image/png",
                 "sha256": "0" * 64,
-                "createdAt": "2026-07-21T00:00:00Z",
-                "expiresAt": "2026-07-21T00:15:00Z",
+                "createdAt": "2099-07-21T00:00:00Z",
+                "expiresAt": "2099-07-21T00:15:00Z",
             },
         )
 
@@ -310,6 +310,60 @@ async def test_submit_rejects_newapi_file_facts_that_do_not_match_uploaded_bytes
         )
 
     assert captured.value.code == GatewayErrorCode.INVALID_RESPONSE
+
+
+@pytest.mark.parametrize(
+    "temporal_facts",
+    [
+        {"createdAt": "not-a-date", "expiresAt": "2099-07-21T00:15:00Z"},
+        {"createdAt": "2000-07-21T00:00:00Z", "expiresAt": "2000-07-21T00:15:00Z"},
+        {"expiresAt": "2099-07-21T00:15:00Z"},
+    ],
+)
+async def test_submit_rejects_invalid_or_expired_temporary_file_without_video_request(
+    temporal_facts: dict[str, str],
+) -> None:
+    store = RecordingVideoStore()
+    organization_id = UUID("018f0000-0000-7000-8000-000000000009")
+    reference = MediaReference(
+        file_version_id=UUID("018f0000-0000-7000-8000-000000000010"),
+        mime_type="image/png",
+    )
+    content = b"provider-media-test-image"
+    received_urls: list[str] = []
+
+    class Resolver:
+        def read(self, **_kwargs) -> SimpleNamespace:
+            return SimpleNamespace(
+                content=content,
+                mime_type="image/png",
+                sha256=hashlib.sha256(content).hexdigest(),
+            )
+
+    def handler(http_request: httpx.Request) -> httpx.Response:
+        received_urls.append(str(http_request.url))
+        assert http_request.url == "https://gateway.test/v1/files"
+        return httpx.Response(
+            201,
+            json={
+                "id": "file_" + "c" * 32,
+                "object": "file",
+                "purpose": "video_reference",
+                "bytes": len(content),
+                "mimeType": "image/png",
+                "sha256": hashlib.sha256(content).hexdigest(),
+                **temporal_facts,
+            },
+        )
+
+    with pytest.raises(ModelGatewayError) as captured:
+        await provider(handler, store, media_reference_reader=Resolver()).submit(
+            video_request(references=[reference]),
+            organization_id=organization_id,
+        )
+
+    assert captured.value.code == GatewayErrorCode.INVALID_RESPONSE
+    assert received_urls == ["https://gateway.test/v1/files"]
 
 
 async def test_submit_conflict_becomes_submission_unknown_without_a_second_request() -> None:

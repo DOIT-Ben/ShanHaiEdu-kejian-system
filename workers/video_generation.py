@@ -41,7 +41,7 @@ from workflow.node_state import NodeStatus
 
 logger = logging.getLogger(__name__)
 
-_PROVIDER_REQUEST_WINDOWS = 3
+_PROVIDER_REQUEST_WINDOWS = 4
 _VIDEO_PROBE_TIMEOUT_SECONDS = 30
 _VIDEO_PERSISTENCE_MARGIN_SECONDS = 30
 

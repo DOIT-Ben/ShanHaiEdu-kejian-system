@@ -128,7 +128,7 @@ def test_video_worker_lease_covers_provider_and_validation_windows() -> None:
         }
     )
 
-    assert video_worker._video_lease_seconds(settings) == 431
+    assert video_worker._video_lease_seconds(settings) == 551
 
 
 async def test_video_worker_persists_verified_candidate_and_refreshes_playback(
@@ -214,7 +214,7 @@ async def test_video_worker_persists_verified_candidate_and_refreshes_playback(
                 media_type="video/mp4",
             )
             drifted_playback = await client.get(playback_url)
-        assert claimed_lease_seconds == [431]
+        assert claimed_lease_seconds == [551]
         assert provider.submitted_prompt is not None
         assert "intro_selection.snapshot" in provider.submitted_prompt
         assert str(lesson.intro_selection_id) in provider.submitted_prompt

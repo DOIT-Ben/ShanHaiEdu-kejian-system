@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, ValidationError
 
 from apps.api.model_gateway.contracts import GatewayErrorCode, ModelGatewayError
 from apps.api.model_gateway.provider_media import ProviderMediaBlob
@@ -21,7 +22,8 @@ class _GatewayFileObject(BaseModel):
     bytes: int = Field(gt=0, le=10_485_760)
     mime_type: Literal["image/png", "image/jpeg", "image/webp"] = Field(alias="mimeType")
     sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
-    expires_at: str = Field(alias="expiresAt", min_length=1)
+    created_at: AwareDatetime = Field(alias="createdAt")
+    expires_at: AwareDatetime = Field(alias="expiresAt")
 
 
 async def upload_temporary_video_reference(
@@ -31,6 +33,7 @@ async def upload_temporary_video_reference(
     headers: dict[str, str],
     blob: ProviderMediaBlob,
     ttl_seconds: int,
+    minimum_remaining_seconds: float,
     raise_for_error: Callable[[httpx.Response], None],
 ) -> str:
     try:
@@ -62,6 +65,9 @@ async def upload_temporary_video_reference(
         file_object.bytes != len(blob.content)
         or file_object.mime_type != blob.mime_type
         or file_object.sha256 != blob.sha256
+        or file_object.expires_at <= file_object.created_at
+        or file_object.expires_at
+        <= datetime.now(UTC) + timedelta(seconds=minimum_remaining_seconds)
     ):
         raise ModelGatewayError(GatewayErrorCode.INVALID_RESPONSE, retryable=False)
     return file_object.id
