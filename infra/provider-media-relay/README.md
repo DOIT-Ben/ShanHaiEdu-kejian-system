@@ -221,7 +221,7 @@ finally:
    relay_deploy_phase=relay-exec-start
    relay_exec_start="$(systemctl show shanhai-provider-media-relay.service -p ExecStart --value)"
    case "${relay_exec_start}" in
-     *"/opt/shanhaiedu/provider-media-relay/provider_media_relay.py"*) ;;
+     "{ path=/usr/bin/python3 ; argv[]=/usr/bin/python3 /opt/shanhaiedu/provider-media-relay/provider_media_relay.py --port 8201 ; "*) ;;
      *) false ;;
    esac
    unset relay_exec_start

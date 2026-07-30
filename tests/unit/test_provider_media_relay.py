@@ -387,7 +387,9 @@ def test_relay_deploy_post_start_gates_report_only_redacted_phase_and_line() -> 
             'relay_exec_start="$(systemctl show '
             'shanhai-provider-media-relay.service -p ExecStart --value)"\n'
             '   case "${relay_exec_start}" in\n'
-            '     *"/opt/shanhaiedu/provider-media-relay/provider_media_relay.py"*) ;;'
+            '     "{ path=/usr/bin/python3 ; argv[]=/usr/bin/python3 '
+            "/opt/shanhaiedu/provider-media-relay/provider_media_relay.py "
+            '--port 8201 ; "*) ;;'
         ),
         "relay-pid-owner": (
             'test "${relay_pid}" -gt 1\n'

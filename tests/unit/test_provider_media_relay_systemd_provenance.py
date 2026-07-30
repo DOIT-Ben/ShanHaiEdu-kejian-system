@@ -40,7 +40,13 @@ systemctl() {
 """
 
     scenarios = (
-        (expected_fragment, f"/usr/bin/python3 {expected_runtime} --port 8201", 0, None),
+        (
+            expected_fragment,
+            f"{{ path=/usr/bin/python3 ; argv[]=/usr/bin/python3 {expected_runtime} "
+            "--port 8201 ; ignore_errors=no ; start_time=[not set] ; }}",
+            0,
+            None,
+        ),
         (
             expected_fragment,
             "/srv/shanhaiedu/repository/apps/api/provider_media_relay.py --port 8201",
@@ -48,8 +54,17 @@ systemctl() {
             "relay-exec-start",
         ),
         (
+            expected_fragment,
+            "{ path=/usr/bin/python3 ; argv[]=/usr/bin/python3 "
+            "/srv/shanhaiedu/repository/apps/api/provider_media_relay.py "
+            f"--audit-label={expected_runtime} ; ignore_errors=no ; }}",
+            1,
+            "relay-exec-start",
+        ),
+        (
             "/usr/lib/systemd/system/shanhai-provider-media-relay.service",
-            f"/usr/bin/python3 {expected_runtime} --port 8201",
+            f"{{ path=/usr/bin/python3 ; argv[]=/usr/bin/python3 {expected_runtime} "
+            "--port 8201 ; ignore_errors=no ; }}",
             1,
             "relay-fragment-path",
         ),
