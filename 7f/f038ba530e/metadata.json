@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "7ff038ba530e",
+  "strategy": "manual-commit",
+  "branch": "feat/205-video-golden-slice",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "CURRENT_STATUS.md",
+    "apps/api/logging.py",
+    "tests/unit/test_health.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/7f/f038ba530e/0/metadata.json",
+      "transcript": "/7f/f038ba530e/0/full.jsonl",
+      "compact_transcript": "/7f/f038ba530e/0/transcript.jsonl",
+      "content_hash": "/7f/f038ba530e/0/content_hash.txt",
+      "prompt": "/7f/f038ba530e/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 17778850,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 306060708,
+    "output_tokens": 952041,
+    "api_call_count": 2273
+  }
+}
