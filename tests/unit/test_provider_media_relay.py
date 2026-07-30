@@ -443,10 +443,14 @@ def test_relay_deploy_smokes_keep_exact_phase_diagnostics() -> None:
         "https-old-url-sign": 'old_url="$(printf \'%s\' "${old_secret}"',
         "https-new-url-fetch": 'curl --fail --silent --show-error --output /dev/null "$url"',
         "https-tampered-url-rejected": (
-            'if curl --fail --silent --output /dev/null "${url}x"; then false; fi'
+            'tampered_status="$(curl --silent --show-error --output /dev/null '
+            '--write-out \'%{http_code}\' "${url}x")"\n'
+            'test "${tampered_status}" = "404"'
         ),
         "https-old-url-rejected": (
-            'if curl --fail --silent --output /dev/null "${old_url}"; then false; fi'
+            'old_url_status="$(curl --silent --show-error --output /dev/null '
+            '--write-out \'%{http_code}\' "${old_url}")"\n'
+            'test "${old_url_status}" = "404"'
         ),
         "https-smoke-remove": 'rm -f -- "${smoke_path}"',
         "cleanup-opaque-absent": 'test ! -e "${opaque_smoke}"',
@@ -460,12 +464,20 @@ def test_relay_deploy_smokes_keep_exact_phase_diagnostics() -> None:
         "cleanup-oneshot-final-result": (
             'test "$(systemctl show provider-media-cleanup.service -p Result --value)" = "success"'
         ),
+        "relay-log-read": (
+            'relay_journal="$(journalctl -u shanhai-provider-media-relay.service '
+            "--since '-10 minutes' --no-pager)\""
+        ),
         "relay-log-redaction": (
-            "if journalctl -u shanhai-provider-media-relay.service --since '-10 minutes' "
-            "--no-pager | grep -Fq 'signature='; then false; fi"
+            "relay_log_status=0\n"
+            "grep -Fq 'signature=' <<< \"${relay_journal}\" || relay_log_status=$?\n"
+            'test "${relay_log_status}" -eq 1'
         ),
         "nginx-log-redaction": (
-            "if grep -Fq 'signature=' /var/log/nginx/access.log 2>/dev/null; then false; fi"
+            "nginx_log_status=0\n"
+            "grep -Fq 'signature=' /var/log/nginx/access.log 2>/dev/null || "
+            "nginx_log_status=$?\n"
+            'test "${nginx_log_status}" -eq 1'
         ),
     }
     previous_gate = 0
@@ -509,6 +521,65 @@ def test_relay_deploy_smokes_keep_exact_phase_diagnostics() -> None:
         assert match is not None, line
         reported_phases.append(match.group(1))
     assert reported_phases == list(gates)
+
+    tampered_gate = (
+        "relay_deploy_phase=https-tampered-url-rejected\n"
+        + post_start.split("relay_deploy_phase=https-tampered-url-rejected\n", 1)[1].split(
+            "relay_deploy_phase=https-old-url-rejected", 1
+        )[0]
+    )
+    for fake_curl, expected_status in (
+        ("curl() { printf '404'; return 0; }\n", 0),
+        ("curl() { printf '500'; return 0; }\n", 1),
+        ("curl() { return 7; }\n", 7),
+    ):
+        completed = subprocess.run(
+            ["bash", "-s"],
+            input=(bootstrap + fake_curl + "url=https://invalid.example\n" + tampered_gate).encode(
+                "utf-8"
+            ),
+            check=False,
+            capture_output=True,
+        )
+        assert completed.returncode == expected_status
+
+    relay_log_gate = (
+        "relay_deploy_phase=relay-log-read\n"
+        + post_start.split("relay_deploy_phase=relay-log-read\n", 1)[1].split(
+            "relay_deploy_phase=nginx-log-redaction", 1
+        )[0]
+    )
+    for fake_journal, expected_status, forbidden in (
+        ("journalctl() { printf 'safe log'; return 0; }\n", 0, b""),
+        ("journalctl() { return 1; }\n", 1, b""),
+        ("journalctl() { printf 'signature=fake-secret'; return 0; }\n", 1, b"fake-secret"),
+    ):
+        completed = subprocess.run(
+            ["bash", "-s"],
+            input=(bootstrap + fake_journal + relay_log_gate).encode("utf-8"),
+            check=False,
+            capture_output=True,
+        )
+        assert completed.returncode == expected_status
+        if forbidden:
+            assert forbidden not in completed.stderr
+
+    nginx_log_gate = (
+        "relay_deploy_phase=nginx-log-redaction\n"
+        + post_start.split("relay_deploy_phase=nginx-log-redaction\n", 1)[1].split(
+            "relay_deploy_phase=migration-complete", 1
+        )[0]
+    )
+    for grep_status, expected_status in ((1, 0), (0, 1), (2, 1)):
+        completed = subprocess.run(
+            ["bash", "-s"],
+            input=(bootstrap + f"grep() {{ return {grep_status}; }}\n" + nginx_log_gate).encode(
+                "utf-8"
+            ),
+            check=False,
+            capture_output=True,
+        )
+        assert completed.returncode == expected_status
 
 
 def test_relay_runbook_pre_rollback_blocks_are_lf_safe_base64_bash() -> None:

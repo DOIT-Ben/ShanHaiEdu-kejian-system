@@ -261,10 +261,12 @@ old_url="$(printf '%s' "${old_secret}" | (cd /opt/shanhaiedu/provider-media-rela
 relay_deploy_phase=https-new-url-fetch
 curl --fail --silent --show-error --output /dev/null "$url"
 relay_deploy_phase=https-tampered-url-rejected
-if curl --fail --silent --output /dev/null "${url}x"; then false; fi
+tampered_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "${url}x")"
+test "${tampered_status}" = "404"
 relay_deploy_phase=https-old-url-rejected
-if curl --fail --silent --output /dev/null "${old_url}"; then false; fi
-unset url old_url old_secret SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET
+old_url_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "${old_url}")"
+test "${old_url_status}" = "404"
+unset url old_url old_secret tampered_status old_url_status SHANHAI_PROVIDER_MEDIA_SIGNING_SECRET
 relay_deploy_phase=https-smoke-remove
 rm -f -- "${smoke_path}"
 ```
@@ -306,10 +308,18 @@ relay_deploy_phase=cleanup-marker-remove
 rm -f -- "${keep_smoke}"
 relay_deploy_phase=cleanup-oneshot-final-result
 test "$(systemctl show provider-media-cleanup.service -p Result --value)" = "success"
+relay_deploy_phase=relay-log-read
+relay_journal="$(journalctl -u shanhai-provider-media-relay.service --since '-10 minutes' --no-pager)"
 relay_deploy_phase=relay-log-redaction
-if journalctl -u shanhai-provider-media-relay.service --since '-10 minutes' --no-pager | grep -Fq 'signature='; then false; fi
+relay_log_status=0
+grep -Fq 'signature=' <<< "${relay_journal}" || relay_log_status=$?
+test "${relay_log_status}" -eq 1
+unset relay_journal relay_log_status
 relay_deploy_phase=nginx-log-redaction
-if grep -Fq 'signature=' /var/log/nginx/access.log 2>/dev/null; then false; fi
+nginx_log_status=0
+grep -Fq 'signature=' /var/log/nginx/access.log 2>/dev/null || nginx_log_status=$?
+test "${nginx_log_status}" -eq 1
+unset nginx_log_status
 relay_deploy_phase=migration-complete
 unset cleanup_root opaque_smoke partial_smoke keep_smoke
 ```
