@@ -1,0 +1,40 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "2d04c1f366b2",
+  "strategy": "manual-commit",
+  "branch": "feat/205-video-golden-slice",
+  "checkpoints_count": 28,
+  "files_touched": [
+    ".env.example",
+    "CURRENT_STATUS.md",
+    "apps/api/cli.py",
+    "apps/api/model_gateway/factory.py",
+    "apps/api/model_gateway/newapi_video.py",
+    "apps/api/model_gateway/newapi_video_files.py",
+    "apps/api/model_gateway/newapi_video_submission.py",
+    "apps/api/model_gateway/provider_media.py",
+    "apps/api/model_gateway/video_smoke_media.py",
+    "apps/api/settings.py",
+    "docs/backend/03_内容运行时与模型网关.md",
+    "tests/unit/model_gateway/test_factory.py",
+    "tests/unit/model_gateway/test_newapi_video.py",
+    "tests/unit/model_gateway/test_provider_media.py",
+    "workers/video_generation.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/2d/04c1f366b2/0/metadata.json",
+      "transcript": "/2d/04c1f366b2/0/full.jsonl",
+      "compact_transcript": "/2d/04c1f366b2/0/transcript.jsonl",
+      "content_hash": "/2d/04c1f366b2/0/content_hash.txt",
+      "prompt": "/2d/04c1f366b2/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 14850760,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 256998564,
+    "output_tokens": 814643,
+    "api_call_count": 1913
+  }
+}
