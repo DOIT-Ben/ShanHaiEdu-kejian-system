@@ -530,6 +530,90 @@ async def test_video_worker_rejects_invalid_mp4_without_candidate(
         engine.dispose()
 
 
+@pytest.mark.parametrize("reported_duration_seconds", [5, 7])
+async def test_video_worker_rejects_declared_wrong_duration_before_download(
+    migrated_database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+    reported_duration_seconds: int,
+) -> None:
+    engine = build_engine(migrated_database_url)
+    factory = build_session_factory(engine)
+    seeded = await seed_video_project(factory, lesson_count=1)
+    storage = FakeObjectStorage()
+    provider = StoredVideoFakeProvider(
+        storage,
+        b"download-must-not-run",
+        reported_duration_seconds=reported_duration_seconds,
+    )
+    gateway = ModelGateway(
+        {},
+        video_routes={ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S: provider},
+        audit_sink=SqlAlchemyAttemptAuditSink(factory),
+    )
+    settings = _settings(migrated_database_url)
+    app = create_app(settings=settings, session_factory=factory, object_storage=storage)
+    override_test_identity(app, seeded.actor)
+    lesson = seeded.lessons[0]
+    download_calls = 0
+    probe_calls = 0
+
+    def reject_download(**_kwargs: object) -> None:
+        nonlocal download_calls
+        download_calls += 1
+        raise AssertionError("wrong declared duration must fail before object download")
+
+    def reject_probe(_path: Path) -> None:
+        nonlocal probe_calls
+        probe_calls += 1
+        raise AssertionError("wrong declared duration must fail before ffprobe")
+
+    monkeypatch.setattr(storage, "download_to_path", reject_download)
+    monkeypatch.setattr("workers.video_generation_runtime.probe_mp4", reject_probe)
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+            started = await client.post(
+                f"/api/v2/projects/{seeded.project_id}/lessons/{lesson.lesson_id}"
+                "/video/generations",
+                headers={"Idempotency-Key": f"video-worker-duration-{reported_duration_seconds}"},
+                json={"keyframe_file_asset_version_id": str(lesson.keyframe_file_version_id)},
+            )
+        assert started.status_code == 202, started.text
+        job_id = UUID(started.json()["data"]["job_id"])
+        outcome = await execute_video_generation_job(
+            job_id,
+            worker_id=f"video-worker-duration-{reported_duration_seconds}",
+            gateway=gateway,
+            storage=storage,
+            settings=settings,
+        )
+        with factory() as session:
+            job = session.get(GenerationJob, job_id)
+            node = session.get(NodeRun, job.node_run_id if job else None)
+            result_count = session.scalar(
+                select(func.count())
+                .select_from(GenerationResult)
+                .where(GenerationResult.generation_job_id == job_id)
+            )
+            version_count = session.scalar(
+                select(func.count())
+                .select_from(FileAssetVersion)
+                .where(FileAssetVersion.metadata_json["generation_job_id"].astext == str(job_id))
+            )
+        assert outcome == "failed"
+        assert download_calls == 0
+        assert probe_calls == 0
+        assert job is not None and job.status == "failed"
+        assert job.error_code == "VIDEO_FILE_INVALID"
+        assert node is not None and node.status == "failed"
+        assert result_count == 0
+        assert version_count == 0
+    finally:
+        engine.dispose()
+
+
 def _settings(database_url: str) -> Settings:
     return Settings(
         _env_file=None,
