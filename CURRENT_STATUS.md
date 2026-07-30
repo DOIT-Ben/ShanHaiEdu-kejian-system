@@ -1,7 +1,7 @@
 # 当前项目状态
 
 当前阶段：阶段1后端基座以及R1教材范围、课时划分、十二部分教案和三类九套四个教师可见文本结果已经进入`main`；受控真实文本Provider教师黄金项目、独立审查、合并和`main`复验均已完成。约6秒课堂导入短片黄金纵向切片已经暂停，当前先完成其受控媒体relay安全运行形态。
-> 最后核验：2026-07-29。
+> 最后核验：2026-07-30。
 > 当前任务：[Issue #165](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/165)由[Draft PR #250](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/250)继续承载；[PR #249](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/249)已合并，两次受控迁移均在失败后完整回滚，当前先为启动后门禁补齐脱敏阶段诊断，再经独立审查、合并授权和一次受控服务器迁移完成安全运行形态。[Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)保持`status:blocked`，[Draft PR #247](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/247)不恢复、不转Ready、不合并。
 
 ## 当前可演示成果
