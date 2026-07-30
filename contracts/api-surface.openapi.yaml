@@ -829,6 +829,108 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/GenerationJobListEnvelope'}
         '4XX': {$ref: '#/components/responses/Error'}
+  /projects/{project_id}/lessons/{lesson_id}/video:
+    get:
+      summary: 恢复指定课时的六秒课堂导入短片状态
+      operationId: getLessonVideoGoldenSlice
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/LessonId'
+      responses:
+        '200':
+          description: Exact video job, candidate, adoption, and project binding facts
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/VideoGoldenSliceEnvelope'}
+        '4XX': {$ref: '#/components/responses/Error'}
+  /projects/{project_id}/lessons/{lesson_id}/video/generations:
+    post:
+      summary: 从exact导入方案与正式关键帧启动六秒短片生成
+      operationId: startLessonVideoGeneration
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StartVideoGenerationRequest'}
+      responses:
+        '202': {$ref: '#/components/responses/AcceptedJob'}
+        '4XX': {$ref: '#/components/responses/Error'}
+  /projects/{project_id}/lessons/{lesson_id}/video/results/{result_id}/content:
+    get:
+      summary: 播放exact课堂导入短片候选
+      operationId: playLessonVideoResult
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/GenerationResultId'
+      responses:
+        '200':
+          description: Verified MP4 candidate bytes
+          content:
+            video/mp4:
+              schema: {type: string, format: binary}
+        '4XX': {$ref: '#/components/responses/Error'}
+  /projects/{project_id}/lessons/{lesson_id}/video/results/{result_id}/adoptions:
+    post:
+      summary: 采用指定课时的exact短片候选
+      operationId: adoptLessonVideoResult
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/GenerationResultId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AdoptGenerationResultRequest'}
+      responses:
+        '201':
+          description: Exact video candidate adopted
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AdoptionEnvelope'}
+        '4XX': {$ref: '#/components/responses/Error'}
+  /projects/{project_id}/lessons/{lesson_id}/video/adoptions/{adoption_id}/save:
+    post:
+      summary: 将exact短片采用事实原子写回当前课时槽位
+      operationId: saveLessonVideoAdoption
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/LessonId'
+        - $ref: '#/components/parameters/AdoptionId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SaveVideoAdoptionRequest'}
+      responses:
+        '200':
+          description: Video adoption saved to the immutable lesson target slot
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SaveToProjectOperationEnvelope'}
+        '4XX': {$ref: '#/components/responses/Error'}
   /projects/{project_id}/artifacts:
     post:
       summary: 创建项目内容产物及活动草稿
@@ -2334,6 +2436,75 @@ components:
             items:
               type: array
               items: {$ref: '#/components/schemas/GenerationJob'}
+        request_id: {type: string, minLength: 1}
+    StartVideoGenerationRequest:
+      type: object
+      additionalProperties: false
+      required: [keyframe_file_asset_version_id]
+      properties:
+        keyframe_file_asset_version_id: {type: string, format: uuid}
+    SaveVideoAdoptionRequest:
+      type: object
+      additionalProperties: false
+      required: [replace_mode]
+      properties:
+        replace_mode: {const: replace_active}
+    VideoGoldenSliceCandidate:
+      type: object
+      additionalProperties: false
+      required:
+        - result_id
+        - file_asset_version_id
+        - mime_type
+        - byte_size
+        - sha256
+        - duration_ms
+        - playback_url
+        - adoption_id
+        - saved_binding_id
+      properties:
+        result_id: {type: string, format: uuid}
+        file_asset_version_id: {type: string, format: uuid}
+        mime_type: {const: video/mp4}
+        byte_size: {type: integer, minimum: 1}
+        sha256: {type: string, pattern: '^[a-f0-9]{64}$'}
+        duration_ms: {type: integer, minimum: 1}
+        playback_url: {type: string, minLength: 1}
+        adoption_id: {type: [string, 'null'], format: uuid}
+        saved_binding_id: {type: [string, 'null'], format: uuid}
+    VideoGoldenSlice:
+      type: object
+      additionalProperties: false
+      required:
+        - project_id
+        - lesson_unit_id
+        - intro_selection_id
+        - intro_artifact_version_id
+        - keyframe_file_asset_version_id
+        - keyframe_slot_key
+        - job
+        - candidate
+      properties:
+        project_id: {type: string, format: uuid}
+        lesson_unit_id: {type: string, format: uuid}
+        intro_selection_id: {type: string, format: uuid}
+        intro_artifact_version_id: {type: string, format: uuid}
+        keyframe_file_asset_version_id: {type: [string, 'null'], format: uuid}
+        keyframe_slot_key: {type: [string, 'null']}
+        job:
+          oneOf:
+            - $ref: '#/components/schemas/GenerationJob'
+            - type: 'null'
+        candidate:
+          oneOf:
+            - $ref: '#/components/schemas/VideoGoldenSliceCandidate'
+            - type: 'null'
+    VideoGoldenSliceEnvelope:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: {$ref: '#/components/schemas/VideoGoldenSlice'}
         request_id: {type: string, minLength: 1}
     DependencyReadiness:
       type: object

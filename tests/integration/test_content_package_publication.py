@@ -111,6 +111,27 @@ RELEASE_1_5_1_PACKAGE_CHECKSUM = "724d95b532b1f181f0ea428cab5d83cb5e142e41b00a3c
 RELEASE_1_5_1_WORKFLOW_CHECKSUM = "017995664712052bd8652c4ac2094f3881ad1ad8e087675bf975c2875513b79c"
 RELEASE_1_5_2_PACKAGE_CHECKSUM = "b63286ddb941d98b9f5ac0699b17ae2b51eae03f641838a98daa755454911629"
 RELEASE_1_5_2_WORKFLOW_CHECKSUM = "a2e5dafe66c0138bc2f997e74bdf5d14944f1b5d65a9929f914aae592220ba3d"
+RELEASE_1_5_3_PACKAGE_CHECKSUM = "dc0f8525e0a8689ee6bdb6a98d9e20c997203e5c9e0bbe8c51431665f433b1de"
+RELEASE_1_5_3_WORKFLOW_CHECKSUM = "df1c93a078df788d262be773997e5e7d2812b7c2c2d55d2244b820ab47f5b9f4"
+RELEASE_1_5_3_CHANGE_SUMMARY = (
+    "在不可变1.5.2基础上前向修正三类九套质量校验对教师适配说明中讲授边界复述的误判；"  # noqa: RUF001
+    "旧Release与既有项目绑定保持不变。"
+)
+RELEASE_1_5_3_VIDEO_ITEM_HASHES = {
+    "video.shots.generate.input": (
+        "f4287a720162efbf1446b5c71d42760366463a1f995f0451697bf2bd041ee749"
+    ),
+    "video.shots.generate.output": (
+        "b895b7da15db97e1921b4e2dbed2377c864c369a49762fd90cb94cd76efbfc93"
+    ),
+    "video.shots.generate.prompt": (
+        "1c02507795764b560182086a94867ddd6e383947da58b0a48966633337fe8ecc"
+    ),
+    "video.shots.generate.projection": (
+        "be4de484c95db3b8c506d2c361ede3aa68b38faa3dc6e282d878eb34d5517bfb"
+    ),
+    "video.shots.generate": "a313a2f7eebd3daad7238fa68944dcac1dfe5001d74ff5eb18bbcb41407ab4aa",
+}
 RELEASE_1_5_2_CHANGE_SUMMARY = (
     "在不可变1.5.1基础上把三类九套改为候选生成与独立统一评分两个受审计阶段，删除辅助倾向字段与跨倾向门禁；"  # noqa: RUF001
     "旧Release与既有项目绑定保持不变。"
@@ -803,6 +824,157 @@ def restore_release_1_5_2_validator(catalog: dict[str, Any]) -> None:
         replace_validator_ref(refs, RELEASE_1_5_2_INTRO_SINGLE_ANCHOR)
 
 
+def restore_video_before_1_6(items: dict[str, dict[str, Any]]) -> None:
+    title = "逐镜头候选视频生成"
+    description = "按细分镜逐shot生成候选视频，候选通过校验、采用并保存后才形成正式clip。"  # noqa: RUF001
+    for item_key in (
+        "video.shots.generate",
+        "video.shots.generate.input",
+        "video.shots.generate.output",
+        "video.shots.generate.prompt",
+        "video.shots.generate.projection",
+    ):
+        item = items[item_key]
+        suffix = item_key.removeprefix("video.shots.generate").removeprefix(".")
+        label = {
+            "": title,
+            "input": f"{title}输入",
+            "output": f"{title}输出",
+            "prompt": f"{title}业务Prompt",
+            "projection": f"{title}教师投影",
+        }[suffix]
+        item["metadata"]["name"] = label
+        item["spec"]["title"] = label
+    items["video.shots.generate"]["spec"]["description"] = description
+
+    input_spec = items["video.shots.generate.input"]["spec"]
+    input_spec["description"] = "输入一个shot合同、视频风格、候选数及必需关键帧与连续性参考。"
+    input_spec["fields"] = [
+        {
+            "field_key": "shot_spec_ref",
+            "label": "细分镜shot",
+            "value_type": "reference",
+            "required": True,
+            "source": "system",
+            "visibility": "hidden",
+            "widget": "textarea",
+        },
+        {
+            "field_key": "shot_candidate_count",
+            "label": "候选数量",
+            "value_type": "number",
+            "required": True,
+            "source": "teacher",
+            "visibility": "primary",
+            "widget": "number",
+            "default_value": 2,
+            "validation": {"minimum": 1, "maximum": 4},
+        },
+        {
+            "field_key": "shot_generation_quality",
+            "label": "逻辑质量档位",
+            "value_type": "enum",
+            "required": True,
+            "source": "teacher",
+            "visibility": "secondary",
+            "widget": "select",
+            "default_value": "balanced",
+            "options": [
+                {"value": "fast", "label": "快速"},
+                {"value": "balanced", "label": "均衡"},
+                {"value": "quality", "label": "高质量"},
+            ],
+        },
+        {
+            "field_key": "shot_reference_assets",
+            "label": "关键帧与连续性参考",
+            "value_type": "asset",
+            "required": True,
+            "source": "system",
+            "visibility": "hidden",
+            "widget": "asset_picker",
+        },
+        {
+            "field_key": "shot_style_contract_ref",
+            "label": "视频风格合同",
+            "value_type": "reference",
+            "required": True,
+            "source": "system",
+            "visibility": "hidden",
+            "widget": "textarea",
+        },
+    ]
+
+    prompt_spec = items["video.shots.generate.prompt"]["spec"]
+    prompt_spec["description"] = description
+    old_sections = {
+        "role": "你是服务端逐shot视频生成执行器。",
+        "task": "严格按一个已冻结shot合同生成指定数量候选，按image_index顺序传入shot_keyframe和continuity_reference，不改写故事、时长、动作或固定槽位。",  # noqa: E501, RUF001
+        "method": "通过模型网关选择满足video.image_to_video.6s_30s能力的路由；只传节点允许的参考资产与业务提示词。记录候选键、实际时长、分辨率、帧率、媒体类型、SHA-256和质量标记。候选阶段不创建clip_id；只有校验通过、被采用并原子保存到shot槽位后才形成正式clip。",  # noqa: E501, RUF001
+        "quality_gate": "输出可播放且时长匹配6至30秒shot合同；首尾状态、主体身份、资产、动作、光线和镜头连续；无文字字幕水印Logo和儿童安全问题；失败只影响当前shot；Provider私有参数和临时URL不进入业务产物。",  # noqa: E501, RUF001
+    }
+    for section in prompt_spec["sections"]:
+        section["content"] = old_sections[section["section_key"]]
+    prompt_spec["context_bindings"] = []
+
+
+def restore_video_catalog_before_1_6(catalog: dict[str, Any]) -> None:
+    master_script = package_node(catalog, "video.master_script.generate")
+    master_script["dependencies"] = []
+    master_script["entrypoint"] = True
+
+    shots = package_node(catalog, "video.shots.generate")
+    shots["title"] = "逐镜头候选视频生成"
+    shots["input_contract_refs"] = ["artifact:video_fine_storyboard", "contract:video_style"]
+    shots["context_policy"] = {"mode": "none", "allowed_sources": [], "forbidden_sources": []}
+    shots["reference_asset_policy"]["roles"] = [
+        {
+            "role_key": "shot_keyframe",
+            "requirement": "required",
+            "media_types": ["image"],
+            "min_items": 1,
+            "max_items": 3,
+            "order_mode": "stable_by_role_then_version",
+            "allowed_sources": ["artifact_version", "asset_slot_current"],
+            "provider_exposure": ["signed_url", "provider_file_id", "inline_bytes"],
+        },
+        {
+            "role_key": "continuity_reference",
+            "requirement": "optional",
+            "media_types": ["image", "video"],
+            "min_items": 0,
+            "max_items": 2,
+            "order_mode": "stable_by_role_then_version",
+            "allowed_sources": ["artifact_version", "asset_slot_current", "creation_result"],
+            "provider_exposure": ["signed_url", "provider_file_id"],
+        },
+    ]
+    continuity_validator = next(
+        descriptor
+        for descriptor in catalog["validator_descriptors"]
+        if descriptor["key"] == "validator.video.continuity"
+    )
+    shots["validator_refs"].insert(
+        2,
+        {
+            key: continuity_validator[key]
+            for key in ("key", "semantic_version", "implementation_digest")
+        },
+    )
+    shots["dependencies"] = ["video.fine_storyboard.generate"]
+    shots["entrypoint"] = False
+    shots["output_persistence"]["artifact"]["relations"] = [
+        {
+            "source_binding": "artifact:video_fine_storyboard",
+            "relation_type": "derives_from",
+            "binding_key": "upstream.artifact.video_fine_storyboard",
+            "impact_scope": {"mode": "all"},
+        }
+    ]
+    package_node(catalog, "audio.plan.generate")["dependencies"] = ["video.clips.select"]
+    catalog["external_input_contract_refs"].remove("asset:shot_keyframe")
+
+
 def legacy_courseware_release(
     source: BuiltinCoursewareReleaseSource,
 ) -> BuiltinCoursewareReleaseSource:
@@ -820,6 +992,7 @@ def legacy_courseware_release(
             items[entry["item_key"]] = load_json_object(fixture_path)
     restore_lesson_division_before_1_5_1(items)
     restore_lesson_plan_output_before_1_5_1(items)
+    restore_video_before_1_6(items)
     if set(items) != set(entries):
         raise AssertionError("legacy package item inventory differs from the published snapshot")
     for item_key, entry in entries.items():
@@ -972,15 +1145,55 @@ def release_1_3_courseware_release(
     )
 
 
-def release_1_5_2_courseware_release(
+def release_1_5_3_courseware_release(
     source: BuiltinCoursewareReleaseSource,
 ) -> BuiltinCoursewareReleaseSource:
     manifest = deepcopy(source.manifest)
+    manifest["semantic_version"] = "1.5.3"
+    manifest["change_summary"] = RELEASE_1_5_3_CHANGE_SUMMARY
+    for entry in manifest["items"]:
+        if entry["item_key"] in RELEASE_1_5_3_VIDEO_ITEM_HASHES:
+            entry["sha256"] = RELEASE_1_5_3_VIDEO_ITEM_HASHES[entry["item_key"]]
+    entries = {entry["item_key"]: entry for entry in manifest["items"]}
+    items = {item_key: deepcopy(source.items[item_key]) for item_key in entries}
+    restore_video_before_1_6(items)
+    for item_key, entry in entries.items():
+        if canonical_json_sha256(items[item_key]) != entry["sha256"]:
+            raise AssertionError(f"1.5.3 package item drifted: {item_key}")
+    catalog = deepcopy(source.workflow_catalog)
+    catalog["semantic_version"] = "1.5.3"
+    restore_video_catalog_before_1_6(catalog)
+    package_checksum = canonical_json_sha256(manifest)
+    workflow_checksum = hashlib.sha256(canonical_catalog_json(catalog)).hexdigest()
+    if (
+        package_checksum != RELEASE_1_5_3_PACKAGE_CHECKSUM
+        or workflow_checksum != RELEASE_1_5_3_WORKFLOW_CHECKSUM
+    ):
+        raise AssertionError(
+            "1.5.3 release checksum differs from the published snapshot: "
+            f"package={package_checksum}, workflow={workflow_checksum}"
+        )
+    return replace(
+        source,
+        manifest=manifest,
+        items=items,
+        manifest_entries=entries,
+        workflow_catalog=catalog,
+        package_checksum=package_checksum,
+        workflow_checksum=workflow_checksum,
+    )
+
+
+def release_1_5_2_courseware_release(
+    source: BuiltinCoursewareReleaseSource,
+) -> BuiltinCoursewareReleaseSource:
+    release_1_5_3 = release_1_5_3_courseware_release(source)
+    manifest = deepcopy(release_1_5_3.manifest)
     manifest["semantic_version"] = "1.5.2"
     manifest["change_summary"] = RELEASE_1_5_2_CHANGE_SUMMARY
     entries = {entry["item_key"]: entry for entry in manifest["items"]}
-    items = {item_key: deepcopy(source.items[item_key]) for item_key in entries}
-    catalog = deepcopy(source.workflow_catalog)
+    items = {item_key: deepcopy(release_1_5_3.items[item_key]) for item_key in entries}
+    catalog = deepcopy(release_1_5_3.workflow_catalog)
     catalog["semantic_version"] = "1.5.2"
     restore_release_1_5_2_validator(catalog)
     package_checksum = canonical_json_sha256(manifest)
@@ -991,7 +1204,7 @@ def release_1_5_2_courseware_release(
     ):
         raise AssertionError("1.5.2 release checksum differs from the published snapshot")
     return replace(
-        source,
+        release_1_5_3,
         manifest=manifest,
         items=items,
         manifest_entries=entries,
@@ -1363,14 +1576,14 @@ def test_golden_release_is_published_from_validated_fixtures_and_is_idempotent(
         assert second.created is False
         assert second == first.as_existing()
         assert publication_counts(session) == counts_after_first
-        assert source.semantic_version == "1.5.3"
-        assert source.manifest["semantic_version"] == "1.5.3"
-        assert source.workflow_catalog["semantic_version"] == "1.5.3"
-        assert source.release_key == f"{source.package_key}@1.5.3"
+        assert source.semantic_version == "1.6.0"
+        assert source.manifest["semantic_version"] == "1.6.0"
+        assert source.workflow_catalog["semantic_version"] == "1.6.0"
+        assert source.release_key == f"{source.package_key}@1.6.0"
         assert package_version is not None
-        assert package_version.semantic_version == "1.5.3"
+        assert package_version.semantic_version == "1.6.0"
         assert package_version.manifest_json == source.manifest
-        assert package_version.manifest_json["semantic_version"] == "1.5.3"
+        assert package_version.manifest_json["semantic_version"] == "1.6.0"
         assert package_version.checksum == source.package_checksum
         assert release is not None and release.status == "published"
         assert release.release_key == source.release_key
@@ -1508,11 +1721,11 @@ def test_forward_publication_preserves_legacy_release_and_project_bindings(
         assert current_result.content_release_id != old_release.id
         assert current_result.workflow_definition_version_id != old_workflow.id
         assert current_package_version.content_package_id == old_package.id
-        assert current_package_version.semantic_version == source.semantic_version == "1.5.3"
+        assert current_package_version.semantic_version == source.semantic_version == "1.6.0"
         assert current_package_version.manifest_json == source.manifest
         assert current_package_version.checksum == source.package_checksum
         assert current_release.release_key == source.release_key
-        assert current_release.release_key == f"{source.package_key}@1.5.3"
+        assert current_release.release_key == f"{source.package_key}@1.6.0"
         assert current_workflow.graph_json == source.workflow_catalog
         assert current_workflow.checksum == source.workflow_checksum
         assert old_result.content_release_id == old_project.content_release_id
@@ -1705,12 +1918,12 @@ def test_release_1_4_preserves_1_3_rows_and_existing_project_binding(
         assert snapshot_publication_rows(session, previous_result) == previous_snapshot
 
 
-def test_release_1_5_3_preserves_1_5_2_rows_and_existing_project_binding(
+def test_release_1_6_preserves_1_5_3_rows_and_existing_project_binding(
     migrated_database_url: str,
 ) -> None:
     factory = build_session_factory(build_engine(migrated_database_url))
     source = load_builtin_courseware_release(ROOT)
-    previous = release_1_5_2_courseware_release(source)
+    previous = release_1_5_3_courseware_release(source)
 
     with factory() as session, session.begin():
         actor = seed_test_actor(session)
@@ -1719,7 +1932,7 @@ def test_release_1_5_3_preserves_1_5_2_rows_and_existing_project_binding(
             published_by=actor.principal_id,
         )
         existing = ProjectRepository(session, actor).create(
-            CreateProjectRequest(title="Bound to 1.5.2", knowledge_point="One half")
+            CreateProjectRequest(title="Bound to 1.5.3", knowledge_point="One half")
         )
         previous_snapshot = snapshot_publication_rows(session, previous_result)
         previous_binding = (
@@ -1732,13 +1945,13 @@ def test_release_1_5_3_preserves_1_5_2_rows_and_existing_project_binding(
             published_by=actor.principal_id,
         )
         current = ProjectRepository(session, actor).create(
-            CreateProjectRequest(title="Bound to 1.5.3", knowledge_point="One half")
+            CreateProjectRequest(title="Bound to 1.6.0", knowledge_point="One half")
         )
 
-        assert previous.semantic_version == "1.5.2"
-        assert previous.package_checksum == RELEASE_1_5_2_PACKAGE_CHECKSUM
-        assert previous.workflow_checksum == RELEASE_1_5_2_WORKFLOW_CHECKSUM
-        assert source.semantic_version == "1.5.3"
+        assert previous.semantic_version == "1.5.3"
+        assert previous.package_checksum == RELEASE_1_5_3_PACKAGE_CHECKSUM
+        assert previous.workflow_checksum == RELEASE_1_5_3_WORKFLOW_CHECKSUM
+        assert source.semantic_version == "1.6.0"
         assert previous_result.content_release_id != current_result.content_release_id
         assert (
             current.content_release_id,

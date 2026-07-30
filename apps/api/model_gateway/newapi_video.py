@@ -25,9 +25,13 @@ from apps.api.model_gateway.contracts import (
     VideoPollRequest,
     VideoProviderResult,
 )
+from apps.api.model_gateway.newapi_video_files import upload_temporary_video_reference
 from apps.api.model_gateway.newapi_video_submission import build_newapi_video_submission_payload
 from apps.api.model_gateway.openai_compatible import map_provider_error
-from apps.api.model_gateway.provider_media import ProviderMediaReferenceResolver
+from apps.api.model_gateway.provider_media import (
+    ProviderMediaReferenceReader,
+    ProviderMediaResolutionError,
+)
 from apps.api.model_gateway.video_store import StoredVideoFile, VideoResultStore
 
 
@@ -40,6 +44,7 @@ class NewApiVideoConfig(BaseModel):
     api_key: SecretStr
     timeout_seconds: float = Field(gt=0, le=600)
     max_download_bytes: int = Field(gt=0, le=1_073_741_824)
+    temporary_file_ttl_seconds: int = Field(default=900, ge=300, le=86_400)
 
 
 class _GatewayMediaTask(BaseModel):
@@ -57,18 +62,17 @@ class NewApiVideoProvider:
         config: NewApiVideoConfig,
         *,
         store: VideoResultStore,
-        media_reference_resolver: ProviderMediaReferenceResolver | None = None,
+        media_reference_reader: ProviderMediaReferenceReader | None = None,
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self._config = config
         self._store = store
-        self._media_reference_resolver = media_reference_resolver
+        self._media_reference_reader = media_reference_reader
         self._owns_client = client is None
         self._client = client or httpx.AsyncClient(
             timeout=httpx.Timeout(config.timeout_seconds),
             headers={
                 "Authorization": f"Bearer {config.api_key.get_secret_value()}",
-                "Content-Type": "application/json",
             },
         )
 
@@ -86,11 +90,15 @@ class NewApiVideoProvider:
         *,
         organization_id: UUID | None = None,
     ) -> VideoProviderResult:
+        first_frame_file_id = await self._upload_reference(
+            request,
+            organization_id=organization_id,
+        )
         payload = await build_newapi_video_submission_payload(
             model=self._config.model,
             request=request,
             organization_id=organization_id,
-            media_reference_resolver=self._media_reference_resolver,
+            first_frame_file_id=first_frame_file_id,
         )
         try:
             response = await self._client.post(
@@ -240,13 +248,50 @@ class NewApiVideoProvider:
         finally:
             _delete_temporary_file(temporary_path)
 
+    async def _upload_reference(
+        self,
+        request: VideoModelRequest,
+        *,
+        organization_id: UUID | None,
+    ) -> str | None:
+        if not request.references:
+            return None
+        if len(request.references) != 1 or organization_id is None:
+            raise ModelGatewayError(GatewayErrorCode.ROUTE_UNAVAILABLE, retryable=False)
+        reader = self._media_reference_reader
+        if reader is None:
+            raise ModelGatewayError(GatewayErrorCode.ROUTE_UNAVAILABLE, retryable=False)
+        try:
+            blob = await asyncio.to_thread(
+                reader.read,
+                organization_id=organization_id,
+                reference=request.references[0],
+            )
+        except ProviderMediaResolutionError as exc:
+            raise ModelGatewayError(GatewayErrorCode.ROUTE_UNAVAILABLE, retryable=False) from exc
+        return await upload_temporary_video_reference(
+            self._client,
+            url=self._url("files"),
+            headers=self._auth_headers(),
+            blob=blob,
+            ttl_seconds=self._config.temporary_file_ttl_seconds,
+            minimum_remaining_seconds=self._config.timeout_seconds,
+            raise_for_error=_raise_for_error,
+        )
+
     def _url(self, path: str) -> str:
         return f"{self._config.base_url.rstrip('/')}/{path}"
 
     def _headers(self, **extra: str) -> dict[str, str]:
         return {
-            "Authorization": f"Bearer {self._config.api_key.get_secret_value()}",
+            **self._auth_headers(),
             "Content-Type": "application/json",
+            **extra,
+        }
+
+    def _auth_headers(self, **extra: str) -> dict[str, str]:
+        return {
+            "Authorization": f"Bearer {self._config.api_key.get_secret_value()}",
             **extra,
         }
 

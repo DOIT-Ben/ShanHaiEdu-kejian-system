@@ -10,6 +10,7 @@ import { useProjectEvents } from "@/shared/api/useProjectEvents";
 vi.mock("@/shared/api/useProjectEvents", () => ({ useProjectEvents: vi.fn() }));
 const lessonPlanPanelMock = vi.hoisted(() => vi.fn());
 const introOptionsPanelMock = vi.hoisted(() => vi.fn());
+const videoGoldenSlicePanelMock = vi.hoisted(() => vi.fn());
 vi.mock("@/features/intro-options/components/IntroOptionsWorkflowPanel", () => ({
   IntroOptionsWorkflowPanel: (props: { lessonId: string; projectId: string }) => {
     introOptionsPanelMock(props);
@@ -20,6 +21,12 @@ vi.mock("@/features/lessons/components/LessonPlanWorkflowPanel", () => ({
   LessonPlanWorkflowPanel: (props: { lessonId: string; projectId: string }) => {
     lessonPlanPanelMock(props);
     return <div data-testid="lesson-plan-workflow" />;
+  },
+}));
+vi.mock("@/features/video-golden-slice/components/VideoGoldenSliceWorkflowPanel", () => ({
+  VideoGoldenSliceWorkflowPanel: (props: { lessonId: string; projectId: string }) => {
+    videoGoldenSlicePanelMock(props);
+    return <div data-testid="video-golden-slice-workflow" />;
   },
 }));
 
@@ -51,6 +58,7 @@ describe("RuntimeLessonWorkbenchPage", () => {
   beforeEach(() => {
     lessonPlanPanelMock.mockClear();
     introOptionsPanelMock.mockClear();
+    videoGoldenSlicePanelMock.mockClear();
     vi.spyOn(projectsApi, "getProject").mockResolvedValue({
       id: projectId,
       title: "认识百分数",
@@ -104,7 +112,7 @@ describe("RuntimeLessonWorkbenchPage", () => {
       `/app/projects/${projectId}`,
     );
     expect(screen.getByText("课堂 PPT").closest("a")).toBeNull();
-    expect(screen.getAllByText("尚未开放")).toHaveLength(2);
+    expect(screen.getAllByText("尚未开放")).toHaveLength(1);
     expect(screen.getByText("课堂视频")).toBeVisible();
   });
 
@@ -128,6 +136,14 @@ describe("RuntimeLessonWorkbenchPage", () => {
     expect(screen.getByTestId("intro-options-workflow")).toBeVisible();
     expect(introOptionsPanelMock).toHaveBeenCalledWith({ lessonId, projectId });
     expect(screen.queryByTestId("lesson-plan-workflow")).not.toBeInTheDocument();
+  });
+
+  it("只在课堂视频分支挂载 6 秒黄金切片闭环", async () => {
+    renderPage("video");
+
+    expect(await screen.findByTestId("video-golden-slice-workflow")).toBeVisible();
+    expect(videoGoldenSlicePanelMock).toHaveBeenCalledWith({ lessonId, projectId });
+    expect(screen.queryByText("课堂视频 尚未开放")).not.toBeInTheDocument();
   });
 
   it("旧连字符路由与未知步骤都不会泄漏内部键", async () => {

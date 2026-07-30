@@ -14,8 +14,8 @@ from apps.api.model_gateway.contracts import (
     MediaReference,
     ModelGatewayError,
 )
-from apps.api.model_gateway.factory import build_provider_media_reference_resolver
-from apps.api.model_gateway.provider_media import ProviderMediaReferenceResolver
+from apps.api.model_gateway.factory import build_provider_media_reference_reader
+from apps.api.model_gateway.provider_media import ProviderMediaReferenceReader
 from apps.api.settings import Settings
 from apps.api.uploads.storage import build_object_storage
 
@@ -24,7 +24,7 @@ from apps.api.uploads.storage import build_object_storage
 class VideoSmokeMediaContext:
     organization_id: UUID
     reference: MediaReference
-    resolver: ProviderMediaReferenceResolver
+    reader: ProviderMediaReferenceReader
 
 
 @contextmanager
@@ -54,7 +54,7 @@ def open_video_smoke_media_context(
         yield VideoSmokeMediaContext(
             organization_id=organization_id,
             reference=MediaReference(file_version_id=file_version_id, mime_type=version.mime_type),
-            resolver=build_provider_media_reference_resolver(
+            reader=build_provider_media_reference_reader(
                 settings,
                 session=session,
                 storage=storage,

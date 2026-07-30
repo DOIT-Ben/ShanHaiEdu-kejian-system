@@ -12,6 +12,7 @@ import pytest
 from apps.api.assets.provider_media import ProviderMediaAssetVersion
 from apps.api.model_gateway.contracts import MediaReference
 from apps.api.model_gateway.provider_media import (
+    ProviderMediaReferenceReader,
     ProviderMediaReferenceResolver,
     ProviderMediaResolutionError,
     ProviderMediaResolverConfig,
@@ -20,6 +21,36 @@ from apps.api.model_gateway.provider_media import (
 from tests.fakes.object_storage import FakeObjectStorage
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\nprovider-media-test"
+
+
+def test_reader_returns_validated_bytes_without_creating_a_relay_file(
+    tmp_path: Path,
+) -> None:
+    organization_id = uuid4()
+    version_id = uuid4()
+    storage = FakeObjectStorage()
+    record = _record(organization_id=organization_id, version_id=version_id)
+    storage.put_bytes(
+        bucket=record.storage_bucket,
+        key=record.storage_key,
+        payload=PNG_BYTES,
+        media_type=record.mime_type,
+    )
+    reader = ProviderMediaReferenceReader(
+        asset_reader=FakeAssetReader(record),
+        storage=storage,
+        max_file_bytes=1024,
+    )
+
+    blob = reader.read(
+        organization_id=organization_id,
+        reference=MediaReference(file_version_id=version_id, mime_type="image/png"),
+    )
+
+    assert blob.content == PNG_BYTES
+    assert blob.mime_type == "image/png"
+    assert blob.sha256 == hashlib.sha256(PNG_BYTES).hexdigest()
+    assert list(tmp_path.iterdir()) == []
 
 
 class FakeAssetReader:

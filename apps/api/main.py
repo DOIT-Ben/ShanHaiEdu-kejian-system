@@ -47,6 +47,7 @@ from apps.api.prompt_runtime.router import router as prompt_runtime_router
 from apps.api.settings import Settings, get_settings
 from apps.api.uploads.router import router as uploads_router
 from apps.api.uploads.storage import ObjectStorage, build_object_storage
+from apps.api.video_golden_slice.router import router as video_golden_slice_router
 from apps.api.workflows.router import router as workflows_router
 from apps.api.workflows.start_router import router as workflow_start_router
 
@@ -107,6 +108,7 @@ def create_app(
     app.include_router(lesson_plan_jobs_router)
     app.include_router(workflows_router)
     app.include_router(workflow_start_router)
+    app.include_router(video_golden_slice_router)
     _include_health_routes(app, resolved_settings, readiness_provider)
     _configure_openapi_security_contract(app)
     return app

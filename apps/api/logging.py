@@ -11,6 +11,7 @@ from apps.api.request_context import request_id_context
 
 _STANDARD_RECORD_FIELDS = frozenset(logging.makeLogRecord({}).__dict__)
 _STRUCTURED_HANDLER_MARKER = "_shanhaiedu_json_handler"
+_PRIVATE_URL_LOGGERS = ("httpx", "httpcore")
 
 
 class JsonFormatter(logging.Formatter):
@@ -44,6 +45,8 @@ class JsonFormatter(logging.Formatter):
 def configure_logging(*, service: str, environment: str, level: str) -> None:
     root = logging.getLogger()
     root.setLevel(level)
+    for logger_name in _PRIVATE_URL_LOGGERS:
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
     for handler in root.handlers:
         if getattr(handler, _STRUCTURED_HANDLER_MARKER, False):
             handler.setFormatter(JsonFormatter(service=service, environment=environment))

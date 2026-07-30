@@ -17,3 +17,8 @@ export const apiConfig = {
   baseUrl: import.meta.env.VITE_API_BASE_URL ?? "/api/v2",
   releaseVersion: import.meta.env.VITE_RELEASE_VERSION ?? "local",
 } as const;
+
+export function resolveApiResourceUrl(path: string) {
+  if (!/^https?:\/\//u.test(apiConfig.baseUrl)) return path;
+  return new URL(path, apiConfig.baseUrl).toString();
+}

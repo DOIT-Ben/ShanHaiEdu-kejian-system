@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import signal
 import socket
+import subprocess
+import tempfile
 from decimal import Decimal
 from pathlib import Path
 from threading import Event
@@ -19,19 +22,26 @@ from apps.api.database import build_engine, build_session_factory
 from apps.api.jobs.models import GenerationJob
 from apps.api.model_gateway.audit import SqlAlchemyAttemptAuditSink
 from apps.api.model_gateway.contracts import (
+    GeneratedFileFact,
     ModelCapability,
     ModelUsage,
     TextModelRequest,
     TextProviderResult,
+    VideoModelRequest,
+    VideoOperationStatus,
+    VideoPollRequest,
+    VideoProviderResult,
 )
 from apps.api.model_gateway.gateway import ModelGateway
 from apps.api.reliability.models import OutboxEvent
 from apps.api.reliability.outbox import OutboxDispatcher
 from apps.api.settings import get_settings
+from apps.api.uploads.storage import ObjectStorage, build_object_storage
 from scripts.golden_courseware_branch_inputs import (
     build_golden_branch_source_outputs,
     build_intro_generation_stage_outputs,
 )
+from workers.video_generation import execute_video_generation_job
 
 ROOT = Path(__file__).resolve().parents[2]
 GOLDEN_CASE = ROOT / "contracts/fixtures/golden-projects/numbers-1-to-5/golden-project.json"
@@ -78,6 +88,114 @@ class R1RescueNodeOutputProvider:
         )
 
 
+class R1RescueVideoProvider:
+    provider_name = "r1-rescue-deterministic"
+    model_name = "r1-rescue-video-6s-v1"
+
+    def __init__(self, storage: ObjectStorage, *, bucket: str, payload: bytes) -> None:
+        self._storage = storage
+        self._bucket = bucket
+        self._payload = payload
+        self._tasks: set[str] = set()
+
+    async def submit(
+        self,
+        request: VideoModelRequest,
+        *,
+        organization_id: UUID | None = None,
+    ) -> VideoProviderResult:
+        if organization_id is None or request.duration_seconds != 6 or len(request.references) != 1:
+            raise RuntimeError("the R1 E2E video provider received an invalid request")
+        task_id = f"r1-video:{request.request_id}"
+        self._tasks.add(task_id)
+        return self._result(request.request_id, task_id, VideoOperationStatus.SUBMITTED)
+
+    async def poll(self, request: VideoPollRequest) -> VideoProviderResult:
+        if request.provider_task_id not in self._tasks:
+            raise RuntimeError("the R1 E2E video provider received an unknown task")
+        digest = hashlib.sha256(request.provider_task_id.encode("utf-8")).hexdigest()
+        key = f"e2e/video-golden-slice/{digest}.mp4"
+        metadata = self._storage.put_bytes(
+            bucket=self._bucket,
+            key=key,
+            payload=self._payload,
+            media_type="video/mp4",
+        )
+        return VideoProviderResult(
+            status=VideoOperationStatus.SUCCEEDED,
+            provider_request_id=f"fake:{request.request_id}",
+            provider_task_id=request.provider_task_id,
+            actual_model=self.model_name,
+            files=[
+                GeneratedFileFact(
+                    storage_key=key,
+                    sha256=metadata.sha256 or "",
+                    size_bytes=metadata.size_bytes,
+                    mime_type="video/mp4",
+                    duration_seconds=6,
+                )
+            ],
+            usage=ModelUsage(output_units={"video_seconds": 6}),
+        )
+
+    async def cancel(self, request: VideoPollRequest) -> VideoProviderResult:
+        return self._result(
+            request.request_id,
+            request.provider_task_id,
+            VideoOperationStatus.CANCELLED,
+        )
+
+    def _result(
+        self,
+        request_id: str,
+        task_id: str,
+        status: VideoOperationStatus,
+    ) -> VideoProviderResult:
+        return VideoProviderResult(
+            status=status,
+            provider_request_id=f"fake:{request_id}",
+            provider_task_id=task_id,
+            actual_model=self.model_name,
+            usage=ModelUsage(),
+        )
+
+
+def _six_second_video() -> bytes:
+    with tempfile.TemporaryDirectory(prefix="shanhai-r1-video-e2e-") as directory:
+        output = Path(directory) / "six-second.mp4"
+        completed = subprocess.run(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=black:s=320x180:d=6:r=12",
+                "-an",
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                "-movflags",
+                "+faststart",
+                "-y",
+                str(output),
+            ],
+            check=False,
+            capture_output=True,
+            timeout=30,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        if completed.returncode != 0:
+            raise RuntimeError(
+                "the R1 E2E video fixture could not be generated: "
+                + completed.stderr.decode("utf-8", errors="replace")
+            )
+        return output.read_bytes()
+
+
 def main() -> int:
     settings = get_settings()
     if (
@@ -99,11 +217,20 @@ def main() -> int:
     outputs = build_golden_branch_source_outputs(case)
     outputs["lesson.division.generate"]["lesson_units"][0]["evidence_refs"] = ["p2-text-1"]
     provider = R1RescueNodeOutputProvider(outputs)
+    storage = build_object_storage(settings)
+    if storage is None:
+        raise RuntimeError("the rescue E2E worker requires object storage")
+    video_provider = R1RescueVideoProvider(
+        storage,
+        bucket=settings.object_storage_bucket,
+        payload=_six_second_video(),
+    )
     gateway = ModelGateway(
         {
             ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: provider,
             ModelCapability.TEXT_STRUCTURED_CREATIVE_EDUCATION: provider,
         },
+        video_routes={ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S: video_provider},
         audit_sink=SqlAlchemyAttemptAuditSink(factory),
     )
 
@@ -115,6 +242,16 @@ def main() -> int:
             job_type = job.job_type if job is not None else None
         if job_type == "material.parse":
             return original_run_generation_job(job_id, worker_id=worker_id)
+        if job_type == "video.golden_slice":
+            return asyncio.run(
+                execute_video_generation_job(
+                    job_id,
+                    worker_id=worker_id or "r1-rescue-e2e-worker",
+                    gateway=gateway,
+                    storage=storage,
+                    settings=settings,
+                )
+            )
         return asyncio.run(
             execute_node_execution_job(
                 job_id,
