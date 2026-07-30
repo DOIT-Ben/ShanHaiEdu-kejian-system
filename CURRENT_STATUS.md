@@ -2,7 +2,7 @@
 
 当前阶段：阶段1后端基座以及R1教材范围、课时划分、十二部分教案和三类九套四个教师可见文本结果已经进入`main`；受控真实文本Provider教师黄金项目、独立审查、合并和`main`复验均已完成。当前正在交付首个教师可见媒体结果：约6秒课堂导入短片黄金纵向切片。
 > 最后核验：2026-07-30。
-> 当前任务：[Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)由[Draft PR #247](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/247)承载；确定性Fake下的真实API教师闭环已经通过。一次授权的真实NewAPI请求已生成经SHA-256和ffprobe验证的6.041667秒MP4，但Worker因Adapter未声明可选时长字段而在正式采用前失败关闭；当前正在收口最小修复，尚待新final head的CI与独立审查。未经新的明确授权不得再次调用Provider、转Ready或合并。
+> 当前任务：[Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)由[Draft PR #247](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/247)承载；确定性Fake与真实NewAPI下的教师闭环均已通过。第二次授权验收只提交1次视频请求且未重试，形成经SHA-256和ffprobe验证的6.041667秒MP4，并完成GenerationResult、exact Adoption、LessonUnit槽位写回和刷新恢复。本次真实Provider额度已消耗，PR继续保持Draft；未经新的明确授权不得再次调用Provider、转Ready或合并。
 
 ## 当前可演示成果
 
@@ -36,10 +36,10 @@
 - #165的relay/cleanup部署合同、阶段化脱敏失败证据和systemd运行来源门禁已进入`main`；本PR不重复迁移生产服务器，也不调用付费Provider。
 - [Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)正在交付“exact已采用IntroSelection + 同课时正式关键帧 -> 异步生成约6秒MP4 -> 进度/失败可见 -> 播放 -> exact采用 -> LessonUnit槽位写回 -> 刷新恢复”的教师纵向闭环；[Draft PR #247](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/247)是唯一实现现场。
 - #205复用现有Session/CSRF、LessonUnit、IntroSelection、ArtifactVersion、NodeRun、GenerationJob、Worker、Model Gateway、对象存储、FileAssetVersion、GenerationResult/Adoption和生成客户端，没有新增第二套任务、候选、采用、文件或前端DTO。
-- 当前分支已通过active OpenAPI/生成客户端、PostgreSQL视频隔离与采用、Worker MP4校验、前端质量/构建，以及14个backend和5个real API browser delivery selectors；浏览器视频场景使用确定性Fake经FFmpeg形成真实6秒MP4，不代表真实视频Provider验收。
+- 当前分支已通过active OpenAPI/生成客户端、PostgreSQL视频隔离与采用、Worker MP4校验、前端质量/构建、14个backend和5个real API browser delivery selectors，以及修复head的8项GitHub CI；浏览器场景继续使用确定性Fake，真实Provider证据由独立受控验收提供。
 - 公网NewAPI `v1.9.0`已经提供`POST /v1/files`、私有`file_id`、Provider签名内容读取和`first_frame_file_id`视频提交合同；#205适配器现已改为校验内部正式关键帧后上传临时文件，不再把自建relay URL作为视频输入。
-- 2026-07-30的一次授权真实请求已完成且未重试：临时关键帧上传1次、视频提交1次；Provider返回的MP4为`video/mp4`、1,465,128字节，SHA-256为`f120bc77057de1dc9b80d230667d2f9502644d00097940999335894a350f5d75`，ffprobe为6.041667秒、736x400。验收因NewAPI Adapter未填`GeneratedFileFact.duration_seconds`而被Worker以`VIDEO_FILE_INVALID`失败关闭，未形成GenerationResult、Adoption或LessonUnit槽位写回；receipt不含密钥、Prompt、Provider task ID、storage key、临时URL或原始响应。
-- #205正在以红测试收口最小修复：Provider未声明可选时长时继续以实际MP4的ffprobe结果为权威门禁；Provider明确声明错误时长仍失败关闭。新提交会使既有独立审查绑定失效，同一只读reviewer必须复核最终base/head。修复、CI和审查完成前PR保持Draft，未经董事长新的明确授权不得再次调用Provider、转Ready或合并。
+- 首次授权验收生成了有效MP4，但暴露Worker错误要求Provider声明可选时长字段；修复后以实际MP4的ffprobe结果为权威门禁，Provider明确声明5秒或7秒时仍在下载前以`VIDEO_FILE_INVALID`失败关闭且零候选。相关NewAPI Adapter与PostgreSQL Worker焦点测试、8项GitHub CI和同一独立reviewer审查均已通过。
+- 2026-07-30的第二次授权真实验收已完成：临时关键帧上传1次、视频提交1次、未重试；正式MP4为`video/mp4`、1,193,100字节，SHA-256为`1aab6267808a8ad50ca954b68bea00b0cc21668d97d9a6d8686ec19cde7b54a5`，ffprobe为6.041667秒、736x400、H.264。PostgreSQL中同organization/project/lesson、exact IntroSelection与关键帧lineage、GenerationJob、12个成功Attempt及Usage、唯一GenerationResult、exact Adoption、active槽位绑定和刷新恢复全部一致；脱敏receipt不含密钥、Prompt、Provider task ID、storage key、临时URL、原始响应或业务ID。
 - [Issue #239](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/239)已经由[PR #240](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/240)完成主线状态收口并关闭。
 - [Issue #241](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/241)已由[PR #242](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/242)完成技术交付；生产Worker在未注入测试模型时通过现有`build_real_text_gateway()`调用真实文本Provider，普通CI继续使用确定性Fake。
 - #242只增加受控黄金项目、脱敏receipt、现有Provider流式接线和验收发现的最小质量修复，没有建设新的Provider平台、Worker队列、状态机或治理框架。
@@ -55,7 +55,7 @@
 
 ## 当前阻塞
 
-- #205当前阻塞在真实Provider验收未闭环：唯一已授权请求生成了有效MP4，但因Worker对可选Provider时长字段的错误前置要求而在采用前失败；最小修复完成后仍需新的明确授权才能再次执行真实Provider请求。不得把已验证的孤立MP4表述为GenerationResult、教师采用或LessonUnit槽位闭环。
+- #205当前没有已知实现、CI、独立审查或真实Provider验收阻塞；本次一次性真实请求额度已消耗，不得再次调用Provider。PR仍保持Draft，转Ready或合并等待董事长新的明确授权。
 - 当前没有已知的Session/CSRF、PostgreSQL、Worker、active OpenAPI、生产页面、真实文本Provider验收或R1收口阻塞。
 - 真实黄金项目已经生成passed receipt；不再调用Provider。普通CI继续只允许确定性Fake，不得把真实模型内容写入仓库测试夹具。
 - [Issue #233](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/233)单独跟踪`origin/main`既有Stage1 E2E旧`impact_scope` fixture；该测试债不改变#231验收结果，也不在救援PR内顺手修复。
@@ -63,9 +63,9 @@
 
 ## 下一个阶段出口
 
-1. #205先完成可选Provider时长字段的最小修复、相关门禁和同一独立只读reviewer对新final base/head的审查绑定，关闭全部P0/P1并处置P2/P3；PR仍保持Draft。
-2. 第二次真实视频Provider最短付费验收必须在调用前取得新的明确授权，并只保存脱敏文件、lineage与Usage事实；未经授权继续以确定性Fake为普通开发和CI证据，不恢复失败Job或重用私有Provider task。
-3. 未经董事长在新任务中明确授权，不合并PR #247；完整图片链、母版剧本、粗/细分镜、多镜头、TTS、字幕、混音、时间线和长视频合成继续由后续独立Decision/Issue定界。
+1. #205同步最终脱敏验收证据到Draft PR与Issue，并让同一独立只读reviewer对状态更新后的final base/head重新绑定；P0/P1/P2/P3保持为0。
+2. 真实视频Provider验收已经完成且本次额度为1/1；后续普通开发和CI继续只使用确定性Fake，不恢复历史失败Job或复用私有Provider task。
+3. 未经董事长新的明确授权，不将PR #247转Ready或合并；完整图片链、母版剧本、粗/细分镜、多镜头、TTS、字幕、混音、时间线和长视频合成继续由后续独立Decision/Issue定界。
 
 ## 接手提示
 
