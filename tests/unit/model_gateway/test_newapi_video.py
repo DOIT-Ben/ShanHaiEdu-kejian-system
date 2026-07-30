@@ -158,6 +158,7 @@ async def test_completed_poll_downloads_mp4_and_persists_a_hashed_file() -> None
     assert result.files[0].sha256 == expected_sha
     assert result.files[0].size_bytes == len(video_bytes)
     assert result.files[0].mime_type == "video/mp4"
+    assert result.files[0].duration_seconds is None
     assert store.uploads == [(f"model-smoke/video/{TASK_ID}.mp4", video_bytes, "video/mp4")]
 
 

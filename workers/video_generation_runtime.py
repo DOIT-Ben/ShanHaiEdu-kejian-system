@@ -131,7 +131,9 @@ async def validate_video_result(
     if len(result.files) != 1:
         raise VideoGenerationFailure("VIDEO_FILE_INVALID")
     file = result.files[0]
-    if file.mime_type != "video/mp4" or file.duration_seconds != 6:
+    if file.mime_type != "video/mp4" or (
+        file.duration_seconds is not None and file.duration_seconds != 6
+    ):
         raise VideoGenerationFailure("VIDEO_FILE_INVALID")
     with tempfile.TemporaryDirectory(prefix="shanhaiedu-video-worker-") as directory:
         path = Path(directory) / "candidate.mp4"

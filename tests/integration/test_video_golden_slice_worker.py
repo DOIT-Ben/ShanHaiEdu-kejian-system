@@ -53,10 +53,12 @@ class StoredVideoFakeProvider:
         payload: bytes,
         *,
         invalid_media: bool = False,
+        reported_duration_seconds: int | None = 6,
     ) -> None:
         self._storage = storage
         self._payload = payload
         self._invalid_media = invalid_media
+        self._reported_duration_seconds = reported_duration_seconds
         self.poll_calls = 0
         self.submitted_prompt: str | None = None
 
@@ -95,7 +97,7 @@ class StoredVideoFakeProvider:
                     sha256=metadata.sha256 or "",
                     size_bytes=metadata.size_bytes,
                     mime_type="video/mp4",
-                    duration_seconds=6,
+                    duration_seconds=self._reported_duration_seconds,
                 )
             ],
             usage=ModelUsage(output_units={"video_seconds": 6}),
@@ -141,7 +143,11 @@ async def test_video_worker_persists_verified_candidate_and_refreshes_playback(
     seeded = await seed_video_project(factory, lesson_count=1)
     storage = FakeObjectStorage()
     payload = _six_second_mp4(tmp_path)
-    provider = StoredVideoFakeProvider(storage, payload)
+    provider = StoredVideoFakeProvider(
+        storage,
+        payload,
+        reported_duration_seconds=None,
+    )
     gateway = ModelGateway(
         {},
         video_routes={ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S: provider},
