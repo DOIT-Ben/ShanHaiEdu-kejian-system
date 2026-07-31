@@ -18,13 +18,14 @@ from apps.api.model_gateway.contracts import (
     VideoModelRequest,
     VideoOperationStatus,
     VideoPollRequest,
+    VideoResultScope,
 )
 from apps.api.model_gateway.newapi_video import (
     NewApiVideoConfig,
     NewApiVideoProvider,
-    StoredVideoFile,
 )
 from apps.api.model_gateway.provider_media import ProviderMediaResolutionError
+from apps.api.model_gateway.video_store import StoredVideoFile
 
 TASK_ID = "018f0000-0000-7000-8000-000000000001"
 
@@ -49,14 +50,39 @@ class RecordingVideoStore:
             mime_type=media_type,
         )
 
+    def stage(
+        self,
+        *,
+        source: Path,
+        media_type: str,
+        scope: VideoResultScope,
+        provider_name: str,
+        provider_task_id: str,
+    ) -> StoredVideoFile:
+        task_hash = hashlib.sha256(f"{provider_name}\0{provider_task_id}".encode()).hexdigest()[:32]
+        return self.persist(
+            key=(
+                f"staging/video-results/{scope.organization_id}/{scope.project_id}/"
+                f"{scope.lesson_unit_id}/{scope.generation_job_id}/"
+                f"{task_hash}.mp4"
+            ),
+            source=source,
+            media_type=media_type,
+        )
 
-def video_request(*, references: list[MediaReference] | None = None) -> VideoModelRequest:
+
+def video_request(
+    *,
+    references: list[MediaReference] | None = None,
+    result_scope: VideoResultScope | None = None,
+) -> VideoModelRequest:
     return VideoModelRequest(
         capability=ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S,
         request_id="req-video-provider-test",
         prompt="A simple paper boat moves across a calm blue pond.",
         duration_seconds=6,
         references=references or [],
+        result_scope=result_scope,
     )
 
 
@@ -160,6 +186,44 @@ async def test_completed_poll_downloads_mp4_and_persists_a_hashed_file() -> None
     assert result.files[0].mime_type == "video/mp4"
     assert result.files[0].duration_seconds is None
     assert store.uploads == [(f"model-smoke/video/{TASK_ID}.mp4", video_bytes, "video/mp4")]
+
+
+async def test_completed_poll_with_scope_only_stages_under_owned_namespace() -> None:
+    store = RecordingVideoStore()
+    video_bytes = b"scoped-video-bytes"
+    result_scope = VideoResultScope(
+        organization_id=UUID("018f0000-0000-7000-8000-000000000011"),
+        project_id=UUID("018f0000-0000-7000-8000-000000000012"),
+        lesson_unit_id=UUID("018f0000-0000-7000-8000-000000000013"),
+        generation_job_id=UUID("018f0000-0000-7000-8000-000000000014"),
+    )
+
+    def handler(http_request: httpx.Request) -> httpx.Response:
+        if http_request.url == f"https://gateway.test/v1/videos/{TASK_ID}":
+            return httpx.Response(
+                200,
+                json={
+                    "id": TASK_ID,
+                    "model": "video-grok",
+                    "status": "completed",
+                    "hasOutput": True,
+                },
+            )
+        return httpx.Response(200, headers={"Content-Type": "video/mp4"}, content=video_bytes)
+
+    result = await provider(handler, store).poll(
+        VideoPollRequest(
+            capability=ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S,
+            request_id="req-video-poll-scoped",
+            provider_task_id=TASK_ID,
+            result_scope=result_scope,
+        )
+    )
+
+    assert result.files[0].storage_key.startswith(
+        f"staging/video-results/{result_scope.organization_id}/{result_scope.project_id}/"
+    )
+    assert TASK_ID not in result.files[0].storage_key
 
 
 async def test_submit_fails_closed_when_private_asset_references_cannot_be_resolved() -> None:

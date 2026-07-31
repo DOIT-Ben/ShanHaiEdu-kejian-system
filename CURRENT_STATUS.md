@@ -38,7 +38,7 @@
 - #165的relay/cleanup部署合同、阶段化脱敏失败证据和systemd运行来源门禁已进入`main`；#248不重复迁移生产服务器，也不调用真实Provider。
 - [Issue #248](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/248)是唯一当前实现现场。它只修正#205现有视频结果的对象生命周期：Adapter写staging，Worker校验后幂等晋升到content-addressed final，PostgreSQL只绑定final，GC保守回收过期未晋升staging与隔离期后的未绑定final。
 - #248复用现有Model Gateway、ObjectStorage、GenerationJob/Attempt/Usage、Worker lease、FileAssetVersion、GenerationResult和结构化日志，不新增第二状态机、第二资产表、通用治理平台或前端DTO。
-- 决策已经固定强类型`VideoResultScope`和无Provider私有标识的key合同；下一步先写scope、非法媒体、取消、租约、数据库回滚、重复Worker、幂等晋升与GC权限红测试，再做最小实现。
+- #248最小实现已经完成：业务视频提交、轮询和取消携带exact `VideoResultScope`并与审计上下文校验；Adapter只写staging，Worker完成文件事实与`ffprobe`后幂等晋升final，PostgreSQL只绑定final，提交成功后best-effort清理staging。数据库回滚保留未绑定final给隔离GC，并发loser通过重新stat接受winner且不删除winner final。
 - [Issue #239](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/239)已经由[PR #240](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/240)完成主线状态收口并关闭。
 - [Issue #241](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/241)已由[PR #242](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/242)完成技术交付；生产Worker在未注入测试模型时通过现有`build_real_text_gateway()`调用真实文本Provider，普通CI继续使用确定性Fake。
 - #242只增加受控黄金项目、脱敏receipt、现有Provider流式接线和验收发现的最小质量修复，没有建设新的Provider平台、Worker队列、状态机或治理框架。
@@ -54,7 +54,7 @@
 
 ## 当前阻塞
 
-- #248当前没有已知产品或决策阻塞；实现尚未开始，必须先形成红测试证据。普通开发和CI不得调用真实Provider。
+- #248当前没有已知产品或决策阻塞；红测试、最小实现和本地风险门禁已完成，正在等待exact base/head独立审查。普通开发和CI未调用真实Provider。
 - 当前没有已知的Session/CSRF、PostgreSQL、Worker、active OpenAPI、生产页面、真实文本Provider验收或R1收口阻塞。
 - 真实黄金项目已经生成passed receipt；不再调用Provider。普通CI继续只允许确定性Fake，不得把真实模型内容写入仓库测试夹具。
 - [Issue #233](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/233)单独跟踪`origin/main`既有Stage1 E2E旧`impact_scope` fixture；该测试债不改变#231验收结果，也不在救援PR内顺手修复。
@@ -62,9 +62,9 @@
 
 ## 下一个阶段出口
 
-1. #248先提交规划checkpoint并创建Draft PR，再写对象生命周期与竞态边界红测试；不得先改生产实现。
-2. 最小实现后运行Model Gateway合同、对象存储、PostgreSQL Worker、取消/租约/回滚/重复投递、仓库治理、密钥扫描和生产build门禁；普通CI只使用确定性Fake。
-3. 未参与实现的同一只读reviewer对exact base/head最多审查2轮。每轮finding先修复再复审；两轮后仍未关闭的问题建立独立遗留Issue并进入最终遗留清理阶段，不隐瞒、不标记通过。
+1. #248冻结审查checkpoint，由未参与实现的同一只读reviewer对exact base/head开展第1轮完整diff审查。
+2. finding先修复、重跑相关门禁，再由同一reviewer绑定最终head；最多2轮。两轮后仍未关闭的问题建立独立遗留Issue并进入最终遗留清理阶段，不隐瞒、不标记通过。
+3. 审查通过后推送最终head并等待Draft PR全部CI；未经明确授权不转Ready、不合并，也不调用真实Provider。
 
 ## 接手提示
 

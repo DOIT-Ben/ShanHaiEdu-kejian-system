@@ -6,7 +6,9 @@ import hashlib
 import shutil
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Protocol
+from typing import Protocol, runtime_checkable
+
+from apps.api.model_gateway.contracts import VideoResultScope
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +26,19 @@ class VideoResultStore(Protocol):
         key: str,
         source: Path,
         media_type: str,
+    ) -> StoredVideoFile: ...
+
+
+@runtime_checkable
+class ScopedVideoResultStore(Protocol):
+    def stage(
+        self,
+        *,
+        source: Path,
+        media_type: str,
+        scope: VideoResultScope,
+        provider_name: str,
+        provider_task_id: str,
     ) -> StoredVideoFile: ...
 
 

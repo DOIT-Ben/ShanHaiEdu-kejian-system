@@ -7,8 +7,6 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import tempfile
-from pathlib import Path
 from typing import Literal, cast
 from uuid import UUID
 
@@ -24,7 +22,9 @@ from apps.api.model_gateway.contracts import (
     VideoOperationStatus,
     VideoPollRequest,
     VideoProviderResult,
+    VideoResultScope,
 )
+from apps.api.model_gateway.newapi_video_download import download_completed_video
 from apps.api.model_gateway.newapi_video_files import upload_temporary_video_reference
 from apps.api.model_gateway.newapi_video_submission import build_newapi_video_submission_payload
 from apps.api.model_gateway.openai_compatible import map_provider_error
@@ -32,7 +32,7 @@ from apps.api.model_gateway.provider_media import (
     ProviderMediaReferenceReader,
     ProviderMediaResolutionError,
 )
-from apps.api.model_gateway.video_store import StoredVideoFile, VideoResultStore
+from apps.api.model_gateway.video_store import VideoResultStore
 
 
 class NewApiVideoConfig(BaseModel):
@@ -123,6 +123,7 @@ class NewApiVideoProvider:
             task,
             provider_request_id=_request_id(response),
             submitted=True,
+            result_scope=request.result_scope,
         )
 
     async def poll(self, request: VideoPollRequest) -> VideoProviderResult:
@@ -132,6 +133,7 @@ class NewApiVideoProvider:
             task,
             provider_request_id=_request_id(response),
             submitted=False,
+            result_scope=request.result_scope,
         )
 
     async def cancel(self, request: VideoPollRequest) -> VideoProviderResult:
@@ -158,6 +160,7 @@ class NewApiVideoProvider:
         *,
         provider_request_id: str | None,
         submitted: bool,
+        result_scope: VideoResultScope | None,
     ) -> VideoProviderResult:
         task_id = str(task.id)
         if task.status in {"queued", "processing"}:
@@ -178,7 +181,10 @@ class NewApiVideoProvider:
                 actual_model=task.model,
                 usage=ModelUsage(),
             )
-        file, content_request_id = await self._download_completed_video(task_id)
+        file, content_request_id = await self._download_completed_video(
+            task_id,
+            result_scope=result_scope,
+        )
         return VideoProviderResult(
             status=VideoOperationStatus.SUCCEEDED,
             provider_request_id=content_request_id or provider_request_id,
@@ -188,65 +194,23 @@ class NewApiVideoProvider:
             usage=ModelUsage(),
         )
 
-    async def _download_completed_video(self, task_id: str) -> tuple[GeneratedFileFact, str | None]:
-        temporary_path: Path | None = None
-        try:
-            try:
-                async with self._client.stream(
-                    "GET",
-                    self._url(f"videos/{task_id}/content"),
-                    headers=self._headers(),
-                ) as response:
-                    _raise_for_error(response)
-                    media_type = (
-                        response.headers.get("Content-Type", "").split(";", maxsplit=1)[0].lower()
-                    )
-                    content_length = response.headers.get("Content-Length")
-                    if media_type != "video/mp4" or _content_length_exceeds_limit(
-                        content_length,
-                        self._config.max_download_bytes,
-                    ):
-                        raise ModelGatewayError(GatewayErrorCode.INVALID_RESPONSE, retryable=False)
-                    digest = hashlib.sha256()
-                    size_bytes = 0
-                    with tempfile.NamedTemporaryFile(
-                        prefix="shanhaiedu-video-", suffix=".mp4", delete=False
-                    ) as file:
-                        temporary_path = Path(file.name)
-                        async for chunk in response.aiter_bytes():
-                            size_bytes += len(chunk)
-                            if size_bytes > self._config.max_download_bytes:
-                                raise ModelGatewayError(
-                                    GatewayErrorCode.INVALID_RESPONSE,
-                                    retryable=False,
-                                )
-                            digest.update(chunk)
-                            file.write(chunk)
-            except httpx.TimeoutException as exc:
-                raise ModelGatewayError(GatewayErrorCode.TIMEOUT, retryable=True) from exc
-            except httpx.RequestError as exc:
-                raise ModelGatewayError(
-                    GatewayErrorCode.PROVIDER_UNAVAILABLE, retryable=True
-                ) from exc
-            if size_bytes == 0:
-                raise ModelGatewayError(GatewayErrorCode.INVALID_RESPONSE, retryable=False)
-            key = f"model-smoke/video/{task_id}.mp4"
-            stored = await _persist_video(
-                self._store,
-                key=key,
-                source=temporary_path,
-                media_type=media_type,
-            )
-            file = _generated_file_fact(
-                stored,
-                key=key,
-                sha256=digest.hexdigest(),
-                size_bytes=size_bytes,
-                mime_type=media_type,
-            )
-            return file, _request_id(response)
-        finally:
-            _delete_temporary_file(temporary_path)
+    async def _download_completed_video(
+        self,
+        task_id: str,
+        *,
+        result_scope: VideoResultScope | None,
+    ) -> tuple[GeneratedFileFact, str | None]:
+        return await download_completed_video(
+            self._client,
+            url=self._url(f"videos/{task_id}/content"),
+            headers=self._headers(),
+            max_download_bytes=self._config.max_download_bytes,
+            store=self._store,
+            result_scope=result_scope,
+            provider_name=self._config.provider_name,
+            task_id=task_id,
+            raise_for_error=_raise_for_error,
+        )
 
     async def _upload_reference(
         self,
@@ -335,58 +299,3 @@ def _request_id(response: httpx.Response) -> str | None:
     if value is None or not value.strip() or len(value) > 255:
         return None
     return value
-
-
-async def _persist_video(
-    store: VideoResultStore,
-    *,
-    key: str,
-    source: Path,
-    media_type: str,
-) -> StoredVideoFile:
-    try:
-        return await asyncio.to_thread(
-            store.persist,
-            key=key,
-            source=source,
-            media_type=media_type,
-        )
-    except OSError as exc:
-        raise ModelGatewayError(GatewayErrorCode.PROVIDER_UNAVAILABLE, retryable=True) from exc
-
-
-def _generated_file_fact(
-    stored: StoredVideoFile,
-    *,
-    key: str,
-    sha256: str,
-    size_bytes: int,
-    mime_type: str,
-) -> GeneratedFileFact:
-    if (
-        stored.storage_key != key
-        or stored.size_bytes != size_bytes
-        or stored.mime_type != mime_type
-        or stored.sha256 != sha256
-    ):
-        raise ModelGatewayError(GatewayErrorCode.INVALID_RESPONSE, retryable=False)
-    return GeneratedFileFact(
-        storage_key=key,
-        sha256=sha256,
-        size_bytes=size_bytes,
-        mime_type=mime_type,
-    )
-
-
-def _content_length_exceeds_limit(value: str | None, maximum: int) -> bool:
-    if value is None:
-        return False
-    try:
-        return int(value) > maximum
-    except ValueError:
-        return True
-
-
-def _delete_temporary_file(path: Path | None) -> None:
-    if path is not None:
-        path.unlink(missing_ok=True)

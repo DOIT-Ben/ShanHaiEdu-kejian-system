@@ -24,6 +24,7 @@ from apps.api.model_gateway.contracts import (
     VideoOperationStatus,
     VideoPollRequest,
     VideoProviderResult,
+    VideoResultScope,
 )
 from apps.api.model_gateway.pending import PendingTextGeneration
 from apps.api.model_gateway.ports import (
@@ -184,6 +185,7 @@ class ModelGateway:
         audit_context: ModelAuditContext | None = None,
         media_organization_id: UUID | None = None,
     ) -> VideoGatewayResult:
+        _require_video_scope_matches_audit(request.result_scope, audit_context)
         audit_organization_id = audit_context.organization_id if audit_context is not None else None
         if (
             media_organization_id is not None
@@ -216,6 +218,7 @@ class ModelGateway:
         cancellation: CancellationToken | None = None,
         audit_context: ModelAuditContext | None = None,
     ) -> VideoGatewayResult:
+        _require_video_scope_matches_audit(request.result_scope, audit_context)
         return await self._run_video(
             request,
             lambda provider: provider.poll(request),
@@ -230,6 +233,7 @@ class ModelGateway:
         *,
         audit_context: ModelAuditContext | None = None,
     ) -> VideoGatewayResult:
+        _require_video_scope_matches_audit(request.result_scope, audit_context)
         return await self._run_video(
             request,
             lambda provider: provider.cancel(request),
@@ -302,3 +306,18 @@ class ModelGateway:
             model=provider.model_name,
             reason="configured_primary",
         )
+
+
+def _require_video_scope_matches_audit(
+    scope: VideoResultScope | None,
+    audit_context: ModelAuditContext | None,
+) -> None:
+    if scope is None:
+        return
+    if audit_context is None or (
+        scope.organization_id != audit_context.organization_id
+        or scope.project_id != audit_context.project_id
+        or scope.lesson_unit_id != audit_context.lesson_unit_id
+        or scope.generation_job_id != audit_context.generation_job_id
+    ):
+        raise ModelGatewayError(GatewayErrorCode.INVALID_RESPONSE, retryable=False)

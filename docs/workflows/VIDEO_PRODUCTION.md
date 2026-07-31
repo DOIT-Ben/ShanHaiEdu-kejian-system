@@ -96,6 +96,8 @@ selected_intro_snapshot
 
 候选阶段只有 `result_id`，不创建 `clip_id`。教师或获授权自动策略选中一个合格候选并成功保存到该 shot 的正式片段槽位后，系统才创建 `clip_id`。一个视频交付版本每个 shot 只能有一个当前正式 clip，旧 clip 作为历史保留。
 
+模型返回的候选文件在成为`result_id`之前必须经过对象生命周期门禁。业务请求使用exact organization/project/lesson/job scope写入staging；Worker核验MP4 MIME、大小、SHA-256、`ffprobe`和目标时长后，才晋升到不可变内容寻址final key。`FileAssetVersion`和`GenerationResult`只能绑定final对象。非法媒体、取消和租约丢失不得产生业务资产；数据库失败后的未绑定final进入7天隔离，由默认dry-run的保守GC根据PostgreSQL事实处理，失败Worker不得即时删除可能属于并发赢家的final对象。
+
 单镜头失败或替换只重做对应 shot；不得为了一个片段失败重写母版剧本或全部资产。
 
 ## 9. 音频、字幕与合成

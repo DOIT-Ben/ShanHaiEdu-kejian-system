@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass, replace
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from apps.api.uploads.storage import ObjectMetadata, ObjectStorageError
@@ -62,6 +62,7 @@ class FakeObjectStorage:
             size_bytes=len(payload),
             media_type=media_type,
             sha256=digest,
+            last_modified=datetime.now(UTC),
         )
         self._objects[(bucket, key)] = metadata
         self._payloads[(bucket, key)] = payload
@@ -89,6 +90,19 @@ class FakeObjectStorage:
     def delete(self, *, bucket: str, key: str) -> None:
         self._objects.pop((bucket, key), None)
         self._payloads.pop((bucket, key), None)
+
+    def list_objects(
+        self,
+        *,
+        bucket: str,
+        prefix: str,
+        limit: int,
+    ) -> list[ObjectMetadata]:
+        return [
+            metadata
+            for (object_bucket, key), metadata in sorted(self._objects.items())
+            if object_bucket == bucket and key.startswith(prefix)
+        ][:limit]
 
     def download_to_path(
         self,

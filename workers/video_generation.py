@@ -23,7 +23,7 @@ from apps.api.model_gateway.factory import (
 from apps.api.model_gateway.gateway import ModelGateway
 from apps.api.model_gateway.object_storage_video_store import ObjectStorageVideoResultStore
 from apps.api.settings import Settings, get_settings
-from apps.api.uploads.storage import ObjectStorage, build_object_storage
+from apps.api.uploads.storage import ObjectStorage, ObjectStorageError, build_object_storage
 from apps.api.workflows.service import WorkflowRuntimeService
 from workers.video_generation_persistence import (
     persist_cancelled,
@@ -208,8 +208,15 @@ async def _run_generation(
     )
     if result.status is not VideoOperationStatus.SUCCEEDED:
         raise VideoGenerationFailure("VIDEO_PROVIDER_FAILED")
-    validated = await validate_video_result(result, storage=storage, settings=settings)
-    return persist_success(
+    if request.result_scope is None:
+        raise VideoGenerationFailure("VIDEO_INPUTS_INVALID")
+    validated = await validate_video_result(
+        result,
+        result_scope=request.result_scope,
+        storage=storage,
+        settings=settings,
+    )
+    outcome = persist_success(
         factory,
         routing,
         job_id,
@@ -217,6 +224,18 @@ async def _run_generation(
         validated=validated,
         settings=settings,
     )
+    if outcome == "succeeded":
+        try:
+            storage.delete(
+                bucket=settings.object_storage_bucket,
+                key=validated.staging_key,
+            )
+        except ObjectStorageError:
+            logger.warning(
+                "video_staging_cleanup_deferred",
+                extra={"generation_job_id": str(job_id)},
+            )
+    return outcome
 
 
 def _routing(

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from io import BytesIO
 from pathlib import Path
 from typing import Protocol
@@ -32,6 +32,7 @@ class ObjectMetadata:
     size_bytes: int
     media_type: str
     sha256: str | None
+    last_modified: datetime | None = None
 
 
 class ObjectStorage(Protocol):
@@ -64,6 +65,14 @@ class ObjectStorage(Protocol):
     ) -> ObjectMetadata: ...
 
     def delete(self, *, bucket: str, key: str) -> None: ...
+
+    def list_objects(
+        self,
+        *,
+        bucket: str,
+        prefix: str,
+        limit: int,
+    ) -> list[ObjectMetadata]: ...
 
     def download_to_path(
         self,
@@ -188,10 +197,6 @@ class MinioObjectStorage:
             )
             return self.stat(bucket=destination_bucket, key=destination_key)
         except (S3Error, HTTPError, ObjectStorageError) as exc:
-            try:
-                self._client.remove_object(destination_bucket, destination_key)
-            except (S3Error, HTTPError):
-                pass
             raise ObjectStorageError("object storage immutable copy failed") from exc
 
     def delete(self, *, bucket: str, key: str) -> None:
@@ -199,6 +204,37 @@ class MinioObjectStorage:
             self._client.remove_object(bucket, key)
         except (S3Error, HTTPError) as exc:
             raise ObjectStorageError("object storage cleanup failed") from exc
+
+    def list_objects(
+        self,
+        *,
+        bucket: str,
+        prefix: str,
+        limit: int,
+    ) -> list[ObjectMetadata]:
+        if limit <= 0:
+            raise ValueError("object storage list limit must be positive")
+        try:
+            objects: list[ObjectMetadata] = []
+            for item in self._client.list_objects(bucket, prefix=prefix, recursive=True):
+                if item.object_name is None:
+                    continue
+                objects.append(
+                    ObjectMetadata(
+                        bucket=bucket,
+                        key=item.object_name,
+                        etag=(item.etag or "").strip('"'),
+                        size_bytes=int(item.size or 0),
+                        media_type="",
+                        sha256=None,
+                        last_modified=item.last_modified,
+                    )
+                )
+                if len(objects) >= limit:
+                    break
+            return objects
+        except (S3Error, HTTPError) as exc:
+            raise ObjectStorageError("object storage object listing failed") from exc
 
     def download_to_path(
         self,

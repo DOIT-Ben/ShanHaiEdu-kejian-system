@@ -20,6 +20,7 @@ class ModelAuditContext:
     project_id: UUID
     node_run_id: UUID
     generation_job_id: UUID | None
+    lesson_unit_id: UUID | None = None
 
 
 class GatewayErrorCode(StrEnum):
@@ -75,6 +76,13 @@ class MediaReference(_StrictModel):
     mime_type: str = Field(pattern=r"^[a-z0-9.+-]+/[a-z0-9.+-]+$")
 
 
+class VideoResultScope(_StrictModel):
+    organization_id: UUID
+    project_id: UUID
+    lesson_unit_id: UUID
+    generation_job_id: UUID
+
+
 class ImageModelRequest(_StrictModel):
     kind: Literal["image"] = "image"
     capability: ModelCapability
@@ -104,6 +112,7 @@ class VideoModelRequest(_StrictModel):
         default_factory=lambda: list[MediaReference](),
         max_length=16,
     )
+    result_scope: VideoResultScope | None = None
 
     @model_validator(mode="after")
     def require_video_capability(self) -> Self:
@@ -117,6 +126,7 @@ class VideoPollRequest(_StrictModel):
     capability: ModelCapability
     request_id: str = Field(min_length=1, max_length=160)
     provider_task_id: str = Field(min_length=1, max_length=255)
+    result_scope: VideoResultScope | None = None
 
     @model_validator(mode="after")
     def require_video_capability(self) -> Self:

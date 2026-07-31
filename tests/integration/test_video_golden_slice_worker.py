@@ -11,6 +11,7 @@ from pydantic import SecretStr
 from sqlalchemy import func, select
 
 from apps.api.assets.models import FileAssetVersion
+from apps.api.assets.video_port import VideoAssetPort
 from apps.api.creation.models import CreationItem, GenerationResult
 from apps.api.database import build_engine, build_session_factory
 from apps.api.identity.context import system_actor
@@ -28,8 +29,13 @@ from apps.api.model_gateway.contracts import (
     VideoOperationStatus,
     VideoPollRequest,
     VideoProviderResult,
+    VideoResultScope,
 )
 from apps.api.model_gateway.gateway import ModelGateway
+from apps.api.model_gateway.object_storage_video_store import (
+    build_video_final_key,
+    build_video_staging_key,
+)
 from apps.api.settings import Settings
 from apps.api.uploads.storage import ObjectStorage
 from apps.api.workflows.models import NodeRun
@@ -71,6 +77,7 @@ class StoredVideoFakeProvider:
         assert organization_id is not None
         assert request.duration_seconds == 6
         assert len(request.references) == 1
+        assert request.result_scope is not None
         self.submitted_prompt = request.prompt
         return self._result(request.request_id, VideoOperationStatus.SUBMITTED)
 
@@ -78,7 +85,12 @@ class StoredVideoFakeProvider:
         self.poll_calls += 1
         if self.poll_calls == 1:
             return self._result(request.request_id, VideoOperationStatus.POLLING)
-        key = "fake/video-golden-slice/result.mp4"
+        assert request.result_scope is not None
+        key = build_video_staging_key(
+            request.result_scope,
+            provider_name=self.provider_name,
+            provider_task_id="fake-video-task",
+        )
         payload = b"not-an-mp4" if self._invalid_media else self._payload
         metadata = self._storage.put_bytes(
             bucket="shanhaiedu",
@@ -213,9 +225,19 @@ async def test_video_worker_persists_verified_candidate_and_refreshes_playback(
             assert snapshot.status_code == 200, snapshot.text
             playback_url = snapshot.json()["data"]["candidate"]["playback_url"]
             playback = await client.get(playback_url)
+            result_scope = VideoResultScope(
+                organization_id=seeded.actor.organization_id,
+                project_id=seeded.project_id,
+                lesson_unit_id=lesson.lesson_id,
+                generation_job_id=job_id,
+            )
+            final_key = build_video_final_key(
+                result_scope,
+                sha256=hashlib.sha256(payload).hexdigest(),
+            )
             storage.put_bytes(
                 bucket="shanhaiedu",
-                key="fake/video-golden-slice/result.mp4",
+                key=final_key,
                 payload=b"mutated-after-verification",
                 media_type="video/mp4",
             )
@@ -324,6 +346,76 @@ async def test_video_worker_synchronizes_pre_execution_cancellation_without_prov
         engine.dispose()
 
 
+async def test_video_worker_database_failure_leaves_only_quarantined_objects(
+    migrated_database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    engine = build_engine(migrated_database_url)
+    factory = build_session_factory(engine)
+    seeded = await seed_video_project(factory, lesson_count=1)
+    storage = FakeObjectStorage()
+    provider = StoredVideoFakeProvider(storage, _six_second_mp4(tmp_path))
+    gateway = ModelGateway(
+        {},
+        video_routes={ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S: provider},
+        audit_sink=SqlAlchemyAttemptAuditSink(factory),
+    )
+    settings = _settings(migrated_database_url)
+    app = create_app(settings=settings, session_factory=factory, object_storage=storage)
+    override_test_identity(app, seeded.actor)
+    lesson = seeded.lessons[0]
+
+    def fail_database_persistence(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("forced database rollback")
+
+    monkeypatch.setattr(VideoAssetPort, "persist_generated", fail_database_persistence)
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+            started = await client.post(
+                f"/api/v2/projects/{seeded.project_id}/lessons/{lesson.lesson_id}"
+                "/video/generations",
+                headers={"Idempotency-Key": "video-worker-db-rollback"},
+                json={"keyframe_file_asset_version_id": str(lesson.keyframe_file_version_id)},
+            )
+        assert started.status_code == 202, started.text
+        job_id = UUID(started.json()["data"]["job_id"])
+
+        with pytest.raises(RuntimeError, match="forced database rollback"):
+            await execute_video_generation_job(
+                job_id,
+                worker_id="video-worker-db-rollback",
+                gateway=gateway,
+                storage=storage,
+                settings=settings,
+            )
+
+        with factory() as session:
+            result_count = session.scalar(
+                select(func.count())
+                .select_from(GenerationResult)
+                .where(GenerationResult.generation_job_id == job_id)
+            )
+            version_count = session.scalar(
+                select(func.count())
+                .select_from(FileAssetVersion)
+                .where(FileAssetVersion.metadata_json["generation_job_id"].astext == str(job_id))
+            )
+            job = session.get(GenerationJob, job_id)
+        objects = storage.list_objects(bucket="shanhaiedu", prefix="", limit=100)
+
+        assert result_count == 0
+        assert version_count == 0
+        assert job is not None and job.status == "failed"
+        assert any(item.key.startswith("staging/video-results/") for item in objects)
+        assert any(item.key.startswith("assets/video-results/") for item in objects)
+    finally:
+        engine.dispose()
+
+
 async def test_video_worker_finalizes_cancellation_after_media_validation(
     migrated_database_url: str,
     monkeypatch: pytest.MonkeyPatch,
@@ -361,10 +453,16 @@ async def test_video_worker_finalizes_cancellation_after_media_validation(
             async def validate_then_cancel(
                 result: VideoGatewayResult,
                 *,
+                result_scope: VideoResultScope,
                 storage: ObjectStorage,
                 settings: Settings,
             ) -> ValidatedVideo:
-                validated = await original_validate(result, storage=storage, settings=settings)
+                validated = await original_validate(
+                    result,
+                    result_scope=result_scope,
+                    storage=storage,
+                    settings=settings,
+                )
                 cancelled = await client.post(
                     f"/api/v2/generation-jobs/{job_id}/cancel",
                     headers={"Idempotency-Key": "video-worker-late-cancel-job"},

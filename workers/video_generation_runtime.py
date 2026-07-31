@@ -14,6 +14,7 @@ from apps.api.identity.context import ActorContext
 from apps.api.jobs.worker_port import GenerationJobRoutingReader, VideoGenerationJobRouting
 from apps.api.model_gateway.contracts import (
     GatewayErrorCode,
+    GeneratedFileFact,
     MediaReference,
     ModelAuditContext,
     ModelCapability,
@@ -22,11 +23,17 @@ from apps.api.model_gateway.contracts import (
     VideoModelRequest,
     VideoOperationStatus,
     VideoPollRequest,
+    VideoResultScope,
 )
 from apps.api.model_gateway.gateway import ModelGateway
-from apps.api.model_gateway.video_smoke import VideoProbeError, probe_mp4
+from apps.api.model_gateway.object_storage_video_store import (
+    ObjectStorageVideoResultStore,
+    build_video_staging_key,
+)
+from apps.api.model_gateway.video_smoke import VideoProbeError, VideoProbeResult, probe_mp4
+from apps.api.model_gateway.video_store import StoredVideoFile
 from apps.api.settings import Settings
-from apps.api.uploads.storage import ObjectStorage, ObjectStorageError
+from apps.api.uploads.storage import ObjectMetadata, ObjectStorage, ObjectStorageError
 from workers.video_generation_persistence import ValidatedVideo, update_progress
 
 
@@ -68,6 +75,7 @@ def build_video_request(
                 mime_type=keyframe.mime_type,
             )
         ],
+        result_scope=_video_result_scope(routing, job_id),
     )
     audit = ModelAuditContext(
         organization_id=routing.organization_id,
@@ -75,6 +83,7 @@ def build_video_request(
         project_id=routing.project_id,
         node_run_id=routing.node_run_id,
         generation_job_id=job_id,
+        lesson_unit_id=routing.lesson_unit_id,
     )
     return request, audit
 
@@ -97,7 +106,13 @@ async def poll_until_terminal(
         if time.monotonic() - started >= settings.video_provider_max_wait_seconds:
             raise ModelGatewayError(GatewayErrorCode.TIMEOUT, retryable=True)
         if _cancel_requested(factory, job_id):
-            await _cancel_provider(gateway, result, job_id)
+            await _cancel_provider(
+                gateway,
+                result,
+                routing,
+                job_id,
+                audit_context,
+            )
             raise VideoGenerationCancelled
         await asyncio.sleep(settings.video_provider_poll_seconds)
         poll_no += 1
@@ -116,6 +131,7 @@ async def poll_until_terminal(
                 capability=ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S,
                 request_id=f"video-job:{job_id}:poll:{poll_no}",
                 provider_task_id=result.provider_task_id,
+                result_scope=_video_result_scope(routing, job_id),
             ),
             audit_context=audit_context,
         )
@@ -125,9 +141,32 @@ async def poll_until_terminal(
 async def validate_video_result(
     result: VideoGatewayResult,
     *,
+    result_scope: VideoResultScope,
     storage: ObjectStorage,
     settings: Settings,
 ) -> ValidatedVideo:
+    file = _require_staged_file(result, result_scope)
+    _, probe = await _download_and_probe(file, storage=storage, settings=settings)
+    promoted_file, final_metadata = _promote_validated_file(
+        file,
+        result_scope=result_scope,
+        storage=storage,
+        settings=settings,
+    )
+    return ValidatedVideo(
+        file=promoted_file,
+        metadata=final_metadata,
+        probe=probe,
+        provider=result.route.provider,
+        model=result.actual_model,
+        staging_key=file.storage_key,
+    )
+
+
+def _require_staged_file(
+    result: VideoGatewayResult,
+    result_scope: VideoResultScope,
+) -> GeneratedFileFact:
     if len(result.files) != 1:
         raise VideoGenerationFailure("VIDEO_FILE_INVALID")
     file = result.files[0]
@@ -135,6 +174,21 @@ async def validate_video_result(
         file.duration_seconds is not None and file.duration_seconds != 6
     ):
         raise VideoGenerationFailure("VIDEO_FILE_INVALID")
+    if result.provider_task_id is None or file.storage_key != build_video_staging_key(
+        result_scope,
+        provider_name=result.route.provider,
+        provider_task_id=result.provider_task_id,
+    ):
+        raise VideoGenerationFailure("VIDEO_FILE_INVALID")
+    return file
+
+
+async def _download_and_probe(
+    file: GeneratedFileFact,
+    *,
+    storage: ObjectStorage,
+    settings: Settings,
+) -> tuple[ObjectMetadata, VideoProbeResult]:
     with tempfile.TemporaryDirectory(prefix="shanhaiedu-video-worker-") as directory:
         path = Path(directory) / "candidate.mp4"
         try:
@@ -159,19 +213,57 @@ async def validate_video_result(
             raise VideoGenerationFailure("VIDEO_FILE_INVALID") from exc
     if not 5.5 <= probe.duration_seconds <= 6.5:
         raise VideoGenerationFailure("VIDEO_DURATION_INVALID")
-    return ValidatedVideo(
-        file=file,
-        metadata=metadata,
-        probe=probe,
-        provider=result.route.provider,
-        model=result.actual_model,
+    return metadata, probe
+
+
+def _promote_validated_file(
+    file: GeneratedFileFact,
+    *,
+    result_scope: VideoResultScope,
+    storage: ObjectStorage,
+    settings: Settings,
+) -> tuple[GeneratedFileFact, ObjectMetadata]:
+    store = ObjectStorageVideoResultStore(
+        storage,
+        bucket=settings.object_storage_bucket,
+        max_bytes=settings.video_provider_max_download_bytes,
+    )
+    try:
+        promoted = store.promote(
+            staged=StoredVideoFile(
+                storage_key=file.storage_key,
+                sha256=file.sha256,
+                size_bytes=file.size_bytes,
+                mime_type=file.mime_type,
+            ),
+            scope=result_scope,
+        )
+        final_metadata = storage.stat(
+            bucket=settings.object_storage_bucket,
+            key=promoted.storage_key,
+        )
+    except ObjectStorageError as exc:
+        raise VideoGenerationFailure("VIDEO_FILE_UNAVAILABLE") from exc
+    except OSError as exc:
+        raise VideoGenerationFailure("VIDEO_FILE_INVALID") from exc
+    return (
+        GeneratedFileFact(
+            storage_key=promoted.storage_key,
+            sha256=promoted.sha256,
+            size_bytes=promoted.size_bytes,
+            mime_type=promoted.mime_type,
+            duration_seconds=file.duration_seconds,
+        ),
+        final_metadata,
     )
 
 
 async def _cancel_provider(
     gateway: ModelGateway,
     result: VideoGatewayResult,
+    routing: VideoGenerationJobRouting,
     job_id: UUID,
+    audit_context: ModelAuditContext,
 ) -> None:
     if result.provider_task_id is None:
         return
@@ -181,7 +273,9 @@ async def _cancel_provider(
                 capability=ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S,
                 request_id=f"video-job:{job_id}:cancel",
                 provider_task_id=result.provider_task_id,
-            )
+                result_scope=_video_result_scope(routing, job_id),
+            ),
+            audit_context=audit_context,
         )
     except ModelGatewayError:
         pass
@@ -197,3 +291,15 @@ def _uuid_fact(payload: dict[str, object], key: str) -> UUID:
         return UUID(str(payload[key]))
     except (KeyError, TypeError, ValueError) as exc:
         raise VideoGenerationFailure("VIDEO_INPUTS_INVALID") from exc
+
+
+def _video_result_scope(
+    routing: VideoGenerationJobRouting,
+    job_id: UUID,
+) -> VideoResultScope:
+    return VideoResultScope(
+        organization_id=routing.organization_id,
+        project_id=routing.project_id,
+        lesson_unit_id=routing.lesson_unit_id,
+        generation_job_id=job_id,
+    )

@@ -28,6 +28,7 @@ class ValidatedVideo:
     probe: VideoProbeResult
     provider: str
     model: str
+    staging_key: str
 
 
 def persist_success(
