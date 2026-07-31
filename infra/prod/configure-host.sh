@@ -18,59 +18,79 @@ if [[ ! "$public_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
 fi
 
 source_root="$(readlink -f "$production_root/current")"
-available=/etc/nginx/sites-available/shanhaiedu-production-ip
-enabled=/etc/nginx/sites-enabled/shanhaiedu-production-ip
-legacy_enabled=/etc/nginx/sites-enabled/image-studio-theme-qa-ip
+nginx_binary="$(command -v nginx)"
+nginx_site_dir="${SHANHAI_NGINX_SITE_DIR:-/etc/nginx/sites-enabled}"
+legacy_site="${SHANHAI_LEGACY_NGINX_SITE:-}"
+enabled="$nginx_site_dir/shanhaiedu-production-ip.conf"
+tls_certificate="${SHANHAI_TLS_CERTIFICATE:-}"
+tls_private_key="${SHANHAI_TLS_PRIVATE_KEY:-}"
 backup_root="$production_root/shared/nginx-backup"
 backup="$backup_root/$(date -u +%Y%m%dT%H%M%SZ)"
+install -d -m 0755 "$nginx_site_dir"
 install -d -m 0700 "$backup"
-if [[ -L "$legacy_enabled" ]]; then
-  readlink "$legacy_enabled" > "$backup/legacy-enabled-target"
-  cp -a "$(readlink -f "$legacy_enabled")" "$backup/legacy-site"
+if [[ -e "$enabled" ]]; then
+  cp -a "$enabled" "$backup/previous-production-site"
+fi
+if [[ -n "$legacy_site" && -e "$legacy_site" ]]; then
+  cp -a "$legacy_site" "$backup/legacy-site"
+  printf '%s\n' "$legacy_site" > "$backup/legacy-site-path"
 fi
 
 restore_legacy() {
   rm -f "$enabled"
-  if [[ -r "$backup/legacy-enabled-target" ]]; then
-    legacy_target="$(cat "$backup/legacy-enabled-target")"
-    cp -a "$backup/legacy-site" "$legacy_target"
-    ln -sfn "$legacy_target" "$legacy_enabled"
+  if [[ -r "$backup/previous-production-site" ]]; then
+    cp -a "$backup/previous-production-site" "$enabled"
   fi
-  nginx -t && systemctl reload nginx
+  if [[ -r "$backup/legacy-site-path" ]]; then
+    legacy_target="$(cat "$backup/legacy-site-path")"
+    cp -a "$backup/legacy-site" "$legacy_target"
+  fi
+  "$nginx_binary" -t && systemctl reload nginx
 }
 trap restore_legacy ERR
 
-install -d -m 0755 /var/lib/letsencrypt/.well-known/acme-challenge
-sed "s/\${SHANHAI_PUBLIC_IP}/$public_ip/g" \
-  "$source_root/infra/prod/host-nginx-http.conf.template" > "$available"
-rm -f "$legacy_enabled"
-ln -sfn "$available" "$enabled"
-nginx -t
-systemctl reload nginx
-
-certbot_root="$production_root/shared/certbot"
-if [[ ! -x "$certbot_root/bin/certbot" ]]; then
-  apt-get update
-  apt-get install --yes --no-install-recommends python3-venv
-  python3 -m venv "$certbot_root"
-  "$certbot_root/bin/pip" install --disable-pip-version-check 'certbot==5.4.0'
+if [[ -n "$legacy_site" ]]; then
+  rm -f "$legacy_site"
 fi
-"$certbot_root/bin/certbot" certonly \
-  --non-interactive \
-  --agree-tos \
-  --register-unsafely-without-email \
-  --preferred-profile shortlived \
-  --webroot \
-  --webroot-path /var/lib/letsencrypt \
-  --ip-address "$public_ip" \
-  --cert-name "$public_ip"
+if [[ -z "$tls_certificate" || -z "$tls_private_key" ]]; then
+  install -d -m 0755 /var/lib/letsencrypt/.well-known/acme-challenge
+  sed "s/\${SHANHAI_PUBLIC_IP}/$public_ip/g" \
+    "$source_root/infra/prod/host-nginx-http.conf.template" > "$enabled"
+  "$nginx_binary" -t
+  systemctl reload nginx
 
-sed "s/\${SHANHAI_PUBLIC_IP}/$public_ip/g" \
-  "$source_root/infra/prod/host-nginx.conf.template" > "$available"
-nginx -t
+  certbot_root="$production_root/shared/certbot"
+  if [[ ! -x "$certbot_root/bin/certbot" ]]; then
+    python3 -m venv "$certbot_root"
+    "$certbot_root/bin/pip" install --disable-pip-version-check 'certbot==5.4.0'
+  fi
+  "$certbot_root/bin/certbot" certonly \
+    --non-interactive \
+    --agree-tos \
+    --register-unsafely-without-email \
+    --preferred-profile shortlived \
+    --webroot \
+    --webroot-path /var/lib/letsencrypt \
+    --ip-address "$public_ip" \
+    --cert-name "$public_ip"
+  tls_certificate="/etc/letsencrypt/live/$public_ip/fullchain.pem"
+  tls_private_key="/etc/letsencrypt/live/$public_ip/privkey.pem"
+fi
+if [[ ! -r "$tls_certificate" || ! -r "$tls_private_key" ]]; then
+  echo "configured TLS material is unavailable" >&2
+  exit 1
+fi
+
+sed \
+  -e "s|\${SHANHAI_PUBLIC_IP}|$public_ip|g" \
+  -e "s|\${SHANHAI_TLS_CERTIFICATE}|$tls_certificate|g" \
+  -e "s|\${SHANHAI_TLS_PRIVATE_KEY}|$tls_private_key|g" \
+  "$source_root/infra/prod/host-nginx.conf.template" > "$enabled"
+"$nginx_binary" -t
 systemctl reload nginx
 
-cat > /etc/systemd/system/shanhaiedu-ip-cert-renew.service <<EOF
+if [[ -n "${certbot_root:-}" ]]; then
+  cat > /etc/systemd/system/shanhaiedu-ip-cert-renew.service <<EOF
 [Unit]
 Description=Renew ShanHaiEdu short-lived IP certificate
 After=network-online.target
@@ -78,10 +98,10 @@ After=network-online.target
 [Service]
 Type=oneshot
 ExecStart=$certbot_root/bin/certbot renew --quiet --preferred-profile shortlived
-ExecStartPost=/usr/sbin/nginx -t
+ExecStartPost=$nginx_binary -t
 ExecStartPost=/usr/bin/systemctl reload nginx
 EOF
-cat > /etc/systemd/system/shanhaiedu-ip-cert-renew.timer <<'EOF'
+  cat > /etc/systemd/system/shanhaiedu-ip-cert-renew.timer <<'EOF'
 [Unit]
 Description=Check ShanHaiEdu short-lived IP certificate twice daily
 
@@ -93,8 +113,9 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 EOF
-systemctl daemon-reload
-systemctl enable --now shanhaiedu-ip-cert-renew.timer
+  systemctl daemon-reload
+  systemctl enable --now shanhaiedu-ip-cert-renew.timer
+fi
 printf '%s\n' "$backup" > "$backup_root/latest"
 trap - ERR
 echo "host HTTPS configured for $public_ip"

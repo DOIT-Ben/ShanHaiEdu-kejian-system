@@ -46,7 +46,7 @@ sudo /opt/shanhaiedu-production/current/infra/prod/verify.sh --public
 
 `release.sh` 会生成缺失的随机 Secret，但不会覆盖现有 Secret；随后构建 exact SHA 镜像、启动独立依赖、执行 Alembic、显式创建对象存储桶、发布黄金内容、初始化 access-code 教师、生成备份并在一次性恢复库校验，最后才切换 `current`。
 
-`configure-host.sh` 会先备份并暂时替换既有公网 IP QA 站点，再申请 Let's Encrypt 短期 IP 证书。任何步骤失败会自动恢复旧 Nginx 入口。现有域名站点不在修改范围。
+`configure-host.sh` 会按 `SHANHAI_NGINX_SITE_DIR` 和 `SHANHAI_LEGACY_NGINX_SITE` 备份并暂时替换既有公网 IP QA 站点。若环境明确提供 `SHANHAI_TLS_CERTIFICATE` 与 `SHANHAI_TLS_PRIVATE_KEY`，复用主机现有且由独立 timer 续期的 IP 证书；否则才在独立 venv 申请 Let's Encrypt 短期 IP 证书。任何步骤失败会自动恢复旧 Nginx 入口。现有域名站点不在修改范围。
 
 ## 验证
 
@@ -69,4 +69,4 @@ sudo /opt/shanhaiedu-production/current/infra/prod/rollback.sh
 
 回退只重启上一版 API、Worker 和 Web 镜像，不降级数据库、不删除对象和业务事实。数据完整性或安全问题应停止入口并执行前向修复；不得盲目恢复旧数据库覆盖已确认写入。
 
-首次 Nginx 切换失败由 `configure-host.sh` 的错误 trap 自动恢复。手工恢复时读取 `shared/nginx-backup/latest`，核对备份路径后恢复原 `image-studio-theme-qa-ip` 链接，并先运行 `nginx -t`。
+首次 Nginx 切换失败由 `configure-host.sh` 的错误 trap 自动恢复。手工恢复时读取 `shared/nginx-backup/latest`，核对 `legacy-site-path` 后恢复原站点文件，并先运行 `nginx -t`。

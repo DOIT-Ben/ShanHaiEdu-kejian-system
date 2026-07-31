@@ -67,6 +67,20 @@ def test_host_nginx_contract_preserves_https_sse_and_private_services() -> None:
     assert "proxy_pass http://127.0.0.1:18080;" in nginx
 
 
+def test_host_configuration_supports_the_approved_shared_ecs_layout() -> None:
+    configure = (PROD / "configure-host.sh").read_text(encoding="utf-8")
+    nginx = (PROD / "host-nginx.conf.template").read_text(encoding="utf-8")
+
+    assert "SHANHAI_NGINX_SITE_DIR" in configure
+    assert "SHANHAI_LEGACY_NGINX_SITE" in configure
+    assert "SHANHAI_TLS_CERTIFICATE" in configure
+    assert "SHANHAI_TLS_PRIVATE_KEY" in configure
+    assert "apt-get" not in configure
+    assert "ExecStartPost=$nginx_binary -t" in configure
+    assert "ssl_certificate ${SHANHAI_TLS_CERTIFICATE};" in nginx
+    assert "ssl_certificate_key ${SHANHAI_TLS_PRIVATE_KEY};" in nginx
+
+
 def test_release_script_requires_exact_sha_backup_and_reversible_activation() -> None:
     release = (PROD / "release.sh").read_text(encoding="utf-8")
     rollback = (PROD / "rollback.sh").read_text(encoding="utf-8")
