@@ -12,7 +12,7 @@
 
 - 根目录固定为 `/opt/shanhaiedu-production`，每个 exact Git SHA 位于 `releases/<sha>`。
 - Compose 项目固定为 `shanhaiedu-production`；PostgreSQL、Redis、MinIO 使用独立命名卷。所有服务共享无默认路由的 `production` internal 网络；只有不挂载 Secret 的 Web/Caddy 额外挂载关闭 IP masquerade 的 `loopback` bridge，并在 internal 网络内按固定路径反代 API 与 MinIO。
-- 只有 Web/Caddy `127.0.0.1:18080` 暴露给宿主机 Nginx；API、Worker、PostgreSQL、Redis 和 MinIO 不发布宿主端口。
+- 只有 Web/Caddy `127.0.0.1:18080` 暴露给宿主机 Nginx；API、Worker、PostgreSQL、Redis 和 MinIO 不发布宿主端口。宿主 Nginx 覆盖客户端提供的 `X-Forwarded-For`，Caddy 仅按严格私网代理链保留真实客户端 IP。
 - Secret 只保存在 `shared/secrets` 的 root-owned `0600` 文件中，并通过 Compose secret 挂载。
 - 首次发布不注入 Provider 配置，生产 Docker 网络禁止容器主动访问公网。
 
@@ -68,7 +68,7 @@ sudo /opt/shanhaiedu-production/current/infra/prod/verify.sh --public
 - API 的 exact release SHA、liveness 和 readiness；
 - Web、PostgreSQL、Redis、MinIO 和 Worker；
 - 最近日志中不得出现 Secret 标识；
-- 宿主 Nginx 日志不得出现 presigned URL 凭据，MinIO 浏览器入口显式关闭 access log；
+- Caddy 运行时日志删除请求 URI，Compose 与宿主 Nginx 日志均不得出现 presigned URL 凭据，MinIO 浏览器入口显式关闭 access log；
 - 公网 HTTPS 证书必须验证该 IP，公网健康和首页必须可访问。
 
 `configure-host.sh` 会安装五分钟一次的 `shanhaiedu-healthcheck.timer`。健康、证书剩余期限或公网入口失败会使 unit 进入 failed，并通过 `shanhaiedu-health-alert@.service` 写入固定格式的脱敏高优先级日志；运维入口为 `systemctl status`、`journalctl -u shanhaiedu-healthcheck.service` 和 Docker Compose 服务状态。

@@ -104,6 +104,20 @@ def test_host_nginx_contract_preserves_https_sse_and_private_services() -> None:
     assert "reverse_proxy minio:9000" in web
 
 
+def test_host_proxy_overwrites_forwarded_ip_and_caddy_uses_a_strict_trust_chain() -> None:
+    compose = yaml.safe_load((PROD / "compose.yaml").read_text(encoding="utf-8"))
+    nginx = (PROD / "host-nginx.conf.template").read_text(encoding="utf-8")
+    web = (PROD / "web.conf").read_text(encoding="utf-8")
+
+    assert nginx.count("proxy_set_header X-Forwarded-For $remote_addr;") == 3
+    assert "$proxy_add_x_forwarded_for" not in nginx
+    assert "trusted_proxies static private_ranges" in web
+    assert "trusted_proxies_strict" in web
+    assert compose["x-app"]["environment"]["SHANHAI_SESSION_TRUSTED_PROXY_HOSTS"] == (
+        '["10.0.0.0/8","172.16.0.0/12","192.168.0.0/16"]'
+    )
+
+
 def test_host_configuration_supports_the_approved_shared_ecs_layout() -> None:
     configure = (PROD / "configure-host.sh").read_text(encoding="utf-8")
     nginx = (PROD / "host-nginx.conf.template").read_text(encoding="utf-8")
