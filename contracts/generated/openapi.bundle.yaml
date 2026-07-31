@@ -3525,6 +3525,7 @@ components:
             - status
             - service
             - environment
+            - release_sha
           properties:
             status:
               const: ok
@@ -3536,6 +3537,9 @@ components:
                 - development
                 - test
                 - production
+            release_sha:
+              type: string
+              pattern: ^(local|[0-9a-f]{40})$
         request_id:
           type: string
           minLength: 1
