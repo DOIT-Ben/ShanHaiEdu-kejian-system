@@ -218,8 +218,12 @@ def test_release_script_requires_exact_sha_backup_and_reversible_activation() ->
 def test_release_waits_for_database_and_object_storage_health_before_writes() -> None:
     release = (PROD / "release.sh").read_text(encoding="utf-8")
 
-    assert '"${compose[@]}" up -d --wait --wait-timeout 120 postgres' in release
-    assert '"${compose[@]}" up -d --wait --wait-timeout 120 redis minio' in release
+    postgres_wait = '"${compose[@]}" up -d --wait --wait-timeout 120 postgres'
+    redis_minio_wait = '"${compose[@]}" up -d --wait --wait-timeout 120 redis minio'
+    assert postgres_wait in release
+    assert redis_minio_wait in release
+    assert release.index(postgres_wait) < release.index("pg_dump")
+    assert release.index(redis_minio_wait) < release.index("mc mirror")
 
 
 def test_release_validates_nginx_before_current_switch_and_restores_symlink() -> None:
