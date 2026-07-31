@@ -5,6 +5,7 @@ from pathlib import Path
 from scripts.check_repository import FULLWIDTH_COLON, check_current_status
 
 FULLWIDTH_SEMICOLON = "\N{FULLWIDTH SEMICOLON}"
+ROOT = Path(__file__).resolve().parents[2]
 REQUIRED_SECTIONS = f"""\
 # 当前项目状态
 
@@ -46,6 +47,24 @@ def create_backend_baseline(root: Path) -> None:
         target = root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.touch()
+
+
+def section(text: str, heading: str) -> str:
+    body = text.split(f"## {heading}\n", maxsplit=1)[1]
+    return body.split("\n## ", maxsplit=1)[0]
+
+
+def test_live_current_status_records_post_mvp_convergence() -> None:
+    text = (ROOT / "CURRENT_STATUS.md").read_text(encoding="utf-8")
+
+    completed = section(text, "已完成")
+    current = section(text, "当前工作")
+    next_exit = section(text, "下一个阶段出口")
+
+    assert "Issue #248" in completed
+    assert "Issue #248" not in current
+    assert "Issue #244" in next_exit
+    assert "status:blocked" in next_exit
 
 
 def test_current_status_accepts_controlled_stage_overlap(tmp_path: Path) -> None:
