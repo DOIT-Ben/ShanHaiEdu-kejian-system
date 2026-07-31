@@ -22,6 +22,7 @@ def test_production_release_assets_are_complete() -> None:
         "host-nginx.conf.template",
         "env.example",
         "release.sh",
+        "validate-image-source.sh",
         "rollback.sh",
         "verify.sh",
         "monitor.sh",
@@ -226,15 +227,18 @@ def test_release_waits_for_database_and_object_storage_health_before_writes() ->
     assert release.index(redis_minio_wait) < release.index("mc mirror")
 
 
-def test_release_accepts_only_exact_revision_labeled_preloaded_images() -> None:
+def test_release_preflights_images_before_production_persistent_writes() -> None:
     release = (PROD / "release.sh").read_text(encoding="utf-8")
 
-    assert 'case "${SHANHAI_IMAGE_SOURCE:-build}" in' in release
-    assert "preloaded)" in release
-    assert "shanhaiedu-api:$release_sha" in release
-    assert "shanhaiedu-web:$release_sha" in release
-    assert "org.opencontainers.image.revision" in release
-    assert '"$revision" != "$release_sha"' in release
+    preflight = 'bash "$source_root/infra/prod/validate-image-source.sh"'
+    assert preflight in release
+    assert '"$release_sha" "$production_root" 0 600' in release
+    assert release.index(preflight) < release.index(
+        'install -d -m 0700 -o root -g root "$SHANHAI_SECRET_DIR"'
+    )
+    assert release.index(preflight) < release.index(
+        'install -d -m 0700 -o root -g root "$production_root/backups"'
+    )
     assert '"${compose[@]}" build api worker web' in release
 
 
