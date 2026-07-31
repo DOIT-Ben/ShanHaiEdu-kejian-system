@@ -145,13 +145,12 @@ def test_retries_then_checks_every_loopback_endpoint(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stderr
     assert calls == [
-        "http://127.0.0.1:18000/health/live",
-        "http://127.0.0.1:18000/health/live",
-        "http://127.0.0.1:18000/health/ready",
+        "http://127.0.0.1:18080/health/live",
+        "http://127.0.0.1:18080/health/live",
+        "http://127.0.0.1:18080/health/ready",
         "http://127.0.0.1:18080/",
-        "http://127.0.0.1:19000/minio/health/ready",
     ]
-    assert curl_count == 5
+    assert curl_count == 4
     assert sleep_count == 1
 
 
@@ -159,7 +158,7 @@ def test_fails_after_bounded_loopback_retries(tmp_path: Path) -> None:
     result, calls, curl_count, sleep_count = _run_verification(tmp_path, "unavailable")
 
     assert result.returncode != 0
-    assert calls == ["http://127.0.0.1:18000/health/live"] * 30
+    assert calls == ["http://127.0.0.1:18080/health/live"] * 30
     assert curl_count == 30
     assert sleep_count == 29
 
@@ -169,6 +168,6 @@ def test_rejects_invalid_release_payload(tmp_path: Path, mode: str) -> None:
     result, calls, curl_count, sleep_count = _run_verification(tmp_path, mode)
 
     assert result.returncode != 0
-    assert calls == ["http://127.0.0.1:18000/health/live"]
+    assert calls == ["http://127.0.0.1:18080/health/live"]
     assert curl_count == 1
     assert sleep_count == 0

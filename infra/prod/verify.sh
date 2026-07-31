@@ -31,15 +31,16 @@ wait_for_local_endpoint() {
   return 1
 }
 
-live_payload="$(wait_for_local_endpoint "http://127.0.0.1:18000/health/live")"
+live_payload="$(wait_for_local_endpoint "http://127.0.0.1:18080/health/live")"
 printf '%s' "$live_payload" | assert_release
-wait_for_local_endpoint "http://127.0.0.1:18000/health/ready" >/dev/null
+wait_for_local_endpoint "http://127.0.0.1:18080/health/ready" >/dev/null
 wait_for_local_endpoint "http://127.0.0.1:18080/" >/dev/null
-wait_for_local_endpoint "http://127.0.0.1:19000/minio/health/ready" >/dev/null
 "${compose[@]}" exec -T postgres pg_isready \
   -U "${SHANHAI_POSTGRES_USER:-shanhai_prod}" \
   -d "${SHANHAI_POSTGRES_DB:-shanhai_prod}"
 "${compose[@]}" exec -T redis redis-cli ping | grep -qx PONG
+"${compose[@]}" exec -T minio \
+  curl -fsS http://127.0.0.1:9000/minio/health/ready >/dev/null
 "${compose[@]}" exec -T worker python -m workers.main --check
 
 if "${compose[@]}" logs --since 10m 2>&1 | grep -Eiq \

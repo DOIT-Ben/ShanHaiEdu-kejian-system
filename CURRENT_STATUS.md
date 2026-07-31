@@ -1,8 +1,8 @@
 # 当前项目状态
 
 当前阶段：阶段1后端基座、R1教材到教案链、三类九套和约6秒课堂导入短片已经形成教师可见MVP并进入`main`；真实文本与视频Provider黄金项目、对象生命周期加固、独立审查和合并后复验均已完成。当前正在执行[P0 Issue #244](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/244)正式环境部署。
-> 最后核验：2026-07-31。
-> 当前 #244 为 `status:in-progress`，对应开放 Draft PR #254；普通开发与CI继续只使用确定性Fake。
+> 最后核验：2026-08-01。
+> 当前 #244 为 `status:in-progress`；PR #254 至 #260 已合并，当前在 `hotfix/244-loopback-ingress-network` 修复首次发布暴露的宿主回环入口；普通开发与CI继续只使用确定性Fake。
 
 ## 当前可演示成果
 
@@ -21,21 +21,22 @@
 
 ## 当前工作
 
-- [Issue #244](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/244)当前为`status:in-progress`，对应开放 Draft PR #254 和 `feat/244-production-release` 分支。
-- [Issue #244](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/244)是当前`priority:p0`生产出口；生产分支和Draft PR已创建，部署仍受合并、镜像、备份、回退和公网验收门禁约束。
+- [Issue #244](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/244)当前为`status:in-progress`。PR #254 至 #260 已合并，最新生产基线为`main@0f6a8477ce0d17496e6f5eeb71a81a6bd9d330be`。
+- exact基线首次发布已完成Alembic、内容发布、身份初始化、PostgreSQL/MinIO备份与恢复校验，并确认API、Worker和Web容器内部健康；随后因internal Docker网络不发布宿主端口而安全失败，`current`与Nginx均未切换，旧公网入口仍保留。
+- 当前`hotfix/244-loopback-ingress-network`仅让不挂载Secret的Web/Caddy额外挂载非NAT loopback网络，在internal网络内反代API与MinIO；进入再次发布前仍须完成Draft PR、CI和exact base/head独立审查。
 - [Issue #165](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/165)以`status:blocked`独立跟踪视频relay安全迁移；第三次迁移已回滚，生产仍运行迁移前relay，第四次尝试需要新的明确生产授权且不得调用真实Provider。
 - [Issue #233](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/233)和[Issue #237](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/237)为`status:ready`技术债，不代表下一产品里程碑，也不阻塞当前MVP事实。
 
 ## 当前阻塞
 
 - #244原先的八项生产决定（主机身份、所有权、操作系统和可用资源；域名、DNS、TLS证书和反向代理；Web、API、Worker、PostgreSQL、Redis、对象存储拓扑与持久化边界；Session/CSRF/CORS/Cookie、访问码、Provider和对象存储密钥的受控注入与轮换；Alembic迁移、迁移前备份、恢复验证和不可逆迁移处置；健康检查、结构化日志、错误率、延迟、队列深度、磁盘和数据库连接监控；精确版本发布、回退触发条件、旧版本保留和回退演练；首次发布采用受控内测或公开开放及其访问控制边界）已获批准，当前不再构成阻塞。
-- 本机生产Compose演练曾因服务网络未注册稳定别名导致依赖解析失败，已通过显式网络别名修复；ECS上线前仍需完成完整门禁、合并后精确SHA发布、Nginx切换和公网浏览器验收。
+- ECS exact release确认`production`网络的`internal: true`使Compose声明的API/MinIO宿主端口在运行态没有端口映射；旧入口未切换且应用层已停止，数据依赖保持健康。当前最小修复已通过本机临时Compose入口验证，仍待PR、CI、独立审查、合并后新SHA重建与ECS复验。
 - #165缺少第四次受控迁移的独立授权和发布窗口；任何门禁失败必须自动回滚并停止，不自动重试。
 - 当前没有已知Session/CSRF、PostgreSQL、Worker、active OpenAPI、生产页面、真实文本/视频黄金验收或视频对象生命周期实现阻塞。
 
 ## 下一个阶段出口
 
-1. 完成当前 [Issue #244](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/244) 分支的实现、CI和独立审查，合并后绑定 exact `main` SHA。
+1. 完成当前 [Issue #244](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/244) 回环入口热修复的Draft PR、CI和独立审查，合并后绑定新的 exact `main` SHA。
 2. 将合并后的 exact SHA 上传到 `/opt/shanhaiedu-production/releases/<sha>`，执行空库迁移、备份/恢复、服务健康检查和可回退发布。
 3. 配置 IP HTTPS 入口并完成公网真实 API Playwright；不执行 #165 迁移、不调用任何真实 Provider。
 4. 若正式部署继续延期，Issue #244 不应退回 `status:blocked`；应新建或更新独立Decision Issue，在PPT/PPTX、完整图片链、完整视频链和TTS中只选择一个教师纵向切片；不得直接恢复历史blocked实现。

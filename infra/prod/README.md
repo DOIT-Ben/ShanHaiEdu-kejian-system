@@ -11,8 +11,8 @@
 本目录把生产运行与共享 ECS 上的开发环境隔离：
 
 - 根目录固定为 `/opt/shanhaiedu-production`，每个 exact Git SHA 位于 `releases/<sha>`。
-- Compose 项目固定为 `shanhaiedu-production`；PostgreSQL、Redis、MinIO 使用独立命名卷和独立 Docker 网络，宿主暴露端口均绑定回环地址。
-- 只有 API `127.0.0.1:18000`、Web `127.0.0.1:18080` 和 MinIO `127.0.0.1:19000` 暴露给宿主机 Nginx。
+- Compose 项目固定为 `shanhaiedu-production`；PostgreSQL、Redis、MinIO 使用独立命名卷。所有服务共享无默认路由的 `production` internal 网络；只有不挂载 Secret 的 Web/Caddy 额外挂载关闭 IP masquerade 的 `loopback` bridge，并在 internal 网络内按固定路径反代 API 与 MinIO。
+- 只有 Web/Caddy `127.0.0.1:18080` 暴露给宿主机 Nginx；API、Worker、PostgreSQL、Redis 和 MinIO 不发布宿主端口。
 - Secret 只保存在 `shared/secrets` 的 root-owned `0600` 文件中，并通过 Compose secret 挂载。
 - 首次发布不注入 Provider 配置，生产 Docker 网络禁止容器主动访问公网。
 
