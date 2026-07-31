@@ -15,10 +15,27 @@ assert_release() {
   python3 -c 'import json,sys; payload=json.load(sys.stdin); expected=sys.argv[1]; actual=payload["data"]["release_sha"]; raise SystemExit(0 if actual == expected else 1)' "$release_sha"
 }
 
-curl -fsS --max-time 10 http://127.0.0.1:18000/health/live | assert_release
-curl -fsS --max-time 10 http://127.0.0.1:18000/health/ready >/dev/null
-curl -fsS --max-time 10 http://127.0.0.1:18080/ >/dev/null
-curl -fsS --max-time 10 http://127.0.0.1:19000/minio/health/ready >/dev/null
+wait_for_local_endpoint() {
+  local url="$1"
+  local attempt response
+  for ((attempt = 1; attempt <= 30; attempt++)); do
+    if response="$(curl -fsS --connect-timeout 1 --max-time 3 "$url")"; then
+      printf '%s' "$response"
+      return 0
+    fi
+    if ((attempt < 30)); then
+      sleep 1
+    fi
+  done
+  echo "production loopback endpoint did not become ready: $url" >&2
+  return 1
+}
+
+live_payload="$(wait_for_local_endpoint "http://127.0.0.1:18000/health/live")"
+printf '%s' "$live_payload" | assert_release
+wait_for_local_endpoint "http://127.0.0.1:18000/health/ready" >/dev/null
+wait_for_local_endpoint "http://127.0.0.1:18080/" >/dev/null
+wait_for_local_endpoint "http://127.0.0.1:19000/minio/health/ready" >/dev/null
 "${compose[@]}" exec -T postgres pg_isready \
   -U "${SHANHAI_POSTGRES_USER:-shanhai_prod}" \
   -d "${SHANHAI_POSTGRES_DB:-shanhai_prod}"
