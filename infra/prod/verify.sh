@@ -42,7 +42,7 @@ wait_for_local_endpoint "http://127.0.0.1:18080/" >/dev/null
 "${compose[@]}" exec -T redis redis-cli ping | grep -qx PONG
 "${compose[@]}" exec -T minio \
   curl -fsS http://127.0.0.1:9000/minio/health/ready >/dev/null
-"${compose[@]}" exec -T worker python -m workers.main --check
+"${compose[@]}" exec -T worker /usr/local/bin/shanhai-entrypoint python -m workers.main --check
 
 if "${compose[@]}" logs --since 10m 2>&1 | grep -Eiq \
   'X-Amz-(Credential|Signature)|MODEL_GATEWAY_API_KEY|SHANHAI_SESSION_ACCESS_CODE|SHANHAI_SESSION_CSRF_SECRET|postgres_password'; then

@@ -340,3 +340,13 @@ def test_local_verification_preserves_explicit_release_sha_over_env_file() -> No
     )
     assert verify.index(preserve_explicit) < verify.index(source_environment)
     assert verify.index(source_environment) < verify.index(resolve_release)
+
+
+def test_local_verification_runs_worker_check_through_entrypoint() -> None:
+    verify = (PROD / "verify.sh").read_text(encoding="utf-8")
+
+    expected = (
+        '"${compose[@]}" exec -T worker /usr/local/bin/shanhai-entrypoint '
+        "python -m workers.main --check"
+    )
+    assert expected in verify
