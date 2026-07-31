@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass, replace
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from apps.api.uploads.storage import ObjectMetadata, ObjectStorageError
+from apps.api.uploads.storage import ObjectMetadata, ObjectNotFoundError, ObjectStorageError
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,7 +41,7 @@ class FakeObjectStorage:
         try:
             return self._objects[(bucket, key)]
         except KeyError as exc:
-            raise ObjectStorageError("fake object not found") from exc
+            raise ObjectNotFoundError("fake object not found") from exc
 
     def put(self, metadata: ObjectMetadata) -> None:
         self._objects[(metadata.bucket, metadata.key)] = metadata
@@ -62,6 +62,7 @@ class FakeObjectStorage:
             size_bytes=len(payload),
             media_type=media_type,
             sha256=digest,
+            last_modified=datetime.now(UTC),
         )
         self._objects[(bucket, key)] = metadata
         self._payloads[(bucket, key)] = payload
@@ -89,6 +90,26 @@ class FakeObjectStorage:
     def delete(self, *, bucket: str, key: str) -> None:
         self._objects.pop((bucket, key), None)
         self._payloads.pop((bucket, key), None)
+
+    def list_objects(
+        self,
+        *,
+        bucket: str,
+        prefix: str,
+        limit: int,
+    ) -> list[ObjectMetadata]:
+        objects = [
+            metadata
+            for (object_bucket, key), metadata in self._objects.items()
+            if object_bucket == bucket and key.startswith(prefix)
+        ]
+        return sorted(
+            objects,
+            key=lambda item: (
+                item.last_modified.timestamp() if item.last_modified is not None else float("inf"),
+                item.key,
+            ),
+        )[:limit]
 
     def download_to_path(
         self,

@@ -39,7 +39,7 @@ def complete_attempt_success(
         attempt.cancel_requested_at = attempt.cancel_requested_at or now
     attempt.status = outcome.value
     attempt.provider_request_id = bounded(result.provider_request_id, 255)
-    attempt.provider_task_id = bounded(result.provider_task_id, 255)
+    attempt.provider_task_id = None
     attempt.finished_at = now
     attempt.latency_ms = latency_ms
     attempt.lease_owner = None

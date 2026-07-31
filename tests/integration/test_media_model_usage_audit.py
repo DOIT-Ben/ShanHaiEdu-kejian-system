@@ -4,6 +4,9 @@ import pytest
 from sqlalchemy import select
 
 from apps.api.database import build_engine, build_session_factory
+from apps.api.ids import new_uuid7
+from apps.api.jobs.models import GenerationJob
+from apps.api.lessons.models import LessonUnit
 from apps.api.model_gateway.audit import SqlAlchemyAttemptAuditSink
 from apps.api.model_gateway.audit_models import GenerationAttempt, UsageRecord
 from apps.api.model_gateway.contracts import (
@@ -17,6 +20,7 @@ from apps.api.model_gateway.contracts import (
     VideoOperationStatus,
     VideoPollRequest,
     VideoProviderResult,
+    VideoResultScope,
 )
 from apps.api.model_gateway.fake import (
     DeterministicFakeImageProvider,
@@ -44,7 +48,7 @@ class ReturnedUnknownVideoProvider(DeterministicFakeVideoProvider):
         )
 
 
-async def test_media_attempts_persist_task_identity_and_provider_neutral_usage(
+async def test_media_attempts_redact_task_identity_and_persist_provider_neutral_usage(
     migrated_database_url: str,
 ) -> None:
     factory = build_session_factory(build_engine(migrated_database_url))
@@ -59,13 +63,53 @@ async def test_media_attempts_persist_task_identity_and_provider_neutral_usage(
             node_key="prepare",
             status=NodeStatus.READY,
         )
+        lesson = LessonUnit(
+            id=new_uuid7(),
+            organization_id=actor.organization_id,
+            project_id=project.id,
+            lesson_key="LESSON-AUDIT",
+            position=1,
+            title="Media audit lesson",
+            scope_summary="Audit the exact lesson scope.",
+            objective_summary="Verify provider-neutral media usage.",
+            estimated_minutes=40,
+            source_division_version_id=new_uuid7(),
+            status="active",
+            created_by=actor.principal_id,
+            updated_by=actor.principal_id,
+        )
+        session.add(lesson)
+        session.flush()
+        job = GenerationJob(
+            id=new_uuid7(),
+            organization_id=actor.organization_id,
+            project_id=project.id,
+            node_run_id=node.id,
+            lesson_unit_id=lesson.id,
+            job_type="video.golden_slice",
+            status="running",
+            progress_percent=0,
+            priority=100,
+            created_by=actor.principal_id,
+            updated_by=actor.principal_id,
+        )
+        session.add(job)
+        session.flush()
+
+    result_scope = VideoResultScope(
+        organization_id=actor.organization_id,
+        project_id=project.id,
+        lesson_unit_id=lesson.id,
+        generation_job_id=job.id,
+    )
 
     audit_context = ModelAuditContext(
         organization_id=actor.organization_id,
         user_id=actor.user_id,
         project_id=project.id,
         node_run_id=node.id,
-        generation_job_id=None,
+        generation_job_id=job.id,
+        lesson_unit_id=lesson.id,
     )
     image_gateway = ModelGateway(
         {},
@@ -98,6 +142,7 @@ async def test_media_attempts_persist_task_identity_and_provider_neutral_usage(
             prompt="PRIVATE_VIDEO_PROMPT",
             duration_seconds=8,
             references=[],
+            result_scope=result_scope,
         ),
         audit_context=audit_context,
     )
@@ -110,7 +155,7 @@ async def test_media_attempts_persist_task_identity_and_provider_neutral_usage(
             )
         )
     assert submit_attempt is not None
-    assert submit_attempt.provider_task_id == submitted.provider_task_id
+    assert submit_attempt.provider_task_id is None
 
     for index in (1, 2):
         await video_gateway.poll_video(
@@ -118,6 +163,7 @@ async def test_media_attempts_persist_task_identity_and_provider_neutral_usage(
                 capability=ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S,
                 request_id=f"req-audit-video-poll-{index}",
                 provider_task_id=submitted.provider_task_id,
+                result_scope=result_scope,
             ),
             audit_context=audit_context,
         )
@@ -136,6 +182,7 @@ async def test_media_attempts_persist_task_identity_and_provider_neutral_usage(
                 prompt="PRIVATE_UNKNOWN_SUBMISSION_PROMPT",
                 duration_seconds=8,
                 references=[],
+                result_scope=result_scope,
             ),
             audit_context=audit_context,
         )
@@ -162,9 +209,9 @@ async def test_media_attempts_persist_task_identity_and_provider_neutral_usage(
     assert [attempt.attempt_no for attempt in attempts] == [1, 2, 3, 4, 5]
     assert [attempt.provider_task_id for attempt in attempts] == [
         None,
-        submitted.provider_task_id,
-        submitted.provider_task_id,
-        submitted.provider_task_id,
+        None,
+        None,
+        None,
         None,
     ]
     assert usage[0].input_units_json == {"prompt_tokens": 0}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -41,6 +42,40 @@ class VideoJobLease:
 
     def owned_running(self, worker_id: str) -> bool:
         return self.status == "running" and self.lease_owner == worker_id
+
+
+@dataclass(frozen=True, slots=True)
+class VideoCleanupJobFact:
+    organization_id: UUID
+    project_id: UUID | None
+    lesson_unit_id: UUID | None
+    job_type: str
+    status: str
+    lease_expires_at: datetime | None
+
+
+class VideoJobCleanupPort:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def fact(self, job_id: UUID, *, for_update: bool = False) -> VideoCleanupJobFact | None:
+        statement = select(GenerationJob).where(
+            GenerationJob.id == job_id,
+            GenerationJob.deleted_at.is_(None),
+        )
+        if for_update:
+            statement = statement.with_for_update(of=GenerationJob)
+        job = self._session.scalar(statement)
+        if job is None:
+            return None
+        return VideoCleanupJobFact(
+            organization_id=job.organization_id,
+            project_id=job.project_id,
+            lesson_unit_id=job.lesson_unit_id,
+            job_type=job.job_type,
+            status=job.status,
+            lease_expires_at=job.lease_expires_at,
+        )
 
 
 class VideoJobPort:

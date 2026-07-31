@@ -227,7 +227,7 @@ class SqlAlchemyAttemptAuditSink:
             attempt.lease_expires_at = None
             if result is not None:
                 attempt.provider_request_id = bounded(result.provider_request_id, 255)
-                attempt.provider_task_id = bounded(result.provider_task_id, 255)
+                attempt.provider_task_id = None
             session.add(self._failed_usage(attempt, context, result, latency_ms))
 
     @staticmethod

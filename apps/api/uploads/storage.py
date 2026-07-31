@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
+from email.utils import parsedate_to_datetime
+from heapq import nsmallest
 from io import BytesIO
 from pathlib import Path
 from typing import Protocol
@@ -24,6 +26,10 @@ class ObjectStorageError(RuntimeError):
     pass
 
 
+class ObjectNotFoundError(ObjectStorageError):
+    pass
+
+
 @dataclass(frozen=True, slots=True)
 class ObjectMetadata:
     bucket: str
@@ -32,6 +38,7 @@ class ObjectMetadata:
     size_bytes: int
     media_type: str
     sha256: str | None
+    last_modified: datetime | None = None
 
 
 class ObjectStorage(Protocol):
@@ -64,6 +71,14 @@ class ObjectStorage(Protocol):
     ) -> ObjectMetadata: ...
 
     def delete(self, *, bucket: str, key: str) -> None: ...
+
+    def list_objects(
+        self,
+        *,
+        bucket: str,
+        prefix: str,
+        limit: int,
+    ) -> list[ObjectMetadata]: ...
 
     def download_to_path(
         self,
@@ -130,7 +145,11 @@ class MinioObjectStorage:
             finally:
                 response.close()
                 response.release_conn()
-        except (S3Error, HTTPError) as exc:
+        except S3Error as exc:
+            if exc.code in {"NoSuchKey", "NoSuchObject", "NotFound"}:
+                raise ObjectNotFoundError("object storage object not found") from exc
+            raise ObjectStorageError("object storage object lookup failed") from exc
+        except HTTPError as exc:
             raise ObjectStorageError("object storage object lookup failed") from exc
         etag = headers.get("etag")
         size = headers.get("content-length")
@@ -143,6 +162,7 @@ class MinioObjectStorage:
             size_bytes=int(size),
             media_type=headers.get("content-type", ""),
             sha256=hasher.hexdigest(),
+            last_modified=_last_modified(headers),
         )
 
     def put_bytes(
@@ -188,10 +208,6 @@ class MinioObjectStorage:
             )
             return self.stat(bucket=destination_bucket, key=destination_key)
         except (S3Error, HTTPError, ObjectStorageError) as exc:
-            try:
-                self._client.remove_object(destination_bucket, destination_key)
-            except (S3Error, HTTPError):
-                pass
             raise ObjectStorageError("object storage immutable copy failed") from exc
 
     def delete(self, *, bucket: str, key: str) -> None:
@@ -199,6 +215,33 @@ class MinioObjectStorage:
             self._client.remove_object(bucket, key)
         except (S3Error, HTTPError) as exc:
             raise ObjectStorageError("object storage cleanup failed") from exc
+
+    def list_objects(
+        self,
+        *,
+        bucket: str,
+        prefix: str,
+        limit: int,
+    ) -> list[ObjectMetadata]:
+        if limit <= 0:
+            raise ValueError("object storage list limit must be positive")
+        try:
+            objects = (
+                ObjectMetadata(
+                    bucket=bucket,
+                    key=item.object_name,
+                    etag=(item.etag or "").strip('"'),
+                    size_bytes=int(item.size or 0),
+                    media_type="",
+                    sha256=None,
+                    last_modified=item.last_modified,
+                )
+                for item in self._client.list_objects(bucket, prefix=prefix, recursive=True)
+                if item.object_name is not None
+            )
+            return nsmallest(limit, objects, key=_object_age_order)
+        except (S3Error, HTTPError) as exc:
+            raise ObjectStorageError("object storage object listing failed") from exc
 
     def download_to_path(
         self,
@@ -270,3 +313,25 @@ def build_object_storage(settings: Settings) -> ObjectStorage | None:
         create_bucket_if_missing=settings.environment != "production",
         timeout_seconds=settings.dependency_timeout_seconds,
     )
+
+
+def _last_modified(headers: dict[str, str]) -> datetime | None:
+    raw = headers.get("last-modified")
+    if raw is None:
+        return None
+    try:
+        modified = parsedate_to_datetime(raw)
+    except (TypeError, ValueError) as exc:
+        raise ObjectStorageError("object storage last-modified metadata is invalid") from exc
+    if modified.tzinfo is None:
+        modified = modified.replace(tzinfo=UTC)
+    return modified.astimezone(UTC)
+
+
+def _object_age_order(metadata: ObjectMetadata) -> tuple[float, str]:
+    modified = metadata.last_modified
+    if modified is None:
+        return (float("inf"), metadata.key)
+    if modified.tzinfo is None:
+        modified = modified.replace(tzinfo=UTC)
+    return (modified.timestamp(), metadata.key)

@@ -241,9 +241,6 @@ class AttemptExecutionCoordinator:
             context,
             AttemptSuccessAudit(
                 provider_request_id=result.provider_request_id,
-                provider_task_id=(
-                    result.provider_task_id if isinstance(result, VideoProviderResult) else None
-                ),
                 actual_model=result.actual_model,
                 finish_reason=(
                     result.finish_reason if isinstance(result, TextProviderResult) else None

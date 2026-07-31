@@ -1,8 +1,8 @@
 # 当前项目状态
 
-当前阶段：阶段1后端基座以及R1教材范围、课时划分、十二部分教案和三类九套四个教师可见文本结果已经进入`main`；受控真实文本Provider教师黄金项目、独立审查、合并和`main`复验均已完成。当前正在交付首个教师可见媒体结果：约6秒课堂导入短片黄金纵向切片。
-> 最后核验：2026-07-30。
-> 当前任务：[Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)由[Draft PR #247](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/247)承载；确定性Fake与真实NewAPI下的教师闭环均已通过。第二次授权验收只提交1次视频请求且未重试，形成经SHA-256和ffprobe验证的6.041667秒MP4，并完成GenerationResult、exact Adoption、LessonUnit槽位写回和刷新恢复。本次真实Provider额度已消耗，PR继续保持Draft；未经新的明确授权不得再次调用Provider、转Ready或合并。
+当前阶段：阶段1后端基座以及R1教材范围、课时划分、十二部分教案、三类九套和约6秒课堂导入短片五个教师可见结果已经进入`main`，真实文本与视频Provider黄金项目、独立审查、合并和`main`复验均已完成。当前正在加固真实视频结果从staging校验、幂等晋升、数据库血缘到孤儿对象回收的生命周期。
+> 最后核验：2026-07-31。
+> 当前任务：[Issue #248](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/248)已经冻结视频结果强类型所有权、staging/final命名、晋升边界、24小时staging保留、7天未绑定final隔离、dry-run GC和最多两轮独立审查规则；分支`feat/248-video-object-lifecycle`从合并后`origin/main`建立。普通开发与CI只使用确定性Fake，不调用真实Provider。
 
 ## 当前可演示成果
 
@@ -30,16 +30,16 @@
 - [Issue #235](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/235)已经由[PR #238](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/238)Squash Merge并关闭；三类九套生成、编辑、质量检查、exact批准、唯一采用、刷新恢复和最终R1真实API浏览器链已经进入`main`，独立reviewer绑定最终base/head且P0/P1/P2/P3均为0。
 - [Issue #241](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/241)的`1.5.3`受控真实文本Provider教师黄金项目已经通过：生产Worker经现有Model Gateway完成5次`NewAPI -> deepseek`流式请求，两个真实API浏览器场景`2 passed (8.2m)`，并生成Schema有效的脱敏passed receipt。
 - 本次receipt包含3个正式Artifact、4个exact GenerationJob、5个GenerationAttempt、exact Approval与唯一Intro选择事实；SHA-256为`46c5bb6f13add7dea7d7002004ee6cf554893be74b280d259f6e7af43f912e21`，不包含密钥、Prompt或模型正文。
+- [Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)已经由[PR #247](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/247)Squash Merge并关闭；合并提交`d70f4b6`的repository-governance、backend-quality、frontend-ci与r1-real-api共8个job全部通过，远端/本地任务分支和Git worktree登记已经清理。
+- #205真实NewAPI验收只上传1次临时关键帧、提交1次视频请求且零重试；生成的6.041667秒H.264 MP4完成文件校验、exact IntroSelection/关键帧血缘、唯一GenerationResult、exact Adoption、LessonUnit槽位写回和刷新恢复，脱敏证据不含密钥、Prompt、Provider task ID、storage key、临时URL、原始响应或业务ID。
 
 ## 当前工作
 
-- #165的relay/cleanup部署合同、阶段化脱敏失败证据和systemd运行来源门禁已进入`main`；本PR不重复迁移生产服务器，也不调用付费Provider。
-- [Issue #205](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/205)正在交付“exact已采用IntroSelection + 同课时正式关键帧 -> 异步生成约6秒MP4 -> 进度/失败可见 -> 播放 -> exact采用 -> LessonUnit槽位写回 -> 刷新恢复”的教师纵向闭环；[Draft PR #247](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/247)是唯一实现现场。
-- #205复用现有Session/CSRF、LessonUnit、IntroSelection、ArtifactVersion、NodeRun、GenerationJob、Worker、Model Gateway、对象存储、FileAssetVersion、GenerationResult/Adoption和生成客户端，没有新增第二套任务、候选、采用、文件或前端DTO。
-- 当前分支已通过active OpenAPI/生成客户端、PostgreSQL视频隔离与采用、Worker MP4校验、前端质量/构建、14个backend和5个real API browser delivery selectors，以及修复head的8项GitHub CI；浏览器场景继续使用确定性Fake，真实Provider证据由独立受控验收提供。
-- 公网NewAPI `v1.9.0`已经提供`POST /v1/files`、私有`file_id`、Provider签名内容读取和`first_frame_file_id`视频提交合同；#205适配器现已改为校验内部正式关键帧后上传临时文件，不再把自建relay URL作为视频输入。
-- 首次授权验收生成了有效MP4，但暴露Worker错误要求Provider声明可选时长字段；修复后以实际MP4的ffprobe结果为权威门禁，Provider明确声明5秒或7秒时仍在下载前以`VIDEO_FILE_INVALID`失败关闭且零候选。相关NewAPI Adapter与PostgreSQL Worker焦点测试、8项GitHub CI和同一独立reviewer审查均已通过。
-- 2026-07-30的第二次授权真实验收已完成：临时关键帧上传1次、视频提交1次、未重试；正式MP4为`video/mp4`、1,193,100字节，SHA-256为`1aab6267808a8ad50ca954b68bea00b0cc21668d97d9a6d8686ec19cde7b54a5`，ffprobe为6.041667秒、736x400、H.264。PostgreSQL中同organization/project/lesson、exact IntroSelection与关键帧lineage、GenerationJob、12个成功Attempt及Usage、唯一GenerationResult、exact Adoption、active槽位绑定和刷新恢复全部一致；脱敏receipt不含密钥、Prompt、Provider task ID、storage key、临时URL、原始响应或业务ID。验收发现的第三方HTTP客户端原始URL日志已被抑制，保留的Model Gateway telemetry只记录Provider request/task哈希。
+- #165的relay/cleanup部署合同、阶段化脱敏失败证据和systemd运行来源门禁已进入`main`；#248不重复迁移生产服务器，也不调用真实Provider。
+- [Issue #248](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/248)是唯一当前实现现场。它只修正#205现有视频结果的对象生命周期：Adapter写staging，Worker校验后幂等晋升到content-addressed final，PostgreSQL只绑定final，GC保守回收过期未晋升staging与隔离期后的未绑定final。
+- #248复用现有Model Gateway、ObjectStorage、GenerationJob/Attempt/Usage、Worker lease、FileAssetVersion、GenerationResult和结构化日志，不新增第二状态机、第二资产表、通用治理平台或前端DTO。
+- #248最小实现已经完成：业务视频提交、轮询和取消携带exact `VideoResultScope`并与审计上下文校验；Adapter只写staging，Worker完成文件事实与`ffprobe`后幂等晋升final，PostgreSQL只绑定final，提交成功后best-effort清理staging。数据库回滚保留未绑定final给隔离GC，并发loser通过重新stat接受winner且不删除winner final。
+- #248第1轮独立审查发现的scope fail-open、Provider私有task ID入库、GC静默保留和第二删除入口已经完成最小修复：业务审计与`VideoResultScope`双向绑定，scope-less仅允许无业务审计的本地smoke且使用哈希文件名；Attempt不保存私有task ID并按视频操作类型保守恢复；正式GC记录脱敏保留reason且只有PostgreSQL授权Coordinator可删除。下一门禁是新final head全套验证、CI与同一reviewer第2轮exact base/head复核。
 - [Issue #239](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/239)已经由[PR #240](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/240)完成主线状态收口并关闭。
 - [Issue #241](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/241)已由[PR #242](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/242)完成技术交付；生产Worker在未注入测试模型时通过现有`build_real_text_gateway()`调用真实文本Provider，普通CI继续使用确定性Fake。
 - #242只增加受控黄金项目、脱敏receipt、现有Provider流式接线和验收发现的最小质量修复，没有建设新的Provider平台、Worker队列、状态机或治理框架。
@@ -55,7 +55,7 @@
 
 ## 当前阻塞
 
-- #205当前没有已知实现、CI、独立审查或真实Provider验收阻塞；本次一次性真实请求额度已消耗，不得再次调用Provider。PR仍保持Draft，转Ready或合并等待董事长新的明确授权。
+- #248当前没有已知产品或决策阻塞；GC可运行性红测试、最小修复、真实MinIO、视频Worker PostgreSQL、全量单元/合同、静态质量、wheel与仓库治理本地门禁已完成，等待新final head CI和exact base/head独立审查。普通开发和CI未调用真实Provider。
 - 当前没有已知的Session/CSRF、PostgreSQL、Worker、active OpenAPI、生产页面、真实文本Provider验收或R1收口阻塞。
 - 真实黄金项目已经生成passed receipt；不再调用Provider。普通CI继续只允许确定性Fake，不得把真实模型内容写入仓库测试夹具。
 - [Issue #233](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/233)单独跟踪`origin/main`既有Stage1 E2E旧`impact_scope` fixture；该测试债不改变#231验收结果，也不在救援PR内顺手修复。
@@ -63,9 +63,9 @@
 
 ## 下一个阶段出口
 
-1. #205同步最终脱敏验收证据到Draft PR与Issue，并让同一独立只读reviewer对状态更新后的final base/head重新绑定；P0/P1/P2/P3保持为0。
-2. 真实视频Provider验收已经完成且本次额度为1/1；后续普通开发和CI继续只使用确定性Fake，不恢复历史失败Job或复用私有Provider task。
-3. 未经董事长新的明确授权，不将PR #247转Ready或合并；完整图片链、母版剧本、粗/细分镜、多镜头、TTS、字幕、混音、时间线和长视频合成继续由后续独立Decision/Issue定界。
+1. #248冻结审查checkpoint，由未参与实现的同一只读reviewer对exact base/head开展第1轮完整diff审查。
+2. finding先修复、重跑相关门禁，再由同一reviewer绑定最终head；最多2轮。两轮后仍未关闭的问题建立独立遗留Issue并进入最终遗留清理阶段，不隐瞒、不标记通过。
+3. 审查通过后推送最终head并等待Draft PR全部CI；未经明确授权不转Ready、不合并，也不调用真实Provider。
 
 ## 接手提示
 
