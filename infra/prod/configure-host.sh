@@ -41,7 +41,7 @@ fi
 activate_nginx() {
   "$nginx_binary" -t
   if pgrep -x nginx >/dev/null; then
-    systemctl reload nginx
+    "$nginx_binary" -s reload
   else
     systemctl start nginx
   fi
@@ -154,7 +154,7 @@ OnFailure=shanhaiedu-health-alert@%n.service
 Type=oneshot
 ExecStart=$certbot_root/bin/certbot renew --quiet --preferred-profile shortlived
 ExecStartPost=$nginx_binary -t
-ExecStartPost=/usr/bin/systemctl reload nginx
+ExecStartPost=$nginx_binary -s reload
 EOF
   cat > /etc/systemd/system/shanhaiedu-ip-cert-renew.timer <<'EOF'
 [Unit]
