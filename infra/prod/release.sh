@@ -194,7 +194,7 @@ restore_bucket="shanhai-restore-${release_sha:0:12}-$(date -u +%s)"
   mc rb --force "production/$restore_bucket"
 ' sh "${SHANHAI_OBJECT_STORAGE_BUCKET:-shanhaiedu-production}" "$minio_backup" "$restore_bucket"
 
-"${compose[@]}" up -d api worker web
+"${compose[@]}" up -d --wait --wait-timeout 120 api worker web
 SHANHAI_RELEASE_SHA="$release_sha" "$source_root/infra/prod/verify.sh" --local
 
 if command -v nginx >/dev/null 2>&1; then

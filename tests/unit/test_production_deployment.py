@@ -221,10 +221,15 @@ def test_release_waits_for_database_and_object_storage_health_before_writes() ->
 
     postgres_wait = '"${compose[@]}" up -d --wait --wait-timeout 120 postgres'
     redis_minio_wait = '"${compose[@]}" up -d --wait --wait-timeout 120 redis minio'
+    application_wait = '"${compose[@]}" up -d --wait --wait-timeout 120 api worker web'
     assert postgres_wait in release
     assert redis_minio_wait in release
+    assert application_wait in release
     assert release.index(postgres_wait) < release.index("pg_dump")
     assert release.index(redis_minio_wait) < release.index("mc mirror")
+    assert release.index(application_wait) < release.index(
+        '"$source_root/infra/prod/verify.sh" --local'
+    )
 
 
 def test_release_preflights_images_before_production_persistent_writes() -> None:
