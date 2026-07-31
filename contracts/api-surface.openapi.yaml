@@ -2522,7 +2522,7 @@ components:
         data:
           type: object
           additionalProperties: false
-          required: [status, service, environment, release_sha]
+          required: [status, service, environment]
           properties:
             status: {const: ok}
             service: {type: string, minLength: 1}

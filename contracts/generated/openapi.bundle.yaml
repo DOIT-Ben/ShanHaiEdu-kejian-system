@@ -3525,7 +3525,6 @@ components:
             - status
             - service
             - environment
-            - release_sha
           properties:
             status:
               const: ok
