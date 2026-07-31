@@ -215,6 +215,13 @@ def test_release_script_requires_exact_sha_backup_and_reversible_activation() ->
     assert "nginx -t" in rollback
 
 
+def test_release_waits_for_database_and_object_storage_health_before_writes() -> None:
+    release = (PROD / "release.sh").read_text(encoding="utf-8")
+
+    assert '"${compose[@]}" up -d --wait --wait-timeout 120 postgres' in release
+    assert '"${compose[@]}" up -d --wait --wait-timeout 120 redis minio' in release
+
+
 def test_release_validates_nginx_before_current_switch_and_restores_symlink() -> None:
     release = (PROD / "release.sh").read_text(encoding="utf-8")
 

@@ -109,7 +109,7 @@ ensure_secret session_csrf_secret 32
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 
 "${compose[@]}" build api worker web
-"${compose[@]}" up -d postgres
+"${compose[@]}" up -d --wait --wait-timeout 120 postgres
 pre_backup="$production_root/backups/pre-$release_sha-$timestamp.dump"
 "${compose[@]}" exec -T postgres pg_dump \
   -U "${SHANHAI_POSTGRES_USER:-shanhai_prod}" \
@@ -117,7 +117,7 @@ pre_backup="$production_root/backups/pre-$release_sha-$timestamp.dump"
   --format=custom > "$pre_backup"
 chmod 0600 "$pre_backup"
 
-"${compose[@]}" up -d redis minio
+"${compose[@]}" up -d --wait --wait-timeout 120 redis minio
 minio_pre_backup="/backups/minio-pre-$release_sha-$timestamp"
 "${compose[@]}" exec -T minio sh -eu -c '
   umask 077
