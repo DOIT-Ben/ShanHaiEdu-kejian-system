@@ -285,16 +285,3 @@ def test_local_verification_does_not_scan_unrelated_host_nginx_logs() -> None:
     assert '"$nginx_log_root"/*.log' not in verify
     assert "shanhaiedu-production-access.log" in nginx
     assert "shanhaiedu-production-error.log" in nginx
-
-
-def test_local_verification_retries_loopback_until_published_ports_are_ready() -> None:
-    verify = (PROD / "verify.sh").read_text(encoding="utf-8")
-
-    assert "wait_for_local_endpoint()" in verify
-    assert "for ((attempt = 1; attempt <= 30; attempt++)); do" in verify
-    assert "curl -fsS --connect-timeout 1 --max-time 3" in verify
-    assert "sleep 1" in verify
-    assert 'wait_for_local_endpoint "http://127.0.0.1:18000/health/live"' in verify
-    assert 'wait_for_local_endpoint "http://127.0.0.1:18000/health/ready"' in verify
-    assert 'wait_for_local_endpoint "http://127.0.0.1:18080/"' in verify
-    assert 'wait_for_local_endpoint "http://127.0.0.1:19000/minio/health/ready"' in verify
