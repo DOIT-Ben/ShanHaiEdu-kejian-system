@@ -332,9 +332,11 @@ def test_local_verification_does_not_scan_unrelated_host_nginx_logs() -> None:
 def test_local_verification_preserves_explicit_release_sha_over_env_file() -> None:
     verify = (PROD / "verify.sh").read_text(encoding="utf-8")
 
-    assert 'explicit_release_sha="${SHANHAI_RELEASE_SHA:-}"' in verify
-    expected = (
+    preserve_explicit = 'explicit_release_sha="${SHANHAI_RELEASE_SHA:-}"'
+    source_environment = 'source "$environment_file"'
+    resolve_release = (
         'release_sha="${explicit_release_sha:-${SHANHAI_RELEASE_SHA:?'
         'exact release SHA is required}}"'
     )
-    assert expected in verify
+    assert verify.index(preserve_explicit) < verify.index(source_environment)
+    assert verify.index(source_environment) < verify.index(resolve_release)
