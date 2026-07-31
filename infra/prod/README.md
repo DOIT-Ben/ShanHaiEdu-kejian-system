@@ -36,7 +36,7 @@
 
 1. 从已审查并合并的 exact `origin/main` 生成 Git bundle，在服务器由该 bundle 建立 detached、干净且保留 Git object 校验能力的 `releases/<sha>` checkout，并写入只含 SHA 的 `RELEASE_SHA`。`release.sh` 会拒绝仅靠目录名或手写 manifest 冒充 exact SHA 的目录。
 2. 从 `env.example` 创建 `shared/production.env`，写入公网 IP、exact SHA 和固定 Principal ID，权限设为 `0600`。
-   `SHANHAI_DEBIAN_MIRROR` 只控制 API 镜像构建期的 Debian 下载源，默认使用 Debian 官方 HTTPS 源；受控生产环境可显式覆盖为已验证的 HTTPS 镜像，参数不会写入运行容器。
+   `SHANHAI_DEBIAN_MIRROR` 只控制 API 镜像构建期的 Debian 下载源，默认使用 Debian 官方 HTTPS 源；受控生产环境可显式覆盖为公开、无凭据、无查询参数或片段、且以 `/debian` 结尾的 HTTPS 镜像。公开镜像 URL 会写入镜像的 APT sources，禁止在该参数中放入密钥或私有 URL。
 3. 执行：
 
 ```bash
