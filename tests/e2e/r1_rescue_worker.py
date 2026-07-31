@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 import signal
 import socket
@@ -33,6 +32,7 @@ from apps.api.model_gateway.contracts import (
     VideoProviderResult,
 )
 from apps.api.model_gateway.gateway import ModelGateway
+from apps.api.model_gateway.object_storage_video_store import build_video_staging_key
 from apps.api.reliability.models import OutboxEvent
 from apps.api.reliability.outbox import OutboxDispatcher
 from apps.api.settings import get_settings
@@ -104,7 +104,13 @@ class R1RescueVideoProvider:
         *,
         organization_id: UUID | None = None,
     ) -> VideoProviderResult:
-        if organization_id is None or request.duration_seconds != 6 or len(request.references) != 1:
+        if (
+            organization_id is None
+            or request.result_scope is None
+            or request.result_scope.organization_id != organization_id
+            or request.duration_seconds != 6
+            or len(request.references) != 1
+        ):
             raise RuntimeError("the R1 E2E video provider received an invalid request")
         task_id = f"r1-video:{request.request_id}"
         self._tasks.add(task_id)
@@ -113,8 +119,13 @@ class R1RescueVideoProvider:
     async def poll(self, request: VideoPollRequest) -> VideoProviderResult:
         if request.provider_task_id not in self._tasks:
             raise RuntimeError("the R1 E2E video provider received an unknown task")
-        digest = hashlib.sha256(request.provider_task_id.encode("utf-8")).hexdigest()
-        key = f"e2e/video-golden-slice/{digest}.mp4"
+        if request.result_scope is None:
+            raise RuntimeError("the R1 E2E video provider requires a result scope")
+        key = build_video_staging_key(
+            request.result_scope,
+            provider_name=self.provider_name,
+            provider_task_id=request.provider_task_id,
+        )
         metadata = self._storage.put_bytes(
             bucket=self._bucket,
             key=key,

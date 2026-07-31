@@ -332,3 +332,39 @@ async def test_worker_promotes_validated_staging_file_before_persistence(
 
     assert validated.file.storage_key.startswith("assets/video-results/")
     assert storage.stat(bucket="shanhaiedu", key=validated.file.storage_key).sha256 == staged.sha256
+
+
+async def test_real_api_deterministic_video_provider_uses_scoped_staging_key() -> None:
+    from tests.e2e.r1_rescue_worker import R1RescueVideoProvider
+
+    storage = FakeObjectStorage()
+    provider = R1RescueVideoProvider(storage, bucket="shanhaiedu", payload=b"fake-mp4")
+    request = VideoModelRequest(
+        capability=ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S,
+        request_id="r1-rescue-submit",
+        prompt="animate",
+        duration_seconds=6,
+        references=[
+            MediaReference(
+                file_version_id=UUID("018f0000-0000-7000-8000-000000000105"),
+                mime_type="image/png",
+            )
+        ],
+        result_scope=scope(),
+    )
+    submitted = await provider.submit(request, organization_id=ORG_ID)
+    polled = await provider.poll(
+        VideoPollRequest(
+            capability=ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S,
+            request_id="r1-rescue-poll",
+            provider_task_id=submitted.provider_task_id or "",
+            result_scope=scope(),
+        )
+    )
+
+    assert polled.files[0].storage_key == build_video_staging_key(
+        scope(),
+        provider_name=provider.provider_name,
+        provider_task_id=submitted.provider_task_id or "",
+    )
+    assert (submitted.provider_task_id or "") not in polled.files[0].storage_key
