@@ -95,9 +95,11 @@ class MinioObjectStorage:
         self,
         *,
         endpoint: str,
+        public_endpoint: str | None,
         access_key: str,
         secret_key: str,
         secure: bool,
+        public_secure: bool,
         create_bucket_if_missing: bool,
         timeout_seconds: float,
     ) -> None:
@@ -114,6 +116,13 @@ class MinioObjectStorage:
             secure=secure,
             http_client=http_client,
         )
+        self._presign_client = Minio(
+            public_endpoint or endpoint,
+            access_key=access_key,
+            secret_key=secret_key,
+            secure=public_secure if public_endpoint else secure,
+            http_client=http_client,
+        )
         self._create_bucket_if_missing = create_bucket_if_missing
 
     def create_presigned_put(
@@ -128,7 +137,7 @@ class MinioObjectStorage:
                 if not self._create_bucket_if_missing:
                     raise ObjectStorageError("object storage bucket is unavailable")
                 self._client.make_bucket(bucket)
-            return self._client.presigned_put_object(bucket, key, expires=expires)
+            return self._presign_client.presigned_put_object(bucket, key, expires=expires)
         except (S3Error, HTTPError) as exc:
             raise ObjectStorageError("object storage upload session failed") from exc
 
@@ -307,12 +316,38 @@ def build_object_storage(settings: Settings) -> ObjectStorage | None:
         return None
     return MinioObjectStorage(
         endpoint=settings.object_storage_endpoint,
+        public_endpoint=settings.object_storage_public_endpoint,
         access_key=settings.object_storage_access_key.get_secret_value(),
         secret_key=settings.object_storage_secret_key.get_secret_value(),
         secure=settings.object_storage_secure,
+        public_secure=settings.object_storage_public_secure,
         create_bucket_if_missing=settings.environment != "production",
         timeout_seconds=settings.dependency_timeout_seconds,
     )
+
+
+def bootstrap_object_storage_bucket(settings: Settings) -> bool:
+    """Explicitly create the configured production bucket if it is absent."""
+
+    if not (
+        settings.object_storage_endpoint
+        and settings.object_storage_access_key
+        and settings.object_storage_secret_key
+    ):
+        raise RuntimeError("object storage configuration is incomplete")
+    client = Minio(
+        settings.object_storage_endpoint,
+        access_key=settings.object_storage_access_key.get_secret_value(),
+        secret_key=settings.object_storage_secret_key.get_secret_value(),
+        secure=settings.object_storage_secure,
+    )
+    try:
+        if client.bucket_exists(settings.object_storage_bucket):
+            return False
+        client.make_bucket(settings.object_storage_bucket)
+        return True
+    except (S3Error, HTTPError) as exc:
+        raise ObjectStorageError("object storage bucket bootstrap failed") from exc
 
 
 def _last_modified(headers: dict[str, str]) -> datetime | None:

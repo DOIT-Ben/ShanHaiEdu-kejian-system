@@ -88,7 +88,7 @@ bash infra/dev/compose.sh exec workspace uv run uvicorn apps.api.main:app --host
 bash infra/dev/compose.sh down
 ```
 
-包装脚本按worktree目录派生Compose项目名和宿主端口，并把Git公共元数据只读挂载给测试，不让容器写Git仓库。它会拒绝共享rootful daemon和低于30 GiB空闲空间的启动/构建。本地`.env`、数据库、缓存和对象存储数据不得提交。普通测试和CI不连接真实模型Provider。完整拓扑、并行worktree、迁移和回退规则见[Linux开发环境与迁移](docs/governance/Linux开发环境与迁移.md)。
+包装脚本按worktree目录派生Compose项目名和宿主端口，并把Git公共元数据只读挂载给测试，不让容器写Git仓库。它会拒绝共享rootful daemon和低于30 GiB空闲空间的启动/构建。本地`.env`、数据库、缓存和对象存储数据不得提交。普通测试和CI不连接真实模型Provider。完整拓扑、并行worktree、迁移和回退规则见[Linux开发环境与迁移](docs/governance/Linux开发环境与迁移.md)。正式公网发布使用独立的[生产公网 IP 发布合同](infra/prod/README.md)，不得直接复用开发 Compose。
 
 真实文本模型只通过显式冒烟命令调用。阿里云开发环境从仓库外受控文件加载统一网关配置，不把密钥写入仓库`.env`、命令历史或参数；其他环境按[内容运行时与模型网关](docs/backend/03_内容运行时与模型网关.md)注入同名变量：
 

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import ClassVar
 
 from apps.api.uploads.storage import MinioObjectStorage
 
 
 class RecordingMinio:
-    instances: list["RecordingMinio"] = []
+    instances: ClassVar[list[RecordingMinio]] = []
 
     def __init__(self, endpoint: str, **_: object) -> None:
         self.endpoint = endpoint
@@ -47,6 +48,4 @@ def test_presigned_upload_uses_public_endpoint_without_routing_server_operations
         "minio:9000",
         "203.0.113.10",
     ]
-    assert url == (
-        "https://203.0.113.10/shanhaiedu-production/materials/lesson.pdf"
-    )
+    assert url == ("https://203.0.113.10/shanhaiedu-production/materials/lesson.pdf")

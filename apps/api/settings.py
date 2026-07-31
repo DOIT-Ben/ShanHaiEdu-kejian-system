@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Self
@@ -25,6 +26,7 @@ class Settings(BaseSettings):
 
     service_name: str = "shanhaiedu-api"
     environment: Literal["development", "test", "production"] = "development"
+    release_sha: str = "local"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     api_host: str = "127.0.0.1"
     api_port: int = Field(default=8000, ge=1, le=65535)
@@ -33,6 +35,8 @@ class Settings(BaseSettings):
     redis_url: SecretStr | None = None
     object_storage_health_url: HttpUrl | None = None
     object_storage_endpoint: str | None = None
+    object_storage_public_endpoint: str | None = None
+    object_storage_public_secure: bool = True
     object_storage_access_key: SecretStr | None = None
     object_storage_secret_key: SecretStr | None = None
     object_storage_secure: bool = True
@@ -118,6 +122,8 @@ class Settings(BaseSettings):
 
         if self.environment != "production":
             return self
+        if re.fullmatch(r"[0-9a-f]{40}", self.release_sha) is None:
+            raise ValueError("release_sha must be an exact lowercase Git SHA in production")
         missing = [
             name
             for name in (
@@ -125,6 +131,7 @@ class Settings(BaseSettings):
                 "redis_url",
                 "object_storage_health_url",
                 "object_storage_endpoint",
+                "object_storage_public_endpoint",
                 "object_storage_access_key",
                 "object_storage_secret_key",
                 *session_fields,

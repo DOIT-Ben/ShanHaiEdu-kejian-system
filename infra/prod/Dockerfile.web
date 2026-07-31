@@ -1,0 +1,27 @@
+# syntax=docker/dockerfile:1.7
+
+FROM node:22.22.0-bookworm-slim@sha256:7cc56ef285a8568121537d17b05e72128f01b89c54607b51acf084a50ef483f3 AS build
+
+ARG SHANHAI_RELEASE_SHA
+ENV COREPACK_HOME=/opt/corepack \
+    PNPM_HOME=/opt/pnpm \
+    PATH=/opt/corepack:/opt/pnpm:$PATH \
+    VITE_API_MODE=real \
+    VITE_API_BASE_URL=/api/v2
+WORKDIR /workspace
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.contracts.json ./
+COPY contracts ./contracts
+COPY apps/web ./apps/web
+RUN mkdir -p /opt/corepack /opt/pnpm \
+    && corepack enable pnpm --install-directory /opt/corepack \
+    && corepack prepare pnpm@10.30.2 --activate \
+    && pnpm install --frozen-lockfile \
+    && VITE_RELEASE_VERSION="${SHANHAI_RELEASE_SHA}" pnpm --filter @shanhaiedu/web build
+
+FROM caddy:2.8-alpine@sha256:af32e97399febea808609119bb21544d0265c58a02836576e32a2d082c262c17 AS runtime
+ARG SHANHAI_RELEASE_SHA
+LABEL org.opencontainers.image.title="ShanHaiEdu Web" \
+      org.opencontainers.image.revision="${SHANHAI_RELEASE_SHA}"
+COPY --from=build /workspace/apps/web/dist /srv
+COPY infra/prod/web.conf /etc/caddy/Caddyfile
+USER 1000:1000
