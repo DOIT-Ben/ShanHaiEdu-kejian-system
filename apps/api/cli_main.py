@@ -14,9 +14,10 @@ from apps.api.cli import (
     run_video_smoke,
 )
 from apps.api.model_gateway.contracts import ModelCapability
+from workers.video_object_cleanup import run_video_object_cleanup
 
 
-def main() -> int:
+def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="ShanHaiEdu administrative commands")
     subparsers = parser.add_subparsers(dest="command", required=True)
     smoke = subparsers.add_parser("model-smoke", help="run an explicit text model smoke")
@@ -44,7 +45,16 @@ def main() -> int:
         "provider-media-cleanup",
         help="remove expired opaque provider-media relay files",
     )
-    args = parser.parse_args()
+    video_cleanup = subparsers.add_parser(
+        "video-object-cleanup",
+        help="inspect expired video objects; pass --execute to delete authorized candidates",
+    )
+    video_cleanup.add_argument("--execute", action="store_true")
+    video_cleanup.add_argument("--limit", type=int, default=100)
+    return parser
+
+
+def _dispatch(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     if args.command == "model-smoke":
         return asyncio.run(
             run_model_smoke(
@@ -68,4 +78,11 @@ def main() -> int:
         return run_publish_golden_content()
     if args.command == "provider-media-cleanup":
         return run_provider_media_cleanup()
+    if args.command == "video-object-cleanup":
+        return run_video_object_cleanup(execute=bool(args.execute), limit=args.limit)
     return 2
+
+
+def main() -> int:
+    parser = _parser()
+    return _dispatch(parser, parser.parse_args())

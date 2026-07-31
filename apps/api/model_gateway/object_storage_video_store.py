@@ -7,7 +7,12 @@ from pathlib import Path
 
 from apps.api.model_gateway.contracts import VideoResultScope
 from apps.api.model_gateway.video_store import StoredVideoFile
-from apps.api.uploads.storage import ObjectMetadata, ObjectStorage, ObjectStorageError
+from apps.api.uploads.storage import (
+    ObjectMetadata,
+    ObjectNotFoundError,
+    ObjectStorage,
+    ObjectStorageError,
+)
 
 _STAGING_PREFIX = "staging/video-results"
 _FINAL_PREFIX = "assets/video-results"
@@ -100,7 +105,7 @@ class ObjectStorageVideoResultStore:
         final_key = build_video_final_key(scope, sha256=staged.sha256)
         try:
             existing = self._storage.stat(bucket=self._bucket, key=final_key)
-        except ObjectStorageError:
+        except ObjectNotFoundError:
             try:
                 existing = self._storage.copy(
                     source_bucket=self._bucket,
@@ -113,6 +118,8 @@ class ObjectStorageVideoResultStore:
                     existing = self._storage.stat(bucket=self._bucket, key=final_key)
                 except ObjectStorageError:
                     raise OSError("video result promotion failed") from exc
+        except ObjectStorageError as exc:
+            raise OSError("video result promotion failed") from exc
         _require_object_facts(existing, staged, final_key)
         return StoredVideoFile(
             storage_key=final_key,
@@ -157,10 +164,13 @@ def cleanup_video_objects(
         raise ValueError("video cleanup limits are outside supported bounds")
     staging_eligible = eligible_staging_keys or set()
     final_eligible = eligible_unbound_final_keys or set()
-    objects = [
-        *storage.list_objects(bucket=bucket, prefix=f"{_STAGING_PREFIX}/", limit=limit),
-        *storage.list_objects(bucket=bucket, prefix=f"{_FINAL_PREFIX}/", limit=limit),
-    ][:limit]
+    objects = sorted(
+        [
+            *storage.list_objects(bucket=bucket, prefix=f"{_STAGING_PREFIX}/", limit=limit),
+            *storage.list_objects(bucket=bucket, prefix=f"{_FINAL_PREFIX}/", limit=limit),
+        ],
+        key=_cleanup_age_order,
+    )[:limit]
     candidates: list[ObjectMetadata] = []
     for metadata in objects:
         if metadata.key in bound_final_keys:
@@ -189,8 +199,8 @@ def cleanup_video_objects(
                 ),
             ):
                 continue
-            storage.delete(bucket=bucket, key=metadata.key)
-            deleted_count += 1
+            if _delete_confirmed(storage, bucket=bucket, key=metadata.key):
+                deleted_count += 1
     return VideoCleanupResult(
         scanned_count=len(objects),
         candidate_count=len(candidates),
@@ -226,6 +236,26 @@ def _older_than(metadata: ObjectMetadata, *, now: float, ttl_seconds: int) -> bo
     if modified.tzinfo is None:
         modified = modified.replace(tzinfo=UTC)
     return modified.timestamp() <= now - ttl_seconds
+
+
+def _delete_confirmed(storage: ObjectStorage, *, bucket: str, key: str) -> bool:
+    storage.delete(bucket=bucket, key=key)
+    try:
+        storage.stat(bucket=bucket, key=key)
+    except ObjectNotFoundError:
+        return True
+    except ObjectStorageError:
+        return False
+    return False
+
+
+def _cleanup_age_order(metadata: ObjectMetadata) -> tuple[float, str]:
+    modified = metadata.last_modified
+    if modified is None:
+        return (float("inf"), metadata.key)
+    if modified.tzinfo is None:
+        modified = modified.replace(tzinfo=UTC)
+    return (modified.timestamp(), metadata.key)
 
 
 def _is_sha256(value: str) -> bool:

@@ -10,7 +10,7 @@ import pytest
 from minio import Minio
 
 from apps.api.settings import Settings
-from apps.api.uploads.storage import ObjectStorageError, build_object_storage
+from apps.api.uploads.storage import ObjectNotFoundError, ObjectStorageError, build_object_storage
 
 
 @pytest.mark.integration
@@ -53,6 +53,7 @@ def test_real_minio_presign_put_stat_copy_and_bounded_download(tmp_path: Path) -
         assert metadata.size_bytes == len(content)
         assert metadata.media_type == "application/pdf"
         assert metadata.sha256 == sha256
+        assert metadata.last_modified is not None
         copied = storage.copy(
             source_bucket=settings.object_storage_bucket,
             source_key=key,
@@ -82,7 +83,7 @@ def test_real_minio_presign_put_stat_copy_and_bounded_download(tmp_path: Path) -
             )
         assert not rejected_path.exists()
         storage.delete(bucket=settings.object_storage_bucket, key=key)
-        with pytest.raises(ObjectStorageError):
+        with pytest.raises(ObjectNotFoundError):
             storage.stat(bucket=settings.object_storage_bucket, key=key)
     finally:
         cleanup_client.remove_object(settings.object_storage_bucket, key)

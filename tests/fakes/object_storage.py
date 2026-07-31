@@ -5,7 +5,7 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from apps.api.uploads.storage import ObjectMetadata, ObjectStorageError
+from apps.api.uploads.storage import ObjectMetadata, ObjectNotFoundError, ObjectStorageError
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,7 +41,7 @@ class FakeObjectStorage:
         try:
             return self._objects[(bucket, key)]
         except KeyError as exc:
-            raise ObjectStorageError("fake object not found") from exc
+            raise ObjectNotFoundError("fake object not found") from exc
 
     def put(self, metadata: ObjectMetadata) -> None:
         self._objects[(metadata.bucket, metadata.key)] = metadata
@@ -98,11 +98,18 @@ class FakeObjectStorage:
         prefix: str,
         limit: int,
     ) -> list[ObjectMetadata]:
-        return [
+        objects = [
             metadata
-            for (object_bucket, key), metadata in sorted(self._objects.items())
+            for (object_bucket, key), metadata in self._objects.items()
             if object_bucket == bucket and key.startswith(prefix)
-        ][:limit]
+        ]
+        return sorted(
+            objects,
+            key=lambda item: (
+                item.last_modified.timestamp() if item.last_modified is not None else float("inf"),
+                item.key,
+            ),
+        )[:limit]
 
     def download_to_path(
         self,

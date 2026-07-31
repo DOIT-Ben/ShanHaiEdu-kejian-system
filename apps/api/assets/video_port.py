@@ -49,6 +49,21 @@ class GeneratedVideoFile:
     metadata: dict[str, Any]
 
 
+class VideoAssetCleanupPort:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def binding_sha256(self, *, bucket: str, key: str) -> str | None:
+        return self._session.scalar(
+            select(FileAssetVersion.sha256)
+            .where(
+                FileAssetVersion.storage_bucket == bucket,
+                FileAssetVersion.storage_key == key,
+            )
+            .limit(1)
+        )
+
+
 class VideoAssetPort:
     def __init__(self, session: Session, actor: ActorContext) -> None:
         self._session = session

@@ -1,7 +1,7 @@
 # 当前项目状态
 
 当前阶段：阶段1后端基座以及R1教材范围、课时划分、十二部分教案、三类九套和约6秒课堂导入短片五个教师可见结果已经进入`main`，真实文本与视频Provider黄金项目、独立审查、合并和`main`复验均已完成。当前正在加固真实视频结果从staging校验、幂等晋升、数据库血缘到孤儿对象回收的生命周期。
-> 最后核验：2026-07-30。
+> 最后核验：2026-07-31。
 > 当前任务：[Issue #248](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/248)已经冻结视频结果强类型所有权、staging/final命名、晋升边界、24小时staging保留、7天未绑定final隔离、dry-run GC和最多两轮独立审查规则；分支`feat/248-video-object-lifecycle`从合并后`origin/main`建立。普通开发与CI只使用确定性Fake，不调用真实Provider。
 
 ## 当前可演示成果
@@ -39,6 +39,7 @@
 - [Issue #248](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/248)是唯一当前实现现场。它只修正#205现有视频结果的对象生命周期：Adapter写staging，Worker校验后幂等晋升到content-addressed final，PostgreSQL只绑定final，GC保守回收过期未晋升staging与隔离期后的未绑定final。
 - #248复用现有Model Gateway、ObjectStorage、GenerationJob/Attempt/Usage、Worker lease、FileAssetVersion、GenerationResult和结构化日志，不新增第二状态机、第二资产表、通用治理平台或前端DTO。
 - #248最小实现已经完成：业务视频提交、轮询和取消携带exact `VideoResultScope`并与审计上下文校验；Adapter只写staging，Worker完成文件事实与`ffprobe`后幂等晋升final，PostgreSQL只绑定final，提交成功后best-effort清理staging。数据库回滚保留未绑定final给隔离GC，并发loser通过重新stat接受winner且不删除winner final。
+- #248预审补齐了GC的可运行边界：MinIO `stat`保留`Last-Modified`并区分明确not-found与存储故障；管理CLI默认dry-run，执行删除前按exact scope锁定GenerationJob并复核Job/Attempt/FileAssetVersion业务真源，删除后再次确认。成功或运行中的Job、活跃Attempt、绑定final、事实缺失或冲突均保留。
 - [Issue #239](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/239)已经由[PR #240](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/240)完成主线状态收口并关闭。
 - [Issue #241](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/241)已由[PR #242](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/242)完成技术交付；生产Worker在未注入测试模型时通过现有`build_real_text_gateway()`调用真实文本Provider，普通CI继续使用确定性Fake。
 - #242只增加受控黄金项目、脱敏receipt、现有Provider流式接线和验收发现的最小质量修复，没有建设新的Provider平台、Worker队列、状态机或治理框架。
@@ -54,7 +55,7 @@
 
 ## 当前阻塞
 
-- #248当前没有已知产品或决策阻塞；红测试、最小实现和本地风险门禁已完成，正在等待exact base/head独立审查。普通开发和CI未调用真实Provider。
+- #248当前没有已知产品或决策阻塞；GC可运行性红测试、最小修复、真实MinIO、视频Worker PostgreSQL、全量单元/合同、静态质量、wheel与仓库治理本地门禁已完成，等待新final head CI和exact base/head独立审查。普通开发和CI未调用真实Provider。
 - 当前没有已知的Session/CSRF、PostgreSQL、Worker、active OpenAPI、生产页面、真实文本Provider验收或R1收口阻塞。
 - 真实黄金项目已经生成passed receipt；不再调用Provider。普通CI继续只允许确定性Fake，不得把真实模型内容写入仓库测试夹具。
 - [Issue #233](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/233)单独跟踪`origin/main`既有Stage1 E2E旧`impact_scope` fixture；该测试债不改变#231验收结果，也不在救援PR内顺手修复。

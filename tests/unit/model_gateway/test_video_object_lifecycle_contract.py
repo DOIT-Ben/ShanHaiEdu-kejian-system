@@ -163,6 +163,41 @@ def test_promote_accepts_concurrent_winner_without_deleting_its_final(
     assert storage.stat(bucket="shanhaiedu", key=promoted.storage_key).sha256 == staged.sha256
 
 
+def test_promote_does_not_copy_when_destination_lookup_is_unavailable(tmp_path: Path) -> None:
+    from apps.api.uploads.storage import ObjectStorageError
+
+    class LookupFailureStorage(FakeObjectStorage):
+        def __init__(self) -> None:
+            super().__init__()
+            self.copy_calls = 0
+
+        def stat(self, *, bucket: str, key: str):
+            if key.startswith("assets/video-results/"):
+                raise ObjectStorageError("lookup unavailable")
+            return super().stat(bucket=bucket, key=key)
+
+        def copy(self, **kwargs):
+            self.copy_calls += 1
+            return super().copy(**kwargs)
+
+    storage = LookupFailureStorage()
+    store = ObjectStorageVideoResultStore(storage, bucket="shanhaiedu", max_bytes=1024)
+    source = tmp_path / "candidate.mp4"
+    source.write_bytes(b"validated-mp4")
+    staged = store.stage(
+        source=source,
+        media_type="video/mp4",
+        scope=scope(),
+        provider_name="newapi",
+        provider_task_id=TASK_ID,
+    )
+
+    with pytest.raises(OSError, match="video result promotion failed"):
+        store.promote(staged=staged, scope=scope())
+
+    assert storage.copy_calls == 0
+
+
 def test_gc_never_deletes_a_bound_final_object() -> None:
     from apps.api.model_gateway.object_storage_video_store import cleanup_video_objects
 
