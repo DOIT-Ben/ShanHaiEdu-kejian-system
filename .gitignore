@@ -24,6 +24,7 @@ venv/
 # Environment and secrets
 .env
 .env.*
+infra/prod/.test-secrets/
 !.env.example
 
 # Local runtime data

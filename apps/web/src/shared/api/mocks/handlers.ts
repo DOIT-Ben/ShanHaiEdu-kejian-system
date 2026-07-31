@@ -107,7 +107,12 @@ export const handlers = [
 
   http.get(`${apiConfig.baseUrl}/health/live`, () => {
     const body = {
-      data: { status: "ok", service: "shanhaiedu-api", environment: "development" },
+      data: {
+        status: "ok",
+        service: "shanhaiedu-api",
+        environment: "development",
+        release_sha: "local",
+      },
       request_id: "contract_health_live",
     } satisfies Schema<"LivenessEnvelope">;
     return HttpResponse.json(body);

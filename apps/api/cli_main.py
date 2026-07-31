@@ -13,6 +13,10 @@ from apps.api.cli import (
     run_publish_golden_content,
     run_video_smoke,
 )
+from apps.api.identity.production_commands import (
+    run_bootstrap_production_identity,
+    run_bootstrap_production_storage,
+)
 from apps.api.model_gateway.contracts import ModelCapability
 from workers.video_object_cleanup import run_video_object_cleanup
 
@@ -40,6 +44,14 @@ def _parser() -> argparse.ArgumentParser:
     subparsers.add_parser(
         "publish-golden-content",
         help="publish the validated built-in content package and activate it for new projects",
+    )
+    subparsers.add_parser(
+        "bootstrap-production-identity",
+        help="create or verify the first access-code production teacher",
+    )
+    subparsers.add_parser(
+        "bootstrap-production-storage",
+        help="create or verify the configured production object-storage bucket",
     )
     subparsers.add_parser(
         "provider-media-cleanup",
@@ -76,6 +88,10 @@ def _dispatch(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         )
     if args.command == "publish-golden-content":
         return run_publish_golden_content()
+    if args.command == "bootstrap-production-identity":
+        return run_bootstrap_production_identity()
+    if args.command == "bootstrap-production-storage":
+        return run_bootstrap_production_storage()
     if args.command == "provider-media-cleanup":
         return run_provider_media_cleanup()
     if args.command == "video-object-cleanup":

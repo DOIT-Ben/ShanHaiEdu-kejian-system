@@ -2527,6 +2527,9 @@ components:
             status: {const: ok}
             service: {type: string, minLength: 1}
             environment: {enum: [development, test, production]}
+            release_sha:
+              type: string
+              pattern: '^(local|[0-9a-f]{40})$'
         request_id: {type: string, minLength: 1}
     ReadinessEnvelope:
       type: object

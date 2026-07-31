@@ -1,0 +1,14 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${SHANHAI_PUBLIC_IP};
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/lib/letsencrypt;
+        default_type text/plain;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}

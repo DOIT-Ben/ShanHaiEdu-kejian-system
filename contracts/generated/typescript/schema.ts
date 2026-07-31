@@ -1693,6 +1693,7 @@ export interface components {
                 service: string;
                 /** @enum {unknown} */
                 environment: "development" | "test" | "production";
+                release_sha?: string;
             };
             request_id: string;
         };

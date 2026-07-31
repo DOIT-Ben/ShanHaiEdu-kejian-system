@@ -157,6 +157,7 @@ def _include_health_routes(
                 "status": "ok",
                 "service": settings.service_name,
                 "environment": settings.environment,
+                "release_sha": settings.release_sha,
             },
             "request_id": request.state.request_id,
         }
