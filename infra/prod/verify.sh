@@ -4,10 +4,11 @@ set -Eeuo pipefail
 mode="${1:---public}"
 production_root="${SHANHAI_PRODUCTION_ROOT:-/opt/shanhaiedu-production}"
 environment_file="${SHANHAI_ENV_FILE:-$production_root/shared/production.env}"
+explicit_release_sha="${SHANHAI_RELEASE_SHA:-}"
 set -a
 source "$environment_file"
 set +a
-release_sha="${SHANHAI_RELEASE_SHA:?exact release SHA is required}"
+release_sha="${explicit_release_sha:-${SHANHAI_RELEASE_SHA:?exact release SHA is required}}"
 compose_file="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/compose.yaml"
 compose=(docker compose --project-name "${SHANHAI_COMPOSE_PROJECT:-shanhaiedu-production}" --env-file "$environment_file" -f "$compose_file")
 
