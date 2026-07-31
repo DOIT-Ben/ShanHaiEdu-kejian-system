@@ -22,20 +22,20 @@
 ## 当前工作
 
 - 当前没有`status:in-progress`产品实现或开放Pull Request；新任务必须从最新`origin/main`创建独立短分支和Draft PR。
-- [Issue #244](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/244)是唯一`priority:p0`产品出口，但在正式主机、域名/TLS、访问范围和PostgreSQL/Redis/对象存储拓扑获批前不创建部署分支、不迁移生产数据。
-- [Issue #165](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/165)独立跟踪视频relay安全迁移；前三次迁移均已回滚，生产仍运行迁移前relay，第四次尝试需要新的明确生产授权且不得调用真实Provider。
+- [Issue #244](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/244)是唯一`priority:p0`产品出口，但其八项生产决定全部获批前不创建部署分支、不迁移生产数据。
+- [Issue #165](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/165)以`status:blocked`独立跟踪视频relay安全迁移；第三次迁移已回滚，生产仍运行迁移前relay，第四次尝试需要新的明确生产授权且不得调用真实Provider。
 - [Issue #233](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/233)和[Issue #237](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/237)为`status:ready`技术债，不代表下一产品里程碑，也不阻塞当前MVP事实。
 
 ## 当前阻塞
 
-- #244缺少四项生产决定：正式主机与所有权、正式域名和DNS/TLS控制权、首次发布访问范围，以及PostgreSQL/Redis/对象存储采用同机自建或托管服务。
+- #244缺少八项生产决定：主机身份、所有权、操作系统和可用资源；域名、DNS、TLS证书和反向代理；Web、API、Worker、PostgreSQL、Redis、对象存储拓扑与持久化边界；Session/CSRF/CORS/Cookie、访问码、Provider和对象存储密钥的受控注入与轮换；Alembic迁移、迁移前备份、恢复验证和不可逆迁移处置；健康检查、结构化日志、错误率、延迟、队列深度、磁盘和数据库连接监控；精确版本发布、回退触发条件、旧版本保留和回退演练；首次发布采用受控内测或公开开放及其访问控制边界。
 - #165缺少第四次受控迁移的独立授权和发布窗口；任何门禁失败必须自动回滚并停止，不自动重试。
 - 当前没有已知Session/CSRF、PostgreSQL、Worker、active OpenAPI、生产页面、真实文本/视频黄金验收或视频对象生命周期实现阻塞。
 
 ## 下一个阶段出口
 
-1. 先在`status:blocked`的[Issue #244](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/244)批准正式主机、域名/TLS、访问范围和数据服务拓扑，并把发布基线刷新到届时最新`origin/main`。
-2. 决定批准后，从最新`origin/main`创建`feat/244-production-release`和Draft PR；先写生产拓扑、备份、发布与回退测试，再实施隔离演练和公网验收。
+1. 先在`status:blocked`的[Issue #244](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/244)批准全部八项生产决定，并把发布基线刷新到届时最新`origin/main`。
+2. 全部决定批准后，从最新`origin/main`创建`feat/244-production-release`和Draft PR；先写生产拓扑、备份、发布与回退测试，再实施隔离演练和公网验收。
 3. #244完成前不把开发Compose、Mock/MSW、CLI或静态页面冒充生产发布；不自动执行#165迁移、生产GC或任何真实Provider调用。
 4. 若正式部署继续延期，应新建或更新独立Decision Issue，在PPT/PPTX、完整图片链、完整视频链和TTS中只选择一个教师纵向切片；不得直接恢复历史blocked实现。
 
@@ -43,5 +43,5 @@
 
 1. 先读`README.md`、`AGENTS.md`、`docs/governance/项目记忆与接手索引.md`和本文件，再实时fetch并核验Issue、PR、分支与工作区。
 2. R1与约6秒视频黄金切片已经完成；不得恢复#222、#230或按技术层严格串行的#223至#229旧执行方式。
-3. #244是生产部署Decision，不是普通代码任务；没有批准四项生产决定时只能做只读核验和方案准备。
+3. #244是生产部署Decision，不是普通代码任务；没有批准全部八项生产决定时只能做只读核验和方案准备。
 4. 普通CI使用确定性Fake。任何真实Provider、生产迁移、生产GC、密钥轮换或不可逆数据操作都必须遵守对应Issue的明确授权和停止条件。

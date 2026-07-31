@@ -59,12 +59,39 @@ def test_live_current_status_records_post_mvp_convergence() -> None:
 
     completed = section(text, "已完成")
     current = section(text, "当前工作")
+    blocked = section(text, "当前阻塞")
     next_exit = section(text, "下一个阶段出口")
 
     assert "Issue #248" in completed
+    assert "PR #252" in completed
     assert "Issue #248" not in current
+    assert "PR #222与#230均已关闭" in completed
+    assert "#222" not in current
+    assert "#230" not in current
+    assert "Issue #165" in current
+    assert "第三次" in current
+    assert "第四次" in current
+    assert "status:blocked" in current
+    assert "不自动重试" in blocked
+    assert "Issue #233" in current
+    assert "Issue #237" in current
+    assert "status:ready" in current
+    assert "Issue #233" not in next_exit
+    assert "Issue #237" not in next_exit
     assert "Issue #244" in next_exit
     assert "status:blocked" in next_exit
+
+    for required_decision in (
+        "主机身份、所有权、操作系统和可用资源",
+        "域名、DNS、TLS证书和反向代理",
+        "Web、API、Worker、PostgreSQL、Redis、对象存储",
+        "Session/CSRF/CORS/Cookie、访问码、Provider和对象存储密钥",
+        "Alembic迁移、迁移前备份、恢复验证",
+        "健康检查、结构化日志、错误率、延迟、队列深度、磁盘和数据库连接监控",
+        "精确版本发布、回退触发条件、旧版本保留和回退演练",
+        "受控内测或公开开放",
+    ):
+        assert required_decision in blocked
 
 
 def test_current_status_accepts_controlled_stage_overlap(tmp_path: Path) -> None:
