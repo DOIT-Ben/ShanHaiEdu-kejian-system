@@ -105,6 +105,13 @@ case "$*" in
   *"logs --since 10m"*) printf '%s' "${FAKE_DOCKER_LOGS:-}" ;;
   *"redis redis-cli ping"*) printf '%s\n' PONG ;;
   *"postgres pg_isready"*) printf '%s\n' accepting ;;
+  *"exec -T worker /usr/local/bin/shanhai-entrypoint python -m workers.main --check"*)
+    exit 0
+    ;;
+  *"exec -T worker"*)
+    printf '%s\n' 'worker verification bypassed the production entrypoint' >&2
+    exit 42
+    ;;
 esac
 """,
     )
@@ -194,6 +201,12 @@ def test_environment_file_release_sha_is_fallback_without_explicit_value(
 
     assert result.returncode == 0, result.stderr
     assert f"production verification passed: {STALE_RELEASE_SHA}" in result.stdout
+
+
+def test_worker_check_uses_production_entrypoint(tmp_path: Path) -> None:
+    result, _, _, _ = _run_verification(tmp_path, "available")
+
+    assert result.returncode == 0, result.stderr
 
 
 def test_fails_after_bounded_loopback_retries(tmp_path: Path) -> None:
