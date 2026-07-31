@@ -84,6 +84,9 @@ def test_host_configuration_supports_the_approved_shared_ecs_layout() -> None:
     assert "ExecStartPost=$nginx_binary -t" in configure
     assert "pgrep -x nginx" in configure
     assert "systemctl start nginx" in configure
+    assert '"$nginx_binary" -s reload' in configure
+    assert "ExecStartPost=$nginx_binary -s reload" in configure
+    assert "systemctl reload nginx" not in configure
     assert "ssl_certificate ${SHANHAI_TLS_CERTIFICATE};" in nginx
     assert "ssl_certificate_key ${SHANHAI_TLS_PRIVATE_KEY};" in nginx
     assert 'configured TLS material is unavailable" >&2\n  false' in configure
