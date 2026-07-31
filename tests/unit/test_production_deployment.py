@@ -107,6 +107,9 @@ def test_production_monitor_covers_resource_and_request_health() -> None:
     assert "dramatiq:*" in monitor
     assert 'redis-cli type "$key"' in monitor
     assert 'zcard "$key"' in monitor
+    assert "dramatiq:__*) continue" in monitor
+    assert "*.msgs) continue" in monitor
+    assert "*.XQ) continue" in monitor
     assert "time_total" in monitor
     assert '"http_status":5' in monitor
     assert "SHANHAI_DB_CONNECTION_MAX" in monitor

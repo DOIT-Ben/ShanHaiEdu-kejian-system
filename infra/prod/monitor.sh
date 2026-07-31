@@ -42,10 +42,20 @@ queue_depth="$("${compose[@]}" exec -T redis sh -c '
   keys="$(redis-cli --scan --pattern "dramatiq:*")"
   total=0
   for key in $keys; do
+    case "$key" in
+      dramatiq:__*) continue ;;
+      *.msgs) continue ;;
+      *.XQ) continue ;;
+    esac
     key_type="$(redis-cli type "$key")"
     case "$key_type" in
       list) value="$(redis-cli llen "$key")" ;;
-      zset) value="$(redis-cli zcard "$key")" ;;
+      zset)
+        case "$key" in
+          *.DQ) value="$(redis-cli zcard "$key")" ;;
+          *) echo "unsupported Dramatiq queue key type" >&2; exit 1 ;;
+        esac
+        ;;
       none) continue ;;
       *) echo "unsupported Dramatiq Redis key type" >&2; exit 1 ;;
     esac
