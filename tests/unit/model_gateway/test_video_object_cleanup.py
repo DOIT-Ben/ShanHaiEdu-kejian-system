@@ -5,27 +5,12 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from email.utils import format_datetime
 from typing import ClassVar, cast
-from uuid import UUID
 
 import pytest
 from minio import Minio
 
-from apps.api.model_gateway.contracts import VideoResultScope
-from apps.api.model_gateway.object_storage_video_store import (
-    build_video_staging_key,
-    cleanup_video_objects,
-)
 from apps.api.uploads.storage import MinioObjectStorage
 from tests.fakes.object_storage import FakeObjectStorage
-
-
-def _scope() -> VideoResultScope:
-    return VideoResultScope(
-        organization_id=UUID("018f0000-0000-7000-8000-000000000201"),
-        project_id=UUID("018f0000-0000-7000-8000-000000000202"),
-        lesson_unit_id=UUID("018f0000-0000-7000-8000-000000000203"),
-        generation_job_id=UUID("018f0000-0000-7000-8000-000000000204"),
-    )
 
 
 def test_minio_stat_preserves_last_modified_for_gc_recheck() -> None:
@@ -68,38 +53,6 @@ def test_minio_stat_preserves_last_modified_for_gc_recheck() -> None:
     assert metadata.last_modified == modified
 
 
-def test_gc_counts_delete_only_after_object_absence_is_confirmed() -> None:
-    class RefusingDeleteStorage(FakeObjectStorage):
-        def delete(self, *, bucket: str, key: str) -> None:
-            assert self.stat(bucket=bucket, key=key).key == key
-
-    storage = RefusingDeleteStorage()
-    key = build_video_staging_key(
-        _scope(),
-        provider_name="deterministic-fake",
-        provider_task_id="private-task",
-    )
-    storage.put_bytes(
-        bucket="shanhaiedu",
-        key=key,
-        payload=b"expired-staging",
-        media_type="video/mp4",
-    )
-
-    result = cleanup_video_objects(
-        storage,
-        bucket="shanhaiedu",
-        now=4_000_000_000.0,
-        dry_run=False,
-        bound_final_keys=set(),
-        eligible_staging_keys={key},
-    )
-
-    assert result.candidate_count == 1
-    assert result.deleted_count == 0
-    assert storage.object_count == 1
-
-
 @pytest.mark.parametrize(
     ("arguments", "expected"),
     [
@@ -127,7 +80,7 @@ def test_video_object_cleanup_cli_is_dry_run_by_default(
     assert calls == [expected]
 
 
-def test_gc_bounded_listing_does_not_starve_old_objects_behind_young_keys() -> None:
+def test_object_storage_bounded_listing_returns_oldest_objects() -> None:
     storage = FakeObjectStorage()
     now = datetime(2026, 7, 31, 6, 0, tzinfo=UTC)
     for index in range(100):
@@ -156,14 +109,11 @@ def test_gc_bounded_listing_does_not_starve_old_objects_behind_young_keys() -> N
         metadata=replace(old_metadata, last_modified=now - timedelta(days=2)),
     )
 
-    result = cleanup_video_objects(
-        storage,
+    objects = storage.list_objects(
         bucket="shanhaiedu",
-        now=now.timestamp(),
-        bound_final_keys=set(),
-        eligible_staging_keys={old_key},
+        prefix="staging/video-results/",
         limit=100,
     )
 
-    assert result.scanned_count == 100
-    assert result.candidate_count == 1
+    assert len(objects) == 100
+    assert objects[0].key == old_key

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
-from datetime import UTC
 from pathlib import Path
 
 from apps.api.model_gateway.contracts import VideoResultScope
@@ -16,13 +14,6 @@ from apps.api.uploads.storage import (
 
 _STAGING_PREFIX = "staging/video-results"
 _FINAL_PREFIX = "assets/video-results"
-
-
-@dataclass(frozen=True, slots=True)
-class VideoCleanupResult:
-    scanned_count: int
-    candidate_count: int
-    deleted_count: int
 
 
 class ObjectStorageVideoResultStore:
@@ -147,67 +138,6 @@ def build_video_final_key(scope: VideoResultScope, *, sha256: str) -> str:
     return f"{_scope_prefix(_FINAL_PREFIX, scope)}/{sha256}.mp4"
 
 
-def cleanup_video_objects(
-    storage: ObjectStorage,
-    *,
-    bucket: str,
-    now: float,
-    bound_final_keys: set[str],
-    dry_run: bool = True,
-    eligible_staging_keys: set[str] | None = None,
-    eligible_unbound_final_keys: set[str] | None = None,
-    staging_ttl_seconds: int = 86_400,
-    unbound_final_ttl_seconds: int = 604_800,
-    limit: int = 100,
-) -> VideoCleanupResult:
-    if not 1 <= limit <= 100 or staging_ttl_seconds <= 0 or unbound_final_ttl_seconds <= 0:
-        raise ValueError("video cleanup limits are outside supported bounds")
-    staging_eligible = eligible_staging_keys or set()
-    final_eligible = eligible_unbound_final_keys or set()
-    objects = sorted(
-        [
-            *storage.list_objects(bucket=bucket, prefix=f"{_STAGING_PREFIX}/", limit=limit),
-            *storage.list_objects(bucket=bucket, prefix=f"{_FINAL_PREFIX}/", limit=limit),
-        ],
-        key=_cleanup_age_order,
-    )[:limit]
-    candidates: list[ObjectMetadata] = []
-    for metadata in objects:
-        if metadata.key in bound_final_keys:
-            continue
-        if metadata.key.startswith(f"{_STAGING_PREFIX}/"):
-            eligible = metadata.key in staging_eligible
-            ttl = staging_ttl_seconds
-        elif metadata.key.startswith(f"{_FINAL_PREFIX}/"):
-            eligible = metadata.key in final_eligible
-            ttl = unbound_final_ttl_seconds
-        else:
-            continue
-        if eligible and _older_than(metadata, now=now, ttl_seconds=ttl):
-            candidates.append(metadata)
-    deleted_count = 0
-    if not dry_run:
-        for metadata in candidates:
-            current = storage.stat(bucket=bucket, key=metadata.key)
-            if current.key != metadata.key or not _older_than(
-                current,
-                now=now,
-                ttl_seconds=(
-                    staging_ttl_seconds
-                    if metadata.key.startswith(f"{_STAGING_PREFIX}/")
-                    else unbound_final_ttl_seconds
-                ),
-            ):
-                continue
-            if _delete_confirmed(storage, bucket=bucket, key=metadata.key):
-                deleted_count += 1
-    return VideoCleanupResult(
-        scanned_count=len(objects),
-        candidate_count=len(candidates),
-        deleted_count=deleted_count,
-    )
-
-
 def _scope_prefix(prefix: str, scope: VideoResultScope) -> str:
     return (
         f"{prefix}/{scope.organization_id}/{scope.project_id}/"
@@ -227,35 +157,6 @@ def _require_object_facts(
         or metadata.sha256 != staged.sha256
     ):
         raise OSError("promotion destination facts do not match")
-
-
-def _older_than(metadata: ObjectMetadata, *, now: float, ttl_seconds: int) -> bool:
-    modified = metadata.last_modified
-    if modified is None:
-        return False
-    if modified.tzinfo is None:
-        modified = modified.replace(tzinfo=UTC)
-    return modified.timestamp() <= now - ttl_seconds
-
-
-def _delete_confirmed(storage: ObjectStorage, *, bucket: str, key: str) -> bool:
-    storage.delete(bucket=bucket, key=key)
-    try:
-        storage.stat(bucket=bucket, key=key)
-    except ObjectNotFoundError:
-        return True
-    except ObjectStorageError:
-        return False
-    return False
-
-
-def _cleanup_age_order(metadata: ObjectMetadata) -> tuple[float, str]:
-    modified = metadata.last_modified
-    if modified is None:
-        return (float("inf"), metadata.key)
-    if modified.tzinfo is None:
-        modified = modified.replace(tzinfo=UTC)
-    return (modified.timestamp(), metadata.key)
 
 
 def _is_sha256(value: str) -> bool:

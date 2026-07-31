@@ -195,9 +195,12 @@ class AttemptRecoveryCoordinator:
 def _recovery_disposition(attempt: GenerationAttempt) -> tuple[str, str, bool]:
     if attempt.cancel_requested_at is not None:
         return "cancelled", "MODEL_CANCELLED", False
-    if attempt.operation_kind in {"video_submit", "legacy_unknown"}:
-        return "submission_unknown", "MODEL_SUBMISSION_UNKNOWN", False
-    if attempt.provider_task_id is not None:
+    if attempt.operation_kind in {
+        "video_submit",
+        "video_poll",
+        "video_cancel",
+        "legacy_unknown",
+    }:
         return "submission_unknown", "MODEL_SUBMISSION_UNKNOWN", False
     return "failed", "MODEL_ATTEMPT_LEASE_EXPIRED", True
 

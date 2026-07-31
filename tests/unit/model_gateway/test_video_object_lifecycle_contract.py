@@ -198,77 +198,6 @@ def test_promote_does_not_copy_when_destination_lookup_is_unavailable(tmp_path: 
     assert storage.copy_calls == 0
 
 
-def test_gc_never_deletes_a_bound_final_object() -> None:
-    from apps.api.model_gateway.object_storage_video_store import cleanup_video_objects
-
-    storage = FakeObjectStorage()
-    storage.put_bytes(
-        bucket="shanhaiedu",
-        key=build_video_final_key(scope(), sha256="b" * 64),
-        payload=b"bound-final",
-        media_type="video/mp4",
-    )
-
-    result = cleanup_video_objects(
-        storage,
-        bucket="shanhaiedu",
-        now=2_000_000,
-        dry_run=False,
-        bound_final_keys={build_video_final_key(scope(), sha256="b" * 64)},
-    )
-
-    assert result.deleted_count == 0
-    assert storage.object_count == 1
-
-
-def test_gc_defaults_to_dry_run_and_respects_both_retention_windows() -> None:
-    from apps.api.model_gateway.object_storage_video_store import cleanup_video_objects
-
-    storage = FakeObjectStorage()
-    staging_key = build_video_staging_key(scope(), provider_name="newapi", provider_task_id=TASK_ID)
-    final_key = build_video_final_key(scope(), sha256="c" * 64)
-    storage.put_bytes(
-        bucket="shanhaiedu",
-        key=staging_key,
-        payload=b"expired-staging",
-        media_type="video/mp4",
-    )
-    storage.put_bytes(
-        bucket="shanhaiedu",
-        key=final_key,
-        payload=b"expired-unbound-final",
-        media_type="video/mp4",
-    )
-    future = 4_000_000_000.0
-
-    preview = cleanup_video_objects(
-        storage,
-        bucket="shanhaiedu",
-        now=future,
-        dry_run=True,
-        bound_final_keys=set(),
-        eligible_staging_keys={staging_key},
-        eligible_unbound_final_keys={final_key},
-    )
-
-    assert preview.candidate_count == 2
-    assert preview.deleted_count == 0
-    assert storage.object_count == 2
-
-    deleted = cleanup_video_objects(
-        storage,
-        bucket="shanhaiedu",
-        now=future,
-        dry_run=False,
-        bound_final_keys=set(),
-        eligible_staging_keys={staging_key},
-        eligible_unbound_final_keys={final_key},
-    )
-
-    assert deleted.deleted_count == 2
-    assert storage.object_count == 0
-
-
 async def test_gateway_rejects_result_scope_that_does_not_match_audit_context() -> None:
     class Provider:
         provider_name = "deterministic-fake"
@@ -312,6 +241,118 @@ async def test_gateway_rejects_result_scope_that_does_not_match_audit_context() 
         await gateway.submit_video(request, audit_context=audit)
 
     assert captured.value.code == GatewayErrorCode.INVALID_RESPONSE
+
+
+@pytest.mark.parametrize("operation", ["submit", "poll", "cancel"])
+async def test_gateway_rejects_business_video_audit_without_result_scope(
+    operation: str,
+) -> None:
+    calls: list[str] = []
+
+    class Provider:
+        provider_name = "deterministic-fake"
+        model_name = "fake-video"
+
+        async def submit(self, request: VideoModelRequest):
+            calls.append("submit")
+            return VideoProviderResult(
+                status=VideoOperationStatus.SUBMITTED,
+                provider_task_id="private-task",
+                actual_model=self.model_name,
+                usage=ModelUsage(),
+            )
+
+        async def poll(self, request: VideoPollRequest):
+            calls.append("poll")
+            return VideoProviderResult(
+                status=VideoOperationStatus.POLLING,
+                provider_task_id=request.provider_task_id,
+                actual_model=self.model_name,
+                usage=ModelUsage(),
+            )
+
+        async def cancel(self, request: VideoPollRequest):
+            calls.append("cancel")
+            return VideoProviderResult(
+                status=VideoOperationStatus.CANCELLED,
+                provider_task_id=request.provider_task_id,
+                actual_model=self.model_name,
+                usage=ModelUsage(),
+            )
+
+    gateway = ModelGateway(
+        {},
+        video_routes={ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S: Provider()},
+    )
+    audit = ModelAuditContext(
+        organization_id=ORG_ID,
+        user_id=None,
+        project_id=PROJECT_ID,
+        node_run_id=UUID("018f0000-0000-7000-8000-000000000198"),
+        generation_job_id=JOB_ID,
+        lesson_unit_id=LESSON_ID,
+    )
+    request = (
+        VideoModelRequest(
+            capability=ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S,
+            request_id="video-business-submit-without-scope",
+            prompt="animate",
+            duration_seconds=6,
+        )
+        if operation == "submit"
+        else VideoPollRequest(
+            capability=ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S,
+            request_id=f"video-business-{operation}-without-scope",
+            provider_task_id="private-task",
+        )
+    )
+
+    with pytest.raises(ModelGatewayError) as captured:
+        if operation == "submit":
+            await gateway.submit_video(request, audit_context=audit)  # type: ignore[arg-type]
+        elif operation == "poll":
+            await gateway.poll_video(request, audit_context=audit)  # type: ignore[arg-type]
+        else:
+            await gateway.cancel_video(request, audit_context=audit)  # type: ignore[arg-type]
+
+    assert captured.value.code == GatewayErrorCode.INVALID_RESPONSE
+    assert calls == []
+
+
+async def test_gateway_allows_scope_less_local_smoke_without_audit() -> None:
+    class Provider:
+        provider_name = "deterministic-fake"
+        model_name = "fake-video"
+
+        async def submit(self, request: VideoModelRequest):
+            return VideoProviderResult(
+                status=VideoOperationStatus.SUBMITTED,
+                provider_task_id="private-task",
+                actual_model=self.model_name,
+                usage=ModelUsage(),
+            )
+
+        async def poll(self, request: VideoPollRequest):
+            raise AssertionError("poll must not run")
+
+        async def cancel(self, request: VideoPollRequest):
+            raise AssertionError("cancel must not run")
+
+    gateway = ModelGateway(
+        {},
+        video_routes={ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S: Provider()},
+    )
+
+    result = await gateway.submit_video(
+        VideoModelRequest(
+            capability=ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S,
+            request_id="video-local-smoke-without-scope",
+            prompt="animate",
+            duration_seconds=6,
+        )
+    )
+
+    assert result.provider_task_id == "private-task"
 
 
 async def test_worker_promotes_validated_staging_file_before_persistence(

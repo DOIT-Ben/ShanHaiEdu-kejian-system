@@ -20,7 +20,6 @@ from apps.api.database import (
 )
 from apps.api.jobs.video_port import VideoCleanupJobFact, VideoJobCleanupPort
 from apps.api.model_gateway.contracts import VideoResultScope
-from apps.api.model_gateway.object_storage_video_store import VideoCleanupResult
 from apps.api.model_gateway.video_cleanup_port import VideoCleanupAttemptPort
 from apps.api.model_registry import register_models
 from apps.api.settings import get_settings
@@ -47,6 +46,20 @@ class _VideoObjectIdentity:
     kind: Literal["staging", "final"]
     scope: VideoResultScope
     sha256: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class VideoCleanupResult:
+    scanned_count: int
+    candidate_count: int
+    deleted_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class _CleanupDecision:
+    eligible: bool
+    reason: str | None = None
+    job_status: str | None = None
 
 
 class VideoObjectCleanupCoordinator:
@@ -128,7 +141,7 @@ class VideoObjectCleanupCoordinator:
         session: Session | None = None,
     ) -> bool:
         if session is not None:
-            return _database_eligible(
+            decision = _database_decision(
                 session,
                 identity,
                 bucket=self._bucket,
@@ -136,15 +149,19 @@ class VideoObjectCleanupCoordinator:
                 now=now,
                 for_update=for_update,
             )
-        with self._session_factory() as read_session:
-            return _database_eligible(
-                read_session,
-                identity,
-                bucket=self._bucket,
-                key=key,
-                now=now,
-                for_update=for_update,
-            )
+        else:
+            with self._session_factory() as read_session:
+                decision = _database_decision(
+                    read_session,
+                    identity,
+                    bucket=self._bucket,
+                    key=key,
+                    now=now,
+                    for_update=for_update,
+                )
+        if not decision.eligible:
+            _log_retained(identity, key, decision)
+        return decision.eligible
 
     def _delete_if_still_eligible(
         self,
@@ -227,7 +244,7 @@ def run_video_object_cleanup(*, execute: bool = False, limit: int = 100) -> int:
     return 0
 
 
-def _database_eligible(
+def _database_decision(
     session: Session,
     identity: _VideoObjectIdentity,
     *,
@@ -235,28 +252,34 @@ def _database_eligible(
     key: str,
     now: datetime,
     for_update: bool,
-) -> bool:
+) -> _CleanupDecision:
     job = VideoJobCleanupPort(session).fact(
         identity.scope.generation_job_id,
         for_update=for_update,
     )
-    if job is None or not _scope_matches(job, identity.scope):
-        return False
+    if job is None:
+        return _CleanupDecision(False, "job_missing")
+    if not _scope_matches(job, identity.scope):
+        return _CleanupDecision(False, "scope_mismatch", job.status)
     if VideoCleanupAttemptPort(session).active_exists(
         identity.scope.generation_job_id,
         identity.scope.organization_id,
         now=now,
     ):
-        return False
+        return _CleanupDecision(False, "active_attempt", job.status)
     if identity.kind == "staging":
-        return job.status in _TERMINAL_STAGING_STATUSES or (
+        if job.status in _TERMINAL_STAGING_STATUSES or (
             job.lease_expires_at is not None and _aware(job.lease_expires_at) <= now
-        )
-    if job.status not in _DELETABLE_FINAL_STATUSES or identity.sha256 is None:
-        return False
+        ):
+            return _CleanupDecision(True, job_status=job.status)
+        return _CleanupDecision(False, "job_not_terminal_or_lease_active", job.status)
+    if job.status not in _DELETABLE_FINAL_STATUSES:
+        return _CleanupDecision(False, "job_status_retained", job.status)
+    if identity.sha256 is None:
+        return _CleanupDecision(False, "invalid_final_identity", job.status)
     bound_sha256 = VideoAssetCleanupPort(session).binding_sha256(bucket=bucket, key=key)
     if bound_sha256 is None:
-        return True
+        return _CleanupDecision(True, job_status=job.status)
     if bound_sha256 != identity.sha256:
         logger.warning(
             "video_object_cleanup_binding_conflict",
@@ -265,7 +288,24 @@ def _database_eligible(
                 "key_hash": _key_hash(key),
             },
         )
-    return False
+        return _CleanupDecision(False, "binding_conflict", job.status)
+    return _CleanupDecision(False, "file_asset_bound", job.status)
+
+
+def _log_retained(
+    identity: _VideoObjectIdentity,
+    key: str,
+    decision: _CleanupDecision,
+) -> None:
+    logger.warning(
+        "video_object_cleanup_retained",
+        extra={
+            "reason": decision.reason,
+            "job_status": decision.job_status,
+            "scope_hash": _scope_hash(identity.scope),
+            "key_hash": _key_hash(key),
+        },
+    )
 
 
 def _scope_matches(job: VideoCleanupJobFact, scope: VideoResultScope) -> bool:

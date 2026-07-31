@@ -39,7 +39,7 @@
 - [Issue #248](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/248)是唯一当前实现现场。它只修正#205现有视频结果的对象生命周期：Adapter写staging，Worker校验后幂等晋升到content-addressed final，PostgreSQL只绑定final，GC保守回收过期未晋升staging与隔离期后的未绑定final。
 - #248复用现有Model Gateway、ObjectStorage、GenerationJob/Attempt/Usage、Worker lease、FileAssetVersion、GenerationResult和结构化日志，不新增第二状态机、第二资产表、通用治理平台或前端DTO。
 - #248最小实现已经完成：业务视频提交、轮询和取消携带exact `VideoResultScope`并与审计上下文校验；Adapter只写staging，Worker完成文件事实与`ffprobe`后幂等晋升final，PostgreSQL只绑定final，提交成功后best-effort清理staging。数据库回滚保留未绑定final给隔离GC，并发loser通过重新stat接受winner且不删除winner final。
-- #248预审补齐了GC的可运行边界：MinIO `stat`保留`Last-Modified`并区分明确not-found与存储故障；管理CLI默认dry-run，执行删除前按exact scope锁定GenerationJob并复核Job/Attempt/FileAssetVersion业务真源，删除后再次确认。成功或运行中的Job、活跃Attempt、绑定final、事实缺失或冲突均保留。
+- #248第1轮独立审查发现的scope fail-open、Provider私有task ID入库、GC静默保留和第二删除入口已经完成最小修复：业务审计与`VideoResultScope`双向绑定，scope-less仅允许无业务审计的本地smoke且使用哈希文件名；Attempt不保存私有task ID并按视频操作类型保守恢复；正式GC记录脱敏保留reason且只有PostgreSQL授权Coordinator可删除。下一门禁是新final head全套验证、CI与同一reviewer第2轮exact base/head复核。
 - [Issue #239](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/239)已经由[PR #240](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/240)完成主线状态收口并关闭。
 - [Issue #241](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/241)已由[PR #242](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/pull/242)完成技术交付；生产Worker在未注入测试模型时通过现有`build_real_text_gateway()`调用真实文本Provider，普通CI继续使用确定性Fake。
 - #242只增加受控黄金项目、脱敏receipt、现有Provider流式接线和验收发现的最小质量修复，没有建设新的Provider平台、Worker队列、状态机或治理框架。

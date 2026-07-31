@@ -119,7 +119,6 @@ class ModelGateway:
             audit_context=audit_context,
             success_audit=AttemptSuccessAudit(
                 provider_request_id=result.provider_request_id,
-                provider_task_id=None,
                 actual_model=result.actual_model,
                 finish_reason=result.finish_reason,
                 usage=result.usage,
@@ -313,6 +312,8 @@ def _require_video_scope_matches_audit(
     audit_context: ModelAuditContext | None,
 ) -> None:
     if scope is None:
+        if audit_context is not None:
+            raise ModelGatewayError(GatewayErrorCode.INVALID_RESPONSE, retryable=False)
         return
     if audit_context is None or (
         scope.organization_id != audit_context.organization_id

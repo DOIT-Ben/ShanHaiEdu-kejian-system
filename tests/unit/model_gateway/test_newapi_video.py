@@ -24,8 +24,10 @@ from apps.api.model_gateway.newapi_video import (
     NewApiVideoConfig,
     NewApiVideoProvider,
 )
+from apps.api.model_gateway.object_storage_video_store import ObjectStorageVideoResultStore
 from apps.api.model_gateway.provider_media import ProviderMediaResolutionError
-from apps.api.model_gateway.video_store import StoredVideoFile
+from apps.api.model_gateway.video_store import StoredVideoFile, VideoResultStore
+from tests.fakes.object_storage import FakeObjectStorage
 
 TASK_ID = "018f0000-0000-7000-8000-000000000001"
 
@@ -50,6 +52,8 @@ class RecordingVideoStore:
             mime_type=media_type,
         )
 
+
+class RecordingScopedVideoStore(RecordingVideoStore):
     def stage(
         self,
         *,
@@ -88,7 +92,7 @@ def video_request(
 
 def provider(
     handler,
-    store: RecordingVideoStore,
+    store: VideoResultStore,
     *,
     max_download_bytes: int = 10_000_000,
     media_reference_reader=None,
@@ -180,16 +184,51 @@ async def test_completed_poll_downloads_mp4_and_persists_a_hashed_file() -> None
     assert result.status == VideoOperationStatus.SUCCEEDED
     assert result.provider_task_id == TASK_ID
     assert result.provider_request_id == "gateway-content-1"
-    assert result.files[0].storage_key == f"model-smoke/video/{TASK_ID}.mp4"
+    task_hash = hashlib.sha256(f"newapi\0{TASK_ID}".encode()).hexdigest()[:32]
+    assert result.files[0].storage_key == f"model-smoke/video/{task_hash}.mp4"
     assert result.files[0].sha256 == expected_sha
     assert result.files[0].size_bytes == len(video_bytes)
     assert result.files[0].mime_type == "video/mp4"
     assert result.files[0].duration_seconds is None
-    assert store.uploads == [(f"model-smoke/video/{TASK_ID}.mp4", video_bytes, "video/mp4")]
+    assert store.uploads == [(f"model-smoke/video/{task_hash}.mp4", video_bytes, "video/mp4")]
+
+
+async def test_scope_less_download_rejects_business_object_storage() -> None:
+    storage = FakeObjectStorage()
+    store = ObjectStorageVideoResultStore(storage, bucket="shanhaiedu", max_bytes=1024)
+
+    def handler(http_request: httpx.Request) -> httpx.Response:
+        if http_request.url == f"https://gateway.test/v1/videos/{TASK_ID}":
+            return httpx.Response(
+                200,
+                json={
+                    "id": TASK_ID,
+                    "model": "video-grok",
+                    "status": "completed",
+                    "hasOutput": True,
+                },
+            )
+        return httpx.Response(
+            200,
+            headers={"Content-Type": "video/mp4"},
+            content=b"scope-less-business-video",
+        )
+
+    with pytest.raises(ModelGatewayError) as captured:
+        await provider(handler, store).poll(
+            VideoPollRequest(
+                capability=ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S,
+                request_id="req-video-poll-scope-less-business-store",
+                provider_task_id=TASK_ID,
+            )
+        )
+
+    assert captured.value.code == GatewayErrorCode.ROUTE_UNAVAILABLE
+    assert storage.object_count == 0
 
 
 async def test_completed_poll_with_scope_only_stages_under_owned_namespace() -> None:
-    store = RecordingVideoStore()
+    store = RecordingScopedVideoStore()
     video_bytes = b"scoped-video-bytes"
     result_scope = VideoResultScope(
         organization_id=UUID("018f0000-0000-7000-8000-000000000011"),

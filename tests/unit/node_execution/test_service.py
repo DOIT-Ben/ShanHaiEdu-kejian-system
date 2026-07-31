@@ -261,7 +261,6 @@ class FakeModel:
             audit_context=context,
             success_audit=AttemptSuccessAudit(
                 provider_request_id=self.result.provider_request_id,
-                provider_task_id=None,
                 actual_model=self.result.actual_model,
                 finish_reason=self.result.finish_reason,
                 usage=self.result.usage,

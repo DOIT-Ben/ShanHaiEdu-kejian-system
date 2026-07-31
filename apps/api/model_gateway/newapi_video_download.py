@@ -121,9 +121,12 @@ async def _persist_result(
     task_id: str,
 ) -> StoredVideoFile:
     if result_scope is None:
+        if isinstance(store, ScopedVideoResultStore):
+            raise ModelGatewayError(GatewayErrorCode.ROUTE_UNAVAILABLE, retryable=False)
+        task_hash = hashlib.sha256(f"{provider_name}\0{task_id}".encode()).hexdigest()[:32]
         return await _persist_smoke(
             store,
-            key=f"model-smoke/video/{task_id}.mp4",
+            key=f"model-smoke/video/{task_hash}.mp4",
             source=source,
             media_type=media_type,
         )

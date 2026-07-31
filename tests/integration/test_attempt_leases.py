@@ -116,6 +116,7 @@ def _add_running_attempt(
     generation_job_id: UUID | None = None,
     submitted_ago: timedelta = timedelta(minutes=1),
     lease_expired: bool = False,
+    operation_kind: str = "text_generate",
 ) -> GenerationAttempt:
     now = utc_now()
     heartbeat_at = now - timedelta(seconds=2) if lease_expired else now
@@ -129,7 +130,7 @@ def _add_running_attempt(
         attempt_no=attempt_no,
         request_id=request_id,
         capability="text.smoke",
-        operation_kind="text_generate",
+        operation_kind=operation_kind,
         provider_name="provider-test",
         provider_model="model-test",
         route_reason="configured_primary",
@@ -174,6 +175,69 @@ def test_start_persists_an_owned_attempt_lease(migrated_database_url: str) -> No
     assert attempt.heartbeat_at is not None
     assert attempt.lease_expires_at is not None
     assert attempt.lease_expires_at > attempt.heartbeat_at
+
+
+def test_video_success_audit_does_not_persist_private_provider_task_id(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    context = _seed_context(factory)
+    sink = SqlAlchemyAttemptAuditSink(factory)
+    lease = sink.start(
+        context,
+        _request("req-video-private-task", operation_kind="video_poll"),
+        provider_name="provider-test",
+        provider_model="model-test",
+        route_reason="configured_primary",
+    )
+    with factory() as session, session.begin():
+        attempt = session.get(GenerationAttempt, lease.attempt_id)
+        assert attempt is not None
+        attempt.provider_task_id = "legacy-private-task-must-be-cleared"
+
+    sink.succeed(
+        lease,
+        context,
+        AttemptSuccessAudit(
+            provider_request_id="provider-request-safe",
+            actual_model="model-test",
+            finish_reason=None,
+            usage=ModelUsage(),
+        ),
+        latency_ms=7,
+    )
+
+    with factory() as session:
+        attempt = session.get(GenerationAttempt, lease.attempt_id)
+    assert attempt is not None
+    assert attempt.provider_request_id == "provider-request-safe"
+    assert attempt.provider_task_id is None
+
+
+def test_video_poll_recovery_does_not_depend_on_persisted_provider_task_id(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    context = _seed_context(factory)
+    with factory() as session, session.begin():
+        attempt = _add_running_attempt(
+            session,
+            context,
+            attempt_no=1,
+            request_id="req-expired-video-poll-without-private-task",
+            lease_expired=True,
+            operation_kind="video_poll",
+        )
+        attempt_id = attempt.id
+
+    result = AttemptRecoveryCoordinator(factory).reconcile()
+
+    with factory() as session:
+        recovered = session.get(GenerationAttempt, attempt_id)
+    assert result.submission_unknown == 1
+    assert recovered is not None
+    assert recovered.status == "submission_unknown"
+    assert recovered.provider_task_id is None
 
 
 def test_concurrent_workers_allocate_distinct_attempt_numbers(

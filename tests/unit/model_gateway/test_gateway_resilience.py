@@ -27,6 +27,7 @@ from apps.api.model_gateway.contracts import (
     VideoOperationStatus,
     VideoPollRequest,
     VideoProviderResult,
+    VideoResultScope,
 )
 from apps.api.model_gateway.fake import (
     DeterministicFakeImageProvider,
@@ -62,6 +63,16 @@ def video_request() -> VideoModelRequest:
         prompt="PRIVATE_RESILIENCE_VIDEO_PROMPT",
         duration_seconds=8,
         references=[],
+        result_scope=video_scope(),
+    )
+
+
+def video_scope() -> VideoResultScope:
+    return VideoResultScope(
+        organization_id=UUID("01980000-0000-7000-8000-000000000010"),
+        project_id=UUID("01980000-0000-7000-8000-000000000012"),
+        lesson_unit_id=UUID("01980000-0000-7000-8000-000000000014"),
+        generation_job_id=UUID("01980000-0000-7000-8000-000000000015"),
     )
 
 
@@ -71,7 +82,8 @@ def audit_context() -> ModelAuditContext:
         user_id=UUID("01980000-0000-7000-8000-000000000011"),
         project_id=UUID("01980000-0000-7000-8000-000000000012"),
         node_run_id=UUID("01980000-0000-7000-8000-000000000013"),
-        generation_job_id=None,
+        generation_job_id=video_scope().generation_job_id,
+        lesson_unit_id=video_scope().lesson_unit_id,
     )
 
 
@@ -362,7 +374,7 @@ async def test_poll_audit_outage_is_not_reported_as_unknown_submission() -> None
         {},
         video_routes={ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S: provider},
     )
-    submitted = await submit_gateway.submit_video(video_request())
+    submitted = await submit_gateway.submit_video(video_request(), audit_context=audit_context())
     assert submitted.provider_task_id is not None
     poll_gateway = ModelGateway(
         {},
@@ -376,6 +388,7 @@ async def test_poll_audit_outage_is_not_reported_as_unknown_submission() -> None
                 capability=ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S,
                 request_id="req-resilient-video-poll",
                 provider_task_id=submitted.provider_task_id,
+                result_scope=video_scope(),
             ),
             audit_context=audit_context(),
         )
@@ -487,7 +500,7 @@ async def test_success_logs_hash_provider_handles_instead_of_recording_raw_ids(
         video_routes={ModelCapability.VIDEO_IMAGE_TO_VIDEO_6S_30S: provider},
     )
 
-    result = await gateway.submit_video(video_request())
+    result = await gateway.submit_video(video_request(), audit_context=audit_context())
 
     rendered = repr(captured)
     assert result.provider_request_id not in rendered

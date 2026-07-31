@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+
+import pytest
 
 from apps.api.assets.models import FileAsset, FileAssetVersion
 from apps.api.creation.models import GenerationResult
@@ -82,7 +85,14 @@ async def test_video_gc_uses_postgresql_truth_for_failed_job_objects(
         session.flush()
         conflicting_asset.current_version_id = conflicting_version.id
 
-    storage = FakeObjectStorage()
+    class ControlledDeleteStorage(FakeObjectStorage):
+        allow_delete = False
+
+        def delete(self, *, bucket: str, key: str) -> None:
+            if self.allow_delete:
+                super().delete(bucket=bucket, key=key)
+
+    storage = ControlledDeleteStorage()
     staging_key = build_video_staging_key(
         scope,
         provider_name="deterministic-fake",
@@ -98,16 +108,37 @@ async def test_video_gc_uses_postgresql_truth_for_failed_job_objects(
         age=timedelta(days=8),
         payload=b"conflict-final",
     )
+    for index in range(100):
+        young_key = build_video_staging_key(
+            scope,
+            provider_name="deterministic-fake",
+            provider_task_id=f"young-task-{index}",
+        )
+        _put_old(storage, young_key, now=now, age=timedelta(minutes=1))
 
-    outcome = VideoObjectCleanupCoordinator(
+    coordinator = VideoObjectCleanupCoordinator(
         factory,
         storage,
         bucket="shanhaiedu",
-    ).cleanup(now=now, dry_run=False)
+    )
+
+    preview = coordinator.cleanup(now=now)
+    assert preview.scanned_count == 100
+    assert preview.candidate_count == 2
+    assert preview.deleted_count == 0
+    assert storage.object_count == 103
+
+    refused = coordinator.cleanup(now=now, dry_run=False)
+    assert refused.candidate_count == 2
+    assert refused.deleted_count == 0
+    assert storage.object_count == 103
+
+    storage.allow_delete = True
+    outcome = coordinator.cleanup(now=now, dry_run=False)
 
     assert outcome.candidate_count == 2
     assert outcome.deleted_count == 2
-    assert storage.object_count == 1
+    assert storage.object_count == 101
     assert storage.stat(bucket="shanhaiedu", key=conflicting_final_key).key == conflicting_final_key
     engine.dispose()
 
@@ -203,6 +234,7 @@ async def test_video_gc_preserves_exact_bound_final_but_cleans_success_staging(
 
 async def test_video_gc_waits_for_active_attempt_after_job_lease_expiry(
     migrated_database_url: str,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     engine = build_engine(migrated_database_url)
     factory = build_session_factory(engine)
@@ -258,10 +290,24 @@ async def test_video_gc_waits_for_active_attempt_after_job_lease_expiry(
     _put_old(storage, staging_key, now=now, age=timedelta(days=2))
     coordinator = VideoObjectCleanupCoordinator(factory, storage, bucket="shanhaiedu")
 
+    cleanup_logger = logging.getLogger("workers.video_object_cleanup")
+    cleanup_logger.disabled = False
+    caplog.set_level(logging.INFO, logger=cleanup_logger.name)
     retained = coordinator.cleanup(now=now, dry_run=False)
 
     assert retained.deleted_count == 0
     assert storage.object_count == 1
+    retained_records = [
+        record
+        for record in caplog.records
+        if record.getMessage() == "video_object_cleanup_retained"
+    ]
+    assert any(record.reason == "active_attempt" for record in retained_records)
+    assert all(record.scope_hash and record.key_hash for record in retained_records)
+    rendered = repr([record.__dict__ for record in retained_records])
+    assert staging_key not in rendered
+    assert str(scope.organization_id) not in rendered
+    assert "active-private-task" not in rendered
 
     with factory() as session, session.begin():
         current = session.get(GenerationAttempt, attempt.id)
