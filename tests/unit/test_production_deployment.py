@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -13,6 +16,7 @@ def test_production_release_assets_are_complete() -> None:
         "compose.yaml",
         "Dockerfile.api",
         "Dockerfile.web",
+        "configure_debian_mirror.py",
         "api-entrypoint.sh",
         "web.conf",
         "host-nginx.conf.template",
@@ -100,6 +104,78 @@ def test_api_image_reads_file_secrets_then_drops_root() -> None:
     assert "gosu" in dockerfile
     assert "USER 10001:10001" not in dockerfile
     assert 'exec gosu 10001:10001 "$@"' in entrypoint
+
+
+def test_api_image_allows_a_controlled_debian_mirror_override() -> None:
+    dockerfile = (PROD / "Dockerfile.api").read_text(encoding="utf-8")
+    compose = yaml.safe_load((PROD / "compose.yaml").read_text(encoding="utf-8"))
+    environment_example = (PROD / "env.example").read_text(encoding="utf-8")
+
+    assert "ARG DEBIAN_MIRROR=https://deb.debian.org/debian" in dockerfile
+    assert "configure_debian_mirror.py" in dockerfile
+    assert compose["x-app"]["build"]["args"]["DEBIAN_MIRROR"] == (
+        "${SHANHAI_DEBIAN_MIRROR:-https://deb.debian.org/debian}"
+    )
+    assert "SHANHAI_DEBIAN_MIRROR=https://deb.debian.org/debian" in environment_example
+
+
+@pytest.mark.parametrize(
+    "mirror",
+    ["https://deb.debian.org/debian", "https://mirrors.aliyun.com/debian"],
+)
+def test_debian_mirror_configurator_writes_main_and_security_sources(
+    tmp_path: Path, mirror: str
+) -> None:
+    sources = tmp_path / "debian.sources"
+    sources.write_text(
+        "URIs: http://deb.debian.org/debian\n"
+        "Suites: bookworm bookworm-updates\n"
+        "URIs: http://deb.debian.org/debian-security\n"
+        "Suites: bookworm-security\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, str(PROD / "configure_debian_mirror.py"), mirror, sources],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    configured = sources.read_text(encoding="utf-8")
+    assert f"URIs: {mirror}\n" in configured
+    assert f"URIs: {mirror}-security\n" in configured
+    assert "http://deb.debian.org" not in configured
+
+
+@pytest.mark.parametrize(
+    "mirror",
+    [
+        "http://mirror.example/debian",
+        "https://user:token@mirror.example/debian",
+        "https://mirror.example/debian/",
+        "https://mirror.example/debian?token=secret",
+        "https://mirror.example/debian#private",
+    ],
+)
+def test_debian_mirror_configurator_rejects_private_or_ambiguous_urls(
+    tmp_path: Path, mirror: str
+) -> None:
+    sources = tmp_path / "debian.sources"
+    original = "URIs: http://deb.debian.org/debian\nURIs: http://deb.debian.org/debian-security\n"
+    sources.write_text(original, encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, str(PROD / "configure_debian_mirror.py"), mirror, sources],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 2
+    assert mirror not in result.stderr
+    assert sources.read_text(encoding="utf-8") == original
 
 
 def test_production_monitor_covers_resource_and_request_health() -> None:
