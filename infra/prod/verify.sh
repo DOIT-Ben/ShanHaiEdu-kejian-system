@@ -31,19 +31,20 @@ wait_for_local_endpoint() {
   return 1
 }
 
-live_payload="$(wait_for_local_endpoint "http://127.0.0.1:18000/health/live")"
+live_payload="$(wait_for_local_endpoint "http://127.0.0.1:18080/health/live")"
 printf '%s' "$live_payload" | assert_release
-wait_for_local_endpoint "http://127.0.0.1:18000/health/ready" >/dev/null
+wait_for_local_endpoint "http://127.0.0.1:18080/health/ready" >/dev/null
 wait_for_local_endpoint "http://127.0.0.1:18080/" >/dev/null
-wait_for_local_endpoint "http://127.0.0.1:19000/minio/health/ready" >/dev/null
 "${compose[@]}" exec -T postgres pg_isready \
   -U "${SHANHAI_POSTGRES_USER:-shanhai_prod}" \
   -d "${SHANHAI_POSTGRES_DB:-shanhai_prod}"
 "${compose[@]}" exec -T redis redis-cli ping | grep -qx PONG
+"${compose[@]}" exec -T minio \
+  curl -fsS http://127.0.0.1:9000/minio/health/ready >/dev/null
 "${compose[@]}" exec -T worker python -m workers.main --check
 
 if "${compose[@]}" logs --since 10m 2>&1 | grep -Eiq \
-  'MODEL_GATEWAY_API_KEY|SHANHAI_SESSION_ACCESS_CODE|SHANHAI_SESSION_CSRF_SECRET|postgres_password'; then
+  'X-Amz-(Credential|Signature)|MODEL_GATEWAY_API_KEY|SHANHAI_SESSION_ACCESS_CODE|SHANHAI_SESSION_CSRF_SECRET|postgres_password'; then
   echo "production logs contain a forbidden secret identifier" >&2
   exit 1
 fi

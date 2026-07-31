@@ -71,7 +71,7 @@ if [[ ! "$queue_depth" =~ ^[0-9]+$ || "$queue_depth" -gt "${SHANHAI_QUEUE_DEPTH_
   exit 1
 fi
 
-latency_seconds="$(curl -fsS -o /dev/null -w '%{time_total}' --max-time 10 http://127.0.0.1:18000/health/live)"
+latency_seconds="$(curl -fsS -o /dev/null -w '%{time_total}' --max-time 10 http://127.0.0.1:18080/health/live)"
 if ! awk -v value="$latency_seconds" 'BEGIN {exit !(value < 5)}'; then
   echo "production liveness latency is above the 5 second monitor limit" >&2
   exit 1

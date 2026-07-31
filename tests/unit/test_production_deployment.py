@@ -52,9 +52,9 @@ def test_production_compose_isolated_persistent_and_loopback_only() -> None:
     assert "ports" not in compose["services"]["postgres"]
     assert "ports" not in compose["services"]["redis"]
     assert compose["networks"]["production"]["internal"] is True
-    assert compose["services"]["api"]["ports"] == ["127.0.0.1:18000:8000"]
+    assert "ports" not in compose["services"]["api"]
     assert compose["services"]["web"]["ports"] == ["127.0.0.1:18080:8080"]
-    assert compose["services"]["minio"]["ports"] == ["127.0.0.1:19000:9000"]
+    assert "ports" not in compose["services"]["minio"]
     for service in compose["services"].values():
         assert "restart" in service
         assert "healthcheck" in service
@@ -64,17 +64,58 @@ def test_production_compose_isolated_persistent_and_loopback_only() -> None:
     assert "shanhai-entrypoint python -m workers.main --check" in worker_health
 
 
+def test_secretless_web_is_the_only_non_nat_loopback_ingress_service() -> None:
+    compose = yaml.safe_load((PROD / "compose.yaml").read_text(encoding="utf-8"))
+
+    loopback = compose["networks"]["loopback"]
+    assert loopback["driver"] == "bridge"
+    assert loopback["internal"] is False
+    assert loopback["driver_opts"] == {
+        "com.docker.network.bridge.enable_ip_masquerade": "false",
+        "com.docker.network.bridge.host_binding_ipv4": "127.0.0.1",
+    }
+
+    assert set(compose["services"]["web"]["networks"]) == {"production", "loopback"}
+    assert "secrets" not in compose["services"]["web"]
+    assert set(compose["services"]["api"]["networks"]) == {"production"}
+    assert set(compose["services"]["minio"]["networks"]) == {"production"}
+    assert set(compose["services"]["postgres"]["networks"]) == {"production"}
+    assert set(compose["services"]["redis"]["networks"]) == {"production"}
+    assert set(compose["services"]["worker"]["networks"]) == {"production"}
+
+
 def test_host_nginx_contract_preserves_https_sse_and_private_services() -> None:
     nginx = (PROD / "host-nginx.conf.template").read_text(encoding="utf-8")
+    web = (PROD / "web.conf").read_text(encoding="utf-8")
 
     assert "server_name ${SHANHAI_PUBLIC_IP};" in nginx
     assert "listen 443 ssl" in nginx
     assert "return 301 https://$host$request_uri;" in nginx
-    assert "proxy_pass http://127.0.0.1:18000;" in nginx
+    assert "proxy_pass http://127.0.0.1:18000;" not in nginx
+    assert "proxy_pass http://127.0.0.1:19000;" not in nginx
+    assert nginx.count("proxy_pass http://127.0.0.1:18080;") == 4
     assert "proxy_buffering off;" in nginx
-    assert "proxy_pass http://127.0.0.1:19000;" in nginx
     assert "access_log off;" in nginx
-    assert "proxy_pass http://127.0.0.1:18080;" in nginx
+    assert "@api path /api/v2 /api/v2/*" in web
+    assert "handle @api" in web
+    assert "handle /health/*" in web
+    assert "reverse_proxy api:8000" in web
+    assert "handle /shanhaiedu-production/*" in web
+    assert "reverse_proxy minio:9000" in web
+
+
+def test_host_proxy_overwrites_forwarded_ip_and_caddy_uses_a_strict_trust_chain() -> None:
+    compose = yaml.safe_load((PROD / "compose.yaml").read_text(encoding="utf-8"))
+    nginx = (PROD / "host-nginx.conf.template").read_text(encoding="utf-8")
+    web = (PROD / "web.conf").read_text(encoding="utf-8")
+
+    assert nginx.count("proxy_set_header X-Forwarded-For $remote_addr;") == 3
+    assert "$proxy_add_x_forwarded_for" not in nginx
+    assert "trusted_proxies static private_ranges" in web
+    assert "trusted_proxies_strict" in web
+    assert compose["x-app"]["environment"]["SHANHAI_SESSION_TRUSTED_PROXY_HOSTS"] == (
+        '["10.0.0.0/8","172.16.0.0/12","192.168.0.0/16"]'
+    )
 
 
 def test_host_configuration_supports_the_approved_shared_ecs_layout() -> None:
@@ -193,6 +234,7 @@ def test_production_monitor_covers_resource_and_request_health() -> None:
     assert "time_total" in monitor
     assert '"http_status":5' in monitor
     assert "SHANHAI_DB_CONNECTION_MAX" in monitor
+    assert "http://127.0.0.1:18080/health/live" in monitor
 
 
 def test_release_script_requires_exact_sha_backup_and_reversible_activation() -> None:

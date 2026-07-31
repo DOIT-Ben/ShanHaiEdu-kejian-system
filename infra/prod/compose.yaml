@@ -36,7 +36,7 @@ x-app: &app
     SHANHAI_SESSION_TTL_SECONDS: "3600"
     SHANHAI_SESSION_LOGIN_MAX_FAILURES: "5"
     SHANHAI_SESSION_LOGIN_WINDOW_SECONDS: "300"
-    SHANHAI_SESSION_TRUSTED_PROXY_HOSTS: '["172.16.0.0/12"]'
+    SHANHAI_SESSION_TRUSTED_PROXY_HOSTS: '["10.0.0.0/8","172.16.0.0/12","192.168.0.0/16"]'
   secrets: &app-secrets
     - postgres_password
     - minio_root_user
@@ -110,8 +110,6 @@ services:
     volumes:
       - minio_data:/data
       - ${SHANHAI_PRODUCTION_ROOT:?production root is required}/backups:/backups
-    ports:
-      - "127.0.0.1:19000:9000"
     networks:
       production:
         aliases:
@@ -133,8 +131,6 @@ services:
         aliases:
           - api
     command: ["uvicorn", "apps.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]
-    ports:
-      - "127.0.0.1:18000:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
       interval: 10s
@@ -178,6 +174,7 @@ services:
       production:
         aliases:
           - web
+      loopback: {}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/"]
       interval: 10s
@@ -192,6 +189,12 @@ networks:
   production:
     driver: bridge
     internal: true
+  loopback:
+    driver: bridge
+    internal: false
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+      com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"
 
 volumes:
   postgres_data:

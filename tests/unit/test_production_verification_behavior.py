@@ -39,7 +39,10 @@ def _find_bash() -> str:
 
 
 def _run_verification(
-    tmp_path: Path, mode: str
+    tmp_path: Path,
+    mode: str,
+    *,
+    docker_logs: str = "",
 ) -> tuple[subprocess.CompletedProcess[str], list[str], int, int]:
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
@@ -95,6 +98,7 @@ printf '%s' "$count" > "$FAKE_SLEEP_COUNT"
         """#!/usr/bin/env bash
 set -eu
 case "$*" in
+  *"logs --since 10m"*) printf '%s' "${FAKE_DOCKER_LOGS:-}" ;;
   *"redis redis-cli ping"*) printf '%s\n' PONG ;;
   *"postgres pg_isready"*) printf '%s\n' accepting ;;
 esac
@@ -112,6 +116,7 @@ esac
             "FAKE_CURL_CALLS": _bash_path(curl_calls),
             "FAKE_CURL_COUNT": _bash_path(curl_count),
             "FAKE_CURL_MODE": mode,
+            "FAKE_DOCKER_LOGS": docker_logs,
             "FAKE_SLEEP_COUNT": _bash_path(sleep_count),
             "SHANHAI_ENV_FILE": _bash_path(environment_file),
         }
@@ -145,13 +150,12 @@ def test_retries_then_checks_every_loopback_endpoint(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stderr
     assert calls == [
-        "http://127.0.0.1:18000/health/live",
-        "http://127.0.0.1:18000/health/live",
-        "http://127.0.0.1:18000/health/ready",
+        "http://127.0.0.1:18080/health/live",
+        "http://127.0.0.1:18080/health/live",
+        "http://127.0.0.1:18080/health/ready",
         "http://127.0.0.1:18080/",
-        "http://127.0.0.1:19000/minio/health/ready",
     ]
-    assert curl_count == 5
+    assert curl_count == 4
     assert sleep_count == 1
 
 
@@ -159,7 +163,7 @@ def test_fails_after_bounded_loopback_retries(tmp_path: Path) -> None:
     result, calls, curl_count, sleep_count = _run_verification(tmp_path, "unavailable")
 
     assert result.returncode != 0
-    assert calls == ["http://127.0.0.1:18000/health/live"] * 30
+    assert calls == ["http://127.0.0.1:18080/health/live"] * 30
     assert curl_count == 30
     assert sleep_count == 29
 
@@ -169,6 +173,20 @@ def test_rejects_invalid_release_payload(tmp_path: Path, mode: str) -> None:
     result, calls, curl_count, sleep_count = _run_verification(tmp_path, mode)
 
     assert result.returncode != 0
-    assert calls == ["http://127.0.0.1:18000/health/live"]
+    assert calls == ["http://127.0.0.1:18080/health/live"]
     assert curl_count == 1
     assert sleep_count == 0
+
+
+@pytest.mark.parametrize(
+    "marker",
+    ["X-Amz-Credential=redacted", "X-Amz-Signature=redacted"],
+)
+def test_rejects_presigned_credential_markers_in_compose_logs(
+    tmp_path: Path,
+    marker: str,
+) -> None:
+    result, _, _, _ = _run_verification(tmp_path, "available", docker_logs=marker)
+
+    assert result.returncode != 0
+    assert "production logs contain a forbidden secret identifier" in result.stderr
