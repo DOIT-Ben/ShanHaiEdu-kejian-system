@@ -20,4 +20,4 @@ export SHANHAI_SESSION_ACCESS_CODE="$(read_secret session_access_code)"
 export SHANHAI_SESSION_CSRF_SECRET="$(read_secret session_csrf_secret)"
 unset postgres_password minio_root_user minio_root_password
 
-exec "$@"
+exec gosu 10001:10001 "$@"

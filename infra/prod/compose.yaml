@@ -108,6 +108,7 @@ services:
       - minio_root_password
     volumes:
       - minio_data:/data
+      - ${SHANHAI_PRODUCTION_ROOT:?production root is required}/backups:/backups
     ports:
       - "127.0.0.1:19000:9000"
     networks:
@@ -150,7 +151,7 @@ services:
           - worker
     command: ["python", "-m", "workers.main"]
     healthcheck:
-      test: ["CMD", "python", "-m", "workers.main", "--check"]
+      test: ["CMD-SHELL", "/usr/local/bin/shanhai-entrypoint python -m workers.main --check"]
       interval: 30s
       timeout: 15s
       retries: 5
@@ -189,6 +190,7 @@ services:
 networks:
   production:
     driver: bridge
+    internal: true
 
 volumes:
   postgres_data:

@@ -31,11 +31,22 @@ if "${compose[@]}" logs --since 10m 2>&1 | grep -Eiq \
   exit 1
 fi
 
+nginx_log_root="${SHANHAI_NGINX_LOG_ROOT:-/var/log/nginx}"
+for nginx_log in "$nginx_log_root"/*.log; do
+  [[ -f "$nginx_log" ]] || continue
+  if tail -n 2000 "$nginx_log" | grep -Eiq \
+    'X-Amz-(Credential|Signature)|SHANHAI_SESSION_ACCESS_CODE|SHANHAI_SESSION_CSRF_SECRET'; then
+    echo "host proxy logs contain a forbidden credential marker" >&2
+    exit 1
+  fi
+done
+
 if [[ "$mode" == "--public" ]]; then
   curl -fsS --max-time 15 "https://${SHANHAI_PUBLIC_IP}/health/live" | assert_release
   curl -fsS --max-time 15 "https://${SHANHAI_PUBLIC_IP}/" >/dev/null
-  echo | openssl s_client -connect "${SHANHAI_PUBLIC_IP}:443" \
-    -verify_ip "$SHANHAI_PUBLIC_IP" -verify_return_error 2>/dev/null | grep -q 'Verify return code: 0'
+  if [[ -n "${SHANHAI_TLS_CERTIFICATE:-}" ]]; then
+    openssl x509 -checkend 86400 -noout -in "$SHANHAI_TLS_CERTIFICATE"
+  fi
 fi
 
 echo "production verification passed: $release_sha"

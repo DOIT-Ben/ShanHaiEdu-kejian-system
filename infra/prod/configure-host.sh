@@ -36,6 +36,16 @@ if [[ -n "$legacy_site" && -e "$legacy_site" ]]; then
   printf '%s\n' "$legacy_site" > "$backup/legacy-site-path"
 fi
 
+activate_nginx() {
+  "$nginx_binary" -t
+  if pgrep -x nginx >/dev/null; then
+    systemctl reload nginx
+  else
+    systemctl start nginx
+  fi
+  pgrep -x nginx >/dev/null
+}
+
 restore_legacy() {
   rm -f "$enabled"
   if [[ -r "$backup/previous-production-site" ]]; then
@@ -45,7 +55,7 @@ restore_legacy() {
     legacy_target="$(cat "$backup/legacy-site-path")"
     cp -a "$backup/legacy-site" "$legacy_target"
   fi
-  "$nginx_binary" -t && systemctl reload nginx
+  activate_nginx
 }
 trap restore_legacy ERR
 
@@ -56,8 +66,7 @@ if [[ -z "$tls_certificate" || -z "$tls_private_key" ]]; then
   install -d -m 0755 /var/lib/letsencrypt/.well-known/acme-challenge
   sed "s/\${SHANHAI_PUBLIC_IP}/$public_ip/g" \
     "$source_root/infra/prod/host-nginx-http.conf.template" > "$enabled"
-  "$nginx_binary" -t
-  systemctl reload nginx
+  activate_nginx
 
   certbot_root="$production_root/shared/certbot"
   if [[ ! -x "$certbot_root/bin/certbot" ]]; then
@@ -78,7 +87,7 @@ if [[ -z "$tls_certificate" || -z "$tls_private_key" ]]; then
 fi
 if [[ ! -r "$tls_certificate" || ! -r "$tls_private_key" ]]; then
   echo "configured TLS material is unavailable" >&2
-  exit 1
+  false
 fi
 
 sed \
@@ -86,14 +95,46 @@ sed \
   -e "s|\${SHANHAI_TLS_CERTIFICATE}|$tls_certificate|g" \
   -e "s|\${SHANHAI_TLS_PRIVATE_KEY}|$tls_private_key|g" \
   "$source_root/infra/prod/host-nginx.conf.template" > "$enabled"
-"$nginx_binary" -t
-systemctl reload nginx
+activate_nginx
+
+cat > /etc/systemd/system/shanhaiedu-health-alert@.service <<'EOF'
+[Unit]
+Description=Record a redacted ShanHaiEdu production health alert
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c '/usr/bin/systemd-cat -p err -t shanhaiedu-monitor echo "production healthcheck failed unit=%i"'
+EOF
+cat > /etc/systemd/system/shanhaiedu-healthcheck.service <<EOF
+[Unit]
+Description=Verify ShanHaiEdu production health and certificate lifetime
+After=docker.service nginx.service
+OnFailure=shanhaiedu-health-alert@%n.service
+
+[Service]
+Type=oneshot
+ExecStart=$production_root/current/infra/prod/monitor.sh
+EOF
+cat > /etc/systemd/system/shanhaiedu-healthcheck.timer <<'EOF'
+[Unit]
+Description=Verify ShanHaiEdu production every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+RandomizedDelaySec=30
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
 
 if [[ -n "${certbot_root:-}" ]]; then
   cat > /etc/systemd/system/shanhaiedu-ip-cert-renew.service <<EOF
 [Unit]
 Description=Renew ShanHaiEdu short-lived IP certificate
 After=network-online.target
+OnFailure=shanhaiedu-health-alert@%n.service
 
 [Service]
 Type=oneshot
@@ -116,6 +157,8 @@ EOF
   systemctl daemon-reload
   systemctl enable --now shanhaiedu-ip-cert-renew.timer
 fi
+systemctl daemon-reload
+systemctl enable --now shanhaiedu-healthcheck.timer
 printf '%s\n' "$backup" > "$backup_root/latest"
 trap - ERR
 echo "host HTTPS configured for $public_ip"

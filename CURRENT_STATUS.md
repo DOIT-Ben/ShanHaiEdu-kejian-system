@@ -21,7 +21,7 @@
 
 ## 当前工作
 
-- 当前没有`status:in-progress`产品实现或开放Pull Request；新任务必须从最新`origin/main`创建独立短分支和Draft PR。
+- [Issue #244](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/244)当前为`status:in-progress`，对应开放 Draft PR #254 和 `feat/244-production-release` 分支。
 - [Issue #244](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/244)是当前`priority:p0`生产出口；生产分支和Draft PR已创建，部署仍受合并、镜像、备份、回退和公网验收门禁约束。
 - [Issue #165](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/165)以`status:blocked`独立跟踪视频relay安全迁移；第三次迁移已回滚，生产仍运行迁移前relay，第四次尝试需要新的明确生产授权且不得调用真实Provider。
 - [Issue #233](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/233)和[Issue #237](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/237)为`status:ready`技术债，不代表下一产品里程碑，也不阻塞当前MVP事实。

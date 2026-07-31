@@ -20,6 +20,7 @@ def test_production_release_assets_are_complete() -> None:
         "release.sh",
         "rollback.sh",
         "verify.sh",
+        "monitor.sh",
         "README.md",
     }
 
@@ -45,6 +46,7 @@ def test_production_compose_isolated_persistent_and_loopback_only() -> None:
     }
     assert "ports" not in compose["services"]["postgres"]
     assert "ports" not in compose["services"]["redis"]
+    assert compose["networks"]["production"]["internal"] is True
     assert compose["services"]["api"]["ports"] == ["127.0.0.1:18000:8000"]
     assert compose["services"]["web"]["ports"] == ["127.0.0.1:18080:8080"]
     assert compose["services"]["minio"]["ports"] == ["127.0.0.1:19000:9000"]
@@ -53,6 +55,8 @@ def test_production_compose_isolated_persistent_and_loopback_only() -> None:
         assert "healthcheck" in service
         assert "mem_limit" in service
         assert "cpus" in service
+    worker_health = compose["services"]["worker"]["healthcheck"]["test"][1]
+    assert "shanhai-entrypoint python -m workers.main --check" in worker_health
 
 
 def test_host_nginx_contract_preserves_https_sse_and_private_services() -> None:
@@ -64,6 +68,7 @@ def test_host_nginx_contract_preserves_https_sse_and_private_services() -> None:
     assert "proxy_pass http://127.0.0.1:18000;" in nginx
     assert "proxy_buffering off;" in nginx
     assert "proxy_pass http://127.0.0.1:19000;" in nginx
+    assert "access_log off;" in nginx
     assert "proxy_pass http://127.0.0.1:18080;" in nginx
 
 
@@ -77,8 +82,31 @@ def test_host_configuration_supports_the_approved_shared_ecs_layout() -> None:
     assert "SHANHAI_TLS_PRIVATE_KEY" in configure
     assert "apt-get" not in configure
     assert "ExecStartPost=$nginx_binary -t" in configure
+    assert "pgrep -x nginx" in configure
+    assert "systemctl start nginx" in configure
     assert "ssl_certificate ${SHANHAI_TLS_CERTIFICATE};" in nginx
     assert "ssl_certificate_key ${SHANHAI_TLS_PRIVATE_KEY};" in nginx
+    assert 'configured TLS material is unavailable" >&2\n  false' in configure
+    assert "shanhaiedu-healthcheck.timer" in configure
+
+
+def test_api_image_reads_file_secrets_then_drops_root() -> None:
+    dockerfile = (PROD / "Dockerfile.api").read_text(encoding="utf-8")
+    entrypoint = (PROD / "api-entrypoint.sh").read_text(encoding="utf-8")
+
+    assert "gosu" in dockerfile
+    assert "USER 10001:10001" not in dockerfile
+    assert 'exec gosu 10001:10001 "$@"' in entrypoint
+
+
+def test_production_monitor_covers_resource_and_request_health() -> None:
+    monitor = (PROD / "monitor.sh").read_text(encoding="utf-8")
+
+    assert "5242880" in monitor
+    assert "pg_stat_activity" in monitor
+    assert "dq.*" in monitor
+    assert "time_total" in monitor
+    assert '"http_status":5' in monitor
 
 
 def test_release_script_requires_exact_sha_backup_and_reversible_activation() -> None:
@@ -87,6 +115,12 @@ def test_release_script_requires_exact_sha_backup_and_reversible_activation() ->
 
     assert "^[0-9a-f]{40}$" in release
     assert "pg_dump" in release
+    assert "umask 077" in release
+    assert "rev-parse --verify HEAD" in release
+    assert "diff --quiet" in release
+    assert "trap rollback_release ERR" in release
+    assert "mc mirror" in release
+    assert "mc diff" in release
     assert "alembic upgrade head" in release
     assert "publish-golden-content" in release
     assert "bootstrap-production-identity" in release

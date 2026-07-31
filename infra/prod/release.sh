@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+umask 077
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "production release must run as root" >&2
@@ -16,7 +17,7 @@ source_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 production_root="${SHANHAI_PRODUCTION_ROOT:-/opt/shanhaiedu-production}"
 environment_file="$production_root/shared/production.env"
 manifest="$source_root/RELEASE_SHA"
-compose=(docker compose --env-file "$environment_file" -f "$source_root/infra/prod/compose.yaml")
+compose=(docker compose --project-name shanhaiedu-production --env-file "$environment_file" -f "$source_root/infra/prod/compose.yaml")
 
 if [[ "$source_root" != "$production_root/releases/$release_sha" ]]; then
   echo "release source is outside the exact production release directory" >&2
@@ -24,6 +25,19 @@ if [[ "$source_root" != "$production_root/releases/$release_sha" ]]; then
 fi
 if [[ ! -r "$manifest" ]] || [[ "$(tr -d '\r\n' < "$manifest")" != "$release_sha" ]]; then
   echo "release manifest does not match requested SHA" >&2
+  exit 1
+fi
+if [[ "$(git -C "$source_root" rev-parse --verify HEAD)" != "$release_sha" ]]; then
+  echo "release Git object does not match requested SHA" >&2
+  exit 1
+fi
+if ! git -C "$source_root" diff --quiet || ! git -C "$source_root" diff --cached --quiet; then
+  echo "release Git worktree contains tracked modifications" >&2
+  exit 1
+fi
+unexpected_files="$(git -C "$source_root" status --porcelain --untracked-files=all | grep -v '^?? RELEASE_SHA$' || true)"
+if [[ -n "$unexpected_files" ]]; then
+  echo "release Git worktree contains unexpected files" >&2
   exit 1
 fi
 if [[ ! -r "$environment_file" ]]; then
@@ -37,6 +51,32 @@ set +a
 export SHANHAI_RELEASE_SHA="$release_sha"
 export SHANHAI_PRODUCTION_ROOT="$production_root"
 export SHANHAI_SECRET_DIR="${SHANHAI_SECRET_DIR:-$production_root/shared/secrets}"
+export COMPOSE_PARALLEL_LIMIT=1
+
+previous_source=""
+if [[ -L "$production_root/current" ]]; then
+  previous_source="$(readlink -f "$production_root/current")"
+fi
+rollback_release() {
+  local status="$?"
+  trap - ERR
+  if [[ -n "$previous_source" && -r "$previous_source/RELEASE_SHA" ]]; then
+    local previous_sha
+    previous_sha="$(tr -d '\r\n' < "$previous_source/RELEASE_SHA")"
+    if [[ "$previous_sha" =~ ^[0-9a-f]{40}$ ]]; then
+      SHANHAI_RELEASE_SHA="$previous_sha" docker compose \
+        --project-name shanhaiedu-production \
+        --env-file "$environment_file" \
+        -f "$previous_source/infra/prod/compose.yaml" \
+        up -d --no-build api worker web || true
+    fi
+  else
+    "${compose[@]}" stop api worker web >/dev/null 2>&1 || true
+  fi
+  echo "production release failed and application rollback was attempted" >&2
+  exit "$status"
+}
+trap rollback_release ERR
 
 install -d -m 0700 -o root -g root "$SHANHAI_SECRET_DIR"
 install -d -m 0700 -o root -g root "$production_root/backups"
@@ -45,7 +85,6 @@ ensure_secret() {
   local bytes="$2"
   local path="$SHANHAI_SECRET_DIR/$name"
   if [[ ! -e "$path" ]]; then
-    umask 077
     openssl rand -hex "$bytes" > "$path"
   fi
   chown root:root "$path"
@@ -53,28 +92,27 @@ ensure_secret() {
 }
 ensure_secret postgres_password 24
 if [[ ! -e "$SHANHAI_SECRET_DIR/minio_root_user" ]]; then
-  umask 077
   printf '%s\n' shanhai-prod > "$SHANHAI_SECRET_DIR/minio_root_user"
 fi
+chown root:root "$SHANHAI_SECRET_DIR/minio_root_user"
 chmod 0600 "$SHANHAI_SECRET_DIR/minio_root_user"
 ensure_secret minio_root_password 24
 ensure_secret session_access_code 24
 ensure_secret session_csrf_secret 32
 
 "${compose[@]}" config --quiet
-
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
-if [[ -n "$("${compose[@]}" ps -q postgres 2>/dev/null)" ]]; then
-  pre_backup="$production_root/backups/pre-$release_sha-$timestamp.dump"
-  "${compose[@]}" exec -T postgres pg_dump \
-    -U "${SHANHAI_POSTGRES_USER:-shanhai_prod}" \
-    -d "${SHANHAI_POSTGRES_DB:-shanhai_prod}" \
-    --format=custom > "$pre_backup"
-  chmod 0600 "$pre_backup"
-fi
 
 "${compose[@]}" build api worker web
-"${compose[@]}" up -d postgres redis minio
+"${compose[@]}" up -d postgres
+pre_backup="$production_root/backups/pre-$release_sha-$timestamp.dump"
+"${compose[@]}" exec -T postgres pg_dump \
+  -U "${SHANHAI_POSTGRES_USER:-shanhai_prod}" \
+  -d "${SHANHAI_POSTGRES_DB:-shanhai_prod}" \
+  --format=custom > "$pre_backup"
+chmod 0600 "$pre_backup"
+
+"${compose[@]}" up -d redis minio
 "${compose[@]}" run --rm api alembic upgrade head
 "${compose[@]}" run --rm api python -m apps.api.cli bootstrap-production-storage
 "${compose[@]}" run --rm api python -m apps.api.cli publish-golden-content
@@ -100,16 +138,34 @@ restore_database="shanhai_restore_${release_sha:0:12}"
 "${compose[@]}" exec -T postgres dropdb \
   -U "${SHANHAI_POSTGRES_USER:-shanhai_prod}" "$restore_database"
 
+minio_backup="/backups/minio-post-$release_sha-$timestamp"
+restore_bucket="shanhai-restore-${release_sha:0:12}-$(date -u +%s)"
+"${compose[@]}" exec -T minio sh -eu -c '
+  umask 077
+  access_key="$(cat /run/secrets/minio_root_user)"
+  secret_key="$(cat /run/secrets/minio_root_password)"
+  export MC_HOST_production="http://${access_key}:${secret_key}@127.0.0.1:9000"
+  bucket="$1"
+  backup="$2"
+  restore_bucket="$3"
+  rm -rf "$backup"
+  install -d -m 0700 "$backup"
+  mc mirror --overwrite "production/$bucket" "$backup"
+  mc mb --ignore-existing "production/$restore_bucket"
+  mc mirror --overwrite --remove "$backup" "production/$restore_bucket"
+  mc diff "production/$bucket" "production/$restore_bucket"
+  mc rb --force "production/$restore_bucket"
+' sh "${SHANHAI_OBJECT_STORAGE_BUCKET:-shanhaiedu-production}" "$minio_backup" "$restore_bucket"
+
 "${compose[@]}" up -d api worker web
 SHANHAI_RELEASE_SHA="$release_sha" "$source_root/infra/prod/verify.sh" --local
 
-if [[ -L "$production_root/current" ]]; then
-  previous="$(readlink -f "$production_root/current")"
-  ln -sfn "$previous" "$production_root/previous-release"
+if [[ -n "$previous_source" ]]; then
+  ln -sfn "$previous_source" "$production_root/previous-release"
 fi
 ln -sfn "$source_root" "$production_root/current"
 if command -v nginx >/dev/null 2>&1; then
   nginx -t
 fi
-
+trap - ERR
 echo "production release activated: $release_sha"
