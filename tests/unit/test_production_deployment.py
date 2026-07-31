@@ -327,3 +327,16 @@ def test_local_verification_does_not_scan_unrelated_host_nginx_logs() -> None:
     assert '"$nginx_log_root"/*.log' not in verify
     assert "shanhaiedu-production-access.log" in nginx
     assert "shanhaiedu-production-error.log" in nginx
+
+
+def test_local_verification_preserves_explicit_release_sha_over_env_file() -> None:
+    verify = (PROD / "verify.sh").read_text(encoding="utf-8")
+
+    preserve_explicit = 'explicit_release_sha="${SHANHAI_RELEASE_SHA:-}"'
+    source_environment = 'source "$environment_file"'
+    resolve_release = (
+        'release_sha="${explicit_release_sha:-${SHANHAI_RELEASE_SHA:?'
+        'exact release SHA is required}}"'
+    )
+    assert verify.index(preserve_explicit) < verify.index(source_environment)
+    assert verify.index(source_environment) < verify.index(resolve_release)
