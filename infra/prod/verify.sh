@@ -31,17 +31,18 @@ if "${compose[@]}" logs --since 10m 2>&1 | grep -Eiq \
   exit 1
 fi
 
-nginx_log_root="${SHANHAI_NGINX_LOG_ROOT:-/var/log/nginx}"
-for nginx_log in "$nginx_log_root"/*.log; do
-  [[ -f "$nginx_log" ]] || continue
-  if tail -n 2000 "$nginx_log" | grep -Eiq \
-    'X-Amz-(Credential|Signature)|SHANHAI_SESSION_ACCESS_CODE|SHANHAI_SESSION_CSRF_SECRET'; then
-    echo "host proxy logs contain a forbidden credential marker" >&2
-    exit 1
-  fi
-done
-
 if [[ "$mode" == "--public" ]]; then
+  nginx_log_root="${SHANHAI_NGINX_LOG_ROOT:-/var/log/nginx}"
+  for nginx_log in \
+    "$nginx_log_root/shanhaiedu-production-access.log" \
+    "$nginx_log_root/shanhaiedu-production-error.log"; do
+    [[ -f "$nginx_log" ]] || continue
+    if tail -n 2000 "$nginx_log" | grep -Eiq \
+      'X-Amz-(Credential|Signature)|SHANHAI_SESSION_ACCESS_CODE|SHANHAI_SESSION_CSRF_SECRET'; then
+      echo "host proxy logs contain a forbidden credential marker" >&2
+      exit 1
+    fi
+  done
   curl -fsS --max-time 15 "https://${SHANHAI_PUBLIC_IP}/health/live" | assert_release
   curl -fsS --max-time 15 "https://${SHANHAI_PUBLIC_IP}/" >/dev/null
   if [[ -n "${SHANHAI_TLS_CERTIFICATE:-}" ]]; then

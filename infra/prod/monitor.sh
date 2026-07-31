@@ -27,10 +27,35 @@ if [[ ! "$db_connections" =~ ^[0-9]+$ ]]; then
   echo "production database connection metric is unavailable" >&2
   exit 1
 fi
+db_connection_max="${SHANHAI_DB_CONNECTION_MAX:-80}"
+if [[ ! "$db_connection_max" =~ ^[0-9]+$ ]]; then
+  echo "production database connection limit is invalid" >&2
+  exit 1
+fi
+if (( db_connections > db_connection_max )); then
+  echo "production database connections are above the configured monitor limit" >&2
+  exit 1
+fi
 
-queue_depth="$("${compose[@]}" exec -T redis sh -c \
-  'redis-cli --scan --pattern "dq.*" | while read -r key; do redis-cli llen "$key"; done' \
-  | awk '{sum += $1} END {print sum + 0}')"
+queue_depth="$("${compose[@]}" exec -T redis sh -c '
+  set -eu
+  keys="$(redis-cli --scan --pattern "dramatiq:*")"
+  total=0
+  for key in $keys; do
+    key_type="$(redis-cli type "$key")"
+    case "$key_type" in
+      list) value="$(redis-cli llen "$key")" ;;
+      zset) value="$(redis-cli zcard "$key")" ;;
+      none) continue ;;
+      *) echo "unsupported Dramatiq Redis key type" >&2; exit 1 ;;
+    esac
+    case "$value" in
+      ""|*[!0-9]*) echo "invalid Dramatiq queue depth" >&2; exit 1 ;;
+    esac
+    total=$((total + value))
+  done
+  printf "%s\n" "$total"
+')"
 if [[ ! "$queue_depth" =~ ^[0-9]+$ || "$queue_depth" -gt "${SHANHAI_QUEUE_DEPTH_MAX:-1000}" ]]; then
   echo "production queue depth is above the configured monitor limit" >&2
   exit 1

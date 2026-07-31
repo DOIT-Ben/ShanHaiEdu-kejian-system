@@ -2,7 +2,7 @@
 
 当前阶段：阶段1后端基座、R1教材到教案链、三类九套和约6秒课堂导入短片已经形成教师可见MVP并进入`main`；真实文本与视频Provider黄金项目、对象生命周期加固、独立审查和合并后复验均已完成。当前正在执行[P0 Issue #244](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/244)正式环境部署。
 > 最后核验：2026-07-31。
-> 当前没有已授权的产品实现分支或开放Pull Request；普通开发与CI继续只使用确定性Fake。
+> 当前 #244 为 `status:in-progress`，对应开放 Draft PR #254；普通开发与CI继续只使用确定性Fake。
 
 ## 当前可演示成果
 

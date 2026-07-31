@@ -80,6 +80,8 @@ def test_live_current_status_records_post_mvp_convergence() -> None:
     assert "Issue #237" not in next_exit
     assert "Issue #244" in next_exit
     assert "status:blocked" in next_exit
+    assert "当前没有已授权的产品实现分支或开放Pull Request" not in text
+    assert "开放 Draft PR #254" in text
 
     for required_decision in (
         "主机身份、所有权、操作系统和可用资源",

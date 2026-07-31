@@ -60,6 +60,11 @@ fi
 rollback_release() {
   local status="$?"
   trap - ERR
+  if [[ -n "$previous_source" ]]; then
+    ln -sfn "$previous_source" "$production_root/current"
+  else
+    rm -f "$production_root/current"
+  fi
   if [[ -n "$previous_source" && -r "$previous_source/RELEASE_SHA" ]]; then
     local previous_sha
     previous_sha="$(tr -d '\r\n' < "$previous_source/RELEASE_SHA")"
@@ -113,6 +118,23 @@ pre_backup="$production_root/backups/pre-$release_sha-$timestamp.dump"
 chmod 0600 "$pre_backup"
 
 "${compose[@]}" up -d redis minio
+minio_pre_backup="/backups/minio-pre-$release_sha-$timestamp"
+"${compose[@]}" exec -T minio sh -eu -c '
+  umask 077
+  access_key="$(cat /run/secrets/minio_root_user)"
+  secret_key="$(cat /run/secrets/minio_root_password)"
+  export MC_HOST_production="http://${access_key}:${secret_key}@127.0.0.1:9000"
+  bucket="$1"
+  backup="$2"
+  rm -rf "$backup"
+  install -d -m 0700 "$backup"
+  if mc stat "production/$bucket" >/dev/null 2>&1; then
+    mc mirror --overwrite "production/$bucket" "$backup"
+    printf "present\n" > "$backup/.bucket-state"
+  else
+    printf "absent\n" > "$backup/.bucket-state"
+  fi
+' sh "${SHANHAI_OBJECT_STORAGE_BUCKET:-shanhaiedu-production}" "$minio_pre_backup"
 "${compose[@]}" run --rm api alembic upgrade head
 "${compose[@]}" run --rm api python -m apps.api.cli bootstrap-production-storage
 "${compose[@]}" run --rm api python -m apps.api.cli publish-golden-content
@@ -153,19 +175,27 @@ restore_bucket="shanhai-restore-${release_sha:0:12}-$(date -u +%s)"
   mc mirror --overwrite "production/$bucket" "$backup"
   mc mb --ignore-existing "production/$restore_bucket"
   mc mirror --overwrite --remove "$backup" "production/$restore_bucket"
-  mc diff "production/$bucket" "production/$restore_bucket"
+  if diff_output="$(mc diff "production/$bucket" "production/$restore_bucket")"; then
+    if ! [[ -z "$diff_output" ]]; then
+      echo "MinIO restore diff detected" >&2
+      exit 1
+    fi
+  else
+    echo "MinIO restore diff command failed" >&2
+    exit 1
+  fi
   mc rb --force "production/$restore_bucket"
 ' sh "${SHANHAI_OBJECT_STORAGE_BUCKET:-shanhaiedu-production}" "$minio_backup" "$restore_bucket"
 
 "${compose[@]}" up -d api worker web
 SHANHAI_RELEASE_SHA="$release_sha" "$source_root/infra/prod/verify.sh" --local
 
+if command -v nginx >/dev/null 2>&1; then
+  nginx -t
+fi
 if [[ -n "$previous_source" ]]; then
   ln -sfn "$previous_source" "$production_root/previous-release"
 fi
 ln -sfn "$source_root" "$production_root/current"
-if command -v nginx >/dev/null 2>&1; then
-  nginx -t
-fi
 trap - ERR
 echo "production release activated: $release_sha"

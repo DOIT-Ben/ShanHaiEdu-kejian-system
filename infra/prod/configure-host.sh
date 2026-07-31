@@ -20,6 +20,7 @@ fi
 source_root="$(readlink -f "$production_root/current")"
 nginx_binary="$(command -v nginx)"
 nginx_site_dir="${SHANHAI_NGINX_SITE_DIR:-/etc/nginx/sites-enabled}"
+nginx_log_root="${SHANHAI_NGINX_LOG_ROOT:-/var/log/nginx}"
 legacy_site="${SHANHAI_LEGACY_NGINX_SITE:-}"
 enabled="$nginx_site_dir/shanhaiedu-production-ip.conf"
 tls_certificate="${SHANHAI_TLS_CERTIFICATE:-}"
@@ -27,6 +28,7 @@ tls_private_key="${SHANHAI_TLS_PRIVATE_KEY:-}"
 backup_root="$production_root/shared/nginx-backup"
 backup="$backup_root/$(date -u +%Y%m%dT%H%M%SZ)"
 install -d -m 0755 "$nginx_site_dir"
+install -d -m 0755 "$nginx_log_root"
 install -d -m 0700 "$backup"
 if [[ -e "$enabled" ]]; then
   cp -a "$enabled" "$backup/previous-production-site"
@@ -84,6 +86,17 @@ if [[ -z "$tls_certificate" || -z "$tls_private_key" ]]; then
     --cert-name "$public_ip"
   tls_certificate="/etc/letsencrypt/live/$public_ip/fullchain.pem"
   tls_private_key="/etc/letsencrypt/live/$public_ip/privkey.pem"
+  if grep -q '^SHANHAI_TLS_CERTIFICATE=' "$environment_file"; then
+    sed -i "s|^SHANHAI_TLS_CERTIFICATE=.*|SHANHAI_TLS_CERTIFICATE=$tls_certificate|" "$environment_file"
+  else
+    printf 'SHANHAI_TLS_CERTIFICATE=%s\n' "$tls_certificate" >> "$environment_file"
+  fi
+  if grep -q '^SHANHAI_TLS_PRIVATE_KEY=' "$environment_file"; then
+    sed -i "s|^SHANHAI_TLS_PRIVATE_KEY=.*|SHANHAI_TLS_PRIVATE_KEY=$tls_private_key|" "$environment_file"
+  else
+    printf 'SHANHAI_TLS_PRIVATE_KEY=%s\n' "$tls_private_key" >> "$environment_file"
+  fi
+  chmod 0600 "$environment_file"
 fi
 if [[ ! -r "$tls_certificate" || ! -r "$tls_private_key" ]]; then
   echo "configured TLS material is unavailable" >&2
@@ -94,6 +107,7 @@ sed \
   -e "s|\${SHANHAI_PUBLIC_IP}|$public_ip|g" \
   -e "s|\${SHANHAI_TLS_CERTIFICATE}|$tls_certificate|g" \
   -e "s|\${SHANHAI_TLS_PRIVATE_KEY}|$tls_private_key|g" \
+  -e "s|\${SHANHAI_NGINX_LOG_ROOT}|$nginx_log_root|g" \
   "$source_root/infra/prod/host-nginx.conf.template" > "$enabled"
 activate_nginx
 
