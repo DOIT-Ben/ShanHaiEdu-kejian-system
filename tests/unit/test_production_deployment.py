@@ -102,6 +102,21 @@ def test_api_image_reads_file_secrets_then_drops_root() -> None:
     assert 'exec gosu 10001:10001 "$@"' in entrypoint
 
 
+def test_api_image_allows_a_controlled_debian_mirror_override() -> None:
+    dockerfile = (PROD / "Dockerfile.api").read_text(encoding="utf-8")
+    compose = yaml.safe_load((PROD / "compose.yaml").read_text(encoding="utf-8"))
+    environment_example = (PROD / "env.example").read_text(encoding="utf-8")
+
+    assert "ARG DEBIAN_MIRROR=https://deb.debian.org/debian" in dockerfile
+    assert "${DEBIAN_MIRROR}" in dockerfile
+    assert 'case "$DEBIAN_MIRROR" in' in dockerfile
+    assert 'echo "DEBIAN_MIRROR must use https" >&2' in dockerfile
+    assert compose["x-app"]["build"]["args"]["DEBIAN_MIRROR"] == (
+        "${SHANHAI_DEBIAN_MIRROR:-https://deb.debian.org/debian}"
+    )
+    assert "SHANHAI_DEBIAN_MIRROR=https://deb.debian.org/debian" in environment_example
+
+
 def test_production_monitor_covers_resource_and_request_health() -> None:
     monitor = (PROD / "monitor.sh").read_text(encoding="utf-8")
 
