@@ -22,6 +22,7 @@ def test_production_release_assets_are_complete() -> None:
         "host-nginx.conf.template",
         "env.example",
         "release.sh",
+        "validate-image-source.sh",
         "rollback.sh",
         "verify.sh",
         "monitor.sh",
@@ -224,6 +225,21 @@ def test_release_waits_for_database_and_object_storage_health_before_writes() ->
     assert redis_minio_wait in release
     assert release.index(postgres_wait) < release.index("pg_dump")
     assert release.index(redis_minio_wait) < release.index("mc mirror")
+
+
+def test_release_preflights_images_before_production_persistent_writes() -> None:
+    release = (PROD / "release.sh").read_text(encoding="utf-8")
+
+    preflight = 'bash "$source_root/infra/prod/validate-image-source.sh"'
+    assert preflight in release
+    assert '"$release_sha" "$production_root" 0 600' in release
+    assert release.index(preflight) < release.index(
+        'install -d -m 0700 -o root -g root "$SHANHAI_SECRET_DIR"'
+    )
+    assert release.index(preflight) < release.index(
+        'install -d -m 0700 -o root -g root "$production_root/backups"'
+    )
+    assert '"${compose[@]}" build api worker web' in release
 
 
 def test_release_validates_nginx_before_current_switch_and_restores_symlink() -> None:

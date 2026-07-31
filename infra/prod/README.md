@@ -37,6 +37,18 @@
 1. 从已审查并合并的 exact `origin/main` 生成 Git bundle，在服务器由该 bundle 建立 detached、干净且保留 Git object 校验能力的 `releases/<sha>` checkout，并写入只含 SHA 的 `RELEASE_SHA`。`release.sh` 会拒绝仅靠目录名或手写 manifest 冒充 exact SHA 的目录。
 2. 从 `env.example` 创建 `shared/production.env`，写入公网 IP、exact SHA 和固定 Principal ID，权限设为 `0600`。
    `SHANHAI_DEBIAN_MIRROR` 只控制 API 镜像构建期的 Debian 下载源，默认使用 Debian 官方 HTTPS 源；受控生产环境可显式覆盖为公开、无凭据、无查询参数或片段、且以 `/debian` 结尾的 HTTPS 镜像。公开镜像 URL 会写入镜像的 APT sources，禁止在该参数中放入密钥或私有 URL。
+   `SHANHAI_IMAGE_SOURCE` 默认为 `build`。共享主机无法安全承担镜像构建时，可显式设为 `preloaded`。该模式要求先在 exact checkout 构建 API/Web 镜像，记录导出前不可变 image ID，执行 `docker save` 后记录归档 SHA-256，传输前后核对归档 SHA-256，执行 `docker load` 后再次核对 image ID 与 OCI `org.opencontainers.image.revision` 标签。
+
+   将这四项事实写入 `$SHANHAI_PRODUCTION_ROOT/shared/preloaded-images/<sha>.env`，文件必须由 root 持有、权限为 `0600`，且不得是符号链接：
+
+   ```dotenv
+   SHANHAI_RELEASE_SHA=<exact-40-character-sha>
+   SHANHAI_PRELOADED_API_IMAGE_ID=sha256:<64-hex>
+   SHANHAI_PRELOADED_WEB_IMAGE_ID=sha256:<64-hex>
+   SHANHAI_PRELOADED_ARCHIVE_SHA256=<64-hex>
+   ```
+
+   `release.sh` 在创建 Secret、备份目录或启动任何生产服务之前验证模式、清单权限、清单字段、当前本地 image ID 和 OCI revision。任一项缺失或不匹配都会停止，且不得靠重打标签绕过 exact 构建来源绑定。
 3. 执行：
 
 ```bash
