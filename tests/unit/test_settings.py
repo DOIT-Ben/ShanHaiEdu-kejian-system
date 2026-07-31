@@ -107,6 +107,50 @@ def test_production_rejects_insecure_session_cookie_configuration() -> None:
         )
 
 
+def test_production_requires_exact_release_sha() -> None:
+    with pytest.raises(ValidationError, match="release_sha"):
+        Settings(
+            _env_file=None,
+            environment="production",
+            release_sha="dev",
+            database_url="postgresql://database.example/shanhai",
+            redis_url="redis://redis.example/0",
+            object_storage_health_url="https://storage.example/health/ready",
+            object_storage_endpoint="storage.example",
+            object_storage_public_endpoint="203.0.113.10",
+            object_storage_access_key=SecretStr("test-only-access-key"),
+            object_storage_secret_key=SecretStr("test-only-secret-key"),
+            session_access_code=SecretStr("x" * 24),
+            session_csrf_secret=SecretStr("y" * 32),
+            session_teacher_principal_id=UUID("01960000-0000-7000-8000-000000000001"),
+            session_allowed_origins=["https://203.0.113.10"],
+        )
+
+
+def test_production_accepts_separate_public_object_storage_endpoint() -> None:
+    settings = Settings(
+        _env_file=None,
+        environment="production",
+        release_sha="a" * 40,
+        database_url="postgresql://database.example/shanhai",
+        redis_url="redis://redis.example/0",
+        object_storage_health_url="http://minio:9000/minio/health/ready",
+        object_storage_endpoint="minio:9000",
+        object_storage_public_endpoint="203.0.113.10",
+        object_storage_public_secure=True,
+        object_storage_access_key=SecretStr("test-only-access-key"),
+        object_storage_secret_key=SecretStr("test-only-secret-key"),
+        session_access_code=SecretStr("x" * 24),
+        session_csrf_secret=SecretStr("y" * 32),
+        session_teacher_principal_id=UUID("01960000-0000-7000-8000-000000000001"),
+        session_allowed_origins=["https://203.0.113.10"],
+    )
+
+    assert settings.object_storage_endpoint == "minio:9000"
+    assert settings.object_storage_public_endpoint == "203.0.113.10"
+    assert settings.object_storage_public_secure is True
+
+
 def test_persistence_rejects_non_postgresql_urls() -> None:
     with pytest.raises(ValueError, match="requires PostgreSQL"):
         sqlalchemy_url("sqlite:///local.db")

@@ -40,7 +40,7 @@ def test_psycopg_probe_normalizes_sqlalchemy_postgresql_driver() -> None:
 
 
 async def test_liveness_is_independent_and_preserves_request_id() -> None:
-    settings = Settings(_env_file=None, environment="test")
+    settings = Settings(_env_file=None, environment="test", release_sha="a" * 40)
     app = create_app(settings=settings, readiness=StubReadiness(ready=False))
     transport = httpx.ASGITransport(app=app)
 
@@ -53,6 +53,7 @@ async def test_liveness_is_independent_and_preserves_request_id() -> None:
     assert response.status_code == 200
     assert response.headers[REQUEST_ID_HEADER] == "req_test_liveness"
     assert response.json()["data"]["status"] == "ok"
+    assert response.json()["data"]["release_sha"] == "a" * 40
 
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         api_response = await client.get("/api/v2/health/live")
