@@ -226,6 +226,18 @@ def test_release_waits_for_database_and_object_storage_health_before_writes() ->
     assert release.index(redis_minio_wait) < release.index("mc mirror")
 
 
+def test_release_accepts_only_exact_revision_labeled_preloaded_images() -> None:
+    release = (PROD / "release.sh").read_text(encoding="utf-8")
+
+    assert 'case "${SHANHAI_IMAGE_SOURCE:-build}" in' in release
+    assert "preloaded)" in release
+    assert "shanhaiedu-api:$release_sha" in release
+    assert "shanhaiedu-web:$release_sha" in release
+    assert "org.opencontainers.image.revision" in release
+    assert '"$revision" != "$release_sha"' in release
+    assert '"${compose[@]}" build api worker web' in release
+
+
 def test_release_validates_nginx_before_current_switch_and_restores_symlink() -> None:
     release = (PROD / "release.sh").read_text(encoding="utf-8")
 

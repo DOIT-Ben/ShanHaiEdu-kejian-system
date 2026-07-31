@@ -108,7 +108,28 @@ ensure_secret session_csrf_secret 32
 "${compose[@]}" config --quiet
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 
-"${compose[@]}" build api worker web
+case "${SHANHAI_IMAGE_SOURCE:-build}" in
+  build)
+    "${compose[@]}" build api worker web
+    ;;
+  preloaded)
+    for image in "shanhaiedu-api:$release_sha" "shanhaiedu-web:$release_sha"; do
+      if ! revision="$(docker image inspect "$image" \
+        --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')"; then
+        echo "preloaded production image is unavailable: $image" >&2
+        false
+      fi
+      if [[ "$revision" != "$release_sha" ]]; then
+        echo "preloaded production image revision does not match release SHA: $image" >&2
+        false
+      fi
+    done
+    ;;
+  *)
+    echo "SHANHAI_IMAGE_SOURCE must be build or preloaded" >&2
+    false
+    ;;
+esac
 "${compose[@]}" up -d --wait --wait-timeout 120 postgres
 pre_backup="$production_root/backups/pre-$release_sha-$timestamp.dump"
 "${compose[@]}" exec -T postgres pg_dump \
