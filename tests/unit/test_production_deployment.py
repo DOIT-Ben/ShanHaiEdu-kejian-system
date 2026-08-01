@@ -155,6 +155,15 @@ def test_api_image_reads_file_secrets_then_drops_root() -> None:
     assert 'exec gosu 10001:10001 "$@"' in entrypoint
 
 
+def test_api_image_normalizes_runtime_permissions_after_dependency_sync() -> None:
+    dockerfile = (PROD / "Dockerfile.api").read_text(encoding="utf-8")
+
+    dependency_sync = "uv sync --frozen --no-dev --no-editable"
+    runtime_permissions = "chmod -R a=rX /app"
+    assert runtime_permissions in dockerfile
+    assert dockerfile.index(dependency_sync) < dockerfile.index(runtime_permissions)
+
+
 def test_api_image_allows_a_controlled_debian_mirror_override() -> None:
     dockerfile = (PROD / "Dockerfile.api").read_text(encoding="utf-8")
     compose = yaml.safe_load((PROD / "compose.yaml").read_text(encoding="utf-8"))
