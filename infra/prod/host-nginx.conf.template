@@ -14,8 +14,8 @@ server {
 }
 
 server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
+    listen 443 ssl http2 default_server;
+    listen [::]:443 ssl http2 default_server;
     server_name ${SHANHAI_PUBLIC_IP};
     access_log ${SHANHAI_NGINX_LOG_ROOT}/shanhaiedu-production-access.log;
     error_log ${SHANHAI_NGINX_LOG_ROOT}/shanhaiedu-production-error.log;
