@@ -23,5 +23,7 @@ ARG SHANHAI_RELEASE_SHA
 LABEL org.opencontainers.image.title="ShanHaiEdu Web" \
       org.opencontainers.image.revision="${SHANHAI_RELEASE_SHA}"
 COPY --from=build /workspace/apps/web/dist /srv
-COPY infra/prod/web.conf /etc/caddy/Caddyfile
+COPY --chmod=0444 infra/prod/web.conf /etc/caddy/Caddyfile
+ENV XDG_CONFIG_HOME=/tmp/caddy-config \
+    XDG_DATA_HOME=/tmp/caddy-data
 USER 1000:1000
