@@ -113,11 +113,16 @@ def test_host_nginx_is_default_tls_server_for_ip_clients_without_sni() -> None:
 
 def test_web_image_makes_caddyfile_readable_to_the_non_root_runtime() -> None:
     dockerfile = (PROD / "Dockerfile.web").read_text(encoding="utf-8")
+    compose = yaml.safe_load((PROD / "compose.yaml").read_text(encoding="utf-8"))
+    web = compose["services"]["web"]
 
     assert "COPY --chmod=0444 infra/prod/web.conf /etc/caddy/Caddyfile" in dockerfile
     assert "XDG_CONFIG_HOME=/tmp/caddy-config" in dockerfile
     assert "XDG_DATA_HOME=/tmp/caddy-data" in dockerfile
     assert "USER 1000:1000" in dockerfile
+    assert web["read_only"] is True
+    assert web["tmpfs"] == ["/tmp:size=16m,mode=1777"]
+    assert web["security_opt"] == ["no-new-privileges:true"]
 
 
 def test_host_proxy_overwrites_forwarded_ip_and_caddy_uses_a_strict_trust_chain() -> None:
