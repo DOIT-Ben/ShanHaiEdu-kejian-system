@@ -111,6 +111,13 @@ def test_host_nginx_is_default_tls_server_for_ip_clients_without_sni() -> None:
     assert "listen [::]:443 ssl http2 default_server;" in nginx
 
 
+def test_web_image_makes_caddyfile_readable_to_the_non_root_runtime() -> None:
+    dockerfile = (PROD / "Dockerfile.web").read_text(encoding="utf-8")
+
+    assert "COPY --chmod=0444 infra/prod/web.conf /etc/caddy/Caddyfile" in dockerfile
+    assert "USER 1000:1000" in dockerfile
+
+
 def test_host_proxy_overwrites_forwarded_ip_and_caddy_uses_a_strict_trust_chain() -> None:
     compose = yaml.safe_load((PROD / "compose.yaml").read_text(encoding="utf-8"))
     nginx = (PROD / "host-nginx.conf.template").read_text(encoding="utf-8")
