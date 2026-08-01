@@ -384,6 +384,21 @@ def test_release_script_requires_exact_sha_backup_and_reversible_activation() ->
     assert "nginx -t" in rollback
 
 
+def test_release_validates_exact_checkout_before_sourcing_operation_lock() -> None:
+    release = (PROD / "release.sh").read_text(encoding="utf-8")
+    source_lock = 'source "$source_root/infra/prod/operation-lock.sh"'
+
+    for validation in (
+        'if [[ "$source_root" != "$production_root/releases/$release_sha" ]]',
+        'if [[ ! -r "$manifest" ]]',
+        'if [[ "$(git -C "$source_root" rev-parse --verify HEAD)" != "$release_sha" ]]',
+        'if ! git -C "$source_root" diff --quiet',
+        'unexpected_files="$(git -C "$source_root" status --porcelain',
+        'if [[ -n "$unexpected_files" ]]',
+    ):
+        assert release.index(validation) < release.index(source_lock)
+
+
 def test_release_waits_for_database_and_object_storage_health_before_writes() -> None:
     release = (PROD / "release.sh").read_text(encoding="utf-8")
 
