@@ -44,7 +44,8 @@ COPY contracts ./contracts
 COPY alembic ./alembic
 COPY alembic.ini ./
 RUN uv sync --frozen --no-dev --no-editable \
-    && find /app -type d -name __pycache__ -prune -exec rm -rf {} +
+    && find /app -type d -name __pycache__ -prune -exec rm -rf {} + \
+    && chmod -R a=rX /app
 
 COPY --chmod=0555 infra/prod/api-entrypoint.sh /usr/local/bin/shanhai-entrypoint
 ENTRYPOINT ["/usr/local/bin/shanhai-entrypoint"]
