@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+umask 077
 
 production_root="${SHANHAI_PRODUCTION_ROOT:-/opt/shanhaiedu-production}"
+operation_lock="$production_root/shared/operations.lock"
+exec 9>"$operation_lock"
+if ! flock --shared --nonblock 9; then
+  echo "production monitor skipped while a release or rollback is active"
+  exit 0
+fi
 environment_file="$production_root/shared/production.env"
 set -a
 source "$environment_file"

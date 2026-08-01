@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+umask 077
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "production rollback must run as root" >&2
@@ -7,6 +8,12 @@ if [[ "${EUID}" -ne 0 ]]; then
 fi
 
 production_root="${SHANHAI_PRODUCTION_ROOT:-/opt/shanhaiedu-production}"
+operation_lock="$production_root/shared/operations.lock"
+exec 9>"$operation_lock"
+if ! flock --exclusive --wait 60 9; then
+  echo "another production release or rollback is active" >&2
+  exit 1
+fi
 previous="$production_root/previous-release"
 environment_file="$production_root/shared/production.env"
 if [[ ! -L "$previous" ]]; then

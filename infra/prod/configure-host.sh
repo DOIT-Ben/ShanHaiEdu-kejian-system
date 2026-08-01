@@ -127,7 +127,7 @@ OnFailure=shanhaiedu-health-alert@%n.service
 
 [Service]
 Type=oneshot
-ExecStart=$production_root/current/infra/prod/monitor.sh
+ExecStart=/usr/bin/flock --shared --nonblock --conflict-exit-code 0 $production_root/shared/operations.lock $production_root/current/infra/prod/monitor.sh
 EOF
 cat > /etc/systemd/system/shanhaiedu-healthcheck.timer <<'EOF'
 [Unit]

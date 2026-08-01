@@ -158,6 +158,12 @@ def test_host_configuration_supports_the_approved_shared_ecs_layout() -> None:
     assert "ssl_certificate_key ${SHANHAI_TLS_PRIVATE_KEY};" in nginx
     assert 'configured TLS material is unavailable" >&2\n  false' in configure
     assert "shanhaiedu-healthcheck.timer" in configure
+    systemd_monitor_lock = (
+        "ExecStart=/usr/bin/flock --shared --nonblock --conflict-exit-code 0 "
+        "$production_root/shared/operations.lock "
+        "$production_root/current/infra/prod/monitor.sh"
+    )
+    assert systemd_monitor_lock in configure
 
 
 def test_api_image_reads_file_secrets_then_drops_root() -> None:
@@ -265,6 +271,58 @@ def test_production_monitor_covers_resource_and_request_health() -> None:
     assert '"http_status":5' in monitor
     assert "SHANHAI_DB_CONNECTION_MAX" in monitor
     assert "http://127.0.0.1:18080/health/live" in monitor
+
+
+def test_release_rollback_and_monitor_coordinate_with_one_operation_lock() -> None:
+    release = (PROD / "release.sh").read_text(encoding="utf-8")
+    rollback = (PROD / "rollback.sh").read_text(encoding="utf-8")
+    monitor = (PROD / "monitor.sh").read_text(encoding="utf-8")
+    lock_path = 'operation_lock="$production_root/shared/operations.lock"'
+
+    for mutation_script in (release, rollback):
+        assert "umask 077" in mutation_script
+        assert lock_path in mutation_script
+        assert 'exec 9>"$operation_lock"' in mutation_script
+        assert "flock --exclusive --wait 60 9" in mutation_script
+
+    assert release.index("flock --exclusive --wait 60 9") < release.index(
+        'bash "$source_root/infra/prod/validate-image-source.sh"'
+    )
+    assert rollback.index("flock --exclusive --wait 60 9") < rollback.index(
+        '"${compose[@]}" up -d --no-build api worker web'
+    )
+    assert "umask 077" in monitor
+    assert lock_path in monitor
+    assert 'exec 9>"$operation_lock"' in monitor
+    assert "flock --shared --nonblock 9" in monitor
+    assert monitor.index("flock --shared --nonblock 9") < monitor.index(
+        '"$production_root/current/infra/prod/verify.sh" --public'
+    )
+    assert "production monitor skipped while a release or rollback is active" in monitor
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="flock behavior is verified on Linux")
+def test_monitor_skips_cleanly_while_an_operation_lock_is_held(tmp_path: Path) -> None:
+    import fcntl
+
+    production_root = tmp_path / "production"
+    shared = production_root / "shared"
+    shared.mkdir(parents=True)
+    lock_path = shared / "operations.lock"
+
+    with lock_path.open("w", encoding="utf-8") as lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        result = subprocess.run(
+            ["bash", str(PROD / "monitor.sh")],
+            check=False,
+            capture_output=True,
+            env={"SHANHAI_PRODUCTION_ROOT": str(production_root)},
+            text=True,
+        )
+
+    assert result.returncode == 0
+    assert result.stdout == ("production monitor skipped while a release or rollback is active\n")
+    assert result.stderr == ""
 
 
 def test_release_script_requires_exact_sha_backup_and_reversible_activation() -> None:

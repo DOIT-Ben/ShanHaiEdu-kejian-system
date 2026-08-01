@@ -16,6 +16,7 @@ fi
 source_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 production_root="${SHANHAI_PRODUCTION_ROOT:-/opt/shanhaiedu-production}"
 environment_file="$production_root/shared/production.env"
+operation_lock="$production_root/shared/operations.lock"
 manifest="$source_root/RELEASE_SHA"
 compose=(docker compose --project-name shanhaiedu-production --env-file "$environment_file" -f "$source_root/infra/prod/compose.yaml")
 
@@ -42,6 +43,11 @@ if [[ -n "$unexpected_files" ]]; then
 fi
 if [[ ! -r "$environment_file" ]]; then
   echo "production environment file is unavailable" >&2
+  exit 1
+fi
+exec 9>"$operation_lock"
+if ! flock --exclusive --wait 60 9; then
+  echo "another production release or rollback is active" >&2
   exit 1
 fi
 
