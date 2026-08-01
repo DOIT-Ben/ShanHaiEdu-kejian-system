@@ -104,6 +104,13 @@ def test_host_nginx_contract_preserves_https_sse_and_private_services() -> None:
     assert "reverse_proxy minio:9000" in web
 
 
+def test_host_nginx_is_default_tls_server_for_ip_clients_without_sni() -> None:
+    nginx = (PROD / "host-nginx.conf.template").read_text(encoding="utf-8")
+
+    assert "listen 443 ssl http2 default_server;" in nginx
+    assert "listen [::]:443 ssl http2 default_server;" in nginx
+
+
 def test_host_proxy_overwrites_forwarded_ip_and_caddy_uses_a_strict_trust_chain() -> None:
     compose = yaml.safe_load((PROD / "compose.yaml").read_text(encoding="utf-8"))
     nginx = (PROD / "host-nginx.conf.template").read_text(encoding="utf-8")
