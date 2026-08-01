@@ -73,6 +73,8 @@ sudo /opt/shanhaiedu-production/current/infra/prod/verify.sh --public
 
 `configure-host.sh` 会安装五分钟一次的 `shanhaiedu-healthcheck.timer`。健康、证书剩余期限或公网入口失败会使 unit 进入 failed，并通过 `shanhaiedu-health-alert@.service` 写入固定格式的脱敏高优先级日志；运维入口为 `systemctl status`、`journalctl -u shanhaiedu-healthcheck.service` 和 Docker Compose 服务状态。
 
+`release.sh` 与 `rollback.sh` 通过 root-owned `0600` 的 `shared/operations.lock` 持有独占锁；`monitor.sh` 使用同一文件的共享非阻塞锁。锁初始化会拒绝符号链接、非普通文件和多硬链接，并原位保留已存在的锁 inode。systemd healthcheck 也会在解析 `current` 下的监控脚本前获取共享非阻塞锁，使回退到不含此协调逻辑的旧应用版本时仍保持发布互斥。已经开始的监控会在换容器前自然完成，发布或回退进行中触发的定时监控会成功跳过，避免把受控容器替换误报为应用故障。
+
 真实业务 Playwright 必须从外部客户端运行，使用受控 access code 完成登录、项目创建、教材上传、异步生成、刷新恢复和登出负测。不得在普通验证中调用真实 Provider。
 
 ## 回退

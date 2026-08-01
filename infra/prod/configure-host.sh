@@ -18,6 +18,8 @@ if [[ ! "$public_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
 fi
 
 source_root="$(readlink -f "$production_root/current")"
+source "$source_root/infra/prod/operation-lock.sh"
+prepare_production_operation_lock "$production_root"
 nginx_binary="$(command -v nginx)"
 nginx_site_dir="${SHANHAI_NGINX_SITE_DIR:-/etc/nginx/sites-enabled}"
 nginx_log_root="${SHANHAI_NGINX_LOG_ROOT:-/var/log/nginx}"
@@ -127,7 +129,8 @@ OnFailure=shanhaiedu-health-alert@%n.service
 
 [Service]
 Type=oneshot
-ExecStart=$production_root/current/infra/prod/monitor.sh
+UMask=0077
+ExecStart=/usr/bin/flock --shared --nonblock --conflict-exit-code 0 $production_root/shared/operations.lock $production_root/current/infra/prod/monitor.sh
 EOF
 cat > /etc/systemd/system/shanhaiedu-healthcheck.timer <<'EOF'
 [Unit]

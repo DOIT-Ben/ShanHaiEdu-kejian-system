@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -26,6 +27,7 @@ def test_production_release_assets_are_complete() -> None:
         "rollback.sh",
         "verify.sh",
         "monitor.sh",
+        "operation-lock.sh",
         "README.md",
     }
 
@@ -158,6 +160,18 @@ def test_host_configuration_supports_the_approved_shared_ecs_layout() -> None:
     assert "ssl_certificate_key ${SHANHAI_TLS_PRIVATE_KEY};" in nginx
     assert 'configured TLS material is unavailable" >&2\n  false' in configure
     assert "shanhaiedu-healthcheck.timer" in configure
+    prepare_lock = 'prepare_production_operation_lock "$production_root"'
+    assert prepare_lock in configure
+    assert configure.index(prepare_lock) < configure.index(
+        "systemctl enable --now shanhaiedu-healthcheck.timer"
+    )
+    assert "UMask=0077" in configure
+    systemd_monitor_lock = (
+        "ExecStart=/usr/bin/flock --shared --nonblock --conflict-exit-code 0 "
+        "$production_root/shared/operations.lock "
+        "$production_root/current/infra/prod/monitor.sh"
+    )
+    assert systemd_monitor_lock in configure
 
 
 def test_api_image_reads_file_secrets_then_drops_root() -> None:
@@ -267,6 +281,88 @@ def test_production_monitor_covers_resource_and_request_health() -> None:
     assert "http://127.0.0.1:18080/health/live" in monitor
 
 
+def test_release_rollback_and_monitor_coordinate_with_one_operation_lock() -> None:
+    release = (PROD / "release.sh").read_text(encoding="utf-8")
+    rollback = (PROD / "rollback.sh").read_text(encoding="utf-8")
+    monitor = (PROD / "monitor.sh").read_text(encoding="utf-8")
+    lock_path = 'operation_lock="$production_root/shared/operations.lock"'
+    prepare_lock = 'prepare_production_operation_lock "$production_root"'
+
+    for mutation_script in (release, rollback):
+        assert "umask 077" in mutation_script
+        assert lock_path in mutation_script
+        assert prepare_lock in mutation_script
+        assert mutation_script.index(prepare_lock) < mutation_script.index(
+            'exec 9>"$operation_lock"'
+        )
+        assert 'exec 9>"$operation_lock"' in mutation_script
+        assert "flock --exclusive --wait 60 9" in mutation_script
+
+    assert release.index("flock --exclusive --wait 60 9") < release.index(
+        'bash "$source_root/infra/prod/validate-image-source.sh"'
+    )
+    assert rollback.index("flock --exclusive --wait 60 9") < rollback.index(
+        '"${compose[@]}" up -d --no-build api worker web'
+    )
+    assert "umask 077" in monitor
+    assert lock_path in monitor
+    assert prepare_lock in monitor
+    assert monitor.index(prepare_lock) < monitor.index('exec 9>"$operation_lock"')
+    assert 'exec 9>"$operation_lock"' in monitor
+    assert "flock --shared --nonblock 9" in monitor
+    assert monitor.index("flock --shared --nonblock 9") < monitor.index(
+        '"$production_root/current/infra/prod/verify.sh" --public'
+    )
+    assert "production monitor skipped while a release or rollback is active" in monitor
+
+
+def test_operation_lock_initializer_is_root_only_inode_preserving_and_link_safe() -> None:
+    initializer = (PROD / "operation-lock.sh").read_text(encoding="utf-8")
+
+    assert 'shared_dir="$production_root/shared"' in initializer
+    assert 'operation_lock="$shared_dir/operations.lock"' in initializer
+    assert '[[ -L "$shared_dir" || ! -d "$shared_dir" ]]' in initializer
+    assert '[[ -L "$operation_lock" ]]' in initializer
+    assert '[[ ! -f "$operation_lock" ]]' in initializer
+    assert "umask 077" in initializer
+    assert "set -o noclobber" in initializer
+    assert initializer.index("umask 077") < initializer.index("set -o noclobber")
+    assert 'stat -c "%u %g %a %h" -- "$operation_lock"' in initializer
+    assert '[[ "$lock_links" != "1" ]]' in initializer
+    assert 'chown root:root -- "$operation_lock"' in initializer
+    assert 'chmod 0600 -- "$operation_lock"' in initializer
+    assert '[[ "$lock_owner:$lock_group:$lock_mode:$lock_links" != "0:0:600:1" ]]' in initializer
+    assert "mv " not in initializer
+    assert "install " not in initializer
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32" or getattr(os, "geteuid", lambda: 1)() != 0,
+    reason="production lock behavior requires a root Linux runtime",
+)
+def test_monitor_skips_cleanly_while_an_operation_lock_is_held(tmp_path: Path) -> None:
+    import fcntl
+
+    production_root = tmp_path / "production"
+    shared = production_root / "shared"
+    shared.mkdir(parents=True)
+    lock_path = shared / "operations.lock"
+
+    with lock_path.open("w", encoding="utf-8") as lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        result = subprocess.run(
+            ["bash", str(PROD / "monitor.sh")],
+            check=False,
+            capture_output=True,
+            env={"SHANHAI_PRODUCTION_ROOT": str(production_root)},
+            text=True,
+        )
+
+    assert result.returncode == 0
+    assert result.stdout == ("production monitor skipped while a release or rollback is active\n")
+    assert result.stderr == ""
+
+
 def test_release_script_requires_exact_sha_backup_and_reversible_activation() -> None:
     release = (PROD / "release.sh").read_text(encoding="utf-8")
     rollback = (PROD / "rollback.sh").read_text(encoding="utf-8")
@@ -286,6 +382,21 @@ def test_release_script_requires_exact_sha_backup_and_reversible_activation() ->
     assert "previous-release" in release
     assert "docker compose" in rollback
     assert "nginx -t" in rollback
+
+
+def test_release_validates_exact_checkout_before_sourcing_operation_lock() -> None:
+    release = (PROD / "release.sh").read_text(encoding="utf-8")
+    source_lock = 'source "$source_root/infra/prod/operation-lock.sh"'
+
+    for validation in (
+        'if [[ "$source_root" != "$production_root/releases/$release_sha" ]]',
+        'if [[ ! -r "$manifest" ]]',
+        'if [[ "$(git -C "$source_root" rev-parse --verify HEAD)" != "$release_sha" ]]',
+        'if ! git -C "$source_root" diff --quiet',
+        'unexpected_files="$(git -C "$source_root" status --porcelain',
+        'if [[ -n "$unexpected_files" ]]',
+    ):
+        assert release.index(validation) < release.index(source_lock)
 
 
 def test_release_waits_for_database_and_object_storage_health_before_writes() -> None:
