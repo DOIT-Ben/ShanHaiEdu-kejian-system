@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -26,6 +27,7 @@ def test_production_release_assets_are_complete() -> None:
         "rollback.sh",
         "verify.sh",
         "monitor.sh",
+        "operation-lock.sh",
         "README.md",
     }
 
@@ -158,6 +160,12 @@ def test_host_configuration_supports_the_approved_shared_ecs_layout() -> None:
     assert "ssl_certificate_key ${SHANHAI_TLS_PRIVATE_KEY};" in nginx
     assert 'configured TLS material is unavailable" >&2\n  false' in configure
     assert "shanhaiedu-healthcheck.timer" in configure
+    prepare_lock = 'prepare_production_operation_lock "$production_root"'
+    assert prepare_lock in configure
+    assert configure.index(prepare_lock) < configure.index(
+        "systemctl enable --now shanhaiedu-healthcheck.timer"
+    )
+    assert "UMask=0077" in configure
     systemd_monitor_lock = (
         "ExecStart=/usr/bin/flock --shared --nonblock --conflict-exit-code 0 "
         "$production_root/shared/operations.lock "
@@ -278,10 +286,15 @@ def test_release_rollback_and_monitor_coordinate_with_one_operation_lock() -> No
     rollback = (PROD / "rollback.sh").read_text(encoding="utf-8")
     monitor = (PROD / "monitor.sh").read_text(encoding="utf-8")
     lock_path = 'operation_lock="$production_root/shared/operations.lock"'
+    prepare_lock = 'prepare_production_operation_lock "$production_root"'
 
     for mutation_script in (release, rollback):
         assert "umask 077" in mutation_script
         assert lock_path in mutation_script
+        assert prepare_lock in mutation_script
+        assert mutation_script.index(prepare_lock) < mutation_script.index(
+            'exec 9>"$operation_lock"'
+        )
         assert 'exec 9>"$operation_lock"' in mutation_script
         assert "flock --exclusive --wait 60 9" in mutation_script
 
@@ -293,6 +306,8 @@ def test_release_rollback_and_monitor_coordinate_with_one_operation_lock() -> No
     )
     assert "umask 077" in monitor
     assert lock_path in monitor
+    assert prepare_lock in monitor
+    assert monitor.index(prepare_lock) < monitor.index('exec 9>"$operation_lock"')
     assert 'exec 9>"$operation_lock"' in monitor
     assert "flock --shared --nonblock 9" in monitor
     assert monitor.index("flock --shared --nonblock 9") < monitor.index(
@@ -301,7 +316,30 @@ def test_release_rollback_and_monitor_coordinate_with_one_operation_lock() -> No
     assert "production monitor skipped while a release or rollback is active" in monitor
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="flock behavior is verified on Linux")
+def test_operation_lock_initializer_is_root_only_inode_preserving_and_link_safe() -> None:
+    initializer = (PROD / "operation-lock.sh").read_text(encoding="utf-8")
+
+    assert 'shared_dir="$production_root/shared"' in initializer
+    assert 'operation_lock="$shared_dir/operations.lock"' in initializer
+    assert '[[ -L "$shared_dir" || ! -d "$shared_dir" ]]' in initializer
+    assert '[[ -L "$operation_lock" ]]' in initializer
+    assert '[[ ! -f "$operation_lock" ]]' in initializer
+    assert "umask 077" in initializer
+    assert "set -o noclobber" in initializer
+    assert initializer.index("umask 077") < initializer.index("set -o noclobber")
+    assert 'stat -c "%u %g %a %h" -- "$operation_lock"' in initializer
+    assert '[[ "$lock_links" != "1" ]]' in initializer
+    assert 'chown root:root -- "$operation_lock"' in initializer
+    assert 'chmod 0600 -- "$operation_lock"' in initializer
+    assert '[[ "$lock_owner:$lock_group:$lock_mode:$lock_links" != "0:0:600:1" ]]' in initializer
+    assert "mv " not in initializer
+    assert "install " not in initializer
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32" or getattr(os, "geteuid", lambda: 1)() != 0,
+    reason="production lock behavior requires a root Linux runtime",
+)
 def test_monitor_skips_cleanly_while_an_operation_lock_is_held(tmp_path: Path) -> None:
     import fcntl
 

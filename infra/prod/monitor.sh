@@ -4,6 +4,9 @@ umask 077
 
 production_root="${SHANHAI_PRODUCTION_ROOT:-/opt/shanhaiedu-production}"
 operation_lock="$production_root/shared/operations.lock"
+script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$script_root/operation-lock.sh"
+prepare_production_operation_lock "$production_root"
 exec 9>"$operation_lock"
 if ! flock --shared --nonblock 9; then
   echo "production monitor skipped while a release or rollback is active"
