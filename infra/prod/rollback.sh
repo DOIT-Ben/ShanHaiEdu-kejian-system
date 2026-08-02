@@ -29,19 +29,72 @@ if [[ ! "$previous_sha" =~ ^[0-9a-f]{40}$ ]]; then
   echo "previous release manifest is invalid" >&2
   exit 1
 fi
+if [[ ! -L "$production_root/current" ]]; then
+  echo "current release is unavailable" >&2
+  exit 1
+fi
+current_source="$(readlink -f "$production_root/current")"
+current_sha="$(tr -d '\r\n' < "$current_source/RELEASE_SHA")"
+if [[ ! "$current_sha" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "current release manifest is invalid" >&2
+  exit 1
+fi
 
+update_release_environment() {
+  python3 "$script_root/update_production_release.py" "$environment_file" "$1" "$2" 0 600
+}
+
+environment_release_sha="$(
+  awk '
+    BEGIN { prefix = "SHANHAI_RELEASE_SHA=" }
+    index($0, prefix) == 1 {
+      value = substr($0, length(prefix) + 1)
+      sub(/\r$/, "", value)
+      print value
+    }
+  ' "$environment_file"
+)"
+if [[ "$environment_release_sha" != "$current_sha" ]]; then
+  echo "production environment release SHA does not match current release" >&2
+  exit 1
+fi
+update_release_environment "$environment_release_sha" "$environment_release_sha" >/dev/null
 set -a
 source "$environment_file"
 set +a
+sourced_environment_release_sha="${SHANHAI_RELEASE_SHA:?"production environment release SHA is required"}"
+if [[ "$sourced_environment_release_sha" != "$environment_release_sha" ]]; then
+  echo "production environment release SHA changed during validation" >&2
+  exit 1
+fi
 export SHANHAI_RELEASE_SHA="$previous_sha"
 export SHANHAI_SECRET_DIR="${SHANHAI_SECRET_DIR:-$production_root/shared/secrets}"
 compose=(docker compose --env-file "$environment_file" -f "$previous_source/infra/prod/compose.yaml")
+
+rollback_rollback() {
+  local status="$?"
+  trap - ERR
+  ln -sfn "$previous_source" "$production_root/previous-release"
+  ln -sfn "$current_source" "$production_root/current"
+  if ! update_release_environment "$previous_sha" "$current_sha"; then
+    echo "production rollback environment restoration failed" >&2
+  fi
+  SHANHAI_RELEASE_SHA="$current_sha" docker compose \
+    --env-file "$environment_file" \
+    -f "$current_source/infra/prod/compose.yaml" \
+    up -d --no-build api worker web || true
+  echo "production rollback failed and application restoration was attempted" >&2
+  exit "$status"
+}
+trap rollback_rollback ERR
+
 "${compose[@]}" up -d --no-build api worker web
 SHANHAI_RELEASE_SHA="$previous_sha" "$previous_source/infra/prod/verify.sh" --local
 
-current_source="$(readlink -f "$production_root/current")"
 ln -sfn "$current_source" "$production_root/previous-release"
 ln -sfn "$previous_source" "$production_root/current"
+update_release_environment "$current_sha" "$previous_sha"
 nginx -t
 systemctl reload nginx
+trap - ERR
 echo "application rollback activated: $previous_sha"
