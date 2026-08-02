@@ -54,7 +54,7 @@ def section(text: str, heading: str) -> str:
     return body.split("\n## ", maxsplit=1)[0]
 
 
-def test_live_current_status_records_post_mvp_convergence() -> None:
+def test_live_current_status_records_production_mvp_closeout() -> None:
     text = (ROOT / "CURRENT_STATUS.md").read_text(encoding="utf-8")
 
     completed = section(text, "已完成")
@@ -68,35 +68,38 @@ def test_live_current_status_records_post_mvp_convergence() -> None:
     assert "PR #222与#230均已关闭" in completed
     assert "#222" not in current
     assert "#230" not in current
+    assert "Issue #244" in completed
+    assert "PR #254" in completed
+    assert "#268" in completed
+    assert "Issue #244" not in current
+    assert "Issue #244" not in next_exit
+    assert "8ec831072c643c7bc9b4cdcf2d240fd3f469bedd" in text
+    assert "https://121.40.117.240" in text
+    assert "3/3" in text
     assert "Issue #165" in current
-    assert "第三次" in current
-    assert "第四次" in current
     assert "status:blocked" in current
-    assert "不自动重试" in blocked
     assert "Issue #233" in current
     assert "Issue #237" in current
     assert "status:ready" in current
     assert "Issue #233" not in next_exit
     assert "Issue #237" not in next_exit
-    assert "Issue #244" in next_exit
-    assert "status:blocked" in next_exit
-    assert "当前没有已授权的产品实现分支或开放Pull Request" not in text
+    assert "当前没有已批准且处于`status:in-progress`的产品实现Issue" in current
+    assert "共享同一ECS" in blocked
+    assert "阶段5产品方向尚未决定" in blocked
+    assert "Decision Issue" in next_exit
+    assert "先写失败测试" in next_exit
+    assert "独立reviewer绑定final exact base/head" in next_exit
     assert "开放 Draft PR #254" not in text
-    assert "PR #254 至 #260 已合并" in text
-    assert "hotfix/244-loopback-ingress-network" in text
-    assert "status:in-progress" in text
+    assert "hotfix/244-loopback-ingress-network" not in text
 
-    for required_decision in (
-        "主机身份、所有权、操作系统和可用资源",
-        "域名、DNS、TLS证书和反向代理",
-        "Web、API、Worker、PostgreSQL、Redis、对象存储",
-        "Session/CSRF/CORS/Cookie、访问码、Provider和对象存储密钥",
-        "Alembic迁移、迁移前备份、恢复验证",
-        "健康检查、结构化日志、错误率、延迟、队列深度、磁盘和数据库连接监控",
-        "精确版本发布、回退触发条件、旧版本保留和回退演练",
-        "受控内测或公开开放",
+    for next_slice_candidate in (
+        "PPT/PPTX",
+        "完整图片链",
+        "完整视频链",
+        "TTS",
     ):
-        assert required_decision in blocked
+        assert next_slice_candidate in blocked
+        assert next_slice_candidate in next_exit
 
 
 def test_current_status_accepts_controlled_stage_overlap(tmp_path: Path) -> None:
