@@ -53,23 +53,71 @@ if ! flock --exclusive --wait 60 9; then
   exit 1
 fi
 
+update_release_environment() {
+  python3 "$source_root/infra/prod/update_production_release.py" "$environment_file" "$1" "$2" 0 600
+}
+
+environment_release_sha="$(
+  python3 "$source_root/infra/prod/update_production_release.py" inspect "$environment_file" 0 600
+)"
+if [[ ! "$environment_release_sha" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "production environment release SHA is invalid" >&2
+  exit 1
+fi
+update_release_environment "$environment_release_sha" "$environment_release_sha" >/dev/null
 set -a
 source "$environment_file"
 set +a
+sourced_environment_release_sha="${SHANHAI_RELEASE_SHA:?"production environment release SHA is required"}"
+if [[ "$sourced_environment_release_sha" != "$environment_release_sha" ]]; then
+  echo "production environment release SHA changed during validation" >&2
+  exit 1
+fi
 export SHANHAI_RELEASE_SHA="$release_sha"
 export SHANHAI_PRODUCTION_ROOT="$production_root"
 export SHANHAI_SECRET_DIR="${SHANHAI_SECRET_DIR:-$production_root/shared/secrets}"
 export COMPOSE_PARALLEL_LIMIT=1
+
+previous_source=""
+previous_sha=""
+previous_release_path="$production_root/previous-release"
+original_previous_release_present=false
+original_previous_release_target=""
+if [[ -L "$production_root/current" ]]; then
+  previous_source="$(readlink -f "$production_root/current")"
+  if [[ ! -r "$previous_source/RELEASE_SHA" ]]; then
+    echo "current production release manifest is unavailable" >&2
+    exit 1
+  fi
+  previous_sha="$(tr -d '\r\n' < "$previous_source/RELEASE_SHA")"
+  if [[ ! "$previous_sha" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "current production release manifest is invalid" >&2
+    exit 1
+  fi
+  if [[ "$environment_release_sha" != "$previous_sha" ]]; then
+    echo "production environment release SHA does not match current release" >&2
+    exit 1
+  fi
+elif [[ -e "$production_root/current" ]]; then
+  echo "current production release is not a symbolic link" >&2
+  exit 1
+elif [[ "$environment_release_sha" != "$release_sha" ]]; then
+  echo "initial production environment release SHA does not match requested release" >&2
+  exit 1
+fi
+if [[ -L "$previous_release_path" ]]; then
+  original_previous_release_present=true
+  original_previous_release_target="$(readlink "$previous_release_path")"
+elif [[ -e "$previous_release_path" ]]; then
+  echo "previous-release is not a symbolic link" >&2
+  exit 1
+fi
 
 image_source="$(
   bash "$source_root/infra/prod/validate-image-source.sh" \
     "$release_sha" "$production_root" 0 600
 )"
 
-previous_source=""
-if [[ -L "$production_root/current" ]]; then
-  previous_source="$(readlink -f "$production_root/current")"
-fi
 rollback_release() {
   local status="$?"
   trap - ERR
@@ -78,16 +126,20 @@ rollback_release() {
   else
     rm -f "$production_root/current"
   fi
-  if [[ -n "$previous_source" && -r "$previous_source/RELEASE_SHA" ]]; then
-    local previous_sha
-    previous_sha="$(tr -d '\r\n' < "$previous_source/RELEASE_SHA")"
-    if [[ "$previous_sha" =~ ^[0-9a-f]{40}$ ]]; then
-      SHANHAI_RELEASE_SHA="$previous_sha" docker compose \
-        --project-name shanhaiedu-production \
-        --env-file "$environment_file" \
-        -f "$previous_source/infra/prod/compose.yaml" \
-        up -d --no-build api worker web || true
-    fi
+  if [[ "$original_previous_release_present" == true ]]; then
+    ln -sfn "$original_previous_release_target" "$previous_release_path"
+  else
+    rm -f "$previous_release_path"
+  fi
+  if ! update_release_environment "$release_sha" "$environment_release_sha"; then
+    echo "production release environment rollback failed" >&2
+  fi
+  if [[ -n "$previous_source" ]]; then
+    SHANHAI_RELEASE_SHA="$previous_sha" docker compose \
+      --project-name shanhaiedu-production \
+      --env-file "$environment_file" \
+      -f "$previous_source/infra/prod/compose.yaml" \
+      up -d --no-build api worker web || true
   else
     "${compose[@]}" stop api worker web >/dev/null 2>&1 || true
   fi
@@ -209,8 +261,9 @@ if command -v nginx >/dev/null 2>&1; then
   nginx -t
 fi
 if [[ -n "$previous_source" ]]; then
-  ln -sfn "$previous_source" "$production_root/previous-release"
+  ln -sfn "$previous_source" "$previous_release_path"
 fi
 ln -sfn "$source_root" "$production_root/current"
+update_release_environment "$environment_release_sha" "$release_sha"
 trap - ERR
 echo "production release activated: $release_sha"

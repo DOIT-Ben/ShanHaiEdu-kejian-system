@@ -28,6 +28,7 @@ def test_production_release_assets_are_complete() -> None:
         "verify.sh",
         "monitor.sh",
         "operation-lock.sh",
+        "update_production_release.py",
         "README.md",
     }
 

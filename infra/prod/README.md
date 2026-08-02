@@ -75,6 +75,8 @@ sudo /opt/shanhaiedu-production/current/infra/prod/verify.sh --public
 
 `release.sh` 与 `rollback.sh` 通过 root-owned `0600` 的 `shared/operations.lock` 持有独占锁；`monitor.sh` 使用同一文件的共享非阻塞锁。锁初始化会拒绝符号链接、非普通文件和多硬链接，并原位保留已存在的锁 inode。systemd healthcheck 也会在解析 `current` 下的监控脚本前获取共享非阻塞锁，使回退到不含此协调逻辑的旧应用版本时仍保持发布互斥。已经开始的监控会在换容器前自然完成，发布或回退进行中触发的定时监控会成功跳过，避免把受控容器替换误报为应用故障。
 
+同一独占锁还保护 `current`、`previous-release` 与 `shared/production.env` 的 exact SHA 切换。发布和回退只接受 root-owned `0600`、单硬链接且仅含一个 `SHANHAI_RELEASE_SHA` 条目的环境文件，并通过同目录原子替换持久更新该字段；环境 SHA 与切换前 `current` 不一致时会在替换应用前停止。切换后的任一步失败会恢复原链接、原环境 SHA 和原应用版本。
+
 真实业务 Playwright 必须从外部客户端运行，使用受控 access code 完成登录、项目创建、教材上传、异步生成、刷新恢复和登出负测。不得在普通验证中调用真实 Provider。
 
 ## 回退
@@ -85,6 +87,6 @@ sudo /opt/shanhaiedu-production/current/infra/prod/verify.sh --public
 sudo /opt/shanhaiedu-production/current/infra/prod/rollback.sh
 ```
 
-回退只重启上一版 API、Worker 和 Web 镜像，不降级数据库、不删除对象和业务事实。数据完整性或安全问题应停止入口并执行前向修复；不得盲目恢复旧数据库覆盖已确认写入。
+回退只重启上一版 API、Worker 和 Web 镜像，并在同一独占锁内原子同步 `production.env` 的 exact SHA；不降级数据库、不删除对象和业务事实。回退过程失败时会尝试恢复原应用、链接和环境 SHA。数据完整性或安全问题应停止入口并执行前向修复；不得盲目恢复旧数据库覆盖已确认写入。
 
 首次 Nginx 切换失败由 `configure-host.sh` 的错误 trap 自动恢复。手工恢复时读取 `shared/nginx-backup/latest`，核对 `legacy-site-path` 后恢复原站点文件，并先运行 `nginx -t`。
