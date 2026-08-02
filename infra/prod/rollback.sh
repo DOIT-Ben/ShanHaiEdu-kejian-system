@@ -45,14 +45,7 @@ update_release_environment() {
 }
 
 environment_release_sha="$(
-  awk '
-    BEGIN { prefix = "SHANHAI_RELEASE_SHA=" }
-    index($0, prefix) == 1 {
-      value = substr($0, length(prefix) + 1)
-      sub(/\r$/, "", value)
-      print value
-    }
-  ' "$environment_file"
+  python3 "$script_root/update_production_release.py" inspect "$environment_file" 0 600
 )"
 if [[ "$environment_release_sha" != "$current_sha" ]]; then
   echo "production environment release SHA does not match current release" >&2

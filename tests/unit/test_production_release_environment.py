@@ -44,10 +44,36 @@ def _run_updater(
     )
 
 
+def _run_inspector(path: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            sys.executable,
+            str(UPDATER),
+            "inspect",
+            str(path),
+            str(os.getuid()),
+            "600",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
 pytestmark = pytest.mark.skipif(
     sys.platform == "win32",
     reason="production environment ownership and atomic replacement require Linux",
 )
+
+
+def test_inspector_validates_and_prints_the_exact_release_sha(tmp_path: Path) -> None:
+    environment = tmp_path / "shared" / "production.env"
+    _write_environment(environment)
+
+    result = _run_inspector(environment)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == f"{OLD_SHA}\n"
 
 
 def test_updater_atomically_replaces_only_the_exact_release_sha(tmp_path: Path) -> None:
@@ -118,7 +144,10 @@ def test_updater_rejects_ambiguous_or_stale_state_without_writing(
     assert environment.stat().st_ino == original_inode
 
 
-@pytest.mark.parametrize("unsafe_kind", ["symlink", "hardlink", "wide-mode", "wrong-owner"])
+@pytest.mark.parametrize(
+    "unsafe_kind",
+    ["symlink", "hardlink", "wide-mode", "nonregular", "wrong-identity"],
+)
 def test_updater_rejects_unsafe_environment_files_without_writing(
     tmp_path: Path,
     unsafe_kind: str,
@@ -133,11 +162,14 @@ def test_updater_rejects_unsafe_environment_files_without_writing(
     elif unsafe_kind == "hardlink":
         target = shared / "hardlinked.env"
         os.link(environment, target)
-    else:
+    elif unsafe_kind == "wide-mode":
         environment.chmod(0o644)
+    elif unsafe_kind == "nonregular":
+        target = shared / "named-pipe.env"
+        os.mkfifo(target)
     before = environment.read_bytes()
 
-    if unsafe_kind == "wrong-owner":
+    if unsafe_kind == "wrong-identity":
         result = subprocess.run(
             [
                 sys.executable,
@@ -157,6 +189,23 @@ def test_updater_rejects_unsafe_environment_files_without_writing(
 
     assert result.returncode != 0
     assert "unsafe" in result.stderr
+    assert environment.read_bytes() == before
+
+
+@pytest.mark.skipif(
+    getattr(os, "geteuid", lambda: 1)() != 0,
+    reason="changing the environment file owner requires root",
+)
+def test_updater_rejects_a_file_owned_by_another_user_without_writing(tmp_path: Path) -> None:
+    environment = tmp_path / "shared" / "production.env"
+    _write_environment(environment)
+    before = environment.read_bytes()
+    os.chown(environment, 1, environment.stat().st_gid)
+
+    result = _run_updater(environment)
+
+    assert result.returncode != 0
+    assert "file owner is unsafe" in result.stderr
     assert environment.read_bytes() == before
 
 

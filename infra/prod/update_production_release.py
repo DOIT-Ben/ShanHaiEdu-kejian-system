@@ -53,6 +53,59 @@ def _read_file(
         os.close(descriptor)
 
 
+def _validate_environment_path(
+    path: Path,
+    *,
+    expected_owner: int,
+    expected_mode: int,
+) -> os.stat_result:
+    if not path.is_absolute():
+        raise UpdateError("production environment path must be absolute")
+    if expected_owner < 0 or not 0 <= expected_mode <= 0o777:
+        raise UpdateError("production environment metadata contract is invalid")
+    if os.geteuid() != expected_owner:
+        raise UpdateError("production environment updater identity is unsafe")
+
+    parent_metadata = os.lstat(path.parent)
+    if (
+        not stat.S_ISDIR(parent_metadata.st_mode)
+        or parent_metadata.st_uid != expected_owner
+        or stat.S_IMODE(parent_metadata.st_mode) & 0o022
+    ):
+        raise UpdateError("production environment directory is unsafe")
+    return parent_metadata
+
+
+def _extract_release_sha(content: bytes) -> bytes:
+    lines = content.splitlines(keepends=True)
+    matches = [index for index, line in enumerate(lines) if line.startswith(RELEASE_PREFIX)]
+    if len(matches) != 1:
+        raise UpdateError("production environment must contain exactly one release SHA entry")
+    current_line = lines[matches[0]]
+    current_sha = current_line[len(RELEASE_PREFIX) :].rstrip(b"\r\n")
+    if not SHA_PATTERN.fullmatch(current_sha):
+        raise UpdateError("production environment release SHA is invalid")
+    return current_sha
+
+
+def inspect_release(
+    path: Path,
+    expected_owner: int,
+    expected_mode: int,
+) -> bytes:
+    _validate_environment_path(
+        path,
+        expected_owner=expected_owner,
+        expected_mode=expected_mode,
+    )
+    content, _ = _read_file(
+        path,
+        expected_owner=expected_owner,
+        expected_mode=expected_mode,
+    )
+    return _extract_release_sha(content)
+
+
 def _replace_file_atomically(
     path: Path,
     replacement: bytes,
@@ -120,38 +173,23 @@ def update_release(
     expected_owner: int,
     expected_mode: int,
 ) -> bool:
-    if not path.is_absolute():
-        raise UpdateError("production environment path must be absolute")
     if not SHA_PATTERN.fullmatch(expected_sha) or not SHA_PATTERN.fullmatch(new_sha):
         raise UpdateError("production release SHA argument is invalid")
-    if expected_owner < 0 or not 0 <= expected_mode <= 0o777:
-        raise UpdateError("production environment metadata contract is invalid")
-    if os.geteuid() != expected_owner:
-        raise UpdateError("production environment updater identity is unsafe")
-
-    parent = path.parent
-    parent_metadata = os.lstat(parent)
-    if (
-        not stat.S_ISDIR(parent_metadata.st_mode)
-        or parent_metadata.st_uid != expected_owner
-        or stat.S_IMODE(parent_metadata.st_mode) & 0o022
-    ):
-        raise UpdateError("production environment directory is unsafe")
+    parent_metadata = _validate_environment_path(
+        path,
+        expected_owner=expected_owner,
+        expected_mode=expected_mode,
+    )
 
     content, initial = _read_file(
         path,
         expected_owner=expected_owner,
         expected_mode=expected_mode,
     )
+    current_sha = _extract_release_sha(content)
     lines = content.splitlines(keepends=True)
-    matches = [index for index, line in enumerate(lines) if line.startswith(RELEASE_PREFIX)]
-    if len(matches) != 1:
-        raise UpdateError("production environment must contain exactly one release SHA entry")
-    index = matches[0]
+    index = next(index for index, line in enumerate(lines) if line.startswith(RELEASE_PREFIX))
     current_line = lines[index]
-    current_sha = current_line[len(RELEASE_PREFIX) :].rstrip(b"\r\n")
-    if not SHA_PATTERN.fullmatch(current_sha):
-        raise UpdateError("production environment release SHA is invalid")
     if current_sha == new_sha:
         return False
     if current_sha != expected_sha:
@@ -171,13 +209,23 @@ def update_release(
 
 
 def main() -> int:
-    if len(sys.argv) != 6:
+    inspect_mode = len(sys.argv) == 5 and sys.argv[1] == "inspect"
+    if not inspect_mode and len(sys.argv) != 6:
         print(
-            "usage: update_production_release.py <env> <expected-sha> <new-sha> <uid> <mode>",
+            "usage: update_production_release.py inspect <env> <uid> <mode> | "
+            "<env> <expected-sha> <new-sha> <uid> <mode>",
             file=sys.stderr,
         )
         return 2
     try:
+        if inspect_mode:
+            release_sha = inspect_release(
+                Path(sys.argv[2]),
+                int(sys.argv[3], 10),
+                int(sys.argv[4], 8),
+            )
+            print(release_sha.decode("ascii"))
+            return 0
         changed = update_release(
             Path(sys.argv[1]),
             sys.argv[2].encode("ascii"),
