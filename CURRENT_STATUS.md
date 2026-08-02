@@ -25,7 +25,7 @@
 - [Issue #244](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/244)当前为`status:in-progress`。PR #254 至 #268已经交付生产拓扑、来源校验、IP HTTPS入口、健康检查、发布互斥和exact环境切换；生产`current`、环境文件与运行容器均绑定当前exact SHA，应用回退演练通过。
 - #244的Alembic、内容与身份初始化、PostgreSQL/MinIO pre/post备份与独立恢复、六容器健康、HTTP到HTTPS跳转、IP证书、monitor和公网认证流均已复验；详细脱敏证据保存在Issue。
 - #244验收标准第5条剩余公网十二部分教案教师流：打开真实LessonUnit、启动异步生成、查看进度、编辑保存、质量检查、批准exact ArtifactVersion、刷新恢复，以及登出后写入失败。现有公网证据只覆盖认证流；2026-07-28的完整教案浏览器证据来自本地确定性Fake环境，不能替代公网生产验收。
-- Draft PR #269只修正现行状态与治理断言；在上述公网验收完成或Issue正式修改验收标准前，不得使用`Closes #244`、转Ready或关闭Issue。
+- 当前收口变更只修正现行状态与治理断言；在上述公网验收完成或Issue正式修改验收标准前，不得使用`Closes #244`或关闭Issue。
 - [Issue #233](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/233)和[Issue #237](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/237)为`status:ready`技术债，不代表下一产品里程碑，也不阻塞当前MVP或生产运行。
 - [Issue #165](https://github.com/DOIT-Ben/ShanHaiEdu-kejian-system/issues/165)仍以`status:blocked`独立跟踪视频relay迁移；它不是生产应用发布或下一产品切片的默认入口。
 
