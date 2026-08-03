@@ -114,12 +114,8 @@ def test_text_provider_egress_and_secret_are_scoped_to_the_worker() -> None:
         "SHANHAI_TEXT_PROVIDER_MODEL": (
             "${SHANHAI_TEXT_PROVIDER_MODEL:?text provider model is required}"
         ),
-        "SHANHAI_TEXT_PROVIDER_SECRET_ENV": (
-            "${SHANHAI_TEXT_PROVIDER_SECRET_ENV:?text provider secret env is required}"
-        ),
-        "SHANHAI_TEXT_PROVIDER_TIMEOUT_SECONDS": (
-            "${SHANHAI_TEXT_PROVIDER_TIMEOUT_SECONDS:-300}"
-        ),
+        "SHANHAI_TEXT_PROVIDER_SECRET_ENV": "MODEL_GATEWAY_API_KEY",
+        "SHANHAI_TEXT_PROVIDER_TIMEOUT_SECONDS": ("${SHANHAI_TEXT_PROVIDER_TIMEOUT_SECONDS:-300}"),
     }
     for name, value in provider_environment.items():
         assert worker["environment"][name] == value
@@ -236,10 +232,10 @@ def test_api_image_reads_file_secrets_then_drops_root() -> None:
 def test_worker_entrypoint_maps_the_provider_secret_without_a_literal_value() -> None:
     entrypoint = (PROD / "api-entrypoint.sh").read_text(encoding="utf-8")
 
-    assert 'SHANHAI_TEXT_PROVIDER_SECRET_ENV' in entrypoint
-    assert 'read_secret text_provider_api_key' in entrypoint
+    assert "SHANHAI_TEXT_PROVIDER_SECRET_ENV" in entrypoint
+    assert "read_secret text_provider_api_key" in entrypoint
     assert 'export "$SHANHAI_TEXT_PROVIDER_SECRET_ENV=$text_provider_api_key"' in entrypoint
-    assert 'unset text_provider_api_key' in entrypoint
+    assert "unset text_provider_api_key" in entrypoint
     assert "invalid text provider secret environment name" in entrypoint
 
 
@@ -249,17 +245,33 @@ def test_release_requires_a_preprovisioned_provider_secret() -> None:
     environment_example = (PROD / "env.example").read_text(encoding="utf-8")
 
     assert "require_existing_secret text_provider_api_key" in release
+    assert "require_text_provider_configuration" in release
     assert "ensure_secret text_provider_api_key" not in release
+    assert release.index("require_existing_secret text_provider_api_key") < release.index(
+        "image_source="
+    )
+    assert release.index("require_existing_secret text_provider_api_key") < release.index(
+        "trap rollback_release ERR"
+    )
     assert "text_provider_api_key" in verify
+    assert "build_real_text_gateway" in verify
     for name in (
         "SHANHAI_TEXT_PROVIDER_NAME",
         "SHANHAI_TEXT_PROVIDER_BASE_URL",
         "SHANHAI_TEXT_PROVIDER_MODEL",
-        "SHANHAI_TEXT_PROVIDER_SECRET_ENV",
         "SHANHAI_TEXT_PROVIDER_TIMEOUT_SECONDS",
     ):
         assert f"{name}=" in environment_example
     assert "MODEL_GATEWAY_API_KEY=" not in environment_example
+
+
+def test_production_runbook_documents_worker_only_provider_access() -> None:
+    runbook = (PROD / "README.md").read_text(encoding="utf-8")
+
+    assert "只有 Worker" in runbook
+    assert "provider-egress" in runbook
+    assert "text_provider_api_key" in runbook
+    assert "首次发布不注入 Provider 配置" not in runbook
 
 
 def test_api_image_normalizes_runtime_permissions_after_dependency_sync() -> None:

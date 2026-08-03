@@ -78,6 +78,51 @@ export SHANHAI_PRODUCTION_ROOT="$production_root"
 export SHANHAI_SECRET_DIR="${SHANHAI_SECRET_DIR:-$production_root/shared/secrets}"
 export COMPOSE_PARALLEL_LIMIT=1
 
+require_text_provider_configuration() {
+  local name
+  for name in \
+    SHANHAI_TEXT_PROVIDER_NAME \
+    SHANHAI_TEXT_PROVIDER_BASE_URL \
+    SHANHAI_TEXT_PROVIDER_MODEL; do
+    if [[ -z "${!name:-}" ]]; then
+      echo "production text provider configuration is incomplete" >&2
+      exit 1
+    fi
+  done
+  if [[ ! "$SHANHAI_TEXT_PROVIDER_BASE_URL" =~ ^https:// ]]; then
+    echo "production text provider base URL must use HTTPS" >&2
+    exit 1
+  fi
+}
+require_text_provider_configuration
+
+require_existing_secret() {
+  local name="$1"
+  local path="$SHANHAI_SECRET_DIR/$name"
+  local owner group mode links size secret_value
+  if [[ -L "$path" || ! -f "$path" ]]; then
+    echo "required production secret is unavailable: $name" >&2
+    exit 1
+  fi
+  read -r owner group mode links < <(stat -c '%u %g %a %h' -- "$path")
+  if [[ "$owner:$group:$mode:$links" != "0:0:600:1" ]]; then
+    echo "required production secret has unsafe metadata: $name" >&2
+    exit 1
+  fi
+  size="$(stat -c '%s' -- "$path")"
+  if ((size < 1 || size > 4096)); then
+    echo "required production secret has an invalid size: $name" >&2
+    exit 1
+  fi
+  secret_value="$(< "$path")"
+  if [[ -z "$secret_value" || "$secret_value" == *$'\n'* || "$secret_value" == *$'\r'* ]]; then
+    echo "required production secret has an invalid value: $name" >&2
+    exit 1
+  fi
+  unset secret_value
+}
+require_existing_secret text_provider_api_key
+
 previous_source=""
 previous_sha=""
 previous_release_path="$production_root/previous-release"

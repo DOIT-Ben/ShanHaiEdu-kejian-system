@@ -108,6 +108,9 @@ case "$*" in
   *"exec -T worker /usr/local/bin/shanhai-entrypoint python -m workers.main --check"*)
     exit 0
     ;;
+  *"exec -T worker /usr/local/bin/shanhai-entrypoint python -c"*"build_real_text_gateway"*)
+    exit 0
+    ;;
   *"exec -T worker"*)
     printf '%s\n' 'worker verification bypassed the production entrypoint' >&2
     exit 42
@@ -203,7 +206,7 @@ def test_environment_file_release_sha_is_fallback_without_explicit_value(
     assert f"production verification passed: {STALE_RELEASE_SHA}" in result.stdout
 
 
-def test_worker_check_uses_production_entrypoint(tmp_path: Path) -> None:
+def test_worker_checks_use_production_entrypoint(tmp_path: Path) -> None:
     result, _, _, _ = _run_verification(tmp_path, "available")
 
     assert result.returncode == 0, result.stderr
