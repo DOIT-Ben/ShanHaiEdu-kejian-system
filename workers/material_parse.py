@@ -61,12 +61,12 @@ class MaterialParseJobRunner:
         actor = self._actor_for_job(job_id)
         if actor is None:
             return "ignored"
-        prepared = self._claim_and_prepare(job_id, worker_id=worker_id, actor=actor)
-        if prepared is None:
+        if (prepared := self._claim_and_prepare(job_id, worker_id=worker_id, actor=actor)) is None:
             return "ignored"
         parse_id, parse_input, terminal_status = prepared
         if terminal_status is not None:
             return terminal_status
+        assert parse_id is not None and parse_input is not None
         try:
             self._validate_parse_input(parse_input.version)
             progress_state = self._update_progress(
@@ -174,7 +174,7 @@ class MaterialParseJobRunner:
         *,
         worker_id: str,
         actor: ActorContext,
-    ) -> tuple[UUID, ParseInput, str | None] | None:
+    ) -> tuple[UUID | None, ParseInput | None, str | None] | None:
         with self._factory() as session, session.begin():
             jobs = self._jobs(session, actor)
             claimed = jobs.claim(
@@ -190,7 +190,11 @@ class MaterialParseJobRunner:
             if claimed.job_type != "material.parse" or claimed.source_material_id is None:
                 jobs.complete(job_id, worker_id=worker_id, error_code="JOB_TYPE_UNSUPPORTED")
                 return None
-            parse_input = self._load_parse_input(session, claimed)
+            try:
+                parse_input = self._load_parse_input(session, claimed)
+            except MaterialParserError as exc:
+                jobs.complete(job_id, worker_id=worker_id, error_code=exc.code)
+                return None, None, "failed"
             parses = MaterialParseService(session, actor)
             parse = parses.create(
                 parse_input.material_id,
@@ -218,6 +222,7 @@ class MaterialParseJobRunner:
             .where(
                 SourceMaterial.id == job.source_material_id,
                 SourceMaterial.organization_id == job.organization_id,
+                SourceMaterial.project_id == job.project_id,
                 SourceMaterial.upload_status == "confirmed",
                 SourceMaterial.deleted_at.is_(None),
                 FileAsset.organization_id == job.organization_id,

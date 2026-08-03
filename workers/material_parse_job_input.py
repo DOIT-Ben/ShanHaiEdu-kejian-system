@@ -14,8 +14,13 @@ class MaterialParseJobInput(Protocol):
 
 
 def exact_file_version_id(job: MaterialParseJobInput) -> UUID | None:
-    request = cast(dict[str, object] | None, job.creation_request_json)
-    if request is None or "file_asset_version_id" not in request:
+    raw_request = job.creation_request_json
+    if raw_request is None:
+        return None
+    if not isinstance(raw_request, dict):
+        raise MaterialParserError("PDF_SOURCE_UNAVAILABLE")
+    request = cast(dict[str, object], raw_request)
+    if "file_asset_version_id" not in request:
         return None
     value = request["file_asset_version_id"]
     if not isinstance(value, str):

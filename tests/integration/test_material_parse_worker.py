@@ -262,6 +262,75 @@ def test_worker_uses_the_file_version_frozen_by_the_parse_job(
         assert parse.content_json["source"]["file_asset_version_id"] == str(frozen_version_id)
 
 
+def test_worker_persists_failure_for_malformed_frozen_input(
+    migrated_database_url: str,
+    tmp_path: Path,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    storage = FakeObjectStorage()
+    _actor, job_id = seed_material_job(
+        factory,
+        storage,
+        generated_pdf(),
+        key_suffix="malformed-input",
+    )
+    with factory() as session, session.begin():
+        job = session.get(GenerationJob, job_id, with_for_update=True)
+        assert job is not None
+        job.creation_request_json = 1
+
+    result = runner(
+        factory,
+        storage,
+        FakeMaterialParser(page_texts=("Should not parse",)),
+        tmp_path,
+    ).run(job_id, worker_id="parse-worker-malformed-input")
+
+    assert result == "failed"
+    with factory() as session:
+        job = session.get(GenerationJob, job_id)
+        assert job is not None
+        assert job.status == "failed"
+        assert job.error_code == "PDF_SOURCE_UNAVAILABLE"
+        assert session.scalar(select(func.count()).select_from(MaterialParseVersion)) == 0
+
+
+def test_worker_rejects_material_job_with_mismatched_project(
+    migrated_database_url: str,
+    tmp_path: Path,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    storage = FakeObjectStorage()
+    actor, job_id = seed_material_job(
+        factory,
+        storage,
+        generated_pdf(),
+        key_suffix="project-mismatch",
+    )
+    with factory() as session, session.begin():
+        other_project = ProjectRepository(session, actor).create(
+            CreateProjectRequest(title="Other project", knowledge_point="Other point")
+        )
+        job = session.get(GenerationJob, job_id, with_for_update=True)
+        assert job is not None
+        job.project_id = other_project.id
+
+    result = runner(
+        factory,
+        storage,
+        FakeMaterialParser(page_texts=("Should not parse",)),
+        tmp_path,
+    ).run(job_id, worker_id="parse-worker-project-mismatch")
+
+    assert result == "failed"
+    with factory() as session:
+        job = session.get(GenerationJob, job_id)
+        assert job is not None
+        assert job.status == "failed"
+        assert job.error_code == "PDF_SOURCE_UNAVAILABLE"
+        assert session.scalar(select(func.count()).select_from(MaterialParseVersion)) == 0
+
+
 def test_worker_failure_is_classified_and_temp_files_are_removed(
     migrated_database_url: str,
     tmp_path: Path,
