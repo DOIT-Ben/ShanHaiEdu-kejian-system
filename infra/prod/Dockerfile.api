@@ -44,6 +44,7 @@ COPY contracts ./contracts
 COPY alembic ./alembic
 COPY alembic.ini ./
 RUN uv sync --frozen --no-dev --no-editable \
+    && /app/.venv/bin/python -I -c "from apps.api.assets.material_parser import EVIDENCE_SCHEMA_PATH; EVIDENCE_SCHEMA_PATH.read_text(encoding='utf-8')" \
     && find /app -type d -name __pycache__ -prune -exec rm -rf {} + \
     && chmod -R a=rX /app
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import lru_cache
@@ -14,9 +15,27 @@ from uuid import UUID
 from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import ValidationError
 
-EVIDENCE_SCHEMA_PATH = (
-    Path(__file__).resolve().parents[3] / "contracts" / "material-evidence-package.schema.json"
-)
+_EVIDENCE_SCHEMA_RELATIVE_PATH = Path("contracts") / "material-evidence-package.schema.json"
+
+
+def _resolve_evidence_schema_path(
+    *,
+    module_path: Path = Path(__file__),
+    runtime_prefix: Path | None = None,
+) -> Path:
+    module_root = module_path.resolve().parents[3]
+    environment_root = (runtime_prefix or Path(sys.prefix)).resolve().parent
+    candidates = (
+        module_root / _EVIDENCE_SCHEMA_RELATIVE_PATH,
+        environment_root / _EVIDENCE_SCHEMA_RELATIVE_PATH,
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    raise FileNotFoundError("material evidence schema is unavailable")
+
+
+EVIDENCE_SCHEMA_PATH = _resolve_evidence_schema_path()
 
 
 @dataclass(frozen=True, slots=True)
