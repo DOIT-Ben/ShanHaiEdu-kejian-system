@@ -16,10 +16,10 @@ from apps.api.artifacts.context_source_registry import (
     is_known_context_source,
     resolve_artifact_source,
 )
+from apps.api.artifacts.context_version import build_artifact_context_version
 from apps.api.artifacts.domain import canonical_content_hash
 from apps.api.artifacts.execution_errors import ArtifactExecutionPortError
 from apps.api.artifacts.generated_write_guard import GeneratedArtifactWriteGuard
-from apps.api.artifacts.lesson_context_projection import project_artifact_context
 from apps.api.artifacts.models import Artifact, ArtifactVersion
 from apps.api.artifacts.relation_service import ArtifactRelationService
 from apps.api.artifacts.replacement_service import ArtifactReplacementService
@@ -80,19 +80,7 @@ class SqlAlchemyArtifactPort:
             .order_by(ArtifactVersion.created_at, ArtifactVersion.id)
         ).all()
         return tuple(
-            ArtifactContextVersion(
-                project_id=execution.project_id,
-                lesson_unit_id=artifact.lesson_unit_id,
-                artifact_version_id=version.id,
-                contract_ref=source,
-                artifact_type=artifact.artifact_type,
-                content=project_artifact_context(
-                    source=source,
-                    lesson_key=execution.lesson_key,
-                    content=version.content_json,
-                ),
-                content_hash=version.content_hash,
-            )
+            build_artifact_context_version(execution, source, version, artifact)
             for version, artifact in rows
         )
 
@@ -166,14 +154,8 @@ class SqlAlchemyArtifactPort:
                     "a frozen upstream artifact version is unavailable",
                 )
             version, artifact = row
-            values[contract_ref] = ArtifactContextVersion(
-                project_id=execution.project_id,
-                lesson_unit_id=artifact.lesson_unit_id,
-                artifact_version_id=version.id,
-                contract_ref=contract_ref,
-                artifact_type=artifact.artifact_type,
-                content=version.content_json,
-                content_hash=version.content_hash,
+            values[contract_ref] = build_artifact_context_version(
+                execution, contract_ref, version, artifact
             )
         return values
 
