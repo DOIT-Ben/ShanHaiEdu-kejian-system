@@ -27,13 +27,12 @@ def test_minio_failures_emit_only_fixed_redacted_reasons() -> None:
 
     for reason in (
         "MinIO pre-release backup failed",
-        "MinIO post-release backup failed",
-        "MinIO restore bucket creation failed",
-        "MinIO restore mirror failed",
-        "MinIO restore diff command failed",
-        "MinIO restore bucket cleanup failed",
+        "MinIO post-release backup or restore verification failed",
     ):
-        assert reason in release
+        assert f'run_redacted "{reason}"' in release
+
+    assert '"$@" >/dev/null 2>&1 || status=$?' in release
+    assert 'return "$status"' in release
 
 
 def test_production_bootstrap_commands_suppress_internal_identifiers() -> None:
@@ -44,7 +43,7 @@ def test_production_bootstrap_commands_suppress_internal_identifiers() -> None:
 
     assert len(bootstrap_operations) == 3
     for operation in bootstrap_operations:
-        assert ">/dev/null 2>&1" in operation
+        assert operation.startswith("run_redacted")
 
     for reason in (
         "production storage bootstrap failed",

@@ -120,6 +120,15 @@ def _create_release_fake_bin(tmp_path: Path) -> tuple[Path, Path, Path]:
         fake_bin / "docker",
         "#!/bin/sh\n"
         'printf "docker %s\\n" "$*" >> "$SHANHAI_TEST_COMMAND_LOG"\n'
+        'if [ -n "${SHANHAI_TEST_FAIL_DOCKER_MATCH:-}" ]; then\n'
+        '  case "$*" in\n'
+        '    *"$SHANHAI_TEST_FAIL_DOCKER_MATCH"*)\n'
+        '      printf "%s\\n" "$SHANHAI_TEST_SENSITIVE_OUTPUT"\n'
+        '      printf "%s\\n" "$SHANHAI_TEST_SENSITIVE_OUTPUT" >&2\n'
+        '      exit "$SHANHAI_TEST_FAIL_DOCKER_STATUS"\n'
+        "      ;;\n"
+        "  esac\n"
+        "fi\n"
         'case "$*" in\n'
         '  *"run --rm --no-deps worker python -c"*"build_real_text_gateway"*)\n'
         '    if [ "${SHANHAI_TEST_FAIL_PROVIDER_PREFLIGHT:-0}" = "1" ]; then\n'
@@ -349,6 +358,62 @@ def test_release_failure_restores_original_previous_link_environment_and_applica
     assert environment.read_text(encoding="utf-8") == f"SHANHAI_RELEASE_SHA={CURRENT_SHA}\n"
     commands = command_log.read_text(encoding="utf-8")
     assert f"-f {production_root}/releases/{CURRENT_SHA}/infra/prod/compose.yaml" in commands
+
+
+@pytest.mark.parametrize(
+    ("docker_match", "failure_status", "redacted_reason"),
+    (
+        ("exec -T minio sh -eu -c", 73, "MinIO pre-release backup failed"),
+        (
+            "minio-post-",
+            75,
+            "MinIO post-release backup or restore verification failed",
+        ),
+        (
+            "bootstrap-production-storage",
+            74,
+            "production storage bootstrap failed",
+        ),
+    ),
+)
+@pytest.mark.skipif(
+    sys.platform == "win32" or getattr(os, "geteuid", lambda: 1)() != 0,
+    reason="production release behavior requires a root Linux runtime",
+)
+def test_release_redacts_operation_output_preserves_status_and_restores_application(
+    tmp_path: Path,
+    docker_match: str,
+    failure_status: int,
+    redacted_reason: str,
+) -> None:
+    production_root, environment, _, release_sha, release_source, env = (
+        _prepare_release_failure_environment(tmp_path)
+    )
+    sensitive_output = "/private/objects/fixture-tenant/fixture-object-id"
+    env.update(
+        {
+            "SHANHAI_TEST_FAIL_DOCKER_MATCH": docker_match,
+            "SHANHAI_TEST_FAIL_DOCKER_STATUS": str(failure_status),
+            "SHANHAI_TEST_SENSITIVE_OUTPUT": sensitive_output,
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(release_source / "infra" / "prod" / "release.sh"), release_sha],
+        check=False,
+        capture_output=True,
+        env=env,
+        text=True,
+    )
+
+    assert result.returncode == failure_status
+    assert sensitive_output not in result.stdout
+    assert sensitive_output not in result.stderr
+    assert redacted_reason in result.stderr
+    assert "application rollback was attempted" in result.stderr
+    assert _resolve_link(production_root / "current").name == CURRENT_SHA
+    assert _resolve_link(production_root / "previous-release").name == PREVIOUS_SHA
+    assert environment.read_text(encoding="utf-8") == f"SHANHAI_RELEASE_SHA={CURRENT_SHA}\n"
 
 
 @pytest.mark.skipif(

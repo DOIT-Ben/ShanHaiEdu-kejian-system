@@ -193,6 +193,18 @@ rollback_release() {
 }
 trap rollback_release ERR
 
+run_redacted() {
+  local failure_reason="$1"
+  shift
+  local status=0
+  "$@" >/dev/null 2>&1 || status=$?
+  if ((status == 0)); then
+    return 0
+  fi
+  printf '%s\n' "$failure_reason" >&2
+  return "$status"
+}
+
 install -d -m 0700 -o root -g root "$SHANHAI_SECRET_DIR"
 install -d -m 0700 -o root -g root "$production_root/backups"
 ensure_secret() {
@@ -233,7 +245,7 @@ chmod 0600 "$pre_backup"
 
 "${compose[@]}" up -d --wait --wait-timeout 120 redis minio
 minio_pre_backup="/backups/minio-pre-$release_sha-$timestamp"
-"${compose[@]}" exec -T minio sh -eu -c '
+run_redacted "MinIO pre-release backup failed" "${compose[@]}" exec -T minio sh -eu -c '
   umask 077
   access_key="$(cat /run/secrets/minio_root_user)"
   secret_key="$(cat /run/secrets/minio_root_password)"
@@ -243,28 +255,16 @@ minio_pre_backup="/backups/minio-pre-$release_sha-$timestamp"
   rm -rf "$backup"
   install -d -m 0700 "$backup"
   if mc stat "production/$bucket" >/dev/null 2>&1; then
-    if ! mc mirror --overwrite "production/$bucket" "$backup" >/dev/null 2>&1; then
-      echo "MinIO pre-release backup failed" >&2
-      exit 1
-    fi
+    mc mirror --overwrite "production/$bucket" "$backup" >/dev/null 2>&1
     printf "present\n" > "$backup/.bucket-state"
   else
     printf "absent\n" > "$backup/.bucket-state"
   fi
 ' sh "${SHANHAI_OBJECT_STORAGE_BUCKET:-shanhaiedu-production}" "$minio_pre_backup"
 "${compose[@]}" run --rm api alembic upgrade head
-if ! "${compose[@]}" run --rm api python -m apps.api.cli bootstrap-production-storage >/dev/null 2>&1; then
-  echo "production storage bootstrap failed" >&2
-  false
-fi
-if ! "${compose[@]}" run --rm api python -m apps.api.cli publish-golden-content >/dev/null 2>&1; then
-  echo "golden content publication failed" >&2
-  false
-fi
-if ! "${compose[@]}" run --rm api python -m apps.api.cli bootstrap-production-identity >/dev/null 2>&1; then
-  echo "production identity bootstrap failed" >&2
-  false
-fi
+run_redacted "production storage bootstrap failed" "${compose[@]}" run --rm api python -m apps.api.cli bootstrap-production-storage
+run_redacted "golden content publication failed" "${compose[@]}" run --rm api python -m apps.api.cli publish-golden-content
+run_redacted "production identity bootstrap failed" "${compose[@]}" run --rm api python -m apps.api.cli bootstrap-production-identity
 
 post_backup="$production_root/backups/post-$release_sha-$timestamp.dump"
 "${compose[@]}" exec -T postgres pg_dump \
@@ -288,7 +288,7 @@ restore_database="shanhai_restore_${release_sha:0:12}"
 
 minio_backup="/backups/minio-post-$release_sha-$timestamp"
 restore_bucket="shanhai-restore-${release_sha:0:12}-$(date -u +%s)"
-"${compose[@]}" exec -T minio sh -eu -c '
+run_redacted "MinIO post-release backup or restore verification failed" "${compose[@]}" exec -T minio sh -eu -c '
   umask 077
   access_key="$(cat /run/secrets/minio_root_user)"
   secret_key="$(cat /run/secrets/minio_root_password)"
@@ -298,31 +298,18 @@ restore_bucket="shanhai-restore-${release_sha:0:12}-$(date -u +%s)"
   restore_bucket="$3"
   rm -rf "$backup"
   install -d -m 0700 "$backup"
-  if ! mc mirror --overwrite "production/$bucket" "$backup" >/dev/null 2>&1; then
-    echo "MinIO post-release backup failed" >&2
+  mc mirror --overwrite "production/$bucket" "$backup" >/dev/null 2>&1
+  mc mb --ignore-existing "production/$restore_bucket" >/dev/null 2>&1
+  mc mirror --overwrite --remove "$backup" "production/$restore_bucket" >/dev/null 2>&1
+  diff_status=0
+  diff_output="$(mc diff "production/$bucket" "production/$restore_bucket" 2>/dev/null)" || diff_status=$?
+  if [[ "$diff_status" -ne 0 ]]; then
+    exit "$diff_status"
+  fi
+  if ! [[ -z "$diff_output" ]]; then
     exit 1
   fi
-  if ! mc mb --ignore-existing "production/$restore_bucket" >/dev/null 2>&1; then
-    echo "MinIO restore bucket creation failed" >&2
-    exit 1
-  fi
-  if ! mc mirror --overwrite --remove "$backup" "production/$restore_bucket" >/dev/null 2>&1; then
-    echo "MinIO restore mirror failed" >&2
-    exit 1
-  fi
-  if diff_output="$(mc diff "production/$bucket" "production/$restore_bucket" 2>/dev/null)"; then
-    if ! [[ -z "$diff_output" ]]; then
-      echo "MinIO restore diff detected" >&2
-      exit 1
-    fi
-  else
-    echo "MinIO restore diff command failed" >&2
-    exit 1
-  fi
-  if ! mc rb --force "production/$restore_bucket" >/dev/null 2>&1; then
-    echo "MinIO restore bucket cleanup failed" >&2
-    exit 1
-  fi
+  mc rb --force "production/$restore_bucket" >/dev/null 2>&1
 ' sh "${SHANHAI_OBJECT_STORAGE_BUCKET:-shanhaiedu-production}" "$minio_backup" "$restore_bucket"
 
 "${compose[@]}" up -d --wait --wait-timeout 120 api worker web
