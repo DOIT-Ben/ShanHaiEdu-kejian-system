@@ -18,6 +18,7 @@ from apps.api.artifacts.authoring_provision import (
     ArtifactAuthoringProvisionPort,
     GeneratedDraftRequest,
 )
+from apps.api.artifacts.domain import canonical_content_hash
 from apps.api.artifacts.models import Approval, Artifact, ArtifactVersion
 from apps.api.artifacts.service import ArtifactService
 from apps.api.content_runtime.package_source import (
@@ -28,6 +29,7 @@ from apps.api.content_runtime.publication_service import ContentReleasePublisher
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, system_actor
+from apps.api.ids import new_uuid7
 from apps.api.lessons.lesson_plan_runtime import LessonPlanRuntimeService
 from apps.api.lessons.models import LessonUnit
 from apps.api.model_gateway.audit import SqlAlchemyAttemptAuditSink
@@ -222,6 +224,103 @@ async def test_lesson_plan_three_node_chain_uses_exact_lesson_and_material_scope
         assert session.scalar(select(func.count()).select_from(ArtifactQualityReport)) == 2
         assert session.scalar(select(func.count()).select_from(GenerationAttempt)) == 2
         assert session.scalar(select(func.count()).select_from(UsageRecord)) == 2
+
+
+async def test_teacher_edited_division_keeps_generated_context_for_lesson_plan(
+    migrated_database_url: str,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
+    outputs = build_golden_branch_source_outputs(case)
+    prepared = await _prepare_approval(factory, case, outputs["lesson.division.generate"])
+
+    with factory() as session, session.begin():
+        ArtifactService(session, prepared.actor).review(
+            prepared.version_id,
+            action="approve",
+            comment="Approve the generated division before teacher editing.",
+            request_id="issue-244-approve-generated-division",
+        )
+
+    with factory() as session, session.begin():
+        generated = session.get(ArtifactVersion, prepared.version_id)
+        assert generated is not None
+        assert generated.context_snapshot_id is not None
+        artifact = session.get(Artifact, generated.artifact_id)
+        lesson = session.scalar(select(LessonUnit).where(LessonUnit.lesson_key == "LESSON-001"))
+        assert artifact is not None
+        assert lesson is not None
+        edited = deepcopy(generated.content_json)
+        edited["lesson_units"][0]["title"] = "Teacher-edited lesson division"
+        replacement = ArtifactVersion(
+            id=new_uuid7(),
+            organization_id=prepared.actor.organization_id,
+            artifact_id=artifact.id,
+            version_no=generated.version_no + 1,
+            content_json=edited,
+            content_hash=canonical_content_hash(edited),
+            render_summary_json={},
+            source_kind="manual",
+            source_node_run_id=None,
+            context_snapshot_id=None,
+            prompt_snapshot_id=None,
+            validation_report_json={"valid": True},
+            created_by=prepared.actor.principal_id,
+        )
+        session.add(replacement)
+        session.flush()
+        replacement_id = replacement.id
+        artifact.current_submitted_version_id = replacement.id
+        artifact.current_approved_version_id = replacement.id
+        artifact.status = "approved"
+        lesson.source_division_version_id = replacement.id
+
+    with factory() as session, session.begin():
+        lesson = session.scalar(select(LessonUnit).where(LessonUnit.lesson_key == "LESSON-001"))
+        assert lesson is not None
+        assert lesson.source_division_version_id == replacement_id
+        generate_id = LessonPlanRuntimeService(session, prepared.actor).stage_generation(lesson.id)
+        generate = session.get(NodeRun, generate_id)
+        selection = session.scalar(
+            select(NodeInputSnapshot).where(
+                NodeInputSnapshot.node_run_id == generate_id,
+                NodeInputSnapshot.input_key == "runtime.artifact_input_selection",
+            )
+        )
+        assert generate is not None and generate.status == "ready"
+        assert selection is not None
+        assert selection.snapshot_json == {
+            "artifact_versions": {"approval:lesson_division": str(replacement_id)}
+        }
+
+    committed = await NodeExecutionService(
+        SqlAlchemyNodeExecutionTransactionFactory(factory, prepared.actor),
+        ModelGateway(
+            {
+                ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: (
+                    DeterministicNodeOutputProvider(outputs["lesson_plan.generate"])
+                )
+            },
+            audit_sink=SqlAlchemyAttemptAuditSink(factory),
+        ),
+    ).execute(generate_id, request_id="issue-244-generate-from-edited-division")
+
+    with factory() as session:
+        generated_plan = session.get(ArtifactVersion, committed.artifact_version_id)
+        context = session.scalar(
+            select(ContextSnapshot).where(ContextSnapshot.node_run_id == generate_id)
+        )
+        assert generated_plan is not None
+        assert context is not None
+        bindings = {
+            binding["source"]: binding["items"] for binding in context.bindings_json["bindings"]
+        }
+        division_items = bindings["lesson_division.approved_version"]
+        assert len(division_items) == 1
+        assert division_items[0]["source_version_id"] == str(replacement_id)
+        assert (
+            division_items[0]["content"]["lesson_unit"]["title"] == "Teacher-edited lesson division"
+        )
 
 
 async def test_lesson_plan_return_edit_revalidate_and_approve_requires_new_exact_evidence(

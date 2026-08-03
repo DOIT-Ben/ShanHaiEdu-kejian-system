@@ -8,7 +8,6 @@ import signal
 import socket
 import subprocess
 import tempfile
-from decimal import Decimal
 from pathlib import Path
 from threading import Event
 from uuid import UUID
@@ -24,8 +23,6 @@ from apps.api.model_gateway.contracts import (
     GeneratedFileFact,
     ModelCapability,
     ModelUsage,
-    TextModelRequest,
-    TextProviderResult,
     VideoModelRequest,
     VideoOperationStatus,
     VideoPollRequest,
@@ -37,55 +34,12 @@ from apps.api.reliability.models import OutboxEvent
 from apps.api.reliability.outbox import OutboxDispatcher
 from apps.api.settings import get_settings
 from apps.api.uploads.storage import ObjectStorage, build_object_storage
-from scripts.golden_courseware_branch_inputs import (
-    build_golden_branch_source_outputs,
-    build_intro_generation_stage_outputs,
-)
+from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
+from tests.e2e.r1_rescue_node_provider import R1RescueNodeOutputProvider
 from workers.video_generation import execute_video_generation_job
 
 ROOT = Path(__file__).resolve().parents[2]
 GOLDEN_CASE = ROOT / "contracts/fixtures/golden-projects/numbers-1-to-5/golden-project.json"
-
-
-class R1RescueNodeOutputProvider:
-    provider_name = "r1-rescue-deterministic"
-    model_name = "r1-rescue-node-output-v1"
-
-    def __init__(self, outputs: dict[str, dict[str, object]]) -> None:
-        self._outputs = outputs
-        self._intro_stages = build_intro_generation_stage_outputs(outputs["intro.generate_options"])
-
-    async def complete(self, request: TextModelRequest) -> TextProviderResult:
-        if request.capability == ModelCapability.TEXT_STRUCTURED_CREATIVE_EDUCATION:
-            output = (
-                self._intro_stages[1]
-                if "Exact candidate pool JSON:" in request.prompt
-                else self._intro_stages[0]
-            )
-        elif '"lesson_plan_key"' in request.prompt:
-            output = self._outputs["lesson_plan.generate"]
-        elif '"division_key"' in request.prompt:
-            output = self._outputs["lesson.division.generate"]
-        else:
-            raise RuntimeError("the R1 E2E provider received an unsupported output contract")
-        return TextProviderResult(
-            text=json.dumps(
-                output,
-                sort_keys=True,
-                separators=(",", ":"),
-                ensure_ascii=False,
-                allow_nan=False,
-            ),
-            provider_request_id=f"fake:{request.request_id}",
-            actual_model=self.model_name,
-            finish_reason="stop",
-            usage=ModelUsage(
-                prompt_tokens=8,
-                completion_tokens=4,
-                total_tokens=12,
-                cost=Decimal("0"),
-            ),
-        )
 
 
 class R1RescueVideoProvider:

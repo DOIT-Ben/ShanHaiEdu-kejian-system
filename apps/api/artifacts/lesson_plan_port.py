@@ -128,7 +128,7 @@ class ArtifactLessonPlanReader:
             or version.source_node_run_id is None
             or version.context_snapshot_id is None
         ):
-            raise self._invalid("The lesson plan has no generated fixed-release lineage.")
+            raise self._invalid("The Artifact has no generated fixed-release lineage.")
         return version
 
     def require_approved_division(
@@ -156,7 +156,10 @@ class ArtifactLessonPlanReader:
         if row is None:
             raise self._invalid("The current approved lesson division is unavailable.")
         version, artifact = row
-        if version.context_snapshot_id is None:
+        context_version = version
+        if version.context_snapshot_id is None and version.source_kind == "manual":
+            context_version = self._generated_lineage(artifact.id, version.version_no)
+        if context_version.context_snapshot_id is None:
             raise self._invalid("The approved lesson division context is unavailable.")
         return (
             QualitySource(
@@ -167,7 +170,7 @@ class ArtifactLessonPlanReader:
                 content=version.content_json,
                 schema=None,
             ),
-            version.context_snapshot_id,
+            context_version.context_snapshot_id,
         )
 
     @staticmethod

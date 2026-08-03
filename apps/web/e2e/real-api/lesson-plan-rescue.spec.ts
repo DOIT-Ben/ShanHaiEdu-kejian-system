@@ -67,7 +67,10 @@ test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }
   await page.getByRole("link").filter({ hasText: "issue-125-material.pdf" }).click();
   await expect(page.getByText(/已保存范围：物理页 .*教师已确认/)).toBeVisible();
   await expect(page.getByRole("region", { name: "课时划分" })).toBeVisible();
-  await expect(page.getByLabel("课题名称")).toHaveValue("1～5的认识");
+  const lessonTitles = page.getByLabel("课题名称");
+  await expect(lessonTitles).toHaveCount(2);
+  await expect(lessonTitles.nth(0)).toHaveValue("1～5的认识");
+  await expect(lessonTitles.nth(1)).toHaveValue("第二课时隔离验证");
   await expect(page.getByText(/已批准版本/)).toBeVisible();
   await page.getByRole("link", { name: "返回项目" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "十二部分教案验收" })).toBeVisible();
@@ -461,7 +464,25 @@ test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }
           ),
         ]);
       return {
-        artifact: (await artifactResponse.json()) as { data: { artifact: unknown } },
+        artifact: (await artifactResponse.json()) as {
+          data: {
+            artifact: {
+              current_draft: {
+                content: {
+                  teaching_content: {
+                    lesson_plan_key: string;
+                    lesson_topic: string;
+                    source_lesson_unit_key: string;
+                    teaching_evidence_refs: string[];
+                  };
+                  teaching_objectives: Array<{
+                    objective_evidence_refs: string[];
+                  }>;
+                };
+              } | null;
+            } | null;
+          };
+        },
         introArtifact: (await introArtifactResponse.json()) as { data: { artifact: unknown } },
         introJobs: (await introJobsResponse.json()) as { data: { items: unknown[] } },
         jobs: (await jobsResponse.json()) as { data: { items: unknown[] } },
@@ -469,6 +490,24 @@ test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }
     },
     { baseUrl: apiBaseUrl, lessonId: secondLessonId, projectId },
   );
+  const secondTeaching =
+    secondFacts.artifact.data.artifact?.current_draft?.content.teaching_content;
+  expect(secondTeaching).toEqual(
+    expect.objectContaining({
+      lesson_plan_key: "LESSON-PLAN-RESCUE-002",
+      lesson_topic: "第二课时隔离验证",
+      source_lesson_unit_key: "LESSON-RESCUE-002",
+    }),
+  );
+  const secondLessonEvidenceRefs = ["EV-MAT-05", "EV-MAT-06", "EV-MAT-07", "EV-MAT-08"];
+  expect(secondTeaching?.teaching_evidence_refs).toEqual(secondLessonEvidenceRefs);
+  const secondObjectives =
+    secondFacts.artifact.data.artifact?.current_draft?.content.teaching_objectives;
+  expect(secondObjectives).toBeDefined();
+  const secondObjectiveEvidenceRefs = (secondObjectives ?? []).flatMap(
+    (objective) => objective.objective_evidence_refs,
+  );
+  expect(secondObjectiveEvidenceRefs.sort()).toEqual(secondLessonEvidenceRefs);
   expect(secondFacts.artifact.data.artifact).not.toBeNull();
   expect(secondFacts.jobs.data.items).toHaveLength(1);
   expect(secondFacts.introArtifact.data.artifact).toBeNull();

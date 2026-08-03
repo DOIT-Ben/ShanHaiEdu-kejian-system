@@ -7,6 +7,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
 
+from apps.api.artifacts.execution_errors import ArtifactExecutionPortError
 from apps.api.database import build_engine, build_session_factory
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, system_actor
@@ -143,7 +144,7 @@ async def _run_claimed_job(
             request_id=f"generation-job:{job_id}",
             user_revision=_user_revision(routing.creation_request),
         )
-    except NodeExecutionError as exc:
+    except (NodeExecutionError, ArtifactExecutionPortError) as exc:
         return _fail_node_execution(
             factory,
             initiating_actor,
