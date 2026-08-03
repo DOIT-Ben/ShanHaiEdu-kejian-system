@@ -67,7 +67,10 @@ test("teacher_completes_exact_lesson_plan_rescue_with_real_api", async ({ page }
   await page.getByRole("link").filter({ hasText: "issue-125-material.pdf" }).click();
   await expect(page.getByText(/已保存范围：物理页 .*教师已确认/)).toBeVisible();
   await expect(page.getByRole("region", { name: "课时划分" })).toBeVisible();
-  await expect(page.getByLabel("课题名称")).toHaveValue("1～5的认识");
+  const lessonTitles = page.getByLabel("课题名称");
+  await expect(lessonTitles).toHaveCount(2);
+  await expect(lessonTitles.nth(0)).toHaveValue("1～5的认识");
+  await expect(lessonTitles.nth(1)).toHaveValue("第二课时隔离验证");
   await expect(page.getByText(/已批准版本/)).toBeVisible();
   await page.getByRole("link", { name: "返回项目" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "十二部分教案验收" })).toBeVisible();
