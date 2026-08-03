@@ -15,10 +15,11 @@ from apps.api.assets.material_parser import (
     MaterialParseSource,
     ParseLimits,
 )
-from apps.api.assets.models import MaterialParseVersion
+from apps.api.assets.models import FileAsset, FileAssetVersion, MaterialParseVersion
 from apps.api.assets.pypdf_parser import PypdfMaterialParser
 from apps.api.database import build_engine, build_session_factory, utc_now
 from apps.api.identity.context import ActorContext, system_actor
+from apps.api.ids import new_uuid7
 from apps.api.jobs.models import GenerationJob
 from apps.api.jobs.service import GenerationJobService
 from apps.api.projects.repository import ProjectRepository
@@ -26,6 +27,7 @@ from apps.api.projects.schemas import CreateProjectRequest
 from apps.api.reliability.models import EventStreamEntry, OutboxEvent
 from apps.api.settings import Settings
 from apps.api.uploads.confirmation_service import UploadConfirmationService
+from apps.api.uploads.models import SourceMaterial
 from apps.api.uploads.schemas import ConfirmUploadRequest, CreateUploadSessionRequest
 from apps.api.uploads.session_service import UploadSessionService
 from tests.fakes.identity import seed_test_actor
@@ -196,6 +198,68 @@ def test_worker_parses_generated_pdf_with_real_local_adapter(
         assert parse.page_count == 2
         assert parse.content_json is not None
         assert [page["page_number"] for page in parse.content_json["pages"]] == [1, 2]
+
+
+def test_worker_uses_the_file_version_frozen_by_the_parse_job(
+    migrated_database_url: str,
+    tmp_path: Path,
+) -> None:
+    factory = build_session_factory(build_engine(migrated_database_url))
+    storage = FakeObjectStorage()
+    payload = generated_pdf()
+    actor, job_id = seed_material_job(factory, storage, payload, key_suffix="frozen-version")
+    with factory() as session, session.begin():
+        job = session.get(GenerationJob, job_id, with_for_update=True)
+        assert job is not None and job.source_material_id is not None
+        material = session.get(SourceMaterial, job.source_material_id)
+        assert material is not None and material.file_asset_id is not None
+        asset = session.get(FileAsset, material.file_asset_id)
+        assert asset is not None and asset.current_version_id is not None
+        frozen_version = session.get(FileAssetVersion, asset.current_version_id)
+        assert frozen_version is not None
+        frozen_version_id = frozen_version.id
+        job.creation_request_json = {"file_asset_version_id": str(frozen_version.id)}
+        replacement_key = f"test/reparse/{new_uuid7()}/replacement.pdf"
+        replacement_metadata = storage.put_bytes(
+            bucket=frozen_version.storage_bucket,
+            key=replacement_key,
+            payload=payload + b"replacement",
+            media_type="application/pdf",
+        )
+        replacement = FileAssetVersion(
+            id=new_uuid7(),
+            organization_id=actor.organization_id,
+            file_asset_id=asset.id,
+            version_no=2,
+            storage_bucket=replacement_metadata.bucket,
+            storage_key=replacement_metadata.key,
+            mime_type=replacement_metadata.media_type,
+            byte_size=replacement_metadata.size_bytes,
+            sha256=replacement_metadata.sha256,
+            etag=replacement_metadata.etag,
+            scan_status="clean",
+            metadata_json={},
+            created_at=utc_now(),
+            created_by=actor.principal_id,
+        )
+        session.add(replacement)
+        session.flush()
+        asset.current_version_id = replacement.id
+
+    result = runner(
+        factory,
+        storage,
+        FakeMaterialParser(page_texts=("Frozen",)),
+        tmp_path,
+    ).run(job_id, worker_id="parse-worker-frozen-version")
+
+    assert result == "succeeded"
+    with factory() as session:
+        parse = session.scalar(select(MaterialParseVersion))
+        assert parse is not None
+        assert parse.file_asset_version_id == frozen_version_id
+        assert parse.content_json is not None
+        assert parse.content_json["source"]["file_asset_version_id"] == str(frozen_version_id)
 
 
 def test_worker_failure_is_classified_and_temp_files_are_removed(

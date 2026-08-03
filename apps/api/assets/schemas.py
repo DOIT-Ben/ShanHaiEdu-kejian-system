@@ -6,7 +6,13 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+
+
+class RetryMaterialParseRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    file_asset_version_id: UUID
 
 
 class FileAssetVersionRead(BaseModel):

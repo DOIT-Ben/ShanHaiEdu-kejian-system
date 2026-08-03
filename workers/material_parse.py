@@ -28,6 +28,7 @@ from apps.api.jobs.service import GenerationJobService
 from apps.api.settings import Settings, get_settings
 from apps.api.uploads.models import SourceMaterial
 from apps.api.uploads.storage import ObjectStorage, ObjectStorageError, build_object_storage
+from workers.material_parse_job_input import exact_file_version_id
 
 logger = logging.getLogger(__name__)
 
@@ -209,10 +210,11 @@ class MaterialParseJobRunner:
             return parse.id, parse_input, None
 
     def _load_parse_input(self, session: Session, job: GenerationJob) -> ParseInput:
-        row = session.execute(
+        requested_version_id = exact_file_version_id(job)
+        statement = (
             select(SourceMaterial, FileAssetVersion)
             .join(FileAsset, FileAsset.id == SourceMaterial.file_asset_id)
-            .join(FileAssetVersion, FileAssetVersion.id == FileAsset.current_version_id)
+            .join(FileAssetVersion, FileAssetVersion.file_asset_id == FileAsset.id)
             .where(
                 SourceMaterial.id == job.source_material_id,
                 SourceMaterial.organization_id == job.organization_id,
@@ -223,7 +225,12 @@ class MaterialParseJobRunner:
                 FileAssetVersion.organization_id == job.organization_id,
             )
             .with_for_update(of=(SourceMaterial, FileAsset))
-        ).one_or_none()
+        )
+        if requested_version_id is None:
+            statement = statement.where(FileAssetVersion.id == FileAsset.current_version_id)
+        else:
+            statement = statement.where(FileAssetVersion.id == requested_version_id)
+        row = session.execute(statement).one_or_none()
         if row is None:
             raise MaterialParserError("PDF_SOURCE_UNAVAILABLE")
         return ParseInput(material_id=row[0].id, version=row[1])

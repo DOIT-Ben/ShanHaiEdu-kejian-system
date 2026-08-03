@@ -700,6 +700,29 @@ paths:
         4XX:
           $ref: '#/components/responses/Error'
   /projects/{project_id}/materials/{material_id}/parse-versions:
+    post:
+      summary: 对当前教材文件的最新失败解析创建新任务
+      operationId: retryMaterialParse
+      security:
+        - BrowserOrigin: []
+          CsrfToken: []
+          cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/MaterialId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RetryMaterialParseRequest'
+      responses:
+        '202':
+          $ref: '#/components/responses/AcceptedJob'
+        4XX:
+          $ref: '#/components/responses/Error'
     get:
       summary: 查询教材解析版本摘要
       operationId: listMaterialParseVersions
@@ -2477,6 +2500,15 @@ components:
         sha256:
           type: string
           pattern: ^[a-f0-9]{64}$
+    RetryMaterialParseRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - file_asset_version_id
+      properties:
+        file_asset_version_id:
+          type: string
+          format: uuid
     FileAssetVersion:
       type: object
       additionalProperties: false
