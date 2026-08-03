@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
 from uuid import uuid4
 
 import httpx
@@ -10,7 +11,46 @@ import pytest
 from minio import Minio
 
 from apps.api.settings import Settings
-from apps.api.uploads.storage import ObjectNotFoundError, ObjectStorageError, build_object_storage
+from apps.api.uploads.storage import (
+    MinioObjectStorage,
+    ObjectNotFoundError,
+    ObjectStorageError,
+    build_object_storage,
+)
+
+
+@pytest.mark.integration
+def test_real_minio_presign_does_not_contact_the_public_endpoint() -> None:
+    settings = Settings(_env_file=None)
+    if not (
+        settings.object_storage_endpoint
+        and settings.object_storage_access_key
+        and settings.object_storage_secret_key
+    ):
+        pytest.skip("object storage credentials are only configured for explicit integration runs")
+
+    storage = MinioObjectStorage(
+        endpoint=settings.object_storage_endpoint,
+        public_endpoint="203.0.113.10",
+        region=settings.object_storage_region,
+        access_key=settings.object_storage_access_key.get_secret_value(),
+        secret_key=settings.object_storage_secret_key.get_secret_value(),
+        secure=settings.object_storage_secure,
+        public_secure=True,
+        create_bucket_if_missing=False,
+        timeout_seconds=settings.dependency_timeout_seconds,
+    )
+
+    url = storage.create_presigned_put(
+        bucket=settings.object_storage_bucket,
+        key=f"integration/{uuid4().hex}/presign-only.pdf",
+        expires=timedelta(minutes=5),
+    )
+
+    parsed = urlsplit(url)
+    assert parsed.scheme == "https"
+    assert parsed.hostname == "203.0.113.10"
+    assert "X-Amz-Signature=" in parsed.query
 
 
 @pytest.mark.integration

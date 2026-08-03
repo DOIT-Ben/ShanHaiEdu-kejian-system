@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     object_storage_health_url: HttpUrl | None = None
     object_storage_endpoint: str | None = None
     object_storage_public_endpoint: str | None = None
+    object_storage_region: str = Field(default="us-east-1", min_length=1, max_length=128)
     object_storage_public_secure: bool = True
     object_storage_access_key: SecretStr | None = None
     object_storage_secret_key: SecretStr | None = None

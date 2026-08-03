@@ -96,6 +96,7 @@ class MinioObjectStorage:
         *,
         endpoint: str,
         public_endpoint: str | None,
+        region: str,
         access_key: str,
         secret_key: str,
         secure: bool,
@@ -114,6 +115,7 @@ class MinioObjectStorage:
             access_key=access_key,
             secret_key=secret_key,
             secure=secure,
+            region=region,
             http_client=http_client,
         )
         self._presign_client = Minio(
@@ -121,6 +123,7 @@ class MinioObjectStorage:
             access_key=access_key,
             secret_key=secret_key,
             secure=public_secure if public_endpoint else secure,
+            region=region,
             http_client=http_client,
         )
         self._create_bucket_if_missing = create_bucket_if_missing
@@ -317,6 +320,7 @@ def build_object_storage(settings: Settings) -> ObjectStorage | None:
     return MinioObjectStorage(
         endpoint=settings.object_storage_endpoint,
         public_endpoint=settings.object_storage_public_endpoint,
+        region=settings.object_storage_region,
         access_key=settings.object_storage_access_key.get_secret_value(),
         secret_key=settings.object_storage_secret_key.get_secret_value(),
         secure=settings.object_storage_secure,
