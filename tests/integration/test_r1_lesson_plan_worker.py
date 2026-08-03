@@ -15,7 +15,7 @@ from apps.api.artifacts.service import ArtifactService
 from apps.api.database import build_engine, build_session_factory, utc_now
 from apps.api.ids import new_uuid7
 from apps.api.jobs.models import GenerationJob
-from apps.api.lessons.models import LessonUnit
+from apps.api.lessons.models import LessonBranchConfig, LessonUnit
 from apps.api.main import create_app
 from apps.api.model_gateway.audit import SqlAlchemyAttemptAuditSink
 from apps.api.model_gateway.audit_models import GenerationAttempt
@@ -30,6 +30,8 @@ from apps.api.model_gateway.pending import PendingTextGeneration
 from apps.api.model_gateway.ports import CancellationToken
 from apps.api.node_execution.fake import DeterministicNodeOutputProvider
 from apps.api.settings import Settings
+from apps.api.workflows.lesson_fanout import LessonWorkflowFanoutService
+from apps.api.workflows.lesson_fanout_contracts import LessonFanoutTarget
 from apps.api.workflows.models import BranchRun, NodeExecutionLease, NodeRun
 from scripts.golden_courseware_branch_inputs import build_golden_branch_source_outputs
 from tests.fakes.identity import override_test_identity
@@ -110,22 +112,49 @@ async def test_lesson_plan_job_worker_persists_exact_result_draft_and_cancellati
     with factory() as session, session.begin():
         first_lesson = session.get(LessonUnit, lesson_unit_id)
         assert first_lesson is not None
-        session.add(
-            LessonUnit(
-                id=second_lesson_id,
-                organization_id=prepared.actor.organization_id,
-                project_id=first_lesson.project_id,
-                lesson_key="LESSON-RESCUE-002",
-                position=2,
-                title="第二课时隔离验证",
-                scope_summary="仅用于证明 exact lesson 查询不串线",
-                objective_summary="第二课时保持独立空状态",
-                estimated_minutes=40,
-                source_division_version_id=first_lesson.source_division_version_id,
-                status="active",
-                created_by=prepared.actor.principal_id,
-                updated_by=prepared.actor.principal_id,
+        second_lesson = LessonUnit(
+            id=second_lesson_id,
+            organization_id=prepared.actor.organization_id,
+            project_id=first_lesson.project_id,
+            lesson_key="LESSON-RESCUE-002",
+            position=2,
+            title="第二课时隔离验证",
+            scope_summary="仅用于证明 exact lesson 查询不串线",
+            objective_summary="第二课时保持独立空状态",
+            estimated_minutes=40,
+            source_division_version_id=first_lesson.source_division_version_id,
+            status="active",
+            created_by=prepared.actor.principal_id,
+            updated_by=prepared.actor.principal_id,
+        )
+        session.add(second_lesson)
+        session.flush()
+        branch_enabled = {
+            branch_key: branch_key == "lesson_plan"
+            for branch_key in ("lesson_plan", "intro_options", "ppt", "video")
+        }
+        for branch_key, enabled in branch_enabled.items():
+            session.add(
+                LessonBranchConfig(
+                    id=new_uuid7(),
+                    lesson_unit_id=second_lesson.id,
+                    branch_key=branch_key,
+                    enabled=enabled,
+                    settings_json={},
+                    created_by=prepared.actor.principal_id,
+                    updated_by=prepared.actor.principal_id,
+                )
             )
+        assert (
+            LessonWorkflowFanoutService(session, prepared.actor).synchronize_lesson_configuration(
+                prepared.project_id,
+                LessonFanoutTarget(
+                    lesson_unit_id=second_lesson.id,
+                    branch_enabled=branch_enabled,
+                ),
+                request_id="r1-rescue-worker-invalid-second-lesson-fanout",
+            )
+            is not None
         )
 
     settings = Settings(
@@ -233,6 +262,32 @@ async def test_lesson_plan_job_worker_persists_exact_result_draft_and_cancellati
             assert second_artifact.status_code == 200, second_artifact.text
             assert first_artifact.json()["data"]["artifact"] is not None
             assert second_artifact.json()["data"]["artifact"] is None
+
+            invalid_node_id, invalid_job_id = await _prepare_and_start(
+                client,
+                second_lesson_id,
+                key_suffix="invalid-division-scope",
+            )
+            invalid_provider = DeterministicNodeOutputProvider(outputs["lesson_plan.generate"])
+            invalid_outcome = await execute_node_execution_job(
+                invalid_job_id,
+                worker_id="r1-rescue-node-worker-invalid-division-scope",
+                model=ModelGateway(
+                    {ModelCapability.TEXT_STRUCTURED_ZH_PRIMARY_MATH: invalid_provider},
+                    audit_sink=SqlAlchemyAttemptAuditSink(factory),
+                ),
+                settings=settings,
+            )
+            assert invalid_outcome == "failed"
+            assert invalid_provider.calls == 0
+            with factory() as session:
+                invalid_job = session.get(GenerationJob, invalid_job_id)
+                invalid_node = session.get(NodeRun, invalid_node_id)
+                assert invalid_job is not None and invalid_node is not None
+                assert invalid_job.status == "failed"
+                assert invalid_job.error_code == "NODE_EXECUTION_LESSON_SCOPE_INVALID"
+                assert invalid_node.status == "failed"
+                assert invalid_node.last_error_code == "NODE_EXECUTION_LESSON_SCOPE_INVALID"
 
             concurrent_node_id, concurrent_job_id = await _prepare_and_start(
                 client,

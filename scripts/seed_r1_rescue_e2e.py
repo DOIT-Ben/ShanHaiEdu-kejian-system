@@ -6,6 +6,8 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from collections.abc import Mapping
+from copy import deepcopy
 from pathlib import Path
 from typing import cast
 from uuid import UUID
@@ -25,7 +27,6 @@ from apps.api.database import build_engine, build_session_factory, utc_now
 from apps.api.identity.context import ActorContext, AuthenticatedIdentity
 from apps.api.identity.models import Principal
 from apps.api.identity.repository import IdentityRepository
-from apps.api.ids import new_uuid7
 from apps.api.lessons.models import LessonBranchConfig, LessonUnit
 from apps.api.workflows.lesson_fanout import LessonWorkflowFanoutService
 from apps.api.workflows.lesson_fanout_contracts import LessonFanoutTarget
@@ -42,6 +43,7 @@ ROOT = Path(__file__).resolve().parents[1]
 GOLDEN_CASE = ROOT / "contracts/fixtures/golden-projects/numbers-1-to-5/golden-project.json"
 PROJECT_TITLE = "十二部分教案验收"
 ACCEPTANCE_LOCATOR_ENV = "SHANHAI_R1_ACCEPTANCE_LOCATOR"
+ISOLATION_LESSON_KEY = "LESSON-RESCUE-002"
 
 
 def _required(name: str) -> str:
@@ -101,6 +103,62 @@ def _build_material_content(case: dict[str, object]) -> dict[str, object]:
         "knowledge_boundary": case["knowledge_boundary"],
         "pages": pages,
     }
+
+
+def _extend_rescue_material_evidence(case: dict[str, object]) -> dict[str, str]:
+    raw_evidence = case.get("material_evidence")
+    if not isinstance(raw_evidence, list):
+        raise RuntimeError("the rescue case requires material evidence")
+    untyped_evidence = cast(list[object], raw_evidence)
+    if not untyped_evidence or any(not isinstance(item, dict) for item in untyped_evidence):
+        raise RuntimeError("the rescue case material evidence is invalid")
+    evidence = cast(list[dict[str, object]], untyped_evidence)
+    existing_keys = {item.get("evidence_key") for item in evidence}
+    mapping: dict[str, str] = {}
+    isolation: list[dict[str, object]] = []
+    for index, item in enumerate(evidence, start=len(evidence) + 1):
+        source_key = item.get("evidence_key")
+        replacement_key = f"EV-MAT-{index:02d}"
+        if type(source_key) is not str or replacement_key in existing_keys:
+            raise RuntimeError("the rescue case material evidence keys are invalid")
+        replacement = deepcopy(item)
+        replacement["evidence_key"] = replacement_key
+        mapping[source_key] = replacement_key
+        isolation.append(replacement)
+    case["material_evidence"] = [*evidence, *isolation]
+    return mapping
+
+
+def _build_rescue_division_output(
+    source: Mapping[str, object],
+    evidence_mapping: Mapping[str, str],
+) -> dict[str, object]:
+    output = deepcopy(dict(source))
+    raw_units = output.get("lesson_units")
+    if not isinstance(raw_units, list):
+        raise RuntimeError("the rescue division requires one source lesson")
+    untyped_units = cast(list[object], raw_units)
+    if len(untyped_units) != 1 or not isinstance(untyped_units[0], dict):
+        raise RuntimeError("the rescue division requires one source lesson")
+    units = cast(list[dict[str, object]], untyped_units)
+    isolation = deepcopy(units[0])
+    isolation.update(
+        lesson_unit_key=ISOLATION_LESSON_KEY,
+        position=2,
+        title="第二课时隔离验证",
+        core_learning_outcome="独立生成本课时教案, 不读取第一课时教案。",
+        material_scope="使用同一教材范围验证课时级上下文隔离。",
+    )
+    raw_evidence_refs = isolation.get("evidence_refs")
+    if not isinstance(raw_evidence_refs, list):
+        raise RuntimeError("the rescue division lesson requires material evidence")
+    evidence_refs = cast(list[object], raw_evidence_refs)
+    if any(type(value) is not str or value not in evidence_mapping for value in evidence_refs):
+        raise RuntimeError("the rescue division lesson evidence is invalid")
+    isolation["evidence_refs"] = [evidence_mapping[cast(str, value)] for value in evidence_refs]
+    units.append(isolation)
+    output["lesson_count"] = len(units)
+    return output
 
 
 def _write_acceptance_locator(
@@ -205,12 +263,16 @@ async def seed() -> None:
 
         case = json.loads(GOLDEN_CASE.read_text(encoding="utf-8"))
         outputs = build_golden_branch_source_outputs(case)
+        evidence_mapping = _extend_rescue_material_evidence(case)
+        division_output = _build_rescue_division_output(
+            outputs["lesson.division.generate"], evidence_mapping
+        )
         material_content = _build_material_content(case)
         material_pages = cast(list[object], material_content["pages"])
         prepared = await _prepare_approval(
             factory,
             case,
-            outputs["lesson.division.generate"],
+            division_output,
             actor=actor,
             material_content=material_content,
             material_scope_page_range=(1, len(material_pages)),
@@ -228,45 +290,23 @@ async def seed() -> None:
             first = session.scalar(
                 select(LessonUnit).where(
                     LessonUnit.project_id == prepared.project_id,
-                    LessonUnit.position == 1,
+                    LessonUnit.lesson_key == "LESSON-001",
                 )
             )
-            if first is None:
-                raise RuntimeError("the first rescue LessonUnit was not materialized")
-            second = LessonUnit(
-                id=new_uuid7(),
-                organization_id=actor.organization_id,
-                project_id=prepared.project_id,
-                lesson_key="LESSON-RESCUE-002",
-                position=2,
-                title="第二课时隔离验证",
-                scope_summary="用于验证两个课时分别生成教案且任务与产物不会串线。",
-                objective_summary="独立生成本课时教案, 不读取第一课时教案。",
-                estimated_minutes=40,
-                source_division_version_id=prepared.version_id,
-                status="active",
-                created_by=actor.principal_id,
-                updated_by=actor.principal_id,
+            second = session.scalar(
+                select(LessonUnit).where(
+                    LessonUnit.project_id == prepared.project_id,
+                    LessonUnit.lesson_key == ISOLATION_LESSON_KEY,
+                )
             )
-            session.add(second)
-            session.flush()
+            if first is None or second is None:
+                raise RuntimeError("the rescue LessonUnits were not materialized from the division")
             first_lesson_id = first.id
             isolation_lesson_id = second.id
             branch_enabled: dict[str, bool] = {}
             for branch_key in ("lesson_plan", "intro_options", "ppt", "video"):
                 enabled = branch_key == "lesson_plan"
                 branch_enabled[branch_key] = enabled
-                session.add(
-                    LessonBranchConfig(
-                        id=new_uuid7(),
-                        lesson_unit_id=second.id,
-                        branch_key=branch_key,
-                        enabled=enabled,
-                        settings_json={},
-                        created_by=actor.principal_id,
-                        updated_by=actor.principal_id,
-                    )
-                )
             fanout = LessonWorkflowFanoutService(
                 session,
                 actor,
