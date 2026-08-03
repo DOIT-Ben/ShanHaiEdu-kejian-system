@@ -61,6 +61,8 @@ sudo /opt/shanhaiedu-production/current/infra/prod/verify.sh --public
 
 `release.sh` 会生成缺失的随机 Secret，但不会覆盖现有 Secret；随后构建 exact SHA 镜像，并在启动 PostgreSQL、Redis 或 MinIO 前通过候选 Worker 的真实 entrypoint 构造 `Settings` 与文本 Model Gateway。该预检只验证完整运行配置和 Secret 注入，不请求 Provider；失败会在数据库或对象存储写入前停止。通过后才启动独立依赖、执行 Alembic、显式创建对象存储桶、发布黄金内容、初始化 access-code 教师、生成 PostgreSQL 与 MinIO 备份并执行独立恢复校验，最后切换 `current`。固定端口服务替换后的任一步失败都会尝试恢复上一应用版本；首次发布失败则停止新应用入口并保留既有 Nginx 站点。
 
+MinIO 备份/恢复和生产 bootstrap 命令的原始输出不得进入发布日志，因为其中可能包含对象路径或内部标识。`release.sh` 丢弃这些命令的 stdout/stderr，只保留固定的脱敏阶段错误，同时继续按原退出码失败关闭并触发既有应用回退。
+
 `configure-host.sh` 会按 `SHANHAI_NGINX_SITE_DIR` 和 `SHANHAI_LEGACY_NGINX_SITE` 备份并暂时替换既有公网 IP QA 站点。若环境明确提供 `SHANHAI_TLS_CERTIFICATE` 与 `SHANHAI_TLS_PRIVATE_KEY`，复用主机现有且由独立 timer 续期的 IP 证书；否则才在独立 venv 申请 Let's Encrypt 短期 IP 证书。任何步骤失败会自动恢复旧 Nginx 入口。现有域名站点不在修改范围。
 
 ## 验证
