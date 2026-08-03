@@ -10,6 +10,7 @@ from apps.api.assets.material_parser import (
     MaterialParserError,
     MaterialParseSource,
     ParseLimits,
+    _resolve_evidence_schema_path,
     validate_evidence_package,
 )
 
@@ -53,3 +54,30 @@ def test_fake_parser_limits_text_block_count(tmp_path: Path) -> None:
         parser.parse(tmp_path / "ignored.pdf", source(), ParseLimits(max_text_blocks=1))
 
     assert error.value.code == "PDF_TEXT_BLOCK_LIMIT_EXCEEDED"
+
+
+def test_evidence_schema_resolution_supports_non_editable_runtime(tmp_path: Path) -> None:
+    runtime_root = tmp_path / "app"
+    runtime_prefix = runtime_root / ".venv"
+    installed_module = (
+        runtime_prefix
+        / "lib"
+        / "python3.12"
+        / "site-packages"
+        / "apps"
+        / "api"
+        / "assets"
+        / "material_parser.py"
+    )
+    installed_module.parent.mkdir(parents=True)
+    installed_module.touch()
+    schema = runtime_root / "contracts" / "material-evidence-package.schema.json"
+    schema.parent.mkdir(parents=True)
+    schema.write_text("{}", encoding="utf-8")
+
+    resolved = _resolve_evidence_schema_path(
+        module_path=installed_module,
+        runtime_prefix=runtime_prefix,
+    )
+
+    assert resolved == schema

@@ -304,8 +304,15 @@ def test_api_image_normalizes_runtime_permissions_after_dependency_sync() -> Non
     dockerfile = (PROD / "Dockerfile.api").read_text(encoding="utf-8")
 
     dependency_sync = "uv sync --frozen --no-dev --no-editable"
+    isolated_schema_preflight = (
+        '/app/.venv/bin/python -I -c "from apps.api.assets.material_parser import '
+        "EVIDENCE_SCHEMA_PATH; EVIDENCE_SCHEMA_PATH.read_text(encoding='utf-8')\""
+    )
     runtime_permissions = "chmod -R a=rX /app"
+    assert isolated_schema_preflight in dockerfile
     assert runtime_permissions in dockerfile
+    assert dockerfile.index(dependency_sync) < dockerfile.index(isolated_schema_preflight)
+    assert dockerfile.index(isolated_schema_preflight) < dockerfile.index(runtime_permissions)
     assert dockerfile.index(dependency_sync) < dockerfile.index(runtime_permissions)
 
 
