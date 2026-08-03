@@ -9,8 +9,9 @@ from apps.api.uploads.storage import MinioObjectStorage
 class RecordingMinio:
     instances: ClassVar[list[RecordingMinio]] = []
 
-    def __init__(self, endpoint: str, **_: object) -> None:
+    def __init__(self, endpoint: str, *, region: str | None = None, **_: object) -> None:
         self.endpoint = endpoint
+        self.region = region
         self.instances.append(self)
 
     def bucket_exists(self, _bucket: str) -> bool:
@@ -30,6 +31,7 @@ def test_presigned_upload_uses_public_endpoint_without_routing_server_operations
     storage = MinioObjectStorage(
         endpoint="minio:9000",
         public_endpoint="203.0.113.10",
+        region="us-east-1",
         access_key="access-key",
         secret_key="secret-key",
         secure=False,
@@ -48,4 +50,5 @@ def test_presigned_upload_uses_public_endpoint_without_routing_server_operations
         "minio:9000",
         "203.0.113.10",
     ]
+    assert [client.region for client in RecordingMinio.instances] == ["us-east-1", "us-east-1"]
     assert url == ("https://203.0.113.10/shanhaiedu-production/materials/lesson.pdf")
