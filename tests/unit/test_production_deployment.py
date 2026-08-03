@@ -37,6 +37,7 @@ def test_production_release_assets_are_complete() -> None:
 
 def test_production_compose_isolated_persistent_and_loopback_only() -> None:
     compose = yaml.safe_load((PROD / "compose.yaml").read_text(encoding="utf-8"))
+    environment_example = (PROD / "env.example").read_text(encoding="utf-8")
 
     assert compose["name"] == "shanhaiedu-production"
     assert set(compose["services"]) == {
@@ -65,6 +66,10 @@ def test_production_compose_isolated_persistent_and_loopback_only() -> None:
         assert "cpus" in service
     worker_health = compose["services"]["worker"]["healthcheck"]["test"][1]
     assert "shanhai-entrypoint python -m workers.main --check" in worker_health
+    assert compose["x-app"]["environment"]["SHANHAI_OBJECT_STORAGE_REGION"] == (
+        "${SHANHAI_OBJECT_STORAGE_REGION:-us-east-1}"
+    )
+    assert "SHANHAI_OBJECT_STORAGE_REGION=us-east-1" in environment_example
 
 
 def test_secretless_web_is_the_only_non_nat_loopback_ingress_service() -> None:

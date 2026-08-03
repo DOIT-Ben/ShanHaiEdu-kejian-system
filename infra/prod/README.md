@@ -14,6 +14,7 @@
 - Compose 项目固定为 `shanhaiedu-production`；PostgreSQL、Redis、MinIO 使用独立命名卷。所有服务共享无默认路由的 `production` internal 网络；只有不挂载 Secret 的 Web/Caddy 额外挂载关闭 IP masquerade 的 `loopback` bridge，并在 internal 网络内按固定路径反代 API 与 MinIO。只有 Worker 额外挂载不发布端口、关闭容器互访的 `provider-egress` bridge，获得文本 Provider 所需的主动出网能力。该通用 NAT bridge 不提供目的地址白名单。
 - 只有 Web/Caddy `127.0.0.1:18080` 暴露给宿主机 Nginx；API、Worker、PostgreSQL、Redis 和 MinIO 不发布宿主端口。宿主 Nginx 覆盖客户端提供的 `X-Forwarded-For`，Caddy 仅按严格私网代理链保留真实客户端 IP。
 - Secret 只保存在 `shared/secrets` 的 root-owned `0600` 文件中，并通过 Compose secret 挂载。文本 Provider 密钥固定写入 `text_provider_api_key`，只挂载给 Worker；非密钥路由字段写入 `shared/production.env`。
+- 对象存储 region 由 `SHANHAI_OBJECT_STORAGE_REGION` 显式配置，默认 `us-east-1`；私网操作 client 与公网签名 client 必须使用同一值，使 API 生成 presigned URL 时不需要访问公网端点查询 bucket region。
 - API、Web、PostgreSQL、Redis 和 MinIO 禁止主动访问公网。只有 Worker 获得通用主动出网；目的地址未由网络层限制，而由 root-owned 生产配置和 Model Gateway 路由约束为受控文本 Provider。该边界仍存在 Worker 被攻陷后可访问其他可路由地址的残余风险；不得借此接入图片、视频或 TTS Provider。
 
 共享 ECS 仍有资源争用和共同故障风险。该风险由董事长在 Issue #244 明确接受，不得把本拓扑描述为物理隔离。

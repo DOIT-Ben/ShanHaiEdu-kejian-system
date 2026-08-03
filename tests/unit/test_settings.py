@@ -141,6 +141,7 @@ def test_production_accepts_separate_public_object_storage_endpoint() -> None:
         object_storage_health_url="http://minio:9000/minio/health/ready",
         object_storage_endpoint="minio:9000",
         object_storage_public_endpoint="203.0.113.10",
+        object_storage_region="us-east-1",
         object_storage_public_secure=True,
         object_storage_access_key=SecretStr("test-only-access-key"),
         object_storage_secret_key=SecretStr("test-only-secret-key"),
@@ -152,6 +153,7 @@ def test_production_accepts_separate_public_object_storage_endpoint() -> None:
 
     assert settings.object_storage_endpoint == "minio:9000"
     assert settings.object_storage_public_endpoint == "203.0.113.10"
+    assert settings.object_storage_region == "us-east-1"
     assert settings.object_storage_public_secure is True
 
 
