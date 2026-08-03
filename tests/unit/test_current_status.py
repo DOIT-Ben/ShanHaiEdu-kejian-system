@@ -55,7 +55,7 @@ def section(text: str, heading: str) -> str:
     return body.split("\n## ", maxsplit=1)[0]
 
 
-def test_live_current_status_records_remaining_public_acceptance_gate() -> None:
+def test_live_current_status_records_completed_public_acceptance_and_stage_five_gate() -> None:
     text = (ROOT / "CURRENT_STATUS.md").read_text(encoding="utf-8")
 
     completed = section(text, "已完成")
@@ -63,15 +63,17 @@ def test_live_current_status_records_remaining_public_acceptance_gate() -> None:
     blocked = section(text, "当前阻塞")
     next_exit = section(text, "下一个阶段出口")
 
-    assert "Issue #244" not in completed
-    assert "Issue #244" in current
-    assert "status:in-progress" in current
-    assert "Issue #244" in blocked
-    assert "公网" in blocked
-    assert "十二部分教案" in blocked
-    assert "Issue #244" in next_exit
-    assert "公网" in next_exit
-    assert "十二部分教案" in next_exit
+    assert "Issue #244" in completed
+    assert "PR #275" in completed
+    assert "公网真实教师流" in completed
+    assert "单Attempt成功事实" in completed
+    assert "Issue #244" not in current
+    assert "status:in-progress" not in text
+    assert "阶段5 Decision Issue" in current
+    assert "没有已获准实施的阶段5功能分支" in current
+    assert "Issue #244" not in blocked
+    assert "公网十二部分教案验收被" not in blocked
+    assert "Issue #244" not in next_exit
     assert re.search(r"`main@[0-9a-f]{40}`", text)
     assert re.search(r"入口为`https://[^`]+`", text)
     assert "共享同一ECS" in blocked
@@ -88,6 +90,14 @@ def test_live_current_status_records_remaining_public_acceptance_gate() -> None:
     ):
         assert next_slice_candidate in blocked
         assert next_slice_candidate in next_exit
+
+    for stale_claim in (
+        "仍未关闭",
+        "尚无通过证据",
+        "剩余公网十二部分教案",
+        "被生产模型路由边界阻塞",
+    ):
+        assert stale_claim not in text
 
 
 def test_current_status_accepts_controlled_stage_overlap(tmp_path: Path) -> None:
