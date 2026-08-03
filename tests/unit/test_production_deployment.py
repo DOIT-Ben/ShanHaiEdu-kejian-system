@@ -84,7 +84,52 @@ def test_secretless_web_is_the_only_non_nat_loopback_ingress_service() -> None:
     assert set(compose["services"]["minio"]["networks"]) == {"production"}
     assert set(compose["services"]["postgres"]["networks"]) == {"production"}
     assert set(compose["services"]["redis"]["networks"]) == {"production"}
-    assert set(compose["services"]["worker"]["networks"]) == {"production"}
+    assert set(compose["services"]["worker"]["networks"]) == {
+        "production",
+        "provider-egress",
+    }
+
+
+def test_text_provider_egress_and_secret_are_scoped_to_the_worker() -> None:
+    compose = yaml.safe_load((PROD / "compose.yaml").read_text(encoding="utf-8"))
+    worker = compose["services"]["worker"]
+
+    assert compose["networks"]["provider-egress"] == {
+        "driver": "bridge",
+        "internal": False,
+        "driver_opts": {
+            "com.docker.network.bridge.enable_icc": "false",
+            "com.docker.network.bridge.enable_ip_masquerade": "true",
+        },
+    }
+    assert worker["networks"]["provider-egress"]["gw_priority"] == 1
+
+    provider_environment = {
+        "SHANHAI_TEXT_PROVIDER_NAME": (
+            "${SHANHAI_TEXT_PROVIDER_NAME:?text provider name is required}"
+        ),
+        "SHANHAI_TEXT_PROVIDER_BASE_URL": (
+            "${SHANHAI_TEXT_PROVIDER_BASE_URL:?text provider base URL is required}"
+        ),
+        "SHANHAI_TEXT_PROVIDER_MODEL": (
+            "${SHANHAI_TEXT_PROVIDER_MODEL:?text provider model is required}"
+        ),
+        "SHANHAI_TEXT_PROVIDER_SECRET_ENV": "MODEL_GATEWAY_API_KEY",
+        "SHANHAI_TEXT_PROVIDER_TIMEOUT_SECONDS": ("${SHANHAI_TEXT_PROVIDER_TIMEOUT_SECONDS:-300}"),
+    }
+    for name, value in provider_environment.items():
+        assert worker["environment"][name] == value
+        assert name not in compose["x-app"]["environment"]
+
+    assert "text_provider_api_key" in worker["secrets"]
+    assert compose["secrets"]["text_provider_api_key"]["file"] == (
+        "${SHANHAI_SECRET_DIR}/text_provider_api_key"
+    )
+    for service_name, service in compose["services"].items():
+        if service_name == "worker":
+            continue
+        assert "provider-egress" not in service.get("networks", {})
+        assert "text_provider_api_key" not in service.get("secrets", [])
 
 
 def test_host_nginx_contract_preserves_https_sse_and_private_services() -> None:
@@ -182,6 +227,72 @@ def test_api_image_reads_file_secrets_then_drops_root() -> None:
     assert "gosu" in dockerfile
     assert "USER 10001:10001" not in dockerfile
     assert 'exec gosu 10001:10001 "$@"' in entrypoint
+
+
+def test_worker_entrypoint_maps_the_provider_secret_without_a_literal_value() -> None:
+    entrypoint = (PROD / "api-entrypoint.sh").read_text(encoding="utf-8")
+
+    assert "SHANHAI_TEXT_PROVIDER_SECRET_ENV" in entrypoint
+    assert "read_secret text_provider_api_key" in entrypoint
+    assert 'export "$SHANHAI_TEXT_PROVIDER_SECRET_ENV=$text_provider_api_key"' in entrypoint
+    assert "unset text_provider_api_key" in entrypoint
+    assert "invalid text provider secret environment name" in entrypoint
+
+
+def test_release_requires_a_preprovisioned_provider_secret() -> None:
+    release = (PROD / "release.sh").read_text(encoding="utf-8")
+    verify = (PROD / "verify.sh").read_text(encoding="utf-8")
+    environment_example = (PROD / "env.example").read_text(encoding="utf-8")
+
+    assert "require_existing_secret text_provider_api_key" in release
+    assert "require_text_provider_configuration" in release
+    assert "ensure_secret text_provider_api_key" not in release
+    assert release.index("require_existing_secret text_provider_api_key") < release.index(
+        "image_source="
+    )
+    assert release.index("require_existing_secret text_provider_api_key") < release.index(
+        "trap rollback_release ERR"
+    )
+    assert "text_provider_api_key" in verify
+    assert "build_real_text_gateway" in verify
+    for name in (
+        "SHANHAI_TEXT_PROVIDER_NAME",
+        "SHANHAI_TEXT_PROVIDER_BASE_URL",
+        "SHANHAI_TEXT_PROVIDER_MODEL",
+        "SHANHAI_TEXT_PROVIDER_TIMEOUT_SECONDS",
+    ):
+        assert f"{name}=" in environment_example
+    assert "MODEL_GATEWAY_API_KEY=" not in environment_example
+
+
+def test_release_preflights_the_runtime_provider_before_persistent_services() -> None:
+    release = (PROD / "release.sh").read_text(encoding="utf-8")
+
+    provider_preflight = '"${compose[@]}" run --rm --no-deps worker python -c'
+    assert provider_preflight in release
+    assert "build_real_text_gateway(Settings())" in release
+    assert release.index('image_source="$(') < release.index(provider_preflight)
+    assert release.index('"${compose[@]}" build api worker web') < release.index(provider_preflight)
+    for persistent_service_or_write in (
+        '"${compose[@]}" up -d --wait --wait-timeout 120 postgres',
+        '"${compose[@]}" up -d --wait --wait-timeout 120 redis minio',
+        "pg_dump",
+        "alembic upgrade head",
+        "bootstrap-production-storage",
+        "publish-golden-content",
+        "bootstrap-production-identity",
+    ):
+        assert release.index(provider_preflight) < release.index(persistent_service_or_write)
+
+
+def test_production_runbook_documents_worker_only_provider_access() -> None:
+    runbook = (PROD / "README.md").read_text(encoding="utf-8")
+
+    assert "只有 Worker" in runbook
+    assert "provider-egress" in runbook
+    assert "text_provider_api_key" in runbook
+    assert "目的地址未由网络层限制" in runbook
+    assert "首次发布不注入 Provider 配置" not in runbook
 
 
 def test_api_image_normalizes_runtime_permissions_after_dependency_sync() -> None:

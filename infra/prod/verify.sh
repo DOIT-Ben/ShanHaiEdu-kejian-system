@@ -43,9 +43,11 @@ wait_for_local_endpoint "http://127.0.0.1:18080/" >/dev/null
 "${compose[@]}" exec -T minio \
   curl -fsS http://127.0.0.1:9000/minio/health/ready >/dev/null
 "${compose[@]}" exec -T worker /usr/local/bin/shanhai-entrypoint python -m workers.main --check
+"${compose[@]}" exec -T worker /usr/local/bin/shanhai-entrypoint python -c \
+  'from apps.api.model_gateway.factory import build_real_text_gateway; from apps.api.settings import Settings; build_real_text_gateway(Settings())'
 
 if "${compose[@]}" logs --since 10m 2>&1 | grep -Eiq \
-  'X-Amz-(Credential|Signature)|MODEL_GATEWAY_API_KEY|SHANHAI_SESSION_ACCESS_CODE|SHANHAI_SESSION_CSRF_SECRET|postgres_password'; then
+  'X-Amz-(Credential|Signature)|MODEL_GATEWAY_API_KEY|NEWAPI_TEXT_API_KEY|text_provider_api_key|SHANHAI_SESSION_ACCESS_CODE|SHANHAI_SESSION_CSRF_SECRET|postgres_password'; then
   echo "production logs contain a forbidden secret identifier" >&2
   exit 1
 fi

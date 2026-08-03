@@ -20,4 +20,20 @@ export SHANHAI_SESSION_ACCESS_CODE="$(read_secret session_access_code)"
 export SHANHAI_SESSION_CSRF_SECRET="$(read_secret session_csrf_secret)"
 unset postgres_password minio_root_user minio_root_password
 
+if [ -n "${SHANHAI_TEXT_PROVIDER_SECRET_ENV:-}" ]; then
+  case "$SHANHAI_TEXT_PROVIDER_SECRET_ENV" in
+    [!A-Z]* | *[!A-Z0-9_]*)
+      echo "invalid text provider secret environment name" >&2
+      exit 1
+      ;;
+  esac
+  if [ "${#SHANHAI_TEXT_PROVIDER_SECRET_ENV}" -lt 3 ]; then
+    echo "invalid text provider secret environment name" >&2
+    exit 1
+  fi
+  text_provider_api_key="$(read_secret text_provider_api_key)"
+  export "$SHANHAI_TEXT_PROVIDER_SECRET_ENV=$text_provider_api_key"
+  unset text_provider_api_key
+fi
+
 exec gosu 10001:10001 "$@"
