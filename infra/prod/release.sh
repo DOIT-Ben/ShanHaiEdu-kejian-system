@@ -221,6 +221,8 @@ timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 if [[ "$image_source" == "build" ]]; then
   "${compose[@]}" build api worker web
 fi
+"${compose[@]}" run --rm --no-deps worker python -c \
+  'from apps.api.model_gateway.factory import build_real_text_gateway; from apps.api.settings import Settings; build_real_text_gateway(Settings())'
 "${compose[@]}" up -d --wait --wait-timeout 120 postgres
 pre_backup="$production_root/backups/pre-$release_sha-$timestamp.dump"
 "${compose[@]}" exec -T postgres pg_dump \

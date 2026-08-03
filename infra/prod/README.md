@@ -11,10 +11,10 @@
 本目录把生产运行与共享 ECS 上的开发环境隔离：
 
 - 根目录固定为 `/opt/shanhaiedu-production`，每个 exact Git SHA 位于 `releases/<sha>`。
-- Compose 项目固定为 `shanhaiedu-production`；PostgreSQL、Redis、MinIO 使用独立命名卷。所有服务共享无默认路由的 `production` internal 网络；只有不挂载 Secret 的 Web/Caddy 额外挂载关闭 IP masquerade 的 `loopback` bridge，并在 internal 网络内按固定路径反代 API 与 MinIO。只有 Worker 额外挂载不发布端口、关闭容器互访的 `provider-egress` bridge，作为文本 Provider 的最小主动出网边界。
+- Compose 项目固定为 `shanhaiedu-production`；PostgreSQL、Redis、MinIO 使用独立命名卷。所有服务共享无默认路由的 `production` internal 网络；只有不挂载 Secret 的 Web/Caddy 额外挂载关闭 IP masquerade 的 `loopback` bridge，并在 internal 网络内按固定路径反代 API 与 MinIO。只有 Worker 额外挂载不发布端口、关闭容器互访的 `provider-egress` bridge，获得文本 Provider 所需的主动出网能力。该通用 NAT bridge 不提供目的地址白名单。
 - 只有 Web/Caddy `127.0.0.1:18080` 暴露给宿主机 Nginx；API、Worker、PostgreSQL、Redis 和 MinIO 不发布宿主端口。宿主 Nginx 覆盖客户端提供的 `X-Forwarded-For`，Caddy 仅按严格私网代理链保留真实客户端 IP。
 - Secret 只保存在 `shared/secrets` 的 root-owned `0600` 文件中，并通过 Compose secret 挂载。文本 Provider 密钥固定写入 `text_provider_api_key`，只挂载给 Worker；非密钥路由字段写入 `shared/production.env`。
-- API、Web、PostgreSQL、Redis 和 MinIO 禁止主动访问公网。Worker 只通过 `provider-egress` 调用受控文本 Provider；不得借此接入图片、视频或 TTS Provider。
+- API、Web、PostgreSQL、Redis 和 MinIO 禁止主动访问公网。只有 Worker 获得通用主动出网；目的地址未由网络层限制，而由 root-owned 生产配置和 Model Gateway 路由约束为受控文本 Provider。该边界仍存在 Worker 被攻陷后可访问其他可路由地址的残余风险；不得借此接入图片、视频或 TTS Provider。
 
 共享 ECS 仍有资源争用和共同故障风险。该风险由董事长在 Issue #244 明确接受，不得把本拓扑描述为物理隔离。
 
@@ -58,7 +58,7 @@ sudo /opt/shanhaiedu-production/releases/<sha>/infra/prod/configure-host.sh
 sudo /opt/shanhaiedu-production/current/infra/prod/verify.sh --public
 ```
 
-`release.sh` 会生成缺失的随机 Secret，但不会覆盖现有 Secret；随后构建 exact SHA 镜像、启动独立依赖、执行 Alembic、显式创建对象存储桶、发布黄金内容、初始化 access-code 教师、生成 PostgreSQL 与 MinIO 备份并执行独立恢复校验，最后才切换 `current`。固定端口服务替换后的任一步失败都会尝试恢复上一应用版本；首次发布失败则停止新应用入口并保留既有 Nginx 站点。
+`release.sh` 会生成缺失的随机 Secret，但不会覆盖现有 Secret；随后构建 exact SHA 镜像，并在启动 PostgreSQL、Redis 或 MinIO 前通过候选 Worker 的真实 entrypoint 构造 `Settings` 与文本 Model Gateway。该预检只验证完整运行配置和 Secret 注入，不请求 Provider；失败会在数据库或对象存储写入前停止。通过后才启动独立依赖、执行 Alembic、显式创建对象存储桶、发布黄金内容、初始化 access-code 教师、生成 PostgreSQL 与 MinIO 备份并执行独立恢复校验，最后切换 `current`。固定端口服务替换后的任一步失败都会尝试恢复上一应用版本；首次发布失败则停止新应用入口并保留既有 Nginx 站点。
 
 `configure-host.sh` 会按 `SHANHAI_NGINX_SITE_DIR` 和 `SHANHAI_LEGACY_NGINX_SITE` 备份并暂时替换既有公网 IP QA 站点。若环境明确提供 `SHANHAI_TLS_CERTIFICATE` 与 `SHANHAI_TLS_PRIVATE_KEY`，复用主机现有且由独立 timer 续期的 IP 证书；否则才在独立 venv 申请 Let's Encrypt 短期 IP 证书。任何步骤失败会自动恢复旧 Nginx 入口。现有域名站点不在修改范围。
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -117,7 +118,15 @@ def _create_release_fake_bin(tmp_path: Path) -> tuple[Path, Path, Path]:
     python_count = tmp_path / "python-count"
     _write_executable(
         fake_bin / "docker",
-        '#!/bin/sh\nprintf "docker %s\\n" "$*" >> "$SHANHAI_TEST_COMMAND_LOG"\n',
+        "#!/bin/sh\n"
+        'printf "docker %s\\n" "$*" >> "$SHANHAI_TEST_COMMAND_LOG"\n'
+        'case "$*" in\n'
+        '  *"run --rm --no-deps worker python -c"*"build_real_text_gateway"*)\n'
+        '    if [ "${SHANHAI_TEST_FAIL_PROVIDER_PREFLIGHT:-0}" = "1" ]; then\n'
+        "      exit 86\n"
+        "    fi\n"
+        "    ;;\n"
+        "esac\n",
     )
     _write_executable(
         fake_bin / "nginx",
@@ -131,7 +140,7 @@ def _create_release_fake_bin(tmp_path: Path) -> tuple[Path, Path, Path]:
         'count="$((count + 1))"\n'
         'printf "%s\\n" "$count" > "$SHANHAI_TEST_PYTHON_COUNT"\n'
         'if [ "$count" -eq 3 ]; then exit 77; fi\n'
-        'exec /usr/bin/python3 "$@"\n',
+        f'exec {shlex.quote(sys.executable)} "$@"\n',
     )
     return fake_bin, command_log, python_count
 
@@ -147,6 +156,11 @@ def _prepare_release_failure_environment(
     environment = shared / "production.env"
     environment.write_text(f"SHANHAI_RELEASE_SHA={CURRENT_SHA}\n", encoding="utf-8")
     environment.chmod(0o600)
+    secrets = shared / "secrets"
+    secrets.mkdir(mode=0o700)
+    provider_secret = secrets / "text_provider_api_key"
+    provider_secret.write_text("fixture-provider-value\n", encoding="utf-8")
+    provider_secret.chmod(0o600)
 
     current_source = releases / CURRENT_SHA
     previous_source = releases / PREVIOUS_SHA
@@ -177,6 +191,10 @@ def _prepare_release_failure_environment(
         "SHANHAI_PRODUCTION_ROOT": str(production_root),
         "SHANHAI_TEST_COMMAND_LOG": str(command_log),
         "SHANHAI_TEST_PYTHON_COUNT": str(python_count),
+        "SHANHAI_TEXT_PROVIDER_NAME": "fixture-provider",
+        "SHANHAI_TEXT_PROVIDER_BASE_URL": "https://provider.example.invalid/v1",
+        "SHANHAI_TEXT_PROVIDER_MODEL": "fixture-model",
+        "SHANHAI_TEXT_PROVIDER_TIMEOUT_SECONDS": "300",
     }
     return production_root, environment, command_log, release_sha, release_source, env
 
@@ -331,6 +349,45 @@ def test_release_failure_restores_original_previous_link_environment_and_applica
     assert environment.read_text(encoding="utf-8") == f"SHANHAI_RELEASE_SHA={CURRENT_SHA}\n"
     commands = command_log.read_text(encoding="utf-8")
     assert f"-f {production_root}/releases/{CURRENT_SHA}/infra/prod/compose.yaml" in commands
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32" or getattr(os, "geteuid", lambda: 1)() != 0,
+    reason="production release behavior requires a root Linux runtime",
+)
+def test_release_provider_preflight_fails_before_persistent_services(tmp_path: Path) -> None:
+    production_root, environment, command_log, release_sha, release_source, env = (
+        _prepare_release_failure_environment(tmp_path)
+    )
+    env["SHANHAI_TEST_FAIL_PROVIDER_PREFLIGHT"] = "1"
+
+    result = subprocess.run(
+        ["bash", str(release_source / "infra" / "prod" / "release.sh"), release_sha],
+        check=False,
+        capture_output=True,
+        env=env,
+        text=True,
+    )
+
+    assert result.returncode == 86
+    assert _resolve_link(production_root / "current").name == CURRENT_SHA
+    assert _resolve_link(production_root / "previous-release").name == PREVIOUS_SHA
+    assert environment.read_text(encoding="utf-8").startswith(
+        f"SHANHAI_RELEASE_SHA={CURRENT_SHA}\n"
+    )
+    commands = command_log.read_text(encoding="utf-8")
+    assert "run --rm --no-deps worker python -c" in commands
+    assert "build_real_text_gateway" in commands
+    for forbidden in (
+        "up -d --wait --wait-timeout 120 postgres",
+        "up -d --wait --wait-timeout 120 redis minio",
+        "pg_dump",
+        "alembic upgrade head",
+        "bootstrap-production-storage",
+        "publish-golden-content",
+        "bootstrap-production-identity",
+    ):
+        assert forbidden not in commands
 
 
 @pytest.mark.skipif(

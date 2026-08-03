@@ -265,12 +265,33 @@ def test_release_requires_a_preprovisioned_provider_secret() -> None:
     assert "MODEL_GATEWAY_API_KEY=" not in environment_example
 
 
+def test_release_preflights_the_runtime_provider_before_persistent_services() -> None:
+    release = (PROD / "release.sh").read_text(encoding="utf-8")
+
+    provider_preflight = '"${compose[@]}" run --rm --no-deps worker python -c'
+    assert provider_preflight in release
+    assert "build_real_text_gateway(Settings())" in release
+    assert release.index('image_source="$(') < release.index(provider_preflight)
+    assert release.index('"${compose[@]}" build api worker web') < release.index(provider_preflight)
+    for persistent_service_or_write in (
+        '"${compose[@]}" up -d --wait --wait-timeout 120 postgres',
+        '"${compose[@]}" up -d --wait --wait-timeout 120 redis minio',
+        "pg_dump",
+        "alembic upgrade head",
+        "bootstrap-production-storage",
+        "publish-golden-content",
+        "bootstrap-production-identity",
+    ):
+        assert release.index(provider_preflight) < release.index(persistent_service_or_write)
+
+
 def test_production_runbook_documents_worker_only_provider_access() -> None:
     runbook = (PROD / "README.md").read_text(encoding="utf-8")
 
     assert "只有 Worker" in runbook
     assert "provider-egress" in runbook
     assert "text_provider_api_key" in runbook
+    assert "目的地址未由网络层限制" in runbook
     assert "首次发布不注入 Provider 配置" not in runbook
 
 
