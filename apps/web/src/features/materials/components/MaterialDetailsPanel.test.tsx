@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { FileAssetDto, MaterialParseVersionDto } from "@/features/materials/api/materialsApi";
 import { MaterialDetailsPanel } from "@/features/materials/components/MaterialDetailsPanel";
@@ -42,5 +42,65 @@ describe("MaterialDetailsPanel", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("本次解析没有完成");
     expect(screen.queryByText("PDF_TEXT_EMPTY")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "刷新教材状态" })).toBeEnabled();
+  });
+
+  it("只为 exact 当前文件的最新失败解析显示重新解析", () => {
+    const onRetry = vi.fn();
+    const asset = {
+      current_version: {
+        byte_size: 4096,
+        id: "01960000-0000-7000-8000-000000000301",
+        page_count: null,
+        scan_status: "clean",
+        sha256: "a".repeat(64),
+      },
+      status: "active",
+    } as FileAssetDto;
+    const failed = {
+      error_code: "PDF_DAMAGED",
+      file_asset_version_id: asset.current_version.id,
+      id: "01960000-0000-7000-8000-000000000302",
+      status: "failed",
+      version_no: 2,
+    } as MaterialParseVersionDto;
+    const succeeded = {
+      file_asset_version_id: asset.current_version.id,
+      id: "01960000-0000-7000-8000-000000000303",
+      status: "succeeded",
+      version_no: 1,
+    } as MaterialParseVersionDto;
+    const { rerender } = render(
+      <MaterialDetailsPanel
+        asset={asset}
+        onRefresh={vi.fn()}
+        onRetry={onRetry}
+        parseVersions={[failed, succeeded]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "重新解析" }));
+    expect(onRetry).toHaveBeenCalledOnce();
+
+    rerender(
+      <MaterialDetailsPanel
+        asset={asset}
+        onRefresh={vi.fn()}
+        onRetry={onRetry}
+        parseVersions={[succeeded, failed]}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "重新解析" })).not.toBeInTheDocument();
+
+    rerender(
+      <MaterialDetailsPanel
+        asset={asset}
+        onRefresh={vi.fn()}
+        onRetry={onRetry}
+        parseVersions={[
+          { ...failed, file_asset_version_id: "01960000-0000-7000-8000-000000000399" },
+        ]}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "重新解析" })).not.toBeInTheDocument();
   });
 });

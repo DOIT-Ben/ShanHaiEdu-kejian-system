@@ -1,11 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, BookOpen } from "lucide-react";
+import { useRef } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   getSourceMaterialFileAsset,
   listMaterialParsePages,
   listMaterialParseVersions,
   listProjectTextbookMaterials,
+  retryMaterialParse,
 } from "@/features/materials/api/materialsApi";
 import { MaterialDetailsPanel } from "@/features/materials/components/MaterialDetailsPanel";
 import { MaterialScopePanel } from "@/features/materials/components/MaterialScopePanel";
@@ -14,6 +16,7 @@ import { useMaterialScopeRuntime } from "@/features/materials/hooks/useMaterialS
 import { materialScopeVersionMatches } from "@/features/materials/lib/materialScopeIdentity";
 import { LessonDivisionWorkflowPanel } from "@/features/lessons/components/LessonDivisionWorkflowPanel";
 import { runtimeErrorMessage } from "@/shared/api/runtimeError";
+import { isCsrfTokenAvailable } from "@/shared/api/client";
 import { useProjectEvents } from "@/shared/api/useProjectEvents";
 import { buttonVariants } from "@/shared/ui/Button";
 import { FocusPageHeader } from "@/shared/ui/FocusPageHeader";
@@ -55,6 +58,27 @@ export function RuntimeMaterialsPage() {
       };
     },
     queryKey: ["projects", projectId, "materials", materialId],
+  });
+  const retryIntentRef = useRef<string | null>(null);
+  const retryMutation = useMutation({
+    mutationFn: () => {
+      const fileAssetVersionId = materialQuery.data?.asset?.current_version.id;
+      if (!materialId || !projectId || !fileAssetVersionId) {
+        throw new Error("MATERIAL_PARSE_RETRY_INPUT_MISSING");
+      }
+      retryIntentRef.current ??= crypto.randomUUID();
+      return retryMaterialParse({
+        fileAssetVersionId,
+        idempotencyKey: retryIntentRef.current,
+        materialId,
+        projectId,
+      });
+    },
+    onSuccess: (job) => {
+      retryIntentRef.current = null;
+      const params = new URLSearchParams({ jobId: job.job_id, materialId: materialId ?? "" });
+      void navigate(`/app/projects/${projectId ?? ""}/setup?${params.toString()}`);
+    },
   });
   const selectedParseVersion = materialQuery.data?.parseVersions.find(
     (version) => version.status === "succeeded",
@@ -113,13 +137,21 @@ export function RuntimeMaterialsPage() {
             <MaterialDetailsPanel
               asset={materialQuery.data?.asset}
               errorMessage={
-                materialQuery.isError
-                  ? runtimeErrorMessage(materialQuery.error, "教材状态暂时无法读取，请稍后重试。")
-                  : materialQuery.data?.partialError
+                retryMutation.isError
+                  ? runtimeErrorMessage(
+                      retryMutation.error,
+                      "教材没有开始重新解析，请检查网络后重试。",
+                    )
+                  : materialQuery.isError
+                    ? runtimeErrorMessage(materialQuery.error, "教材状态暂时无法读取，请稍后重试。")
+                    : materialQuery.data?.partialError
               }
               loading={materialQuery.isFetching}
               onRefresh={() => void materialQuery.refetch()}
+              onRetry={() => retryMutation.mutate()}
               parseVersions={materialQuery.data?.parseVersions ?? []}
+              retryDisabled={!isCsrfTokenAvailable()}
+              retrying={retryMutation.isPending}
             />
 
             {selectedParseVersion ? (

@@ -10,6 +10,7 @@ export type SourceMaterialDto = components["schemas"]["SourceMaterial"];
 export type CreateUploadSessionRequest = components["schemas"]["CreateUploadSessionRequest"];
 export type CreateMaterialScopeVersionRequest =
   components["schemas"]["CreateMaterialScopeVersionRequest"];
+export type RetryMaterialParseRequest = components["schemas"]["RetryMaterialParseRequest"];
 
 export async function listProjectTextbookMaterials(
   projectId: string,
@@ -139,6 +140,29 @@ export async function listMaterialParseVersions({
     }),
   );
   return response.data.items;
+}
+
+export async function retryMaterialParse({
+  fileAssetVersionId,
+  idempotencyKey,
+  materialId,
+  projectId,
+}: {
+  fileAssetVersionId: string;
+  idempotencyKey: string;
+  materialId: string;
+  projectId: string;
+}): Promise<AcceptedJobDto> {
+  const response = unwrapApiResult(
+    await apiClient.POST("/projects/{project_id}/materials/{material_id}/parse-versions", {
+      body: { file_asset_version_id: fileAssetVersionId },
+      params: {
+        header: { "Idempotency-Key": idempotencyKey },
+        path: { material_id: materialId, project_id: projectId },
+      },
+    }),
+  );
+  return response.data;
 }
 
 export async function listMaterialParsePages({

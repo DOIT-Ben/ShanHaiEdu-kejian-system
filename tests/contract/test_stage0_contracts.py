@@ -146,6 +146,7 @@ def test_stage0_operations_preserve_idempotency_and_replay_headers() -> None:
         "createProject",
         "createMaterialUploadSession",
         "confirmMaterialUpload",
+        "retryMaterialParse",
         "cancelGenerationJob",
         "updateProjectLessons",
         "updateLessonBranches",
@@ -169,6 +170,29 @@ def test_stage0_operations_preserve_idempotency_and_replay_headers() -> None:
             resolve_local(openapi, item) for item in operations[operation_id]["parameters"]
         ]
         assert any(parameter.get("name") == "If-Match" for parameter in parameters)
+
+
+def test_retry_material_parse_contract_binds_the_exact_file_version() -> None:
+    openapi = load_openapi()
+    operation = operations_by_id(openapi)["retryMaterialParse"]
+    parameters = [resolve_local(openapi, item) for item in operation["parameters"]]
+    request_schema = resolve_local(
+        openapi,
+        operation["requestBody"]["content"]["application/json"]["schema"],
+    )
+
+    assert operation["responses"]["202"] == {"$ref": "#/components/responses/AcceptedJob"}
+    assert {parameter["name"] for parameter in parameters} >= {
+        "project_id",
+        "material_id",
+        "Idempotency-Key",
+        "X-CSRF-Token",
+    }
+    assert request_schema["additionalProperties"] is False
+    assert request_schema["required"] == ["file_asset_version_id"]
+    assert request_schema["properties"] == {
+        "file_asset_version_id": {"type": "string", "format": "uuid"}
+    }
 
 
 def test_project_asset_contract_exposes_only_stable_non_storage_fields() -> None:

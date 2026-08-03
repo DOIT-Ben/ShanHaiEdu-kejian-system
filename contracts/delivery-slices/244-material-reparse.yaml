@@ -1,0 +1,30 @@
+schema_version: 1
+issue: 244
+rows:
+  - page_route: /app/projects/{project_id}/materials/{material_id}
+    navigation_path: /app/projects/material-reparse/materials/textbook
+    api_requests:
+      - operation_id: getSourceMaterialFileAsset
+        method: GET
+        path: /api/v2/projects/{project_id}/materials/{material_id}/file-asset
+      - operation_id: listMaterialParseVersions
+        method: GET
+        path: /api/v2/projects/{project_id}/materials/{material_id}/parse-versions
+      - operation_id: retryMaterialParse
+        method: POST
+        path: /api/v2/projects/{project_id}/materials/{material_id}/parse-versions
+      - operation_id: getGenerationJob
+        method: GET
+        path: /api/v2/generation-jobs/{job_id}
+    formal_facts:
+      - Session
+      - Project
+      - SourceMaterial
+      - FileAssetVersion
+      - MaterialParseVersion
+      - GenerationJob
+    backend_tests:
+      - tests/integration/test_material_reparse_api.py::test_retry_failed_parse_creates_one_exact_job_and_preserves_history
+      - tests/integration/test_material_parse_worker.py::test_worker_uses_the_file_version_frozen_by_the_parse_job
+    real_api_playwright:
+      - apps/web/e2e/real-api/material-reparse.spec.ts::teacher_reparses_the_exact_failed_material_with_real_api

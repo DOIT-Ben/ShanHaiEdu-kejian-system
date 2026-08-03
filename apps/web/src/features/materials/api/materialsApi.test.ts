@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   confirmMaterialUpload,
   createMaterialUploadSession,
+  retryMaterialParse,
   sha256File,
   uploadMaterialFile,
 } from "./materialsApi";
@@ -85,6 +86,40 @@ describe("materialsApi", () => {
     await expect(confirmRequest.json()).resolves.toMatchObject({
       etag: '"etag-1"',
       upload_session_id: "upload-1",
+    });
+  });
+
+  it("使用 exact 当前文件版本启动重新解析", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(
+        {
+          data: {
+            events_url: "/api/v2/generation-jobs/job-retry/events/stream",
+            job_id: "job-retry",
+            status: "queued",
+          },
+          request_id: "request-retry",
+        },
+        { status: 202 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      retryMaterialParse({
+        fileAssetVersionId: "file-version-1",
+        idempotencyKey: "retry-material-key",
+        materialId: "material-1",
+        projectId: "project-1",
+      }),
+    ).resolves.toMatchObject({ job_id: "job-retry", status: "queued" });
+
+    const request = fetchMock.mock.calls[0]?.[0] as Request;
+    expect(request.method).toBe("POST");
+    expect(request.url).toContain("/projects/project-1/materials/material-1/parse-versions");
+    expect(request.headers.get("Idempotency-Key")).toBe("retry-material-key");
+    await expect(request.json()).resolves.toEqual({
+      file_asset_version_id: "file-version-1",
     });
   });
 });

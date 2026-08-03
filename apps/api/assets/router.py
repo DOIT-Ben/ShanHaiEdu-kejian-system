@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Header, Request, Response, status
 from sqlalchemy.orm import Session
 
 from apps.api.assets.models import FileAssetVersion, MaterialParseVersion
 from apps.api.assets.parse_page_facts import read_material_parse_pages
+from apps.api.assets.reparse_service import MaterialReparseService
 from apps.api.assets.repository import FileAssetRepository, MaterialFileRecord
 from apps.api.assets.schemas import (
     FileAssetEnvelope,
@@ -20,14 +21,21 @@ from apps.api.assets.schemas import (
     MaterialParseVersionListData,
     MaterialParseVersionListEnvelope,
     MaterialParseVersionRead,
+    RetryMaterialParseRequest,
 )
 from apps.api.dependencies import get_session
 from apps.api.errors import ApiError
 from apps.api.identity.context import ActorContext, ProjectAction
 from apps.api.identity.dependencies import get_actor_context
 from apps.api.identity.permissions import ProjectAccessService
+from apps.api.jobs.schemas import AcceptedJobEnvelope
+from apps.api.settings import Settings
 
 router = APIRouter(tags=["assets"])
+IdempotencyHeader = Annotated[
+    str,
+    Header(alias="Idempotency-Key", min_length=8, max_length=128),
+]
 
 
 @router.get(
@@ -52,6 +60,39 @@ def get_source_material_file_asset(
         data=serialize_file_asset(record),
         request_id=request.state.request_id,
     )
+
+
+@router.post(
+    "/api/v2/projects/{project_id}/materials/{material_id}/parse-versions",
+    response_model=AcceptedJobEnvelope,
+    status_code=status.HTTP_202_ACCEPTED,
+    operation_id="retryMaterialParse",
+)
+def retry_material_parse(
+    project_id: UUID,
+    material_id: UUID,
+    payload: RetryMaterialParseRequest,
+    request: Request,
+    idempotency_key: IdempotencyHeader,
+    actor: Annotated[ActorContext, Depends(get_actor_context)],
+    session: Annotated[Session, Depends(get_session)],
+) -> AcceptedJobEnvelope:
+    with session.begin():
+        accepted = MaterialReparseService(
+            session,
+            actor,
+            idempotency_ttl_seconds=cast(
+                Settings,
+                request.app.state.settings,
+            ).idempotency_ttl_seconds,
+        ).retry(
+            project_id,
+            material_id,
+            payload,
+            idempotency_key=idempotency_key,
+            request_id=request.state.request_id,
+        )
+    return AcceptedJobEnvelope(data=accepted, request_id=request.state.request_id)
 
 
 @router.get(

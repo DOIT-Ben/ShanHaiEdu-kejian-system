@@ -8,7 +8,10 @@ type MaterialDetailsPanelProps = {
   errorMessage?: string;
   loading?: boolean;
   onRefresh: () => void;
+  onRetry?: () => void;
   parseVersions: readonly MaterialParseVersionDto[];
+  retryDisabled?: boolean;
+  retrying?: boolean;
 };
 
 function formatBytes(bytes: number) {
@@ -40,9 +43,17 @@ export function MaterialDetailsPanel({
   errorMessage,
   loading = false,
   onRefresh,
+  onRetry,
   parseVersions,
+  retryDisabled = false,
+  retrying = false,
 }: MaterialDetailsPanelProps) {
   const firstLoad = loading && !asset && parseVersions.length === 0;
+  const latestParse = parseVersions[0];
+  const canRetry =
+    Boolean(onRetry) &&
+    latestParse?.status === "failed" &&
+    latestParse.file_asset_version_id === asset?.current_version.id;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -146,18 +157,35 @@ export function MaterialDetailsPanel({
                     <StatusBadge status={parseStatus(version.status)} />
                   </div>
                   <p className="mt-2 text-sm text-[var(--sh-ink-muted)]">
-                    {version.page_count === null
+                    {version.page_count == null
                       ? "页数尚未确认"
                       : `${String(version.page_count)} 页`}
                   </p>
                   {version.error_code ? (
-                    <p
-                      className="mt-3 flex items-center gap-2 text-sm text-[var(--sh-danger)]"
-                      role="alert"
-                    >
-                      <AlertTriangle aria-hidden="true" className="size-4" />
-                      本次解析没有完成，请稍后重试或重新上传教材。
-                    </p>
+                    <>
+                      <p
+                        className="mt-3 flex items-center gap-2 text-sm text-[var(--sh-danger)]"
+                        role="alert"
+                      >
+                        <AlertTriangle aria-hidden="true" className="size-4" />
+                        本次解析没有完成。
+                      </p>
+                      {canRetry && version.id === latestParse.id ? (
+                        <Button
+                          className="mt-3"
+                          disabled={retryDisabled || retrying}
+                          onClick={onRetry}
+                          size="sm"
+                          variant="secondary"
+                        >
+                          <RefreshCw
+                            aria-hidden="true"
+                            className={retrying ? "animate-spin" : ""}
+                          />
+                          {retrying ? "正在重新解析" : "重新解析"}
+                        </Button>
+                      ) : null}
+                    </>
                   ) : null}
                 </article>
               ))

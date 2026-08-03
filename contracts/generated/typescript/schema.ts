@@ -444,7 +444,8 @@ export interface paths {
         /** 查询教材解析版本摘要 */
         get: operations["listMaterialParseVersions"];
         put?: never;
-        post?: never;
+        /** 对当前教材文件的最新失败解析创建新任务 */
+        post: operations["retryMaterialParse"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1334,6 +1335,10 @@ export interface components {
             etag: string;
             size_bytes: number;
             sha256: string;
+        };
+        RetryMaterialParseRequest: {
+            /** Format: uuid */
+            file_asset_version_id: string;
         };
         FileAssetVersion: {
             /** Format: uuid */
@@ -3127,6 +3132,29 @@ export interface operations {
                     "application/json": components["schemas"]["MaterialParseVersionListEnvelope"];
                 };
             };
+            "4XX": components["responses"]["Error"];
+        };
+    };
+    retryMaterialParse: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
+            path: {
+                project_id: components["parameters"]["ProjectId"];
+                material_id: components["parameters"]["MaterialId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetryMaterialParseRequest"];
+            };
+        };
+        responses: {
+            202: components["responses"]["AcceptedJob"];
             "4XX": components["responses"]["Error"];
         };
     };
